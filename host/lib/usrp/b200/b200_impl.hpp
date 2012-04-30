@@ -27,6 +27,7 @@
 #include "tx_dsp_core_200.hpp"
 #include "time64_core_200.hpp"
 #include "user_settings_core_200.hpp"
+#include "recv_packet_demuxer.hpp"
 #include <uhd/device.hpp>
 #include <uhd/property_tree.hpp>
 #include <uhd/utils/pimpl.hpp>
@@ -48,6 +49,7 @@ static const double          B200_LINK_RATE_BPS = 256e6/5; //pratical link rate 
 static const boost::uint32_t B200_ASYNC_SID_BASE = 10;
 static const boost::uint32_t B200_CTRL_MSG_SID = 20;
 static const boost::uint32_t B200_RX_SID_BASE = 30;
+static const boost::uint32_t B200_TX_SID_BASE = 40;
 static const size_t          B200_NUM_RX_FE = 2;
 static const size_t          B200_NUM_TX_FE = 2;
 
@@ -78,7 +80,9 @@ private:
     user_settings_core_200::sptr _user;
 
     //transports
-    uhd::transport::zero_copy_if::sptr _data_transport, _ctrl_transport;
+    uhd::transport::zero_copy_if::sptr _data_transport;
+    uhd::transport::zero_copy_if::sptr _ctrl_transport;
+    uhd::usrp::recv_packet_demuxer::sptr _rx_demux;
 
     //device properties interface
     uhd::property_tree::sptr get_tree(void) const{
@@ -97,6 +101,7 @@ private:
     void update_rx_samp_rate(const size_t, const double rate);
     void update_tx_samp_rate(const size_t, const double rate);
     void update_clock_source(const std::string &);
+    void update_tick_rate(const double rate);
 };
 
 #endif /* INCLUDED_B200_IMPL_HPP */

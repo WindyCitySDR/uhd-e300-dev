@@ -211,6 +211,8 @@ b200_impl::b200_impl(const device_addr_t &device_addr)
     );
     while (_data_transport->get_recv_buff(0.0)){} //flush data xport
 
+    _rx_demux = recv_packet_demuxer::make(_data_transport, _rx_dsps.size(), B200_RX_SID_BASE);
+
     ////////////////////////////////////////////////////////////////////
     // Initialize control (settings regs and async messages)
     ////////////////////////////////////////////////////////////////////
@@ -246,16 +248,7 @@ b200_impl::b200_impl(const device_addr_t &device_addr)
         const std::string y = std::string(1, fe_name[3]);
         const fs_path codec_path = mb_path / (x+"x_codecs") / y;
         _tree->create<std::string>(codec_path / "name").set("B200 " + fe_name + " CODEC");
-
-        BOOST_FOREACH(const std::string &name, _codec_ctrl->get_gain_names(fe_name))
-        {
-            _tree->create<meta_range_t>(codec_path / "gains" / name / "range")
-                .set(_codec_ctrl->get_gain_range(fe_name, name));
-
-            _tree->create<double>(codec_path / "gains" / name / "value")
-                .coerce(boost::bind(&b200_codec_ctrl::set_gain, _codec_ctrl, fe_name, name, _1))
-                .set(0.0);
-        }
+        _tree->create<int>(codec_path / "gains"); //empty cuz gains are in frontend
     }
 
     ////////////////////////////////////////////////////////////////////
@@ -264,7 +257,7 @@ b200_impl::b200_impl(const device_addr_t &device_addr)
     //^^^ clock created up top, just reg props here... ^^^
     _tree->create<double>(mb_path / "tick_rate")
         .coerce(boost::bind(&b200_codec_ctrl::set_clock_rate, _codec_ctrl, _1))
-        .set(40e6);
+        .subscribe(boost::bind(&b200_impl::update_tick_rate, this, _1));
 
     ////////////////////////////////////////////////////////////////////
     // and do the misc mboard sensors
@@ -412,7 +405,15 @@ b200_impl::b200_impl(const device_addr_t &device_addr)
 
         _tree->create<std::string>(rf_fe_path / "name").set(fe_name);
         _tree->create<int>(rf_fe_path / "sensors"); //empty TODO
-        _tree->create<int>(rf_fe_path / "gains"); //empty TODO
+        BOOST_FOREACH(const std::string &name, _codec_ctrl->get_gain_names(fe_name))
+        {
+            _tree->create<meta_range_t>(rf_fe_path / "gains" / name / "range")
+                    .set(_codec_ctrl->get_gain_range(fe_name, name));
+
+            _tree->create<double>(rf_fe_path / "gains" / name / "value")
+                .coerce(boost::bind(&b200_codec_ctrl::set_gain, _codec_ctrl, fe_name, name, _1))
+                .set(0.0);
+        }
         _tree->create<std::string>(rf_fe_path / "connections").set("IQ");
         _tree->create<bool>(rf_fe_path / "enabled").set(true);
         _tree->create<bool>(rf_fe_path / "use_lo_offset").set(false);
@@ -430,6 +431,14 @@ b200_impl::b200_impl(const device_addr_t &device_addr)
     ////////////////////////////////////////////////////////////////////
     // do some post-init tasks
     ////////////////////////////////////////////////////////////////////
+    //allocate streamer weak ptrs containers
+    _rx_streamers.resize(_rx_dsps.size());
+    _tx_streamers.resize(_tx_dsps.size());
+
+    _tree->access<double>(mb_path / "tick_rate") //now subscribe the clock rate setter
+        .subscribe(boost::bind(&b200_ctrl::set_tick_rate, _ctrl, _1))
+        .set(40e6);
+
     this->update_rates();
 
     //reset cordic rates and their properties to zero
