@@ -95,11 +95,11 @@ public:
             res.msg[1] = uhd::wtohx(pkt[packet_info.num_header_words32+1]);
             _ctrl_fifo.push_with_haste(res);
         }
-        else if (packet_info.has_sid and packet_info.sid == B200_ASYNC_MSG_SID0){
+        else if (packet_info.has_sid and packet_info.sid == B200_ASYNC_SID_BASE+0){
             async_metadata_t metadata;
             load_metadata_from_buff(uhd::wtohx<boost::uint32_t>, metadata, packet_info, pkt, _tick_rate, 0);
         }
-        else if (packet_info.has_sid and packet_info.sid == B200_ASYNC_MSG_SID1){
+        else if (packet_info.has_sid and packet_info.sid == B200_ASYNC_SID_BASE+1){
             async_metadata_t metadata;
             load_metadata_from_buff(uhd::wtohx<boost::uint32_t>, metadata, packet_info, pkt, _tick_rate, 1);
         }

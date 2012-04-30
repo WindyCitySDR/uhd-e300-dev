@@ -22,4 +22,22 @@
 #define SETTING_REGS_BASE 0 //TODO
 #define SR_SPI_CORE 0 //TODO
 
+#define SR_RX_FRONTEND(which) 0 //TODO
+#define SR_TX_FRONTEND(which) 0 //TODO
+
+#define SR_RX_DSP(which) 0 //TODO
+#define SR_TX_DSP(which) 0 //TODO
+
+#define SR_RX_CTRL(which) 0 //TODO
+#define SR_TX_CTRL(which) 0 //TODO
+
+#define SR_TIME_CORE 0 //TODO
+
+#define SR_USER_CORE 0 //TODO
+
+#define REG_RB_TIME_NOW_HI 0 //TODO
+#define REG_RB_TIME_NOW_LO 0 //TODO
+#define REG_RB_TIME_PPS_HI 0 //TODO
+#define REG_RB_TIME_PPS_LO 0 //TODO
+
 #endif /* INCLUDED_B200_REGS_HPP */

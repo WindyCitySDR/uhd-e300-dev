@@ -20,6 +20,32 @@
 using namespace uhd;
 using namespace uhd::usrp;
 
+void b200_impl::update_rates(void)
+{
+    //TODO
+}
+
+void b200_impl::update_rx_subdev_spec(const uhd::usrp::subdev_spec_t &)
+{
+    //TODO
+}
+
+void b200_impl::update_tx_subdev_spec(const uhd::usrp::subdev_spec_t &)
+{
+    //TODO
+}
+
+
+void b200_impl::update_rx_samp_rate(const size_t, const double rate)
+{
+    //TODO
+}
+
+void b200_impl::update_tx_samp_rate(const size_t, const double rate)
+{
+    //TODO
+}
+
 /***********************************************************************
  * Async Data
  **********************************************************************/

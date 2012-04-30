@@ -15,7 +15,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 //
 
-#include "b200_iface.hpp"
+#include "b200_codec_ctrl.hpp"
 
 using namespace uhd;
 using namespace uhd::transport;
@@ -23,53 +23,49 @@ using namespace uhd::transport;
 /***********************************************************************
  * The implementation class
  **********************************************************************/
-class b200_iface_impl : public b200_iface{
+class b200_codec_ctrl_impl : public b200_codec_ctrl{
 public:
 
-    b200_iface_impl(usb_control::sptr usb_ctrl):
-        _usb_ctrl(usb_ctrl)
+    b200_codec_ctrl_impl(spi_iface::sptr spiface, usb_control::sptr usb_ctrl)
     {
-        //NOP
+        _spiface = spiface;
+        _usb_ctrl = usb_ctrl;
     }
 
-    void write_i2c(boost::uint8_t addr, const byte_vector_t &bytes)
-    {
-        //TODO
-    }
-
-    boost::uint32_t transact_spi(
-        int which_slave,
-        const spi_config_t &config,
-        boost::uint32_t data,
-        size_t num_bits,
-        bool readback
-    ){
-        //TODO
-    }
-
-    byte_vector_t read_i2c(boost::uint8_t addr, size_t num_bytes)
+    std::vector<std::string> get_gain_names(const std::string &which)
     {
         //TODO
     }
 
-    void load_firmware(const std::string &path)
+    double set_gain(const std::string &which, const std::string &name, const double value)
     {
         //TODO
     }
 
-    void load_fpga(const std::string &path)
+    uhd::meta_range_t get_gain_range(const std::string &which, const std::string &name)
+    {
+        //TODO
+    }
+
+    double set_clock_rate(const double rate)
+    {
+        //TODO
+    }
+
+    double tune(const std::string &which, const double value)
     {
         //TODO
     }
 
 private:
+    spi_iface::sptr _spiface;
     usb_control::sptr _usb_ctrl;
 };
 
 /***********************************************************************
  * Make an instance of the implementation
  **********************************************************************/
-b200_iface::sptr b200_iface::make(usb_control::sptr usb_ctrl)
+b200_codec_ctrl::sptr b200_codec_ctrl::make(spi_iface::sptr spiface, usb_control::sptr usb_ctrl)
 {
-    return sptr(new b200_iface_impl(usb_ctrl));
+    return sptr(new b200_codec_ctrl_impl(spiface, usb_ctrl));
 }

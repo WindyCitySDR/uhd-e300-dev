@@ -20,6 +20,13 @@
 
 #include "b200_iface.hpp"
 #include "b200_ctrl.hpp"
+#include "b200_codec_ctrl.hpp"
+#include "rx_frontend_core_200.hpp"
+#include "tx_frontend_core_200.hpp"
+#include "rx_dsp_core_200.hpp"
+#include "tx_dsp_core_200.hpp"
+#include "time64_core_200.hpp"
+#include "user_settings_core_200.hpp"
 #include <uhd/device.hpp>
 #include <uhd/property_tree.hpp>
 #include <uhd/utils/pimpl.hpp>
@@ -37,9 +44,12 @@ static const std::string     B200_FPGA_FILE_NAME = "usrp_b200_fpga.bin";
 static const boost::uint16_t B200_FW_COMPAT_NUM = 0x03;
 static const boost::uint16_t B200_FPGA_COMPAT_NUM = 0x09;
 static const size_t          B200_MAX_PKT_BYTE_LIMIT = 2048;
-static const boost::uint32_t B200_ASYNC_MSG_SID0 = 1;
-static const boost::uint32_t B200_ASYNC_MSG_SID1 = 2;
-static const boost::uint32_t B200_CTRL_MSG_SID = 3;
+static const double          B200_LINK_RATE_BPS = 256e6/5; //pratical link rate (< 480 Mbps) //TODO for USB3
+static const boost::uint32_t B200_ASYNC_SID_BASE = 10;
+static const boost::uint32_t B200_CTRL_MSG_SID = 20;
+static const boost::uint32_t B200_RX_SID_BASE = 30;
+static const size_t          B200_NUM_RX_FE = 2;
+static const size_t          B200_NUM_TX_FE = 2;
 
 //! Implementation guts
 class b200_impl : public uhd::device {
@@ -59,13 +69,16 @@ private:
     //controllers
     b200_iface::sptr _iface;
     b200_ctrl::sptr _ctrl;
+    b200_codec_ctrl::sptr _codec_ctrl;
+    std::vector<rx_frontend_core_200::sptr> _rx_fes;
+    std::vector<tx_frontend_core_200::sptr> _tx_fes;
+    std::vector<rx_dsp_core_200::sptr> _rx_dsps;
+    std::vector<tx_dsp_core_200::sptr> _tx_dsps;
+    time64_core_200::sptr _time64;
+    user_settings_core_200::sptr _user;
 
     //transports
     uhd::transport::zero_copy_if::sptr _data_transport, _ctrl_transport;
-
-    //handle io stuff
-    UHD_PIMPL_DECL(io_impl) _io_impl;
-    void io_init(void);
 
     //device properties interface
     uhd::property_tree::sptr get_tree(void) const{
@@ -78,6 +91,12 @@ private:
     void set_mb_eeprom(const uhd::usrp::mboard_eeprom_t &);
     void check_fw_compat(void);
     void check_fpga_compat(void);
+    void update_rates(void);
+    void update_rx_subdev_spec(const uhd::usrp::subdev_spec_t &);
+    void update_tx_subdev_spec(const uhd::usrp::subdev_spec_t &);
+    void update_rx_samp_rate(const size_t, const double rate);
+    void update_tx_samp_rate(const size_t, const double rate);
+    void update_clock_source(const std::string &);
 };
 
 #endif /* INCLUDED_B200_IMPL_HPP */

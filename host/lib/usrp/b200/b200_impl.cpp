@@ -16,6 +16,7 @@
 //
 
 #include "b200_impl.hpp"
+#include "b200_regs.hpp"
 #include <uhd/transport/usb_control.hpp>
 #include <uhd/utils/msg.hpp>
 #include <uhd/exception.hpp>
@@ -222,6 +223,7 @@ b200_impl::b200_impl(const device_addr_t &device_addr)
     _tree->create<std::string>("/name").set("B-Series Device");
     const fs_path mb_path = "/mboards/0";
     _tree->create<std::string>(mb_path / "name").set("B200");
+    _tree->create<std::string>(mb_path / "codename").set("Sasquatch");
 
     ////////////////////////////////////////////////////////////////////
     // setup the mboard eeprom
@@ -230,6 +232,219 @@ b200_impl::b200_impl(const device_addr_t &device_addr)
     _tree->create<mboard_eeprom_t>(mb_path / "eeprom")
         .set(mb_eeprom)
         .subscribe(boost::bind(&b200_impl::set_mb_eeprom, this, _1));
+
+    ////////////////////////////////////////////////////////////////////
+    // create codec control objects
+    ////////////////////////////////////////////////////////////////////
+    _codec_ctrl = b200_codec_ctrl::make(_ctrl, control);
+    static const std::vector<std::string> frontends = boost::assign::list_of
+        ("TX_A")("TX_B")("RX_A")("RX_B")
+    ;
+    BOOST_FOREACH(const std::string &fe_name, frontends)
+    {
+        const std::string x = std::string(1, tolower(fe_name[0]));
+        const std::string y = std::string(1, fe_name[3]);
+        const fs_path codec_path = mb_path / (x+"x_codecs") / y;
+        _tree->create<std::string>(codec_path / "name").set("B200 " + fe_name + " CODEC");
+
+        BOOST_FOREACH(const std::string &name, _codec_ctrl->get_gain_names(fe_name))
+        {
+            _tree->create<meta_range_t>(codec_path / "gains" / name / "range")
+                .set(_codec_ctrl->get_gain_range(fe_name, name));
+
+            _tree->create<double>(codec_path / "gains" / name / "value")
+                .coerce(boost::bind(&b200_codec_ctrl::set_gain, _codec_ctrl, fe_name, name, _1))
+                .set(0.0);
+        }
+    }
+
+    ////////////////////////////////////////////////////////////////////
+    // create clock control objects
+    ////////////////////////////////////////////////////////////////////
+    //^^^ clock created up top, just reg props here... ^^^
+    _tree->create<double>(mb_path / "tick_rate")
+        .coerce(boost::bind(&b200_codec_ctrl::set_clock_rate, _codec_ctrl, _1))
+        .set(40e6);
+
+    ////////////////////////////////////////////////////////////////////
+    // and do the misc mboard sensors
+    ////////////////////////////////////////////////////////////////////
+    _tree->create<int>(mb_path / "sensors"); //empty but path exists TODO
+
+    ////////////////////////////////////////////////////////////////////
+    // create frontend mapping
+    ////////////////////////////////////////////////////////////////////
+    _tree->create<subdev_spec_t>(mb_path / "rx_subdev_spec")
+        .subscribe(boost::bind(&b200_impl::update_rx_subdev_spec, this, _1));
+    _tree->create<subdev_spec_t>(mb_path / "tx_subdev_spec")
+        .subscribe(boost::bind(&b200_impl::update_tx_subdev_spec, this, _1));
+
+    ////////////////////////////////////////////////////////////////////
+    // create rx frontend control objects
+    ////////////////////////////////////////////////////////////////////
+    _rx_fes.resize(B200_NUM_RX_FE);
+    for (size_t i = 0; i < _rx_fes.size(); i++)
+    {
+        _rx_fes[i] = rx_frontend_core_200::make(_ctrl, SR_RX_FRONTEND(i));
+        const std::string which = std::string(1, i+'A');
+        const fs_path rx_fe_path = mb_path / "rx_frontends" / which;
+
+        _tree->create<std::complex<double> >(rx_fe_path / "dc_offset" / "value")
+            .coerce(boost::bind(&rx_frontend_core_200::set_dc_offset, _rx_fes[i], _1))
+            .set(std::complex<double>(0.0, 0.0));
+        _tree->create<bool>(rx_fe_path / "dc_offset" / "enable")
+            .subscribe(boost::bind(&rx_frontend_core_200::set_dc_offset_auto, _rx_fes[i], _1))
+            .set(true);
+        _tree->create<std::complex<double> >(rx_fe_path / "iq_balance" / "value")
+            .subscribe(boost::bind(&rx_frontend_core_200::set_iq_balance, _rx_fes[i], _1))
+            .set(std::complex<double>(0.0, 0.0));
+    }
+
+    ////////////////////////////////////////////////////////////////////
+    // create tx frontend control objects
+    ////////////////////////////////////////////////////////////////////
+    _tx_fes.resize(B200_NUM_TX_FE);
+    for (size_t i = _tx_fes.size(); i < 2; i++)
+    {
+        _tx_fes[i] = tx_frontend_core_200::make(_ctrl, SR_TX_FRONTEND(i));
+        const std::string which = std::string(1, i+'A');
+        const fs_path tx_fe_path = mb_path / "tx_frontends" / which;
+
+        _tree->create<std::complex<double> >(tx_fe_path / "dc_offset" / "value")
+            .coerce(boost::bind(&tx_frontend_core_200::set_dc_offset, _tx_fes[i], _1))
+            .set(std::complex<double>(0.0, 0.0));
+        _tree->create<std::complex<double> >(tx_fe_path / "iq_balance" / "value")
+            .subscribe(boost::bind(&tx_frontend_core_200::set_iq_balance, _tx_fes[i], _1))
+            .set(std::complex<double>(0.0, 0.0));
+    }
+
+    ////////////////////////////////////////////////////////////////////
+    // create rx dsp control objects
+    ////////////////////////////////////////////////////////////////////
+    _rx_dsps.resize(B200_NUM_RX_FE);
+    for (size_t dspno = 0; dspno < _rx_dsps.size(); dspno++)
+    {
+        const fs_path rx_dsp_path = mb_path / str(boost::format("rx_dsps/%u") % dspno);
+        _rx_dsps[dspno] = rx_dsp_core_200::make(_ctrl, SR_RX_DSP(dspno), SR_RX_CTRL(dspno), B200_RX_SID_BASE + dspno);
+        _rx_dsps[dspno]->set_link_rate(B200_LINK_RATE_BPS);
+        _tree->access<double>(mb_path / "tick_rate")
+            .subscribe(boost::bind(&rx_dsp_core_200::set_tick_rate, _rx_dsps[dspno], _1));
+        _tree->create<meta_range_t>(rx_dsp_path / "rate/range")
+            .publish(boost::bind(&rx_dsp_core_200::get_host_rates, _rx_dsps[dspno]));
+        _tree->create<double>(rx_dsp_path / "rate/value")
+            .set(1e6) //some default
+            .coerce(boost::bind(&rx_dsp_core_200::set_host_rate, _rx_dsps[dspno], _1))
+            .subscribe(boost::bind(&b200_impl::update_rx_samp_rate, this, dspno, _1));
+        _tree->create<double>(rx_dsp_path / "freq/value")
+            .coerce(boost::bind(&rx_dsp_core_200::set_freq, _rx_dsps[dspno], _1));
+        _tree->create<meta_range_t>(rx_dsp_path / "freq/range")
+            .publish(boost::bind(&rx_dsp_core_200::get_freq_range, _rx_dsps[dspno]));
+        _tree->create<stream_cmd_t>(rx_dsp_path / "stream_cmd")
+            .subscribe(boost::bind(&rx_dsp_core_200::issue_stream_command, _rx_dsps[dspno], _1));
+    }
+
+    ////////////////////////////////////////////////////////////////////
+    // create tx dsp control objects
+    ////////////////////////////////////////////////////////////////////
+    _tx_dsps.resize(B200_NUM_TX_FE);
+    for (size_t dspno = 0; dspno < _tx_dsps.size(); dspno++)
+    {
+        const fs_path tx_dsp_path = mb_path / str(boost::format("tx_dsps/%u") % dspno);
+        _tx_dsps[dspno] = tx_dsp_core_200::make(_ctrl, SR_TX_DSP(dspno), SR_TX_CTRL(dspno), B200_ASYNC_SID_BASE + dspno);
+        _tx_dsps[dspno]->set_link_rate(B200_RX_SID_BASE);
+        _tree->access<double>(mb_path / "tick_rate")
+            .subscribe(boost::bind(&tx_dsp_core_200::set_tick_rate, _tx_dsps[dspno], _1));
+        _tree->create<meta_range_t>(tx_dsp_path / "rate/range")
+            .publish(boost::bind(&tx_dsp_core_200::get_host_rates, _tx_dsps[dspno]));
+        _tree->create<double>(tx_dsp_path / "rate/value")
+            .set(1e6) //some default
+            .coerce(boost::bind(&tx_dsp_core_200::set_host_rate, _tx_dsps[dspno], _1))
+            .subscribe(boost::bind(&b200_impl::update_tx_samp_rate, this, 0, _1));
+        _tree->create<double>(tx_dsp_path / "freq/value")
+            .coerce(boost::bind(&tx_dsp_core_200::set_freq, _tx_dsps[dspno], _1));
+        _tree->create<meta_range_t>(tx_dsp_path / "freq/range")
+            .publish(boost::bind(&tx_dsp_core_200::get_freq_range, _tx_dsps[dspno]));
+    }
+
+    ////////////////////////////////////////////////////////////////////
+    // create time control objects
+    ////////////////////////////////////////////////////////////////////
+    time64_core_200::readback_bases_type time64_rb_bases;
+    time64_rb_bases.rb_hi_now = REG_RB_TIME_NOW_HI;
+    time64_rb_bases.rb_lo_now = REG_RB_TIME_NOW_LO;
+    time64_rb_bases.rb_hi_pps = REG_RB_TIME_PPS_HI;
+    time64_rb_bases.rb_lo_pps = REG_RB_TIME_PPS_LO;
+    _time64 = time64_core_200::make(_ctrl, SR_TIME_CORE, time64_rb_bases);
+    _tree->access<double>(mb_path / "tick_rate")
+        .subscribe(boost::bind(&time64_core_200::set_tick_rate, _time64, _1));
+    _tree->create<time_spec_t>(mb_path / "time/now")
+        .publish(boost::bind(&time64_core_200::get_time_now, _time64))
+        .subscribe(boost::bind(&time64_core_200::set_time_now, _time64, _1));
+    _tree->create<time_spec_t>(mb_path / "time/pps")
+        .publish(boost::bind(&time64_core_200::get_time_last_pps, _time64))
+        .subscribe(boost::bind(&time64_core_200::set_time_next_pps, _time64, _1));
+    //setup time source props
+    _tree->create<std::string>(mb_path / "time_source/value")
+        .subscribe(boost::bind(&time64_core_200::set_time_source, _time64, _1));
+    _tree->create<std::vector<std::string> >(mb_path / "time_source/options")
+        .publish(boost::bind(&time64_core_200::get_time_sources, _time64));
+    //setup reference source props
+    _tree->create<std::string>(mb_path / "clock_source/value")
+        .subscribe(boost::bind(&b200_impl::update_clock_source, this, _1));
+    static const std::vector<std::string> clock_sources = boost::assign::list_of("internal")("external");
+    _tree->create<std::vector<std::string> >(mb_path / "clock_source/options").set(clock_sources);
+
+    ////////////////////////////////////////////////////////////////////
+    // create user-defined control objects
+    ////////////////////////////////////////////////////////////////////
+    _user = user_settings_core_200::make(_ctrl, SR_USER_CORE);
+    _tree->create<user_settings_core_200::user_reg_t>(mb_path / "user/regs")
+        .subscribe(boost::bind(&user_settings_core_200::set_reg, _user, _1));
+
+    ////////////////////////////////////////////////////////////////////
+    // create RF frontend interfacing
+    ////////////////////////////////////////////////////////////////////
+    BOOST_FOREACH(const std::string &fe_name, frontends)
+    {
+        const std::string x = std::string(1, tolower(fe_name[0]));
+        const std::string y = std::string(1, fe_name[3]);
+        const fs_path rf_fe_path = mb_path / (x+"x_frontends") / y;
+
+        _tree->create<std::string>(rf_fe_path / "name").set(fe_name);
+        _tree->create<int>(rf_fe_path / "sensors"); //empty TODO
+        _tree->create<int>(rf_fe_path / "gains"); //empty TODO
+        _tree->create<std::string>(rf_fe_path / "connections").set("IQ");
+        _tree->create<bool>(rf_fe_path / "enabled").set(true);
+        _tree->create<bool>(rf_fe_path / "use_lo_offset").set(false);
+        _tree->create<double>(rf_fe_path / "bandwidth" / "value").set(0.0); //TODO
+        _tree->create<meta_range_t>(rf_fe_path / "bandwidth" / "range").set(meta_range_t(0.0, 0.0)); //TODO
+        _tree->create<double>(rf_fe_path / "freq" / "value")
+            .coerce(boost::bind(&b200_codec_ctrl::tune, _codec_ctrl, fe_name, _1))
+            .set(1e9);
+        _tree->create<meta_range_t>(rf_fe_path / "freq" / "range").set(meta_range_t(0.0, 0.0)); //TODO
+        _tree->create<std::string>(rf_fe_path / "antenna" / "value").set(""); //TODO
+        _tree->create<std::vector<std::string> >(rf_fe_path / "antenna" / "options").set(std::vector<std::string>(1, "")); //TODO
+
+    }
+
+    ////////////////////////////////////////////////////////////////////
+    // do some post-init tasks
+    ////////////////////////////////////////////////////////////////////
+    this->update_rates();
+
+    //reset cordic rates and their properties to zero
+    BOOST_FOREACH(const std::string &name, _tree->list(mb_path / "rx_dsps")){
+        _tree->access<double>(mb_path / "rx_dsps" / name / "freq" / "value").set(0.0);
+    }
+    BOOST_FOREACH(const std::string &name, _tree->list(mb_path / "tx_dsps")){
+        _tree->access<double>(mb_path / "tx_dsps" / name / "freq" / "value").set(0.0);
+    }
+
+    _tree->access<subdev_spec_t>(mb_path / "rx_subdev_spec").set(subdev_spec_t("A:" + _tree->list(mb_path / "dboards/A/rx_frontends").at(0)));
+    _tree->access<subdev_spec_t>(mb_path / "tx_subdev_spec").set(subdev_spec_t("A:" + _tree->list(mb_path / "dboards/A/tx_frontends").at(0)));
+    _tree->access<std::string>(mb_path / "clock_source/value").set("internal");
+    _tree->access<std::string>(mb_path / "time_source/value").set("none");
+
 }
 
 b200_impl::~b200_impl(void)
@@ -248,6 +463,11 @@ void b200_impl::check_fw_compat(void)
 }
 
 void b200_impl::check_fpga_compat(void)
+{
+    //TODO
+}
+
+void b200_impl::update_clock_source(const std::string &)
 {
     //TODO
 }

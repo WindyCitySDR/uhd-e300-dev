@@ -23,16 +23,16 @@
 #include <boost/shared_ptr.hpp>
 #include <boost/utility.hpp>
 
-class b200_iface: boost::noncopyable, public uhd::i2c_iface{
+class b200_iface: boost::noncopyable, public uhd::i2c_iface, public uhd::spi_iface{
 public:
     typedef boost::shared_ptr<b200_iface> sptr;
 
     /*!
      * Make a b200 interface object from a control transport
-     * \param ctrl_transport a USB control transport
+     * \param usb_ctrl a USB control transport
      * \return a new b200 interface object
      */
-    static sptr make(uhd::transport::usb_control::sptr ctrl_transport);
+    static sptr make(uhd::transport::usb_control::sptr usb_ctrl);
 
     //! load a firmware image
     virtual void load_firmware(const std::string &path) = 0;
