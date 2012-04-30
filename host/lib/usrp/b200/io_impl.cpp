@@ -16,14 +16,6 @@
 //
 
 #include "b200_impl.hpp"
-#include <uhd/utils/thread_priority.hpp>
-#include <uhd/transport/bounded_buffer.hpp>
-#include <boost/format.hpp>
-#include <boost/bind.hpp>
-#include <boost/thread.hpp>
-#include <uhd/utils/msg.hpp>
-#include <uhd/utils/log.hpp>
-#include <boost/make_shared.hpp>
 
 using namespace uhd;
 using namespace uhd::usrp;
@@ -34,8 +26,7 @@ using namespace uhd::usrp;
 bool b200_impl::recv_async_msg(
     async_metadata_t &async_metadata, double timeout
 ){
-    boost::this_thread::disable_interruption di; //disable because the wait can throw
-    //TODO
+    return _ctrl->pop_async_msg(async_metadata, timeout);
 }
 
 /***********************************************************************

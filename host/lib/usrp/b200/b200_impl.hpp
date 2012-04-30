@@ -29,8 +29,6 @@
 #include <uhd/types/stream_cmd.hpp>
 #include <uhd/usrp/mboard_eeprom.hpp>
 #include <uhd/usrp/subdev_spec.hpp>
-#include <uhd/usrp/dboard_eeprom.hpp>
-#include <uhd/usrp/dboard_manager.hpp>
 #include <uhd/transport/usb_zero_copy.hpp>
 #include <boost/weak_ptr.hpp>
 
@@ -39,6 +37,9 @@ static const std::string     B200_FPGA_FILE_NAME = "usrp_b200_fpga.bin";
 static const boost::uint16_t B200_FW_COMPAT_NUM = 0x03;
 static const boost::uint16_t B200_FPGA_COMPAT_NUM = 0x09;
 static const size_t          B200_MAX_PKT_BYTE_LIMIT = 2048;
+static const boost::uint32_t B200_ASYNC_MSG_SID0 = 1;
+static const boost::uint32_t B200_ASYNC_MSG_SID1 = 2;
+static const boost::uint32_t B200_CTRL_MSG_SID = 3;
 
 //! Implementation guts
 class b200_impl : public uhd::device {
@@ -57,13 +58,10 @@ private:
 
     //controllers
     b200_iface::sptr _iface;
+    b200_ctrl::sptr _ctrl;
 
     //transports
     uhd::transport::zero_copy_if::sptr _data_transport, _ctrl_transport;
-
-    //dboard stuff
-    uhd::usrp::dboard_manager::sptr _dboard_manager;
-    uhd::usrp::dboard_iface::sptr _dboard_iface;
 
     //handle io stuff
     UHD_PIMPL_DECL(io_impl) _io_impl;
