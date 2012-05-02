@@ -35,10 +35,10 @@ public:
     static sptr make(uhd::transport::usb_control::sptr usb_ctrl);
 
     //! load a firmware image
-    virtual void load_firmware(const std::string &path) = 0;
+    virtual void load_firmware(const std::string filestring) = 0;
 
     //! load an FPGA image
-    virtual void load_fpga(const std::string &path) = 0;
+    virtual void load_fpga(const std::string filestring) = 0;
 
 };
 
