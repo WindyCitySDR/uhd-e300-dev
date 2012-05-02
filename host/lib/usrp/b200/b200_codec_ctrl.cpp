@@ -26,10 +26,9 @@ using namespace uhd::transport;
 class b200_codec_ctrl_impl : public b200_codec_ctrl{
 public:
 
-    b200_codec_ctrl_impl(spi_iface::sptr spiface, usb_control::sptr usb_ctrl)
+    b200_codec_ctrl_impl(b200_iface::sptr iface)
     {
-        _spiface = spiface;
-        _usb_ctrl = usb_ctrl;
+        _b200_iface = iface;
     }
 
     std::vector<std::string> get_gain_names(const std::string &which)
@@ -58,14 +57,13 @@ public:
     }
 
 private:
-    spi_iface::sptr _spiface;
-    usb_control::sptr _usb_ctrl;
+    b200_iface::sptr _b200_iface;
 };
 
 /***********************************************************************
  * Make an instance of the implementation
  **********************************************************************/
-b200_codec_ctrl::sptr b200_codec_ctrl::make(spi_iface::sptr spiface, usb_control::sptr usb_ctrl)
+b200_codec_ctrl::sptr b200_codec_ctrl::make(b200_iface::sptr iface)
 {
-    return sptr(new b200_codec_ctrl_impl(spiface, usb_ctrl));
+    return sptr(new b200_codec_ctrl_impl(iface));
 }

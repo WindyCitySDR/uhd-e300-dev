@@ -28,6 +28,7 @@
 #include <string>
 #include <vector>
 #include <cstring>
+#include <cmath>
 
 
 using namespace uhd;
@@ -38,6 +39,9 @@ static const bool load_img_msg = true;
 const static boost::uint8_t FX3_FIRMWARE_LOAD = 0xA0;
 const static boost::uint8_t VRT_VENDOR_OUT = 0x40;
 const static boost::uint8_t VRT_VENDOR_IN = 0xC0;
+const static boost::uint8_t B200_VREQ_LOOP = 0x22;
+const static boost::uint8_t B200_VREQ_SPI_WRITE = 0x32;
+const static boost::uint8_t B200_VREQ_SPI_READ = 0x42;
 
 typedef boost::uint32_t hash_type;
 
@@ -165,14 +169,35 @@ public:
     }
 
 
-    boost::uint32_t transact_spi(
-        int which_slave,
-        const spi_config_t &config,
-        boost::uint32_t data,
+    void transact_spi(
+        unsigned char *data,
         size_t num_bits,
         bool readback
     ){
-        //TODO
+        int ret = 0;
+        boost::uint16_t length = std::ceil(num_bits / 8);
+
+        if(data[0] & 0x80) {
+            ret = fx3_control_write(B200_VREQ_SPI_WRITE, 0x00, \
+                    0x00, data, length);
+        } else {
+            ret = fx3_control_write(B200_VREQ_SPI_READ, 0x00, \
+                    0x00, data, length);
+        }
+
+        if(ret != 0) {
+            throw uhd::io_error("transact_spi: fx3_control_write failed!");
+        }
+
+
+        if(readback) {
+            ret = fx3_control_write(B200_VREQ_LOOP, 0x00, \
+                    0x00, data, length);
+
+            if(ret != 0) {
+                throw uhd::io_error("transact_spi: readback failed!");
+            }
+        }
     }
 
 

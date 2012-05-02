@@ -23,7 +23,7 @@
 #include <boost/shared_ptr.hpp>
 #include <boost/utility.hpp>
 
-class b200_iface: boost::noncopyable, public uhd::i2c_iface, public uhd::spi_iface{
+class b200_iface: boost::noncopyable, public uhd::i2c_iface {
 public:
     typedef boost::shared_ptr<b200_iface> sptr;
 
@@ -40,6 +40,9 @@ public:
     //! load an FPGA image
     virtual void load_fpga(const std::string filestring) = 0;
 
+    //! send SPI through the FX3
+    virtual void transact_spi(unsigned char *data, size_t num_bits, \
+            bool readback) = 0;
 };
 
 

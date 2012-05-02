@@ -18,6 +18,8 @@
 #ifndef INCLUDED_B200_CODEC_CTRL_HPP
 #define INCLUDED_B200_CODEC_CTRL_HPP
 
+#include "b200_iface.hpp"
+
 #include <uhd/transport/usb_control.hpp>
 #include <uhd/types/serial.hpp>
 #include <uhd/types/ranges.hpp>
@@ -31,7 +33,7 @@ public:
     typedef boost::shared_ptr<b200_codec_ctrl> sptr;
 
     //! make a new codec control object
-    static sptr make(uhd::spi_iface::sptr, uhd::transport::usb_control::sptr);
+    static sptr make(b200_iface::sptr);
 
     //! Get a list of gain names for RX or TX
     virtual std::vector<std::string> get_gain_names(const std::string &which) = 0;
