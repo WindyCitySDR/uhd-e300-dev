@@ -29,13 +29,17 @@
 #include <boost/thread/thread.hpp>
 #include <boost/lexical_cast.hpp>
 #include <cstdio>
+#include <iomanip>
 
 using namespace uhd;
 using namespace uhd::usrp;
 using namespace uhd::transport;
 
-const boost::uint16_t B200_VENDOR_ID  = 0x2500;
-const boost::uint16_t B200_PRODUCT_ID = 0x0003;
+//const boost::uint16_t B200_VENDOR_ID  = 0x2500;
+//const boost::uint16_t B200_PRODUCT_ID = 0x0003;
+
+const boost::uint16_t B200_VENDOR_ID  = 0x04b4;
+const boost::uint16_t B200_PRODUCT_ID = 0x00f0;
 static const boost::posix_time::milliseconds REENUMERATION_TIMEOUT_MS(3000);
 
 /***********************************************************************
@@ -72,6 +76,7 @@ static device_addrs_t b200_find(const device_addr_t &hint)
     size_t found = 0;
     BOOST_FOREACH(usb_device_handle::sptr handle, usb_device_handle::get_device_list(vid, pid)) {
         //extract the firmware path for the b200
+        /*
         std::string b200_fw_image;
         try{
             b200_fw_image = find_image_path(hint.get("fw", B200_FW_FILE_NAME));
@@ -90,6 +95,7 @@ static device_addrs_t b200_find(const device_addr_t &hint)
         catch(const uhd::exception &){continue;} //ignore claimed
 
         b200_iface::make(control)->load_firmware(b200_fw_image);
+        */
 
         found++;
     }
@@ -110,11 +116,13 @@ static device_addrs_t b200_find(const device_addr_t &hint)
             catch(const uhd::exception &){continue;} //ignore claimed
 
             b200_iface::sptr iface = b200_iface::make(control);
-            const mboard_eeprom_t mb_eeprom = mboard_eeprom_t(*iface, mboard_eeprom_t::MAP_B100);
+            //TODO
+            //const mboard_eeprom_t mb_eeprom = mboard_eeprom_t(*iface, mboard_eeprom_t::MAP_B100);
 
             device_addr_t new_addr;
             new_addr["type"] = "b200";
-            new_addr["name"] = mb_eeprom["name"];
+            //TODO
+            //new_addr["name"] = mb_eeprom["name"];
             new_addr["serial"] = handle->get_serial();
             //this is a found b200 when the hint serial and name match or blank
             if (
@@ -148,9 +156,15 @@ UHD_STATIC_BLOCK(register_b200_device)
 b200_impl::b200_impl(const device_addr_t &device_addr)
 {
     //extract the FPGA path for the B200
+    //TODO
+    /*
     std::string b200_fpga_image = find_image_path(
         device_addr.has_key("fpga")? device_addr["fpga"] : B200_FPGA_FILE_NAME
     );
+    */
+
+
+    _tree = property_tree::make();
 
     //try to match the given device address with something on the USB bus
     std::vector<usb_device_handle::sptr> device_list =
@@ -172,7 +186,8 @@ b200_impl::b200_impl(const device_addr_t &device_addr)
     this->check_fw_compat(); //check after making
 
     //load the fpga
-    _iface->load_fpga(b200_fpga_image);
+    //TODO
+    //_iface->load_fpga(b200_fpga_image);
 
     ////////////////////////////////////////////////////////////////////
     // Create control transport
@@ -185,8 +200,8 @@ b200_impl::b200_impl(const device_addr_t &device_addr)
 
     _ctrl_transport = usb_zero_copy::make(
         handle,
-        4, 8, //interface, endpoint //TODO whats the actual numbers?
-        3, 4, //interface, endpoint //TODO whats the actual numbers?
+        4, 8, //interface, endpoint
+        3, 4, //interface, endpoint
         ctrl_xport_args
     );
     while (_ctrl_transport->get_recv_buff(0.0)){} //flush ctrl xport
@@ -195,29 +210,53 @@ b200_impl::b200_impl(const device_addr_t &device_addr)
     // Create data transport
     ////////////////////////////////////////////////////////////////////
     device_addr_t data_xport_args;
-    data_xport_args["recv_frame_size"] = device_addr.get("recv_frame_size", "16384");
+    data_xport_args["recv_frame_size"] = device_addr.get("recv_frame_size", "512");
     data_xport_args["num_recv_frames"] = device_addr.get("num_recv_frames", "16");
-    data_xport_args["send_frame_size"] = device_addr.get("send_frame_size", "16384");
+    data_xport_args["send_frame_size"] = device_addr.get("send_frame_size", "512");
     data_xport_args["num_send_frames"] = device_addr.get("num_send_frames", "16");
 
     _data_transport = usb_zero_copy::make_wrapper(
         usb_zero_copy::make(
             handle,        // identifier
-            2, 6,          // IN interface, endpoint  //TODO whats the actual numbers?
-            1, 2,          // OUT interface, endpoint //TODO whats the actual numbers?
+            2, 6,          // IN interface, endpoint
+            1, 2,          // OUT interface, endpoint
             data_xport_args    // param hints
         ),
         B200_MAX_PKT_BYTE_LIMIT
     );
     while (_data_transport->get_recv_buff(0.0)){} //flush data xport
 
+    {
+        uhd::transport::managed_send_buffer::sptr buff = _data_transport->get_send_buff(0.0);
+        unsigned char *p = buff->cast<unsigned char *>();
+        for(int i = 0; i < buff->size(); i++) {
+            p[i] = i;
+        }
+        buff->commit(buff->size());
+        std::cout << "fuck yeah." << std::endl;
+    }
+
+    {
+    std::cout << "preparing for fuck yeah v2." << std::endl;
+    uhd::transport::managed_recv_buffer::sptr buff = _data_transport->get_recv_buff(5.0);
+    const unsigned char *p = buff->cast<const unsigned char *>();
+    for(int i = 0; i < buff->size(); i++) {
+        std::cout << std::hex << std::noshowbase << std::setw(2) << p[i] << " ";
+    }
+    buff.reset();
+    std::cout << "fuck yeah v2." << std::endl;
+    }
+
+
     _rx_demux = recv_packet_demuxer::make(_data_transport, _rx_dsps.size(), B200_RX_SID_BASE);
 
     ////////////////////////////////////////////////////////////////////
     // Initialize control (settings regs and async messages)
     ////////////////////////////////////////////////////////////////////
+    /*
     _ctrl = b200_ctrl::make(_ctrl_transport);
     this->check_fpga_compat(); //check after making
+    */
 
     ////////////////////////////////////////////////////////////////////
     // Initialize the properties tree
@@ -230,10 +269,13 @@ b200_impl::b200_impl(const device_addr_t &device_addr)
     ////////////////////////////////////////////////////////////////////
     // setup the mboard eeprom
     ////////////////////////////////////////////////////////////////////
+    // TODO
+    /*
     const mboard_eeprom_t mb_eeprom(*_iface, mboard_eeprom_t::MAP_B100);
     _tree->create<mboard_eeprom_t>(mb_path / "eeprom")
         .set(mb_eeprom)
         .subscribe(boost::bind(&b200_impl::set_mb_eeprom, this, _1));
+    */
 
     ////////////////////////////////////////////////////////////////////
     // create codec control objects
@@ -463,7 +505,8 @@ b200_impl::~b200_impl(void)
 
 void b200_impl::set_mb_eeprom(const uhd::usrp::mboard_eeprom_t &mb_eeprom)
 {
-    mb_eeprom.commit(*_iface, mboard_eeprom_t::MAP_B100);
+    //TODO
+    //mb_eeprom.commit(*_iface, mboard_eeprom_t::MAP_B100);
 }
 
 void b200_impl::check_fw_compat(void)
