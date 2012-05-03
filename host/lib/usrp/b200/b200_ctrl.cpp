@@ -41,10 +41,9 @@ static const double ACK_TIMEOUT = 0.5;
 static const double MASSIVE_TIMEOUT = 10.0; //for when we wait on a timed command
 static const boost::uint32_t MAX_SEQS_OUT = 16;
 
-#define SPI_DIV SR_SPI_CORE + 0
-#define SPI_CTRL SR_SPI_CORE + 1
-#define SPI_DATA SR_SPI_CORE + 2
-#define SPI_READBACK 0
+#define SPI_DIV SR_SPI + 0
+#define SPI_CTRL SR_SPI + 1
+#define SPI_DATA SR_SPI + 2
 // spi clock rate = master_clock/(div+1)/2 (10MHz in this case)
 #define SPI_DIVIDER 4
 
@@ -114,7 +113,7 @@ public:
     void poke32(wb_addr_type addr, boost::uint32_t data){
         boost::mutex::scoped_lock lock(_mutex);
 
-        this->send_pkt((addr - SETTING_REGS_BASE)/4, data, POKE32_CMD);
+        this->send_pkt(addr, data, POKE32_CMD);
 
         this->wait_for_ack(_seq_out-MAX_SEQS_OUT);
     }
@@ -122,7 +121,7 @@ public:
     boost::uint32_t peek32(wb_addr_type addr){
         boost::mutex::scoped_lock lock(_mutex);
 
-        this->send_pkt((addr - READBACK_BASE)/4, 0, PEEK32_CMD);
+        this->send_pkt(addr, 0, PEEK32_CMD);
 
         return this->wait_for_ack(_seq_out);
     }
@@ -182,7 +181,7 @@ public:
 
         //conditional readback
         if (readback){
-            this->send_pkt(SPI_READBACK, 0, PEEK32_CMD);
+            this->send_pkt(REG_RB_SPI, 0, PEEK32_CMD);
             return this->wait_for_ack(_seq_out);
         }
 

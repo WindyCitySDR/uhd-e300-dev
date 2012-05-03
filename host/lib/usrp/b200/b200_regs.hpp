@@ -18,26 +18,46 @@
 #ifndef INCLUDED_B200_REGS_HPP
 #define INCLUDED_B200_REGS_HPP
 
-#define READBACK_BASE 0 //TODO
-#define SETTING_REGS_BASE 0 //TODO
-#define SR_SPI_CORE 0 //TODO
+#define localparam static const int
 
-#define SR_RX_FRONTEND(which) 0 //TODO
-#define SR_TX_FRONTEND(which) 0 //TODO
+localparam SR_MISC         = 0;      // 5
+localparam SR_USER_REGS    = 5;      // 2
 
-#define SR_RX_DSP(which) 0 //TODO
-#define SR_TX_DSP(which) 0 //TODO
+localparam SR_TX_CTRL0     = 32;     // 6
+localparam SR_TX_DSP0      = 40;     // 5
+localparam SR_TX_FE0       = 48;     // 5
 
-#define SR_RX_CTRL(which) 0 //TODO
-#define SR_TX_CTRL(which) 0 //TODO
+localparam SR_TX_CTRL1     = 64;      // 6
+localparam SR_TX_DSP1      = 72;      // 5
+localparam SR_TX_FE1       = 80;      // 5
 
-#define SR_TIME_CORE 0 //TODO
+localparam SR_RX_CTRL0     = 96;      // 9
+localparam SR_RX_DSP0      = 106;     // 7
+localparam SR_RX_FE0       = 116;     // 5
 
-#define SR_USER_CORE 0 //TODO
+localparam SR_RX_CTRL1     = 128;     // 9
+localparam SR_RX_DSP1      = 138;     // 7
+localparam SR_RX_FE1       = 148;     // 5
 
-#define REG_RB_TIME_NOW_HI 0 //TODO
-#define REG_RB_TIME_NOW_LO 0 //TODO
-#define REG_RB_TIME_PPS_HI 0 //TODO
-#define REG_RB_TIME_PPS_LO 0 //TODO
+localparam SR_TIME64       = 192;     // 6
+localparam SR_SPI          = 208;     // 3
+localparam SR_GPIO         = 224;     // 5
+
+#define SR_RX_FRONTEND(which) (SR_RX_FE0 + which*32)
+#define SR_TX_FRONTEND(which) (SR_TX_FE0 + which*32)
+
+#define SR_RX_DSP(which) (SR_RX_DSP0 + which*32)
+#define SR_TX_DSP(which) (SR_TX_DSP0 + which*32)
+
+#define SR_RX_CTRL(which) (SR_RX_CTRL0 + which*32)
+#define SR_TX_CTRL(which) (SR_TX_CTRL0 + which*32)
+
+#define REG_RB_TIME_NOW_HI 10
+#define REG_RB_TIME_NOW_LO 11
+#define REG_RB_TIME_PPS_HI 14
+#define REG_RB_TIME_PPS_LO 15
+#define REG_RB_SPI         0
+#define REG_RB_GPIO        9
+#define REG_RB_COMPAT      1
 
 #endif /* INCLUDED_B200_REGS_HPP */

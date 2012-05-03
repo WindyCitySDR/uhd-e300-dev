@@ -224,6 +224,7 @@ b200_impl::b200_impl(const device_addr_t &device_addr)
         ),
         B200_MAX_PKT_BYTE_LIMIT
     );
+/*
     while (_data_transport->get_recv_buff(0.0)){} //flush data xport
 
     {
@@ -246,7 +247,7 @@ b200_impl::b200_impl(const device_addr_t &device_addr)
     buff.reset();
     std::cout << "fuck yeah v2." << std::endl;
     }
-
+*/
 
     _rx_demux = recv_packet_demuxer::make(_data_transport, _rx_dsps.size(), B200_RX_SID_BASE);
 
@@ -409,7 +410,7 @@ b200_impl::b200_impl(const device_addr_t &device_addr)
     time64_rb_bases.rb_lo_now = REG_RB_TIME_NOW_LO;
     time64_rb_bases.rb_hi_pps = REG_RB_TIME_PPS_HI;
     time64_rb_bases.rb_lo_pps = REG_RB_TIME_PPS_LO;
-    _time64 = time64_core_200::make(_ctrl, SR_TIME_CORE, time64_rb_bases);
+    _time64 = time64_core_200::make(_ctrl, SR_TIME64, time64_rb_bases);
     _tree->access<double>(mb_path / "tick_rate")
         .subscribe(boost::bind(&time64_core_200::set_tick_rate, _time64, _1));
     _tree->create<time_spec_t>(mb_path / "time/now")
@@ -432,7 +433,7 @@ b200_impl::b200_impl(const device_addr_t &device_addr)
     ////////////////////////////////////////////////////////////////////
     // create user-defined control objects
     ////////////////////////////////////////////////////////////////////
-    _user = user_settings_core_200::make(_ctrl, SR_USER_CORE);
+    _user = user_settings_core_200::make(_ctrl, SR_USER_REGS);
     _tree->create<user_settings_core_200::user_reg_t>(mb_path / "user/regs")
         .subscribe(boost::bind(&user_settings_core_200::set_reg, _user, _1));
 
@@ -517,6 +518,7 @@ void b200_impl::check_fw_compat(void)
 void b200_impl::check_fpga_compat(void)
 {
     //TODO
+    //_ctrl->peek32(REG_RB_COMPAT);....
 }
 
 void b200_impl::update_clock_source(const std::string &)
