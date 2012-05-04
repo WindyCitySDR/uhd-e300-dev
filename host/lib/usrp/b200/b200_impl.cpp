@@ -39,6 +39,7 @@ using namespace uhd::transport;
 //const boost::uint16_t B200_PRODUCT_ID = 0x0003;
 
 const boost::uint16_t B200_VENDOR_ID  = 0x04b4;
+const boost::uint16_t FX3_PRODUCT_ID = 0x00f3;
 const boost::uint16_t B200_PRODUCT_ID = 0x00f0;
 static const boost::posix_time::milliseconds REENUMERATION_TIMEOUT_MS(3000);
 
@@ -63,7 +64,7 @@ static device_addrs_t b200_find(const device_addr_t &hint)
         sscanf(hint.get("pid").c_str(), "%x", &pid);
     } else {
         vid = B200_VENDOR_ID;
-        pid = B200_PRODUCT_ID;
+        pid = FX3_PRODUCT_ID;
     }
 
     // Important note:
@@ -76,7 +77,6 @@ static device_addrs_t b200_find(const device_addr_t &hint)
     size_t found = 0;
     BOOST_FOREACH(usb_device_handle::sptr handle, usb_device_handle::get_device_list(vid, pid)) {
         //extract the firmware path for the b200
-        /*
         std::string b200_fw_image;
         try{
             b200_fw_image = find_image_path(hint.get("fw", B200_FW_FILE_NAME));
@@ -95,7 +95,6 @@ static device_addrs_t b200_find(const device_addr_t &hint)
         catch(const uhd::exception &){continue;} //ignore claimed
 
         b200_iface::make(control)->load_firmware(b200_fw_image);
-        */
 
         found++;
     }

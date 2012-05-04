@@ -40,7 +40,7 @@
 #include <uhd/transport/usb_zero_copy.hpp>
 #include <boost/weak_ptr.hpp>
 
-static const std::string     B200_FW_FILE_NAME = "usrp_b200_fw.bin";
+static const std::string     B200_FW_FILE_NAME = "usrp_b200_fw.ihx";
 static const std::string     B200_FPGA_FILE_NAME = "usrp_b200_fpga.bin";
 static const boost::uint16_t B200_FW_COMPAT_NUM = 0x03;
 static const boost::uint16_t B200_FPGA_COMPAT_NUM = 0x09;

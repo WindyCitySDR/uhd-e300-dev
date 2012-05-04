@@ -213,7 +213,7 @@ public:
         const char *filename = filestring.c_str();
 
         hash_type hash = generate_hash(filename);
-        
+
         //TODO
         //hash_type loaded_hash; usrp_get_firmware_hash(loaded_hash);
         //if (not force and (hash == loaded_hash)) return;
