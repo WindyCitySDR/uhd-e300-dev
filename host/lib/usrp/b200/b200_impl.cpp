@@ -100,6 +100,8 @@ static device_addrs_t b200_find(const device_addr_t &hint)
     }
 
     //get descriptors again with serial number, but using the initialized VID/PID now since we have firmware
+    //TODO
+    found = 1;
     vid = B200_VENDOR_ID;
     pid = B200_PRODUCT_ID;
 
