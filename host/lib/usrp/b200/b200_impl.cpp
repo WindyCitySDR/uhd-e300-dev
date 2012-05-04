@@ -187,15 +187,16 @@ b200_impl::b200_impl(const device_addr_t &device_addr)
 
     //load the fpga
     //TODO
-    //_iface->load_fpga(b200_fpga_image);
+//    _iface->load_fpga(b200_fpga_image);
+    _iface->load_fpga("");
 
     ////////////////////////////////////////////////////////////////////
     // Create control transport
     ////////////////////////////////////////////////////////////////////
     device_addr_t ctrl_xport_args;
-    ctrl_xport_args["recv_frame_size"] = "2048";
+    ctrl_xport_args["recv_frame_size"] = "512";
     ctrl_xport_args["num_recv_frames"] = "16";
-    ctrl_xport_args["send_frame_size"] = "2048";
+    ctrl_xport_args["send_frame_size"] = "512";
     ctrl_xport_args["num_send_frames"] = "16";
 
     _ctrl_transport = usb_zero_copy::make(
@@ -254,8 +255,8 @@ b200_impl::b200_impl(const device_addr_t &device_addr)
     ////////////////////////////////////////////////////////////////////
     // Initialize control (settings regs and async messages)
     ////////////////////////////////////////////////////////////////////
-    /*
     _ctrl = b200_ctrl::make(_ctrl_transport);
+    /*
     this->check_fpga_compat(); //check after making
     */
 
@@ -271,12 +272,11 @@ b200_impl::b200_impl(const device_addr_t &device_addr)
     // setup the mboard eeprom
     ////////////////////////////////////////////////////////////////////
     // TODO
-    /*
-    const mboard_eeprom_t mb_eeprom(*_iface, mboard_eeprom_t::MAP_B100);
+//    const mboard_eeprom_t mb_eeprom(*_iface, mboard_eeprom_t::MAP_B100);
+    const mboard_eeprom_t mb_eeprom;
     _tree->create<mboard_eeprom_t>(mb_path / "eeprom")
         .set(mb_eeprom)
         .subscribe(boost::bind(&b200_impl::set_mb_eeprom, this, _1));
-    */
 
     ////////////////////////////////////////////////////////////////////
     // create codec control objects
@@ -444,7 +444,7 @@ b200_impl::b200_impl(const device_addr_t &device_addr)
     {
         const std::string x = std::string(1, tolower(fe_name[0]));
         const std::string y = std::string(1, fe_name[3]);
-        const fs_path rf_fe_path = mb_path / (x+"x_frontends") / y;
+        const fs_path rf_fe_path = mb_path / "dboards" / "A" / (x+"x_frontends") / y;
 
         _tree->create<std::string>(rf_fe_path / "name").set(fe_name);
         _tree->create<int>(rf_fe_path / "sensors"); //empty TODO

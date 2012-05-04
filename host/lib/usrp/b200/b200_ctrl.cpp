@@ -213,9 +213,7 @@ private:
         if (not buff){
             throw uhd::runtime_error("fifo ctrl timed out getting a send buffer");
         }
-        boost::uint32_t *trans = buff->cast<boost::uint32_t *>();
-        trans[0] = uhd::htowx(++_seq_out);
-        boost::uint32_t *pkt = trans + 1;
+        boost::uint32_t *pkt = buff->cast<boost::uint32_t *>();
 
         //load packet info
         vrt::if_packet_info_t packet_info;
@@ -241,7 +239,7 @@ private:
         pkt[packet_info.num_header_words32+1] = uhd::htowx(data);
 
         //send the buffer over the interface
-        buff->commit(sizeof(boost::uint32_t)*(packet_info.num_packet_words32+1));
+        buff->commit(sizeof(boost::uint32_t)*(packet_info.num_packet_words32));
     }
 
     UHD_INLINE bool wraparound_lt16(const boost::int16_t i0, const boost::int16_t i1){

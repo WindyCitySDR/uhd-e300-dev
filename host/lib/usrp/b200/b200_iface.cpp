@@ -42,6 +42,7 @@ const static boost::uint8_t VRT_VENDOR_IN = 0xC0;
 const static boost::uint8_t B200_VREQ_LOOP = 0x22;
 const static boost::uint8_t B200_VREQ_SPI_WRITE = 0x32;
 const static boost::uint8_t B200_VREQ_SPI_READ = 0x42;
+const static boost::uint8_t B200_VREQ_FPGA_RESET = 0x62;
 
 typedef boost::uint32_t hash_type;
 
@@ -320,8 +321,19 @@ public:
 
     void load_fpga(const std::string filestring)
     {
-        //TODO
-        boost::this_thread::sleep(boost::posix_time::milliseconds(1000));
+        unsigned char data[4];
+        data[0] = 1;
+        data[1] = 0;
+        data[2] = 0;
+        data[3] = 0;
+
+        fx3_control_write(B200_VREQ_FPGA_RESET, 0x00, \
+                0x00, data, 4);
+
+        data[0] = 0;
+
+        fx3_control_write(B200_VREQ_FPGA_RESET, 0x00, \
+                0x00, data, 4);
     }
 
 

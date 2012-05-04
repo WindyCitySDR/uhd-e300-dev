@@ -34,26 +34,31 @@ public:
     std::vector<std::string> get_gain_names(const std::string &which)
     {
         //TODO
+        return std::vector<std::string>();
     }
 
     double set_gain(const std::string &which, const std::string &name, const double value)
     {
         //TODO
+        return 0.0;
     }
 
     uhd::meta_range_t get_gain_range(const std::string &which, const std::string &name)
     {
         //TODO
+        return uhd::meta_range_t(0.0, 0.0);
     }
 
     double set_clock_rate(const double rate)
     {
         //TODO
+        return 40e6;
     }
 
     double tune(const std::string &which, const double value)
     {
         //TODO
+        return 0.0;
     }
 
 private:
