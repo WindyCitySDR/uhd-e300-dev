@@ -41,7 +41,8 @@ localparam SR_RX_FE1       = 148;     // 5
 
 localparam SR_TIME64       = 192;     // 6
 localparam SR_SPI          = 208;     // 3
-localparam SR_GPIO         = 224;     // 5
+localparam SR_GPIO0        = 224;     // 5
+localparam SR_GPIO1        = 232;     // 5
 
 #define SR_RX_FRONTEND(which) (SR_RX_FE0 + which*32)
 #define SR_TX_FRONTEND(which) (SR_TX_FE0 + which*32)
@@ -57,7 +58,6 @@ localparam SR_GPIO         = 224;     // 5
 #define REG_RB_TIME_PPS_HI 14
 #define REG_RB_TIME_PPS_LO 15
 #define REG_RB_SPI         0
-#define REG_RB_GPIO        9
 #define REG_RB_COMPAT      1
 
 #endif /* INCLUDED_B200_REGS_HPP */

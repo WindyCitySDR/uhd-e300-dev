@@ -26,6 +26,7 @@
 #include "rx_dsp_core_200.hpp"
 #include "tx_dsp_core_200.hpp"
 #include "time64_core_200.hpp"
+#include "gpio_core_200.hpp"
 #include "user_settings_core_200.hpp"
 #include "recv_packet_demuxer.hpp"
 #include <uhd/device.hpp>
@@ -78,6 +79,8 @@ private:
     std::vector<tx_dsp_core_200::sptr> _tx_dsps;
     time64_core_200::sptr _time64;
     user_settings_core_200::sptr _user;
+    gpio_core_200::sptr _atr0;
+    gpio_core_200::sptr _atr1;
 
     //transports
     uhd::transport::zero_copy_if::sptr _data_transport;
@@ -102,6 +105,18 @@ private:
     void update_tx_samp_rate(const size_t, const double rate);
     void update_clock_source(const std::string &);
     void update_tick_rate(const double rate);
+
+    struct gpio_state{
+        boost::uint32_t ext_ref_enable, dac_shdn, pps_fpga_out_enable, pps_gps_out_enable, gps_out_enable, gps_ref_enable;
+        boost::uint32_t tx_bandsel_a, tx_bandsel_b, rx_bandsel_a, rx_bandsel_b, rx_bandsel_c;
+        boost::uint32_t mimo;
+        boost::uint32_t LED_RX1, LED_RX2, LED_TXRX1_RX, LED_TXRX1_TX, LED_TXRX2_RX, LED_TXRX2_TX;
+        boost::uint32_t tx_enable1, tx_enable2;
+        boost::uint32_t SFDX2_RX, SFDX2_TX, SRX2_RX, SRX2_TX, SFDX1_RX, SFDX1_TX, SRX1_RX, SRX1_TX;
+        boost::uint32_t codec_txrx, codec_en_agc, codec_ctrl_in;
+    } _gpio_state;
+
+    void update_gpio_state(void);
 };
 
 #endif /* INCLUDED_B200_IMPL_HPP */

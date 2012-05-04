@@ -281,6 +281,14 @@ b200_impl::b200_impl(const device_addr_t &device_addr)
         .subscribe(boost::bind(&b200_impl::set_mb_eeprom, this, _1));
 
     ////////////////////////////////////////////////////////////////////
+    // create gpio and misc controls
+    ////////////////////////////////////////////////////////////////////
+    _atr0 = gpio_core_200::make(_ctrl, SR_GPIO0, 0/*unused*/);
+    _atr1 = gpio_core_200::make(_ctrl, SR_GPIO1, 0/*unused*/);
+    _gpio_state = gpio_state(); //clear all to zero
+    update_gpio_state(); //first time init
+
+    ////////////////////////////////////////////////////////////////////
     // create codec control objects
     ////////////////////////////////////////////////////////////////////
     _codec_ctrl = b200_codec_ctrl::make(_iface);
@@ -526,4 +534,25 @@ void b200_impl::check_fpga_compat(void)
 void b200_impl::update_clock_source(const std::string &)
 {
     //TODO
+}
+
+void b200_impl::update_gpio_state(void)
+{
+    //TODO a lot more TODO
+
+    const boost::uint32_t misc_word = 0
+        | (_gpio_state.ext_ref_enable << 21)
+        | (_gpio_state.dac_shdn << 20)
+        | (_gpio_state.pps_fpga_out_enable << 19)
+        | (_gpio_state.pps_gps_out_enable << 18)
+        | (_gpio_state.gps_out_enable << 17)
+        | (_gpio_state.gps_ref_enable << 16)
+        | (_gpio_state.tx_bandsel_a << 12)
+        | (_gpio_state.tx_bandsel_b << 11)
+        | (_gpio_state.rx_bandsel_a << 10)
+        | (_gpio_state.rx_bandsel_b << 9)
+        | (_gpio_state.rx_bandsel_c << 8)
+        | (_gpio_state.mimo << 0)
+    ;
+    _ctrl->poke32(SR_MISC, misc_word);
 }
