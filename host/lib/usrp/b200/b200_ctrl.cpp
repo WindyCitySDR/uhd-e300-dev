@@ -220,7 +220,7 @@ private:
         packet_info.packet_type = vrt::if_packet_info_t::PACKET_TYPE_CONTEXT;
         packet_info.num_payload_words32 = 2;
         packet_info.num_payload_bytes = packet_info.num_payload_words32*sizeof(boost::uint32_t);
-        packet_info.packet_count = _seq_out;
+        packet_info.packet_count = ++_seq_out;
         packet_info.tsf = _time.to_ticks(_tick_rate);
         packet_info.sob = false;
         packet_info.eob = false;

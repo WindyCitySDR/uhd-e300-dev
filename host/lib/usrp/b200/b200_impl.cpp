@@ -211,9 +211,9 @@ b200_impl::b200_impl(const device_addr_t &device_addr)
     // Create data transport
     ////////////////////////////////////////////////////////////////////
     device_addr_t data_xport_args;
-    data_xport_args["recv_frame_size"] = device_addr.get("recv_frame_size", "512");
+    data_xport_args["recv_frame_size"] = device_addr.get("recv_frame_size", "16384");
     data_xport_args["num_recv_frames"] = device_addr.get("num_recv_frames", "16");
-    data_xport_args["send_frame_size"] = device_addr.get("send_frame_size", "512");
+    data_xport_args["send_frame_size"] = device_addr.get("send_frame_size", "16384");
     data_xport_args["num_send_frames"] = device_addr.get("num_send_frames", "16");
 
     _data_transport = usb_zero_copy::make_wrapper(
@@ -250,7 +250,8 @@ b200_impl::b200_impl(const device_addr_t &device_addr)
     }
 */
 
-    _rx_demux = recv_packet_demuxer::make(_data_transport, _rx_dsps.size(), B200_RX_SID_BASE);
+    //TODO
+    _rx_demux = recv_packet_demuxer::make(_data_transport, B200_NUM_RX_FE, B200_RX_SID_BASE);
 
     ////////////////////////////////////////////////////////////////////
     // Initialize control (settings regs and async messages)
