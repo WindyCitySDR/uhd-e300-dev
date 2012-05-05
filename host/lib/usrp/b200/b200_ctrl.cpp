@@ -41,9 +41,9 @@ static const double ACK_TIMEOUT = 0.5;
 static const double MASSIVE_TIMEOUT = 10.0; //for when we wait on a timed command
 static const boost::uint32_t MAX_SEQS_OUT = 16;
 
-#define SPI_DIV SR_SPI + 0
-#define SPI_CTRL SR_SPI + 1
-#define SPI_DATA SR_SPI + 2
+#define SPI_DIV SR_SPI_CORE + 0
+#define SPI_CTRL SR_SPI_CORE + 4
+#define SPI_DATA SR_SPI_CORE + 8
 // spi clock rate = master_clock/(div+1)/2 (10MHz in this case)
 #define SPI_DIVIDER 4
 
@@ -234,7 +234,7 @@ private:
         vrt::if_hdr_pack_le(pkt, packet_info);
 
         //load payload
-        const boost::uint32_t ctrl_word = (addr & 0xff) | cmd | (_seq_out << 16);
+        const boost::uint32_t ctrl_word = (addr/4 & 0xff) | cmd | (_seq_out << 16);
         pkt[packet_info.num_header_words32+0] = uhd::htowx(ctrl_word);
         pkt[packet_info.num_header_words32+1] = uhd::htowx(data);
 

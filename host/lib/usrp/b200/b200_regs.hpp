@@ -44,14 +44,19 @@ localparam SR_SPI          = 208;     // 3
 localparam SR_GPIO0        = 224;     // 5
 localparam SR_GPIO1        = 232;     // 5
 
-#define SR_RX_FRONTEND(which) (SR_RX_FE0 + which*32)
-#define SR_TX_FRONTEND(which) (SR_TX_FE0 + which*32)
+#define SR_RX_FRONTEND(which) (SR_RX_FE0 + which*32)*4
+#define SR_TX_FRONTEND(which) (SR_TX_FE0 + which*32)*4
 
-#define SR_RX_DSP(which) (SR_RX_DSP0 + which*32)
-#define SR_TX_DSP(which) (SR_TX_DSP0 + which*32)
+#define SR_RX_DSP(which) (SR_RX_DSP0 + which*32)*4
+#define SR_TX_DSP(which) (SR_TX_DSP0 + which*32)*4
 
-#define SR_RX_CTRL(which) (SR_RX_CTRL0 + which*32)
-#define SR_TX_CTRL(which) (SR_TX_CTRL0 + which*32)
+#define SR_RX_CTRL(which) (SR_RX_CTRL0 + which*32)*4
+#define SR_TX_CTRL(which) (SR_TX_CTRL0 + which*32)*4
+
+#define SR_RX_GPIO(which) (SR_GPIO0 + which*8)*4
+
+#define SR_TIME64_CORE (SR_TIME64)*4
+#define SR_SPI_CORE (SR_SPI)*4
 
 #define REG_RB_TIME_NOW_HI 10
 #define REG_RB_TIME_NOW_LO 11

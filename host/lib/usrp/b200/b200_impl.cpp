@@ -283,8 +283,8 @@ b200_impl::b200_impl(const device_addr_t &device_addr)
     ////////////////////////////////////////////////////////////////////
     // create gpio and misc controls
     ////////////////////////////////////////////////////////////////////
-    _atr0 = gpio_core_200::make(_ctrl, SR_GPIO0, 0/*unused*/);
-    _atr1 = gpio_core_200::make(_ctrl, SR_GPIO1, 0/*unused*/);
+    _atr0 = gpio_core_200::make(_ctrl, SR_RX_GPIO(0), 0/*unused*/);
+    _atr1 = gpio_core_200::make(_ctrl, SR_RX_GPIO(1), 0/*unused*/);
     _gpio_state = gpio_state(); //clear all to zero
 
     //set bandsel switches to A band fixed for now
@@ -453,7 +453,7 @@ b200_impl::b200_impl(const device_addr_t &device_addr)
     time64_rb_bases.rb_lo_now = REG_RB_TIME_NOW_LO;
     time64_rb_bases.rb_hi_pps = REG_RB_TIME_PPS_HI;
     time64_rb_bases.rb_lo_pps = REG_RB_TIME_PPS_LO;
-    _time64 = time64_core_200::make(_ctrl, SR_TIME64, time64_rb_bases);
+    _time64 = time64_core_200::make(_ctrl, SR_TIME64_CORE, time64_rb_bases);
     _tree->access<double>(mb_path / "tick_rate")
         .subscribe(boost::bind(&time64_core_200::set_tick_rate, _time64, _1));
     _tree->create<time_spec_t>(mb_path / "time/now")
