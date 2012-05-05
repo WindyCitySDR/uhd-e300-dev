@@ -81,7 +81,9 @@ public:
         write_reg(0x23d,0x00); //clear RX 1/2 VCO cal clk
         write_reg(0x27d,0x00); //"" TX
 
-        set_clock_rate(40e6); //init ref clk
+        
+
+        //set_clock_rate(40e6); //init ref clk (done above)
     }
 
     std::vector<std::string> get_gain_names(const std::string &which)
@@ -120,7 +122,57 @@ public:
         //setup charge pump based on horrible PLL lock doc
         //setup VCO/RFPLL based on rx/tx freq
         //VCO cal
-        return 0.0;
+
+        //this is the example 800MHz/850MHz stuff from the tuning document
+        //set rx to 800, tx to 850
+        if(which == "RX") {
+            //set up synth
+            write_reg(0x23a, 0x4a);//vco output level
+            write_reg(0x239, 0xc3);//init ALC value and VCO varactor
+            write_reg(0x242, 0x1f);//vco bias and bias ref
+            write_reg(0x238, 0x78);//vco cal offset
+            write_reg(0x245, 0x00);//vco cal ref tcf
+            write_reg(0x251, 0x0c);//varactor ref
+            write_reg(0x250, 0x70);//vco varactor ref tcf
+            write_reg(0x240, 0x09);//rx synth loop filter r3
+            write_reg(0x23f, 0xdf);//r1 and c3
+            write_reg(0x23e, 0xd4);//c2 and c1
+            write_reg(0x23b, 0x92);//Icp
+
+            //tune that shit
+            write_reg(0x233, 0x00);
+            write_reg(0x234, 0x00);
+            write_reg(0x235, 0x00);
+            write_reg(0x232, 0x00);
+            write_reg(0x231, 0x50);
+            write_reg(0x005, 0x22);
+            
+            //TODO: read reg 0x247, verify bit 1 (RX PLL locked)
+            return 800.0e6;
+        } else {
+            write_reg(0x27a, 0x4a);//vco output level
+            write_reg(0x279, 0xc1);//init ALC value and VCO varactor
+            write_reg(0x282, 0x17);//vco bias and bias ref
+            write_reg(0x278, 0x70);//vco cal offset
+            write_reg(0x285, 0x00);//vco cal ref tcf
+            write_reg(0x291, 0x0e);//varactor ref
+            write_reg(0x290, 0x70);//vco varactor ref tcf
+            write_reg(0x280, 0x09);//rx synth loop filter r3
+            write_reg(0x27f, 0xdf);//r1 and c3
+            write_reg(0x27e, 0xd4);//c2 and c1
+            write_reg(0x27b, 0x98);//Icp
+
+            //tuning yo
+            write_reg(0x273, 0x00);
+            write_reg(0x274, 0x00);
+            write_reg(0x275, 0x00);
+            write_reg(0x272, 0x00);
+            write_reg(0x271, 0x55);
+            write_reg(0x005, 0x22);
+            
+            //TODO: read reg 0x287, verify bit 1 (TX PLL locked)
+            return 850.0e6;
+        }
     }
 
     virtual double set_sample_rate(const double rate)
