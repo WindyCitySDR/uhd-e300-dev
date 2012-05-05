@@ -430,7 +430,7 @@ b200_impl::b200_impl(const device_addr_t &device_addr)
     {
         const fs_path tx_dsp_path = mb_path / str(boost::format("tx_dsps/%u") % dspno);
         _tx_dsps[dspno] = tx_dsp_core_200::make(_ctrl, SR_TX_DSP(dspno), SR_TX_CTRL(dspno), B200_ASYNC_SID_BASE + dspno);
-        _tx_dsps[dspno]->set_link_rate(B200_RX_SID_BASE);
+        _tx_dsps[dspno]->set_link_rate(B200_LINK_RATE_BPS);
         _tree->access<double>(mb_path / "tick_rate")
             .subscribe(boost::bind(&tx_dsp_core_200::set_tick_rate, _tx_dsps[dspno], _1));
         _tree->create<meta_range_t>(tx_dsp_path / "rate/range")

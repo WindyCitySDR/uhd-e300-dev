@@ -58,11 +58,11 @@ localparam SR_GPIO1        = 232;     // 5
 #define SR_TIME64_CORE (SR_TIME64)*4
 #define SR_SPI_CORE (SR_SPI)*4
 
-#define REG_RB_TIME_NOW_HI 10
-#define REG_RB_TIME_NOW_LO 11
-#define REG_RB_TIME_PPS_HI 14
-#define REG_RB_TIME_PPS_LO 15
-#define REG_RB_SPI         0
-#define REG_RB_COMPAT      1
+#define REG_RB_TIME_NOW_HI 10*4
+#define REG_RB_TIME_NOW_LO 11*4
+#define REG_RB_TIME_PPS_HI 14*4
+#define REG_RB_TIME_PPS_LO 15*4
+#define REG_RB_SPI         0*4
+#define REG_RB_COMPAT      1*4
 
 #endif /* INCLUDED_B200_REGS_HPP */
