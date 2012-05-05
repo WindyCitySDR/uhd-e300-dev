@@ -38,9 +38,9 @@ public:
         /********setup basic stuff (chip level setup 0-7)*/
         //enable RX1, TX1 @ 8Msps
         //TX1 en, THB3 interp x2, THB2 interp x2 fil. en, THB1 en, TX FIR interp 4 en
-        write_reg(0x002, 0b01011111);
+        write_reg(0x002, 0b01011111); //FIXME?
         //RX1 en, RHB3 decim x2, RHB2 decim x2 fil. en, RHB1 en, RX FIR decim 4 en
-        write_reg(0x003, 0b01011111);
+        write_reg(0x003, 0b01011111); //FIXME?
         //select TX1A/TX2A, RX antennas in balanced mode on ch. A
         write_reg(0x004, 0b00000011);
 
@@ -54,11 +54,11 @@ public:
 
         /********setup data ports (FDD dual port DDR CMOS)*/
         //FDD dual port DDR CMOS no swap
-        write_reg(0x010, 0b00001000);
+        write_reg(0x010, 0b00001000); //FIXME?
         write_reg(0x011, 0b00000000);
         write_reg(0x012, 0b00000010); //force TX on one port, RX on the other, come back to this one
         write_reg(0x013, 0b00000001); //enable ENSM
-        write_reg(0x014, 0b00001000); //use SPI for TXNRX ctrl
+        write_reg(0x014, 0b00001000); //use SPI for TXNRX ctrl //FIXME?
         write_reg(0x015, 0b10000111); //dual synth mode, synth en ctrl en
 
         /**initial VCO setup*/
@@ -76,10 +76,10 @@ public:
         write_reg(0x290,0x70); //"" TX
         write_reg(0x239,0xc1); //init RX ALC
         write_reg(0x279,0xc1); //"" TX
-        write_reg(0x23b,0x80); //set RX MSB?
-        write_reg(0x27b,0x80); //"" TX
-        write_reg(0x23d,0x00); //clear RX 1/2 VCO cal clk
-        write_reg(0x27d,0x00); //"" TX
+        write_reg(0x23b,0x80); //set RX MSB? //FIXME?
+        write_reg(0x27b,0x80); //"" TX //FIXME?
+        write_reg(0x23d,0x00); //clear RX 1/2 VCO cal clk //FIXME?
+        write_reg(0x27d,0x00); //"" TX //FIXME?
 
         //ATRs configured in b200_impl()        
 
@@ -191,17 +191,17 @@ private:
     void write_reg(uint16_t reg, uint8_t val)
     {
         uint8_t buf[3];
-        buf[0] = (reg >> 8) & 0x3F;
+        buf[0] = (0x80 | ((reg >> 8) & 0x3F));
         buf[1] = (reg & 0xFF);
         buf[2] = val;
-        _b200_iface->transact_spi(buf, 24, false);
+        _b200_iface->transact_spi(buf, 24, NULL, 0);
     }
 
     uint8_t read_reg(uint16_t reg) {
         uint8_t buf[3];
         buf[0] = (reg >> 8) & 0x3F;
         buf[1] = (reg & 0xFF);
-        _b200_iface->transact_spi(buf, 24, true);
+        _b200_iface->transact_spi(buf, 16, buf, 24);
         return buf[2];
     }
 };
