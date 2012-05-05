@@ -81,6 +81,7 @@ public:
         write_reg(0x23d,0x00); //clear RX 1/2 VCO cal clk
         write_reg(0x27d,0x00); //"" TX
 
+        //configure GPIOs for antenna switching full duplex
         
 
         //set_clock_rate(40e6); //init ref clk (done above)
