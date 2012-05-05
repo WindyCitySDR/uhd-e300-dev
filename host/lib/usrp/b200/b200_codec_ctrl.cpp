@@ -81,8 +81,7 @@ public:
         write_reg(0x23d,0x00); //clear RX 1/2 VCO cal clk
         write_reg(0x27d,0x00); //"" TX
 
-        //configure GPIOs for antenna switching full duplex
-        
+        //ATRs configured in b200_impl()        
 
         //set_clock_rate(40e6); //init ref clk (done above)
     }
@@ -191,11 +190,19 @@ private:
 
     void write_reg(uint16_t reg, uint8_t val)
     {
-        uint8_t buf[4];
+        uint8_t buf[3];
         buf[0] = (reg >> 8) & 0x3F;
         buf[1] = (reg & 0xFF);
         buf[2] = val;
         _b200_iface->transact_spi(buf, 24, false);
+    }
+
+    uint8_t read_reg(uint16_t reg) {
+        uint8_t buf[3];
+        buf[0] = (reg >> 8) & 0x3F;
+        buf[1] = (reg & 0xFF);
+        _b200_iface->transact_spi(buf, 24, true);
+        return buf[2];
     }
 };
 
