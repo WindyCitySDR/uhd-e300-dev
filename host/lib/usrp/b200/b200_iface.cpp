@@ -30,7 +30,6 @@
 #include <cstring>
 #include <cmath>
 
-
 using namespace uhd;
 using namespace uhd::transport;
 
@@ -171,31 +170,34 @@ public:
 
 
     void transact_spi(
-        unsigned char *data,
-        size_t num_bits,
-        bool readback
+        unsigned char *tx_data,
+        size_t num_tx_bits,
+        unsigned char *rx_data,
+        size_t num_rx_bits
     ){
         int ret = 0;
-        boost::uint16_t length = std::ceil(num_bits / 8);
+        boost::uint16_t tx_length = std::ceil(num_tx_bits / 8);
 
-        if(data[0] & 0x80) {
+        if(tx_data[0] & 0x80) {
             ret = fx3_control_write(B200_VREQ_SPI_WRITE, 0x00, \
-                    0x00, data, length);
+                    0x00, tx_data, tx_length);
         } else {
             ret = fx3_control_write(B200_VREQ_SPI_READ, 0x00, \
-                    0x00, data, length);
+                    0x00, tx_data, tx_length);
         }
 
-        if(ret != 0) {
+        if(ret < 0) {
             throw uhd::io_error("transact_spi: fx3_control_write failed!");
         }
 
 
-        if(readback) {
-            ret = fx3_control_write(B200_VREQ_LOOP, 0x00, \
-                    0x00, data, length);
+        if(num_rx_bits) {
+            boost::uint16_t total_length = std::ceil(num_rx_bits / 8);
 
-            if(ret != 0) {
+            ret = fx3_control_write(B200_VREQ_LOOP, 0x00, \
+                    0x00, rx_data, total_length);
+
+            if(ret < 0) {
                 throw uhd::io_error("transact_spi: readback failed!");
             }
         }

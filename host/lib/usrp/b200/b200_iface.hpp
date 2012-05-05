@@ -41,8 +41,8 @@ public:
     virtual void load_fpga(const std::string filestring) = 0;
 
     //! send SPI through the FX3
-    virtual void transact_spi(unsigned char *data, size_t num_bits, \
-            bool readback) = 0;
+    virtual void transact_spi( unsigned char *tx_data, size_t num_tx_bits, \
+            unsigned char *rx_data, size_t num_rx_bits) = 0;
 };
 
 
