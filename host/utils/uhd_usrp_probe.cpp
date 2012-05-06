@@ -115,7 +115,6 @@ static std::string get_dboard_pp_string(const std::string &type, property_tree::
     ss << boost::format("%s Dboard: %s") % type % path.leaf() << std::endl;
     //ss << std::endl;
     const std::string prefix = (type == "RX")? "rx" : "tx";
-    /*
     usrp::dboard_eeprom_t db_eeprom = tree->access<usrp::dboard_eeprom_t>(path / (prefix + "_eeprom")).get();
     if (db_eeprom.id != usrp::dboard_id_t::none()) ss << boost::format("ID: %s") % db_eeprom.id.to_pp_string() << std::endl;
     if (not db_eeprom.serial.empty()) ss << boost::format("Serial: %s") % db_eeprom.serial << std::endl;
@@ -124,7 +123,6 @@ static std::string get_dboard_pp_string(const std::string &type, property_tree::
         if (gdb_eeprom.id != usrp::dboard_id_t::none()) ss << boost::format("ID: %s") % gdb_eeprom.id.to_pp_string() << std::endl;
         if (not gdb_eeprom.serial.empty()) ss << boost::format("Serial: %s") % gdb_eeprom.serial << std::endl;
     }
-    */
     BOOST_FOREACH(const std::string &name, tree->list(path / (prefix + "_frontends"))){
         ss << make_border(get_frontend_pp_string(type, tree, path / (prefix + "_frontends") / name));
     }

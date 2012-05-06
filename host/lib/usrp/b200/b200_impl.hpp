@@ -1,5 +1,4 @@
-//
-// Copyright 2012 Ettus Research LLC
+// // Copyright 2012 Ettus Research LLC
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -53,6 +52,28 @@ static const boost::uint32_t B200_RX_SID_BASE = 30;
 static const boost::uint32_t B200_TX_SID_BASE = 40;
 static const size_t          B200_NUM_RX_FE = 2;
 static const size_t          B200_NUM_TX_FE = 2;
+
+
+static const uint8_t LED_TXRX_TX = (1 << 0);
+static const uint8_t LED_TXRX_RX = (1 << 1);
+static const uint8_t LED_RX = (1 << 2);
+static const uint8_t SRX_TX = (1 << 3);
+static const uint8_t SRX_RX = (1 << 4);
+static const uint8_t SFDX_TX = (1 << 5);
+static const uint8_t SFDX_RX = (1 << 6);
+static const uint8_t TX_ENABLE = (1 << 7);
+
+static const uint8_t STATE_OFF = 0x00;
+static const uint8_t STATE_TX = (LED_TXRX_TX | SFDX_TX | TX_ENABLE);
+static const uint8_t STATE_RX_ON_TXRX = (LED_TXRX_RX | SRX_TX | SRX_RX);
+static const uint8_t STATE_RX_ON_RX2 = (LED_RX | SFDX_RX);
+static const uint8_t STATE_FDX = (LED_TXRX_TX | LED_RX | SFDX_TX 
+                                  | SFDX_RX | TX_ENABLE);
+
+//FIXME -- What do these do?
+static const uint8_t CODEC_CTRL_IN = 0x04;
+static const uint8_t CODEC_EN_AGC = 0x10;
+static const uint8_t CODEC_TXRX = 0x20;
 
 //! Implementation guts
 class b200_impl : public uhd::device {

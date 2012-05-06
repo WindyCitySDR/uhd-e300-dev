@@ -271,6 +271,9 @@ b200_impl::b200_impl(const device_addr_t &device_addr)
     _gpio_state = gpio_state(); //clear all to zero
 
     //set bandsel switches to A band fixed for now
+    //assign { /* 2'bX, */ ext_ref_enable, dac_shdn, pps_fpga_out_enable, pps_gps_out_enable, gps_out_enable, gps_ref_enable } = misc_outs[23:16];
+    //assign { /* 3'bX, */ tx_bandsel_a, tx_bandsel_b, rx_bandsel_a, rx_bandsel_b, rx_bandsel_c } = misc_outs[15:8];
+    //assign { /* 7'bX, */ mimo } = misc_outs[7:0];
     _gpio_state.tx_bandsel_a = 1;
     _gpio_state.rx_bandsel_a = 1;
     update_gpio_state(); //first time init
@@ -286,22 +289,22 @@ b200_impl::b200_impl(const device_addr_t &device_addr)
     _atr1->set_pin_ctrl(dboard_iface::UNIT_RX, 0x0000);
     
     _atr0->set_gpio_ddr(dboard_iface::UNIT_TX, //upper 16
-                       0b0000000011111111);
+                       0xFFFF);
     _atr0->set_gpio_ddr(dboard_iface::UNIT_RX, //lower 16
-                       0b0000000000110000);
+                       0x30);
     _atr1->set_gpio_ddr(dboard_iface::UNIT_TX, //upper 16
-                       0b0000000011111111);
+                       0xFFFF);
     _atr1->set_gpio_ddr(dboard_iface::UNIT_RX, //lower 16
-                       0b0000000000000000);
-                       
+                       0xFFFF);
+
     _atr0->set_gpio_out(dboard_iface::UNIT_TX, //upper 16
-                       0b0000000011100111);
+                        STATE_TX);
     _atr0->set_gpio_out(dboard_iface::UNIT_RX, //lower 16
-                       0b0000000000100000);
+                        CODEC_TXRX);
     _atr1->set_gpio_out(dboard_iface::UNIT_TX, //upper 16
-                       0b0000000011100111);
+                        STATE_TX);
     _atr1->set_gpio_out(dboard_iface::UNIT_RX, //lower 16
-                       0b0000000000000000);    
+                        0x00);    
                        
 
     ////////////////////////////////////////////////////////////////////
