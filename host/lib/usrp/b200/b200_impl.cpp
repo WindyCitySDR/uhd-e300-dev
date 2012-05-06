@@ -234,32 +234,7 @@ b200_impl::b200_impl(const device_addr_t &device_addr)
         ),
         B200_MAX_PKT_BYTE_LIMIT
     );
-/*
-    while (_data_transport->get_recv_buff(0.0)){} //flush data xport
 
-    {
-        uhd::transport::managed_send_buffer::sptr buff = _data_transport->get_send_buff(0.0);
-        unsigned char *p = buff->cast<unsigned char *>();
-        for(int i = 0; i < buff->size(); i++) {
-            p[i] = i;
-        }
-        buff->commit(buff->size());
-        std::cout << "fuck yeah." << std::endl;
-    }
-
-    {
-    std::cout << "preparing for fuck yeah v2." << std::endl;
-    uhd::transport::managed_recv_buffer::sptr buff = _data_transport->get_recv_buff(5.0);
-    const unsigned char *p = buff->cast<const unsigned char *>();
-    for(int i = 0; i < buff->size(); i++) {
-        std::cout << std::hex << std::noshowbase << std::setw(2) << p[i] << " ";
-    }
-    buff.reset();
-    std::cout << "fuck yeah v2." << std::endl;
-    }
-*/
-
-    //TODO
     _rx_demux = recv_packet_demuxer::make(_data_transport, B200_NUM_RX_FE, B200_RX_SID_BASE);
 
     ////////////////////////////////////////////////////////////////////
@@ -499,6 +474,7 @@ b200_impl::b200_impl(const device_addr_t &device_addr)
 
         _tree->create<std::string>(rf_fe_path / "name").set(fe_name);
         _tree->create<int>(rf_fe_path / "sensors"); //empty TODO
+        _tree->create<int>(rf_fe_path / "gains"); //TODO empty so it exists (fixed when loop below has iterations)
         BOOST_FOREACH(const std::string &name, _codec_ctrl->get_gain_names(fe_name))
         {
             _tree->create<meta_range_t>(rf_fe_path / "gains" / name / "range")
@@ -508,7 +484,7 @@ b200_impl::b200_impl(const device_addr_t &device_addr)
                 .coerce(boost::bind(&b200_codec_ctrl::set_gain, _codec_ctrl, fe_name, name, _1))
                 .set(0.0);
         }
-        _tree->create<std::string>(rf_fe_path / "connections").set("IQ");
+        _tree->create<std::string>(rf_fe_path / "connection").set("IQ");
         _tree->create<bool>(rf_fe_path / "enabled").set(true);
         _tree->create<bool>(rf_fe_path / "use_lo_offset").set(false);
         _tree->create<double>(rf_fe_path / "bandwidth" / "value").set(0.0); //TODO
