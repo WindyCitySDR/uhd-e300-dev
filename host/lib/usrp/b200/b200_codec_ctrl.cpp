@@ -61,6 +61,10 @@ public:
         write_reg(0x014, 0b00001000); //use SPI for TXNRX ctrl //FIXME 0x21
         write_reg(0x015, 0b10000111); //dual synth mode, synth en ctrl en
 
+        //ian magic
+        write_reg(0x014, 0b00001111);
+        write_reg(0x014, 0x00101011);
+
         /**initial VCO setup*/
         write_reg(0x261,0x00); //RX LO power
         write_reg(0x2a1,0x00); //TX LO power
@@ -147,7 +151,9 @@ public:
             write_reg(0x231, 0x50);
             write_reg(0x005, 0x22);
             
-            //TODO: read reg 0x247, verify bit 1 (RX PLL locked)
+            if((read_reg(0x247) & 0x02) == 0) {
+                std::cout << "RX PLL NOT LOCKED" << std::endl;
+            }
             return 800.0e6;
         } else {
             write_reg(0x27a, 0x4a);//vco output level
@@ -170,7 +176,9 @@ public:
             write_reg(0x271, 0x55);
             write_reg(0x005, 0x22);
             
-            //TODO: read reg 0x287, verify bit 1 (TX PLL locked)
+            if((read_reg(0x287) & 0x02) == 0) {
+                std::cout << "RX PLL NOT LOCKED" << std::endl;
+            }
             return 850.0e6;
         }
     }
@@ -183,6 +191,13 @@ public:
     virtual double set_filter_bw(const std::string &which, const double bw)
     {
         //set up BB filter
+        //set BBLPF1 to 1.6x bw
+        //set BBLPF2 to 2x bw
+        if(which == "TX") {
+
+        } else {
+
+        }
     }
 
 private:
