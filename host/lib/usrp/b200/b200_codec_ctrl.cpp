@@ -38,11 +38,11 @@ public:
         _b200_iface->write_reg(0x000,0x00);
 
         /********setup basic stuff (chip level setup 0-7)*/
-        //enable RX1, TX1 @ 8Msps
+        //enable RX1, TX1 @ 4Msps
         //TX1 en, THB3 interp x2, THB2 interp x2 fil. en, THB1 en, TX FIR interp 4 en
-        _b200_iface->write_reg(0x002, 0b11011111); //FIXME 0b11011110 (both xmit, interp 2)
+        _b200_iface->write_reg(0x002, 0b11011110); //FIXME 0b11011110 (both xmit, interp 2)
         //RX1 en, RHB3 decim x2, RHB2 decim x2 fil. en, RHB1 en, RX FIR decim 4 en
-        _b200_iface->write_reg(0x003, 0b11011111); //FIXME 0b11011110 (both rx, interp 2)
+        _b200_iface->write_reg(0x003, 0b11011110); //FIXME 0b11011110 (both rx, interp 2)
         //select TX1A/TX2A, RX antennas in balanced mode on ch. A
         _b200_iface->write_reg(0x004, 0b00000011);
 
