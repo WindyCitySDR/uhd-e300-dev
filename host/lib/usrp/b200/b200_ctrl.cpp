@@ -87,7 +87,12 @@ public:
         const boost::uint32_t *pkt = buff->cast<const boost::uint32_t *>();
         vrt::if_packet_info_t packet_info;
         packet_info.num_packet_words32 = buff->size()/sizeof(boost::uint32_t);
-        vrt::if_hdr_unpack_le(pkt, packet_info);
+        try{
+            vrt::if_hdr_unpack_le(pkt, packet_info);
+        }
+        catch(const std::exception &ex){
+            UHD_MSG(error) << "B200 ctrl bad VITA packet: " << ex.what() << std::endl;
+        }
         if (packet_info.has_sid and packet_info.sid == B200_CTRL_MSG_SID){
             ctrl_result_t res = ctrl_result_t();
             res.msg[0] = uhd::wtohx(pkt[packet_info.num_header_words32+0]);
@@ -105,7 +110,7 @@ public:
             _async_fifo.push_with_pop_on_full(metadata);
         }
         else{
-            UHD_MSG(error) << "B200 ctrl got unknown SID " << packet_info.sid << std::endl;
+            UHD_MSG(error) << "B200 ctrl got unknown SID: " << packet_info.sid << std::endl;
         }
     }
 
