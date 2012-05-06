@@ -17,6 +17,8 @@
 
 #include "b200_codec_ctrl.hpp"
 
+#include <iostream>
+
 using namespace uhd;
 using namespace uhd::transport;
 
@@ -46,11 +48,11 @@ public:
 
         /**set up clock interface*/
         //enable BBPLL, clocks, external clk
-        write_reg(0x009, 0b00010111);
+//        write_reg(0x009, 0b00010111);
 
         /**set up BBPLL*/
         //BBPLL div 4, clkout enable, dac clk = adc clk, BBPLL div 4
-        write_reg(0x00A, 0b00010010);
+//        write_reg(0x00A, 0b00010010);
 
         /********setup data ports (FDD dual port DDR CMOS)*/
         //FDD dual port DDR CMOS no swap
@@ -63,7 +65,7 @@ public:
 
         //ian magic
         write_reg(0x014, 0b00001111);
-        write_reg(0x014, 0x00101011);
+        write_reg(0x014, 0b00101011);
 
         /**initial VCO setup*/
         write_reg(0x261,0x00); //RX LO power
@@ -88,6 +90,8 @@ public:
         //ATRs configured in b200_impl()        
 
         //set_clock_rate(40e6); //init ref clk (done above)
+        tune("TX", 850e6);
+        tune("RX", 800e6);
     }
 
     std::vector<std::string> get_gain_names(const std::string &which)
