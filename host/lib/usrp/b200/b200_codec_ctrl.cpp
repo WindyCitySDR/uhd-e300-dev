@@ -63,7 +63,7 @@ public:
         //FDD dual port DDR CMOS no swap
         _b200_iface->write_reg(0x010, 0b00001000); //FIXME 0b10101000 (swap TX IQ swap TX1/TX2)
         _b200_iface->write_reg(0x011, 0b00000000);
-        _b200_iface->write_reg(0x012, 0b00000010); //force TX on one port, RX on the other, come back to this one
+        _b200_iface->write_reg(0x012, 0b00000010); //force TX on one port, RX on the other
         _b200_iface->write_reg(0x013, 0b00000001); //enable ENSM
         _b200_iface->write_reg(0x014, 0b00100001); //use SPI for TXNRX ctrl, to alert, TX on
         _b200_iface->write_reg(0x015, 0b00000111); //dual synth mode, synth en ctrl en
@@ -107,14 +107,37 @@ public:
 
     double set_gain(const std::string &which, const std::string &name, const double value)
     {
-        //TODO
-        return 0.0;
+        //use Full Gain Table mode, default table
+        if(which[0] == 'R') {
+            //reg 0x109 bits 6:0 for RX gain
+            //gain table index is dB+3 for 200-1300MHz,
+            //db+5 for 1300-4000
+            //db+14 for 4000-6000
+            int gain_offset;
+            if(_rx_freq < 1300) gain_offset = 3;
+            else if(_rx_freq < 4000) gain_offset = 5;
+            else gain_offset = 14;
+
+            int gainreg = value + gain_offset;
+
+            if(gainreg > 76) gainreg = 76;
+            if(gainreg < 0) gainreg = 0;
+            
+            _b200_iface->write_reg(0x109, gainreg);
+
+            return gainreg - gain_offset;
+        } else {
+            return 0.0;
+        }
     }
 
     uhd::meta_range_t get_gain_range(const std::string &which, const std::string &name)
     {
-        //TODO
-        return uhd::meta_range_t(0.0, 0.0);
+        if(which[0] == 'R') {
+            return uhd::meta_range_t(0.0, 73.0);
+        } else {
+            return uhd::meta_range_t(0.0, 0.0);
+        }
     }
 
     double set_clock_rate(const double rate)
@@ -216,7 +239,8 @@ public:
             if((_b200_iface->read_reg(0x247) & 0x02) == 0) {
                 std::cout << "RX PLL NOT LOCKED" << std::endl;
             }
-            return 800.0e6;
+            _rx_freq = 800.0e6;
+            return _rx_freq;
         } else {
             _b200_iface->write_reg(0x27a, 0x4a);//vco output level
             _b200_iface->write_reg(0x279, 0xc1);//init ALC value and VCO varactor
@@ -241,13 +265,15 @@ public:
             if((_b200_iface->read_reg(0x287) & 0x02) == 0) {
                 std::cout << "TX PLL NOT LOCKED" << std::endl;
             }
-            return 850.0e6;
+            _tx_freq = 850.0e6;
+            return _tx_freq;
         }
     }
 
     virtual double set_sample_rate(const double rate)
     {
         //set up BBPLL
+        return 4e6;
     }
 
     virtual double set_filter_bw(const std::string &which, const double bw)
@@ -264,6 +290,7 @@ public:
 
 private:
     b200_iface::sptr _b200_iface;
+    double _rx_freq, _tx_freq;
 };
 
 /***********************************************************************
