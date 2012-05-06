@@ -276,6 +276,7 @@ b200_impl::b200_impl(const device_addr_t &device_addr)
     //assign { /* 7'bX, */ mimo } = misc_outs[7:0];
     _gpio_state.tx_bandsel_a = 1;
     _gpio_state.rx_bandsel_a = 1;
+    _gpio_state.mimo = 0;
     update_gpio_state(); //first time init
 
     //set ATR for FDX operation fixed GPIO, amps enabled, LEDs all on
