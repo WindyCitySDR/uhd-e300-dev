@@ -133,7 +133,7 @@ public:
 
         //this is the example 800MHz/850MHz stuff from the tuning document
         //set rx to 800, tx to 850
-        if(which == "RX") {
+        if(which[0] == 'R') {
             //set up synth
             _b200_iface->write_reg(0x23a, 0x4a);//vco output level
             _b200_iface->write_reg(0x239, 0xc3);//init ALC value and VCO varactor
