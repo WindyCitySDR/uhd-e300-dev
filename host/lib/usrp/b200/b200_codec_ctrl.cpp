@@ -51,7 +51,7 @@ public:
         _b200_iface->write_reg(0x009, 0b00010111);
 
         /**set up BBPLL*/
-        //set BBPLL to 1024MHz, BBPLL div 8, fref=40MHz
+        //set BBPLL to 1024MHz, BBPLL div 16, fref=40MHz for 4Msps
         //modulus is 2088960
         //fo = fref * (Nint + Nfrac/mod)
         //1024/40 = Nint + Nfrac/mod
@@ -60,7 +60,7 @@ public:
         //Nint = 25 = 0x19
         //Cp current 150uA, R1 = 1694, C1 = 522p, R2 = 1563, C2 = 39.2p, C3 = 14.6p
         //R1 = 0x08, C1 = 0x1f, C2 = 0x16, R2 = 0x02, C3 = 0x0c
-        _b200_iface->write_reg(0x00A, 0b00010011);
+        _b200_iface->write_reg(0x00A, 0b00010100);
         _b200_iface->write_reg(0x044, 0x19); //Nint
         _b200_iface->write_reg(0x041, 0x13); //Nfrac[23:16]
         _b200_iface->write_reg(0x042, 0x20); //Nfrac[15:8]
