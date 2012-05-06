@@ -41,9 +41,9 @@ static const double ACK_TIMEOUT = 0.5;
 static const double MASSIVE_TIMEOUT = 10.0; //for when we wait on a timed command
 static const boost::uint32_t MAX_SEQS_OUT = 16;
 
-#define SPI_DIV SR_SPI*4 + 0
-#define SPI_CTRL SR_SPI*4 + 4
-#define SPI_DATA SR_SPI*4 + 8
+#define SPI_DIV TOREG(SR_SPI + 0)
+#define SPI_CTRL TOREG(SR_SPI + 1)
+#define SPI_DATA TOREG(SR_SPI + 2)
 // spi clock rate = master_clock/(div+1)/2 (10MHz in this case)
 #define SPI_DIVIDER 4
 
