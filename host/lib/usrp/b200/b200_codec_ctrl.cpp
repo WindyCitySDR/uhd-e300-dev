@@ -147,7 +147,7 @@ public:
         //RXPLL input scale keep between 40-150MHz?
         //enable CLK_OUT=REF_CLK_IN (could use div. of ADC clk but that'll happen later)
         
-        return 40e6;
+        return 8e6;
     }
 
     double tune(const std::string &which, const double value)

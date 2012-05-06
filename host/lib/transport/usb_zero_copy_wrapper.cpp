@@ -180,6 +180,11 @@ public:
         if (not _last_recv_buff){
             _last_recv_buff = _internal_zc->get_recv_buff(timeout);
             _last_recv_offset = 0; //reset offset into buffer
+
+            //FIXME TODO where do empty buffers come from
+            while (_last_recv_buff and _last_recv_buff->size() == 0){
+                _last_recv_buff = _internal_zc->get_recv_buff(timeout);
+            }
         }
 
         //get the buffer to be returned to the user
