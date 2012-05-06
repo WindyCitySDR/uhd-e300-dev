@@ -54,27 +54,27 @@ static const size_t          B200_NUM_RX_FE = 2;
 static const size_t          B200_NUM_TX_FE = 2;
 
 /* ATR GPIO TX Output Settings */
-static const boost::uint8_t LED_TXRX_TX = (1 << 0);
-static const boost::uint8_t LED_TXRX_RX = (1 << 1);
-static const boost::uint8_t LED_RX = (1 << 2);
-static const boost::uint8_t SRX_TX = (1 << 3);
-static const boost::uint8_t SRX_RX = (1 << 4);
-static const boost::uint8_t SFDX_TX = (1 << 5);
-static const boost::uint8_t SFDX_RX = (1 << 6);
-static const boost::uint8_t TX_ENABLE = (1 << 7);
+static const boost::uint32_t LED_TXRX_TX = (1 << 16);
+static const boost::uint32_t LED_TXRX_RX = (1 << 17);
+static const boost::uint32_t LED_RX = (1 << 18);
+static const boost::uint32_t SRX_TX = (1 << 19);
+static const boost::uint32_t SRX_RX = (1 << 20);
+static const boost::uint32_t SFDX_TX = (1 << 21);
+static const boost::uint32_t SFDX_RX = (1 << 22);
+static const boost::uint32_t TX_ENABLE = (1 << 23);
 
-static const boost::uint8_t STATE_OFF = 0x00;
-static const boost::uint8_t STATE_TX = (LED_TXRX_TX | SFDX_TX | TX_ENABLE);
-static const boost::uint8_t STATE_RX_ON_TXRX = (LED_TXRX_RX | SRX_TX | SRX_RX);
-static const boost::uint8_t STATE_RX_ON_RX2 = (LED_RX | SFDX_RX);
-static const boost::uint8_t STATE_FDX = (LED_TXRX_TX | LED_RX | SFDX_TX 
+static const boost::uint32_t STATE_OFF = 0x00;
+static const boost::uint32_t STATE_TX = (LED_TXRX_TX | SFDX_TX | TX_ENABLE);
+static const boost::uint32_t STATE_RX_ON_TXRX = (LED_TXRX_RX | SRX_TX | SRX_RX);
+static const boost::uint32_t STATE_RX_ON_RX2 = (LED_RX | SFDX_RX);
+static const boost::uint32_t STATE_FDX = (LED_TXRX_TX | LED_RX | SFDX_TX 
                                   | SFDX_RX | TX_ENABLE);
 
 /* ATR GPIO RX Output Settings */
 //FIXME -- What do these do?
-static const boost::uint8_t CODEC_CTRL_IN = 0x0F;
-static const boost::uint8_t CODEC_EN_AGC = (1 << 4);
-static const boost::uint8_t CODEC_TXRX = (1 << 5);
+static const boost::uint32_t CODEC_CTRL_IN = 0x0F;
+static const boost::uint32_t CODEC_EN_AGC = (1 << 4);
+static const boost::uint32_t CODEC_TXRX = (1 << 5);
 
 //! Implementation guts
 class b200_impl : public uhd::device {
@@ -101,8 +101,8 @@ private:
     std::vector<tx_dsp_core_200::sptr> _tx_dsps;
     time64_core_200::sptr _time64;
     user_settings_core_200::sptr _user;
-    gpio_core_200::sptr _atr0;
-    gpio_core_200::sptr _atr1;
+    gpio_core_200_32wo::sptr _atr0;
+    gpio_core_200_32wo::sptr _atr1;
 
     //transports
     uhd::transport::zero_copy_if::sptr _data_transport;

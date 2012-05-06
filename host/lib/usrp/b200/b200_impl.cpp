@@ -266,8 +266,8 @@ b200_impl::b200_impl(const device_addr_t &device_addr)
     ////////////////////////////////////////////////////////////////////
     // create gpio and misc controls
     ////////////////////////////////////////////////////////////////////
-    _atr0 = gpio_core_200::make(_ctrl, TOREG(SR_GPIO0), 0/*unused*/);
-    _atr1 = gpio_core_200::make(_ctrl, TOREG(SR_GPIO1), 0/*unused*/);
+    _atr0 = gpio_core_200_32wo::make(_ctrl, TOREG(SR_GPIO0));
+    _atr1 = gpio_core_200_32wo::make(_ctrl, TOREG(SR_GPIO1));
     _gpio_state = gpio_state(); //clear all to zero
 
     //set bandsel switches to A band fixed for now
@@ -283,29 +283,9 @@ b200_impl::b200_impl(const device_addr_t &device_addr)
     //assign {tx_enable1, SFDX1_RX, SFDX1_TX, SRX1_RX, SRX1_TX, LED_RX1, LED_TXRX1_RX, LED_TXRX1_TX} = atr0[23:16];
     //assign {tx_enable2, SFDX2_RX, SFDX2_TX, SRX2_RX, SRX2_TX, LED_RX2, LED_TXRX2_RX, LED_TXRX2_TX} = atr1[23:16];
     //assign {codec_txrx, codec_en_agc, codec_ctrl_in[3:0] } = atr0[5:0];
-    _atr0->set_pin_ctrl(dboard_iface::UNIT_TX, 0x0000);
-    _atr0->set_pin_ctrl(dboard_iface::UNIT_RX, 0x0000);
-    _atr1->set_pin_ctrl(dboard_iface::UNIT_TX, 0x0000);
-    _atr1->set_pin_ctrl(dboard_iface::UNIT_RX, 0x0000);
     
-    _atr0->set_gpio_ddr(dboard_iface::UNIT_TX, //upper 16
-                       0xFFFF);
-    _atr0->set_gpio_ddr(dboard_iface::UNIT_RX, //lower 16
-                       0x30);
-    _atr1->set_gpio_ddr(dboard_iface::UNIT_TX, //upper 16
-                       0xFFFF);
-    _atr1->set_gpio_ddr(dboard_iface::UNIT_RX, //lower 16
-                       0xFFFF);
-
-    _atr0->set_gpio_out(dboard_iface::UNIT_TX, //upper 16
-                        STATE_TX);
-    _atr0->set_gpio_out(dboard_iface::UNIT_RX, //lower 16
-                        CODEC_TXRX);
-    _atr1->set_gpio_out(dboard_iface::UNIT_TX, //upper 16
-                        STATE_TX);
-    _atr1->set_gpio_out(dboard_iface::UNIT_RX, //lower 16
-                        0x00);    
-                       
+    _atr0->set_all_regs(STATE_TX | CODEC_TXRX);
+    _atr1->set_all_regs(STATE_TX);
 
     ////////////////////////////////////////////////////////////////////
     // create codec control objects
