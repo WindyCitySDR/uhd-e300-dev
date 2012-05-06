@@ -129,8 +129,25 @@ public:
             }
 
             return gainreg - gain_offset;
-        } else {
-            return 0.0;
+        } else { //TX gain
+            //check 0x077 bit 6, make sure it's set
+            _b200_iface->write_reg(0x077, 0x40);
+            //check 0x07c bit 7, make sure it's set
+            _b200_iface->write_reg(0x07c, 0x40);
+            //TX_A gain is 0x074[0], 0x073[7:0]
+            //TX_B gain is 0x076[0], 0x075[7:0]
+            //gain step is -0.25dB, make sure you set for 89.75 - (gain)
+            //in order to get the correct direction
+            double atten = get_gain_range("TX_A", "").stop() - value;
+            int attenreg = atten * 4;
+            if(which[3] == 'A') {
+                _b200_iface->write_reg(0x074, (attenreg >> 8) & 0x01);
+                _b200_iface->write_reg(0x073, attenreg & 0xFF);
+            } else {
+                _b200_iface->write_reg(0x076, (attenreg >> 8) & 0x01);
+                _b200_iface->write_reg(0x075, attenreg & 0xFF);
+            }
+            return get_gain_range("TX_A", "").stop() - (double(attenreg)/ 4);
         }
     }
 
@@ -139,7 +156,7 @@ public:
         if(which[0] == 'R') {
             return uhd::meta_range_t(0.0, 73.0);
         } else {
-            return uhd::meta_range_t(0.0, 0.0);
+            return uhd::meta_range_t(0.0, 89.75);
         }
     }
 
