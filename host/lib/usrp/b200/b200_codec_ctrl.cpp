@@ -16,7 +16,7 @@
 //
 
 #include "b200_codec_ctrl.hpp"
-
+#include <uhd/exception.hpp>
 #include <iostream>
 
 using namespace uhd;
@@ -39,10 +39,6 @@ public:
 
         /********setup basic stuff (chip level setup 0-7)*/
         //enable RX1, TX1 @ 4Msps
-        //TX1 en, THB3 interp x2, THB2 interp x2 fil. en, THB1 en, TX FIR interp 4 en
-        _b200_iface->write_reg(0x002, 0b11011110); //FIXME 0b11011110 (both xmit, interp 2)
-        //RX1 en, RHB3 decim x2, RHB2 decim x2 fil. en, RHB1 en, RX FIR decim 4 en
-        _b200_iface->write_reg(0x003, 0b11011110); //FIXME 0b11011110 (both rx, interp 2)
         //select TX1A/TX2A, RX antennas in balanced mode on ch. A
         _b200_iface->write_reg(0x004, 0b00000011);
 
@@ -51,33 +47,17 @@ public:
         _b200_iface->write_reg(0x009, 0b00010111);
 
         /**set up BBPLL*/
-        //set BBPLL to 1024MHz, BBPLL div 16, fref=40MHz for 4Msps
-        //modulus is 2088960
-        //fo = fref * (Nint + Nfrac/mod)
-        //1024/40 = Nint + Nfrac/mod
-        //1024/40 = 25.6, so Nint=25, Nfrac/mod = 0.6
-        //Nfrac = 1253376 = 0x00132000
-        //Nint = 25 = 0x19
-        //Cp current 150uA, R1 = 1694, C1 = 522p, R2 = 1563, C2 = 39.2p, C3 = 14.6p
-        //R1 = 0x08, C1 = 0x1f, C2 = 0x16, R2 = 0x02, C3 = 0x0c
-        _b200_iface->write_reg(0x00A, 0b00010100);
-        _b200_iface->write_reg(0x044, 0x19); //Nint
-        _b200_iface->write_reg(0x041, 0x13); //Nfrac[23:16]
-        _b200_iface->write_reg(0x042, 0x20); //Nfrac[15:8]
-        _b200_iface->write_reg(0x043, 0x00); //Nfrac[7:0]
-
-        //CP filter recommended coefficients
-        _b200_iface->write_reg(0x048, 0xe8);
-        _b200_iface->write_reg(0x049, 0x5b);
-        _b200_iface->write_reg(0x04a, 0x35);
-
-        //CP current to 150uA
-        _b200_iface->write_reg(0x046, 0x06);
-
-        //calibrate freq (0x04B[7], toggle 0x03F[2] 1 then 0)
-        _b200_iface->write_reg(0x04B, 0xC0);
-        _b200_iface->write_reg(0x03F, 0x05);
-        _b200_iface->write_reg(0x03F, 0x01); //keep bbpll on
+        //64Msps ADC clock means:
+        //div 2 in RHB3 = 32Msps
+        //div 2 in RHB2 = 16Msps
+        //div 2 in RHB1 = 8Msps
+        //div 2 in RXFIR = 4Msps output
+        //eventually this should be done alongside FIR/HB setup
+        set_adcclk(64e6);
+        //TX1/2 en, THB3 interp x2, THB2 interp x2 fil. en, THB1 en, TX FIR interp 2 en
+        _b200_iface->write_reg(0x002, 0b11011110);
+        //RX1/2 en, RHB3 decim x2, RHB2 decim x2 fil. en, RHB1 en, RX FIR decim 2 en
+        _b200_iface->write_reg(0x003, 0b11011110);
 
         /********setup data ports (FDD dual port DDR CMOS)*/
         //FDD dual port DDR CMOS no swap
@@ -139,15 +119,68 @@ public:
 
     double set_clock_rate(const double rate)
     {
-        //clock rate is just the output clock rate to the FPGA
-        //for Catalina sample rate, see set_sample_rate
-        //set ref to refclk in via XTAL_N
-        //set ref to 40e6
-        //BBPLL input scale keep between 35-70MHz
-        //RXPLL input scale keep between 40-150MHz?
-        //enable CLK_OUT=REF_CLK_IN (could use div. of ADC clk but that'll happen later)
+        return 4e6; //FIXME
+    }
+
+    double set_adcclk(const double rate) {
+        //this sets the ADC clock rate -- NOT the sample rate!
+        //sample rate also depends on the HB and FIR filter decimation/interpolations
+        //modulus is 2088960
+        //fo = fref * (Nint + Nfrac/mod)
+        const double fref = 40e6;
+        const int modulus = 2088960;
+
+        const double vcomax = 1430e6;
+        const double vcomin = 715e6;
+        double vcorate;
+        int vcodiv;
+
+        //iterate over VCO dividers until appropriate divider is found
+        int i=0;
+        for(i=0; i<=6; i++) {
+            vcodiv = 2<<i;
+            vcorate = rate * vcodiv;
+            if(vcorate >= vcomin && vcorate <= vcomax) break;
+        }
+        if(i == 7) throw uhd::runtime_error("Can't find valid VCO rate!");
+        //TODO this will pick the low rate for threshold values, should eval
+        //whether vcomax or vcomin has better performance
+
+        int nint = vcorate / fref;
+        int nfrac = ((vcorate / fref) - nint) * modulus;
+        std::cout << "Nint: " << nint << " Nfrac: " << nfrac << std::endl;
+
+        double actual_vcorate = fref * (nint + double(nfrac)/modulus);
         
-        return 8e6;
+        _b200_iface->write_reg(0x044, nint); //Nint
+        _b200_iface->write_reg(0x041, (nfrac >> 16) & 0xFF); //Nfrac[23:16]
+        _b200_iface->write_reg(0x042, (nfrac >> 8) & 0xFF); //Nfrac[15:8]
+        _b200_iface->write_reg(0x043, nfrac & 0xFF); //Nfrac[7:0]
+
+        //use XTALN input, CLKOUT=XTALN (40MHz ref out to FPGA)
+        _b200_iface->write_reg(0x00A, 0b00010000 | vcodiv); //set BBPLL divider
+
+        //CP filter recommended coefficients, don't change unless you have a clue
+        _b200_iface->write_reg(0x048, 0xe8);
+        _b200_iface->write_reg(0x049, 0x5b);
+        _b200_iface->write_reg(0x04a, 0x35);
+
+        //scale CP current according to VCO rate
+        const double icp_baseline = 150e-6;
+        const double freq_baseline = 1280e6;
+        double icp = icp_baseline * actual_vcorate / freq_baseline;
+        std::cout << "Settled on CP current: " << icp * 1e6 << "uA" << std::endl;
+        int icp_reg = icp/25e-6 + 1;
+
+        //CP current to 150uA: FIXME this should change depending on the VCO rate
+        _b200_iface->write_reg(0x046, icp_reg & 0x3F);
+
+        //calibrate freq (0x04B[7], toggle 0x03F[2] 1 then 0)
+        _b200_iface->write_reg(0x04B, 0xC0);
+        _b200_iface->write_reg(0x03F, 0x05);
+        _b200_iface->write_reg(0x03F, 0x01); //keep bbpll on
+
+        return actual_vcorate;
     }
 
     double tune(const std::string &which, const double value)
