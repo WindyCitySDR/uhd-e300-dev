@@ -122,8 +122,11 @@ public:
 
             if(gainreg > 76) gainreg = 76;
             if(gainreg < 0) gainreg = 0;
-            
-            _b200_iface->write_reg(0x109, gainreg);
+            if(which[3] == 'A') {            
+                _b200_iface->write_reg(0x109, gainreg);
+            } else {
+                _b200_iface->write_reg(0x10c, gainreg);
+            }
 
             return gainreg - gain_offset;
         } else {
