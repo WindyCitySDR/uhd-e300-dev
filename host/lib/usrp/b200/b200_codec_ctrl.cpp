@@ -51,8 +51,33 @@ public:
         _b200_iface->write_reg(0x009, 0b00010111);
 
         /**set up BBPLL*/
-        //BBPLL div 4, clkout enable, dac clk = adc clk, BBPLL div 4
-        _b200_iface->write_reg(0x00A, 0b00010010);
+        //set BBPLL to 1024MHz, BBPLL div 8, fref=40MHz
+        //modulus is 2088960
+        //fo = fref * (Nint + Nfrac/mod)
+        //1024/40 = Nint + Nfrac/mod
+        //1024/40 = 25.6, so Nint=25, Nfrac/mod = 0.6
+        //Nfrac = 1253376 = 0x00132000
+        //Nint = 25 = 0x19
+        //Cp current 150uA, R1 = 1694, C1 = 522p, R2 = 1563, C2 = 39.2p, C3 = 14.6p
+        //R1 = 0x08, C1 = 0x1f, C2 = 0x16, R2 = 0x02, C3 = 0x0c
+        _b200_iface->write_reg(0x00A, 0b00010011);
+        _b200_iface->write_reg(0x044, 0x19); //Nint
+        _b200_iface->write_reg(0x041, 0x13); //Nfrac[23:16]
+        _b200_iface->write_reg(0x042, 0x20); //Nfrac[15:8]
+        _b200_iface->write_reg(0x043, 0x00); //Nfrac[7:0]
+
+        //CP filter recommended coefficients
+        _b200_iface->write_reg(0x048, 0xe8);
+        _b200_iface->write_reg(0x049, 0x5b);
+        _b200_iface->write_reg(0x04a, 0x35);
+
+        //CP current to 150uA
+        _b200_iface->write_reg(0x046, 0x06);
+
+        //calibrate freq (0x04B[7], toggle 0x03F[2] 1 then 0)
+        _b200_iface->write_reg(0x04B, 0xC0);
+        _b200_iface->write_reg(0x03F, 0x05);
+        _b200_iface->write_reg(0x03F, 0x01); //keep bbpll on
 
         /********setup data ports (FDD dual port DDR CMOS)*/
         //FDD dual port DDR CMOS no swap
