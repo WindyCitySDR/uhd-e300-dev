@@ -19,7 +19,7 @@
 
 #include <uhd/utils/msg.hpp>
 #include <uhd/exception.hpp>
-#include <uhd/transport/usb_control.hpp>
+#include <uhd/utils/tasks.hpp>
 #include <boost/functional/hash.hpp>
 #include <boost/thread/thread.hpp>
 #include <boost/cstdint.hpp>
