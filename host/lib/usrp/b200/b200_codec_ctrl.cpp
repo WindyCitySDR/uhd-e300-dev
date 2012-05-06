@@ -38,12 +38,19 @@ public:
         _b200_iface->write_reg(0x000,0x00);
 
         /********setup basic stuff (chip level setup 0-7)*/
+        _b200_iface->write_reg(0x001,0x00);
+
         //enable RX1, TX1 @ 4Msps
         //select TX1A/TX2A, RX antennas in balanced mode on ch. A
         _b200_iface->write_reg(0x004, 0b00000011);
 
+        //data delay for TX and RX data clocks
+        _b200_iface->write_reg(0x006, 0x0F);
+        _b200_iface->write_reg(0x007, 0x00);
+
         /**set up clock interface*/
         //enable BBPLL, clocks, external clk
+        _b200_iface->write_reg(0x00A, 0b00010010);
         _b200_iface->write_reg(0x009, 0b00010111);
 
         /**set up BBPLL*/
@@ -61,7 +68,7 @@ public:
 
         /********setup data ports (FDD dual port DDR CMOS)*/
         //FDD dual port DDR CMOS no swap
-        _b200_iface->write_reg(0x010, 0b00001000); //FIXME 0b10101000 (swap TX IQ swap TX1/TX2)
+        _b200_iface->write_reg(0x010, 0b11001000); //FIXME 0b10101000 (swap TX IQ swap TX1/TX2)
         _b200_iface->write_reg(0x011, 0b00000000);
         _b200_iface->write_reg(0x012, 0b00000010); //force TX on one port, RX on the other
         _b200_iface->write_reg(0x013, 0b00000001); //enable ENSM
@@ -97,6 +104,8 @@ public:
         //set_clock_rate(40e6); //init ref clk (done above)
         tune("TX", 850e6);
         tune("RX", 800e6);
+
+        output_test_tone();
     }
 
     std::vector<std::string> get_gain_names(const std::string &which)
@@ -162,7 +171,7 @@ public:
 
     double set_clock_rate(const double rate)
     {
-        return 4e6; //FIXME
+        return (61.44e6 / 4); //FIXME
     }
 
     double set_adcclk(const double rate) {
@@ -307,6 +316,17 @@ public:
 
         }
     }
+
+
+    void output_test_tone(void)
+    {
+        /* Output a 480 kHz tone at 800 MHz */
+        _b200_iface->write_reg(0x3F4, 0x0B);
+        _b200_iface->write_reg(0x3FC, 0xFF);
+        _b200_iface->write_reg(0x3FD, 0xFF);
+        _b200_iface->write_reg(0x3FE, 0x3F);
+    }
+
 
 private:
     b200_iface::sptr _b200_iface;

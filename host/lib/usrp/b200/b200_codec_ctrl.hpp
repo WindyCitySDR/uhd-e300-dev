@@ -56,6 +56,9 @@ public:
     //! set codec filter bandwidth, return the exact value
     virtual double set_filter_bw(const std::string &which, const double bw) = 0;
 
+    //! output a ~480 kHz test tone at 800 MHz
+    virtual void output_test_tone(void) = 0;
+
 };
 
 #endif /* INCLUDED_B200_CODEC_CTRL_HPP */
