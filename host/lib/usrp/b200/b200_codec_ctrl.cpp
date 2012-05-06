@@ -40,9 +40,9 @@ public:
         /********setup basic stuff (chip level setup 0-7)*/
         //enable RX1, TX1 @ 8Msps
         //TX1 en, THB3 interp x2, THB2 interp x2 fil. en, THB1 en, TX FIR interp 4 en
-        _b200_iface->write_reg(0x002, 0b01011111); //FIXME 0xDE
+        _b200_iface->write_reg(0x002, 0b11011111); //FIXME 0b11011110 (both xmit, interp 2)
         //RX1 en, RHB3 decim x2, RHB2 decim x2 fil. en, RHB1 en, RX FIR decim 4 en
-        _b200_iface->write_reg(0x003, 0b01011111); //FIXME 0xDE
+        _b200_iface->write_reg(0x003, 0b11011111); //FIXME 0b11011110 (both rx, interp 2)
         //select TX1A/TX2A, RX antennas in balanced mode on ch. A
         _b200_iface->write_reg(0x004, 0b00000011);
 
@@ -56,12 +56,12 @@ public:
 
         /********setup data ports (FDD dual port DDR CMOS)*/
         //FDD dual port DDR CMOS no swap
-        _b200_iface->write_reg(0x010, 0b00001000); //FIXME 0xC8
+        _b200_iface->write_reg(0x010, 0b00001000); //FIXME 0b10101000 (swap TX IQ swap TX1/TX2)
         _b200_iface->write_reg(0x011, 0b00000000);
         _b200_iface->write_reg(0x012, 0b00000010); //force TX on one port, RX on the other, come back to this one
         _b200_iface->write_reg(0x013, 0b00000001); //enable ENSM
-        _b200_iface->write_reg(0x014, 0b00001000); //use SPI for TXNRX ctrl //FIXME 0x21
-        _b200_iface->write_reg(0x015, 0b10000111); //dual synth mode, synth en ctrl en
+        _b200_iface->write_reg(0x014, 0b00100001); //use SPI for TXNRX ctrl, to alert, TX on
+        _b200_iface->write_reg(0x015, 0b00000111); //dual synth mode, synth en ctrl en
 
         //ian magic
         _b200_iface->write_reg(0x014, 0b00001111);
@@ -82,10 +82,10 @@ public:
         _b200_iface->write_reg(0x290,0x70); //"" TX
         _b200_iface->write_reg(0x239,0xc1); //init RX ALC
         _b200_iface->write_reg(0x279,0xc1); //"" TX
-        _b200_iface->write_reg(0x23b,0x80); //set RX MSB? //FIXME 0x89
-        _b200_iface->write_reg(0x27b,0x80); //"" TX //FIXME 0x88
-        _b200_iface->write_reg(0x23d,0x00); //clear RX 1/2 VCO cal clk //FIXME 0x04
-        _b200_iface->write_reg(0x27d,0x00); //"" TX //FIXME 0x04
+        _b200_iface->write_reg(0x23b,0x89); //set RX MSB? //FIXME 0x89 magic charge pump current, undocumented
+        _b200_iface->write_reg(0x27b,0x88); //"" TX //FIXME 0x88 see above
+        _b200_iface->write_reg(0x23d,0x04); //clear RX 1/2 VCO cal clk //FIXME 0x04 enable CP cal, "only change if apps eng. says so"
+        _b200_iface->write_reg(0x27d,0x04); //"" TX //FIXME 0x04
 
         //ATRs configured in b200_impl()        
 
@@ -163,14 +163,14 @@ public:
             _b200_iface->write_reg(0x27a, 0x4a);//vco output level
             _b200_iface->write_reg(0x279, 0xc1);//init ALC value and VCO varactor
             _b200_iface->write_reg(0x282, 0x17);//vco bias and bias ref
-            _b200_iface->write_reg(0x278, 0x70);//vco cal offset
+            _b200_iface->write_reg(0x278, 0x70);//vco cal offset //fixme 0x71
             _b200_iface->write_reg(0x285, 0x00);//vco cal ref tcf
             _b200_iface->write_reg(0x291, 0x0e);//varactor ref
             _b200_iface->write_reg(0x290, 0x70);//vco varactor ref tcf
-            _b200_iface->write_reg(0x280, 0x09);//rx synth loop filter r3
-            _b200_iface->write_reg(0x27f, 0xdf);//r1 and c3
-            _b200_iface->write_reg(0x27e, 0xd4);//c2 and c1
-            _b200_iface->write_reg(0x27b, 0x98);//Icp
+            _b200_iface->write_reg(0x280, 0x09);//rx synth loop filter r3 //fixme 0x0F
+            _b200_iface->write_reg(0x27f, 0xdf);//r1 and c3 //fixme e7
+            _b200_iface->write_reg(0x27e, 0xd4);//c2 and c1 //fixme f3
+            _b200_iface->write_reg(0x27b, 0x98);//Icp //fixme 0x88
 
             //tuning yo
             _b200_iface->write_reg(0x273, 0x00);
@@ -181,7 +181,7 @@ public:
             _b200_iface->write_reg(0x005, 0x22);
             
             if((_b200_iface->read_reg(0x287) & 0x02) == 0) {
-                std::cout << "RX PLL NOT LOCKED" << std::endl;
+                std::cout << "TX PLL NOT LOCKED" << std::endl;
             }
             return 850.0e6;
         }
