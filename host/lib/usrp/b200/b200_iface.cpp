@@ -204,6 +204,24 @@ public:
     }
 
 
+    void write_reg(uint16_t reg, uint8_t val)
+    {
+        uint8_t buf[3];
+        buf[0] = (0x80 | ((reg >> 8) & 0x3F));
+        buf[1] = (reg & 0xFF);
+        buf[2] = val;
+        transact_spi(buf, 24, NULL, 0);
+    }
+
+    uint8_t read_reg(uint16_t reg) {
+        uint8_t buf[3];
+        buf[0] = (reg >> 8) & 0x3F;
+        buf[1] = (reg & 0xFF);
+        transact_spi(buf, 16, buf, 24);
+        return buf[2];
+    }
+
+
     byte_vector_t read_i2c(boost::uint8_t addr, size_t num_bytes)
     {
         //TODO

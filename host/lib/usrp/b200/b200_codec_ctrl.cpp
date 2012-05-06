@@ -33,59 +33,59 @@ public:
         _b200_iface = iface;
 
         //reset
-        write_reg(0x000,0x01);
+        _b200_iface->write_reg(0x000,0x01);
         //clear reset
-        write_reg(0x000,0x00);
+        _b200_iface->write_reg(0x000,0x00);
 
         /********setup basic stuff (chip level setup 0-7)*/
         //enable RX1, TX1 @ 8Msps
         //TX1 en, THB3 interp x2, THB2 interp x2 fil. en, THB1 en, TX FIR interp 4 en
-        write_reg(0x002, 0b01011111); //FIXME 0xDE
+        _b200_iface->write_reg(0x002, 0b01011111); //FIXME 0xDE
         //RX1 en, RHB3 decim x2, RHB2 decim x2 fil. en, RHB1 en, RX FIR decim 4 en
-        write_reg(0x003, 0b01011111); //FIXME 0xDE
+        _b200_iface->write_reg(0x003, 0b01011111); //FIXME 0xDE
         //select TX1A/TX2A, RX antennas in balanced mode on ch. A
-        write_reg(0x004, 0b00000011);
+        _b200_iface->write_reg(0x004, 0b00000011);
 
         /**set up clock interface*/
         //enable BBPLL, clocks, external clk
-//        write_reg(0x009, 0b00010111);
+        _b200_iface->write_reg(0x009, 0b00010111);
 
         /**set up BBPLL*/
         //BBPLL div 4, clkout enable, dac clk = adc clk, BBPLL div 4
-//        write_reg(0x00A, 0b00010010);
+        _b200_iface->write_reg(0x00A, 0b00010010);
 
         /********setup data ports (FDD dual port DDR CMOS)*/
         //FDD dual port DDR CMOS no swap
-        write_reg(0x010, 0b00001000); //FIXME 0xC8
-        write_reg(0x011, 0b00000000);
-        write_reg(0x012, 0b00000010); //force TX on one port, RX on the other, come back to this one
-        write_reg(0x013, 0b00000001); //enable ENSM
-        write_reg(0x014, 0b00001000); //use SPI for TXNRX ctrl //FIXME 0x21
-        write_reg(0x015, 0b10000111); //dual synth mode, synth en ctrl en
+        _b200_iface->write_reg(0x010, 0b00001000); //FIXME 0xC8
+        _b200_iface->write_reg(0x011, 0b00000000);
+        _b200_iface->write_reg(0x012, 0b00000010); //force TX on one port, RX on the other, come back to this one
+        _b200_iface->write_reg(0x013, 0b00000001); //enable ENSM
+        _b200_iface->write_reg(0x014, 0b00001000); //use SPI for TXNRX ctrl //FIXME 0x21
+        _b200_iface->write_reg(0x015, 0b10000111); //dual synth mode, synth en ctrl en
 
         //ian magic
-        write_reg(0x014, 0b00001111);
-        write_reg(0x014, 0b00101011);
+        _b200_iface->write_reg(0x014, 0b00001111);
+        _b200_iface->write_reg(0x014, 0b00101011);
 
         /**initial VCO setup*/
-        write_reg(0x261,0x00); //RX LO power
-        write_reg(0x2a1,0x00); //TX LO power
-        write_reg(0x248,0x0b); //en RX VCO LDO
-        write_reg(0x288,0x0b); //en TX VCO LDO
-        write_reg(0x246,0x02); //pd RX cal Tcf
-        write_reg(0x286,0x02); //pd TX cal Tcf
-        write_reg(0x243,0x0d); //set rx prescaler bias
-        write_reg(0x283,0x0d); //"" TX
-        write_reg(0x245,0x00); //set RX VCO cal ref Tcf
-        write_reg(0x250,0x70); //set RX VCO varactor ref Tcf
-        write_reg(0x285,0x00); //"" TX
-        write_reg(0x290,0x70); //"" TX
-        write_reg(0x239,0xc1); //init RX ALC
-        write_reg(0x279,0xc1); //"" TX
-        write_reg(0x23b,0x80); //set RX MSB? //FIXME 0x89
-        write_reg(0x27b,0x80); //"" TX //FIXME 0x88
-        write_reg(0x23d,0x00); //clear RX 1/2 VCO cal clk //FIXME 0x04
-        write_reg(0x27d,0x00); //"" TX //FIXME 0x04
+        _b200_iface->write_reg(0x261,0x00); //RX LO power
+        _b200_iface->write_reg(0x2a1,0x00); //TX LO power
+        _b200_iface->write_reg(0x248,0x0b); //en RX VCO LDO
+        _b200_iface->write_reg(0x288,0x0b); //en TX VCO LDO
+        _b200_iface->write_reg(0x246,0x02); //pd RX cal Tcf
+        _b200_iface->write_reg(0x286,0x02); //pd TX cal Tcf
+        _b200_iface->write_reg(0x243,0x0d); //set rx prescaler bias
+        _b200_iface->write_reg(0x283,0x0d); //"" TX
+        _b200_iface->write_reg(0x245,0x00); //set RX VCO cal ref Tcf
+        _b200_iface->write_reg(0x250,0x70); //set RX VCO varactor ref Tcf
+        _b200_iface->write_reg(0x285,0x00); //"" TX
+        _b200_iface->write_reg(0x290,0x70); //"" TX
+        _b200_iface->write_reg(0x239,0xc1); //init RX ALC
+        _b200_iface->write_reg(0x279,0xc1); //"" TX
+        _b200_iface->write_reg(0x23b,0x80); //set RX MSB? //FIXME 0x89
+        _b200_iface->write_reg(0x27b,0x80); //"" TX //FIXME 0x88
+        _b200_iface->write_reg(0x23d,0x00); //clear RX 1/2 VCO cal clk //FIXME 0x04
+        _b200_iface->write_reg(0x27d,0x00); //"" TX //FIXME 0x04
 
         //ATRs configured in b200_impl()        
 
@@ -135,52 +135,52 @@ public:
         //set rx to 800, tx to 850
         if(which == "RX") {
             //set up synth
-            write_reg(0x23a, 0x4a);//vco output level
-            write_reg(0x239, 0xc3);//init ALC value and VCO varactor
-            write_reg(0x242, 0x1f);//vco bias and bias ref
-            write_reg(0x238, 0x78);//vco cal offset
-            write_reg(0x245, 0x00);//vco cal ref tcf
-            write_reg(0x251, 0x0c);//varactor ref
-            write_reg(0x250, 0x70);//vco varactor ref tcf
-            write_reg(0x240, 0x09);//rx synth loop filter r3
-            write_reg(0x23f, 0xdf);//r1 and c3
-            write_reg(0x23e, 0xd4);//c2 and c1
-            write_reg(0x23b, 0x92);//Icp
+            _b200_iface->write_reg(0x23a, 0x4a);//vco output level
+            _b200_iface->write_reg(0x239, 0xc3);//init ALC value and VCO varactor
+            _b200_iface->write_reg(0x242, 0x1f);//vco bias and bias ref
+            _b200_iface->write_reg(0x238, 0x78);//vco cal offset
+            _b200_iface->write_reg(0x245, 0x00);//vco cal ref tcf
+            _b200_iface->write_reg(0x251, 0x0c);//varactor ref
+            _b200_iface->write_reg(0x250, 0x70);//vco varactor ref tcf
+            _b200_iface->write_reg(0x240, 0x09);//rx synth loop filter r3
+            _b200_iface->write_reg(0x23f, 0xdf);//r1 and c3
+            _b200_iface->write_reg(0x23e, 0xd4);//c2 and c1
+            _b200_iface->write_reg(0x23b, 0x92);//Icp
 
             //tune that shit
-            write_reg(0x233, 0x00);
-            write_reg(0x234, 0x00);
-            write_reg(0x235, 0x00);
-            write_reg(0x232, 0x00);
-            write_reg(0x231, 0x50);
-            write_reg(0x005, 0x22);
+            _b200_iface->write_reg(0x233, 0x00);
+            _b200_iface->write_reg(0x234, 0x00);
+            _b200_iface->write_reg(0x235, 0x00);
+            _b200_iface->write_reg(0x232, 0x00);
+            _b200_iface->write_reg(0x231, 0x50);
+            _b200_iface->write_reg(0x005, 0x22);
             
-            if((read_reg(0x247) & 0x02) == 0) {
+            if((_b200_iface->read_reg(0x247) & 0x02) == 0) {
                 std::cout << "RX PLL NOT LOCKED" << std::endl;
             }
             return 800.0e6;
         } else {
-            write_reg(0x27a, 0x4a);//vco output level
-            write_reg(0x279, 0xc1);//init ALC value and VCO varactor
-            write_reg(0x282, 0x17);//vco bias and bias ref
-            write_reg(0x278, 0x70);//vco cal offset
-            write_reg(0x285, 0x00);//vco cal ref tcf
-            write_reg(0x291, 0x0e);//varactor ref
-            write_reg(0x290, 0x70);//vco varactor ref tcf
-            write_reg(0x280, 0x09);//rx synth loop filter r3
-            write_reg(0x27f, 0xdf);//r1 and c3
-            write_reg(0x27e, 0xd4);//c2 and c1
-            write_reg(0x27b, 0x98);//Icp
+            _b200_iface->write_reg(0x27a, 0x4a);//vco output level
+            _b200_iface->write_reg(0x279, 0xc1);//init ALC value and VCO varactor
+            _b200_iface->write_reg(0x282, 0x17);//vco bias and bias ref
+            _b200_iface->write_reg(0x278, 0x70);//vco cal offset
+            _b200_iface->write_reg(0x285, 0x00);//vco cal ref tcf
+            _b200_iface->write_reg(0x291, 0x0e);//varactor ref
+            _b200_iface->write_reg(0x290, 0x70);//vco varactor ref tcf
+            _b200_iface->write_reg(0x280, 0x09);//rx synth loop filter r3
+            _b200_iface->write_reg(0x27f, 0xdf);//r1 and c3
+            _b200_iface->write_reg(0x27e, 0xd4);//c2 and c1
+            _b200_iface->write_reg(0x27b, 0x98);//Icp
 
             //tuning yo
-            write_reg(0x273, 0x00);
-            write_reg(0x274, 0x00);
-            write_reg(0x275, 0x00);
-            write_reg(0x272, 0x00);
-            write_reg(0x271, 0x55);
-            write_reg(0x005, 0x22);
+            _b200_iface->write_reg(0x273, 0x00);
+            _b200_iface->write_reg(0x274, 0x00);
+            _b200_iface->write_reg(0x275, 0x00);
+            _b200_iface->write_reg(0x272, 0x00);
+            _b200_iface->write_reg(0x271, 0x55);
+            _b200_iface->write_reg(0x005, 0x22);
             
-            if((read_reg(0x287) & 0x02) == 0) {
+            if((_b200_iface->read_reg(0x287) & 0x02) == 0) {
                 std::cout << "RX PLL NOT LOCKED" << std::endl;
             }
             return 850.0e6;
@@ -206,23 +206,6 @@ public:
 
 private:
     b200_iface::sptr _b200_iface;
-
-    void write_reg(uint16_t reg, uint8_t val)
-    {
-        uint8_t buf[3];
-        buf[0] = (0x80 | ((reg >> 8) & 0x3F));
-        buf[1] = (reg & 0xFF);
-        buf[2] = val;
-        _b200_iface->transact_spi(buf, 24, NULL, 0);
-    }
-
-    uint8_t read_reg(uint16_t reg) {
-        uint8_t buf[3];
-        buf[0] = (reg >> 8) & 0x3F;
-        buf[1] = (reg & 0xFF);
-        _b200_iface->transact_spi(buf, 16, buf, 24);
-        return buf[2];
-    }
 };
 
 /***********************************************************************

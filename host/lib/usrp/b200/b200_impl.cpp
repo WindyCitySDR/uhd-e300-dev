@@ -191,6 +191,14 @@ b200_impl::b200_impl(const device_addr_t &device_addr)
 //    _iface->load_fpga(b200_fpga_image);
     _iface->load_fpga("");
 
+
+    ////////////////////////////////////////////////////////////////////
+    // Get the FPGA a clock from Catalina
+    ////////////////////////////////////////////////////////////////////
+    _iface->write_reg(0x00A, 0b00010010);
+    _iface->write_reg(0x009, 0b00010111);
+
+
     ////////////////////////////////////////////////////////////////////
     // Create control transport
     ////////////////////////////////////////////////////////////////////
@@ -520,6 +528,8 @@ b200_impl::b200_impl(const device_addr_t &device_addr)
     //allocate streamer weak ptrs containers
     _rx_streamers.resize(_rx_dsps.size());
     _tx_streamers.resize(_tx_dsps.size());
+
+    _ctrl->poke32(SR_MISC + 4, 0xA);
 
     _tree->access<double>(mb_path / "tick_rate") //now subscribe the clock rate setter
         .subscribe(boost::bind(&b200_ctrl::set_tick_rate, _ctrl, _1))
