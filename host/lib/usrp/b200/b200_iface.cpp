@@ -388,12 +388,12 @@ static inline bool wait_for_recv_ready(int sock_fd, const size_t timeout_ms)
             {
                 boost::shared_ptr<asio::ip::tcp::socket> socket(new asio::ip::tcp::socket(io_service));
                 while (not wait_for_recv_ready(acceptor->native(), 100)){
-                    boost::this_thread::interruption_point();
+                    if (boost::this_thread::interruption_requested()) return;
                 }
                 acceptor->accept(*socket);
                 boost::uint32_t buff[512];
                 while (not wait_for_recv_ready(socket->native(), 100)){
-                    boost::this_thread::interruption_point();
+                    if (boost::this_thread::interruption_requested()) return;
                 }
                 socket->receive(asio::buffer(buff, sizeof(buff)));
                 const bool write = buff[0];
