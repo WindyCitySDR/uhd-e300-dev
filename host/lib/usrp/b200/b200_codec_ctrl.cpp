@@ -215,7 +215,7 @@ public:
         //iterate over VCO dividers until appropriate divider is found
         int i=0;
         for(i=0; i<=6; i++) {
-            vcodiv = 2<<i;
+            vcodiv = 1<<i;
             vcorate = rate * vcodiv;
             if(vcorate >= vcomin && vcorate <= vcomax) break;
         }
