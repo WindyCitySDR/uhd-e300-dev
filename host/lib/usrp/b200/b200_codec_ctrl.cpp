@@ -117,8 +117,8 @@ public:
         //ATRs configured in b200_impl()
 
         //set_clock_rate(40e6); //init ref clk (done above)
-        //tune("TX", 850e6);
-        //tune("RX", 800e6);
+        tune("TX", 850e6);
+        tune("RX", 800e6);
 
         //output_test_tone();
     }
