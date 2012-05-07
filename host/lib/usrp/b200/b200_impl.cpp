@@ -450,8 +450,6 @@ b200_impl::b200_impl(const device_addr_t &device_addr)
     _rx_streamers.resize(_rx_dsps.size());
     _tx_streamers.resize(_tx_dsps.size());
 
-    _ctrl->poke32(TOREG(SR_MISC + 1), 0xA);
-
     _tree->access<double>(mb_path / "tick_rate") //now subscribe the clock rate setter
         .subscribe(boost::bind(&b200_ctrl::set_tick_rate, _ctrl, _1))
         .set(40e6);
