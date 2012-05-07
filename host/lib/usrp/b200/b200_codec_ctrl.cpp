@@ -30,8 +30,6 @@ static const int RX_BANDSEL_A = (1 << 2);
 static const int TX_BANDSEL_B = (1 << 3);
 static const int TX_BANDSEL_A = (1 << 4);
 
-//TODO _ctrl->poke32(TOREG(SR_MISC+1), flags);
-
 /***********************************************************************
  * The implementation class
  **********************************************************************/
@@ -42,6 +40,10 @@ public:
     {
         _b200_iface = iface;
         _ctrl = ctrl;
+
+        //init bandsels (TODO based on settings)
+        const int bs_flags = TX_BANDSEL_A | RX_BANDSEL_B;
+        _ctrl->poke32(TOREG(SR_MISC+1), bs_flags);
 
         //reset
         _b200_iface->write_reg(0x000,0x01);
