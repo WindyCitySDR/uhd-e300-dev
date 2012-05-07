@@ -79,7 +79,7 @@ public:
         //RX1/2 en, RHB3 decim x2, RHB2 decim x2 fil. en, RHB1 en, RX FIR decim 2 en
         _b200_iface->write_reg(0x003, 0b01011110);
         //select TX1A/TX2A, RX antennas in balanced mode on ch. C
-        _b200_iface->write_reg(0x004, 0b00110000);
+        _b200_iface->write_reg(0x004, 0b01110000);
 
         //setup TX FIR
         setup_tx_fir();
