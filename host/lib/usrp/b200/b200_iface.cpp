@@ -29,7 +29,6 @@
 #include <string>
 #include <vector>
 #include <cstring>
-#include <cmath>
 
 namespace asio = boost::asio;
 
@@ -166,6 +165,21 @@ public:
     }
 
 
+    int fx3_control_read(boost::uint8_t request,
+                           boost::uint16_t value,
+                           boost::uint16_t index,
+                           unsigned char *buff,
+                           boost::uint16_t length)
+    {
+        return _usb_ctrl->submit(VRT_VENDOR_IN,         // bmReqeustType
+                                   request,             // bRequest
+                                   value,               // wValue
+                                   index,               // wIndex
+                                   buff,                // data
+                                   length);             // wLength
+    }
+
+
     void write_i2c(boost::uint8_t addr, const byte_vector_t &bytes)
     {
         //TODO
@@ -179,7 +193,7 @@ public:
         size_t num_rx_bits
     ){
         int ret = 0;
-        boost::uint16_t tx_length = std::ceil(num_tx_bits / 8);
+        boost::uint16_t tx_length = num_tx_bits / 8;
 
         if(tx_data[0] & 0x80) {
             ret = fx3_control_write(B200_VREQ_SPI_WRITE, 0x00, \
@@ -195,9 +209,9 @@ public:
 
 
         if(num_rx_bits) {
-            boost::uint16_t total_length = std::ceil(num_rx_bits / 8);
+            boost::uint16_t total_length = num_rx_bits / 8;
 
-            ret = fx3_control_write(B200_VREQ_LOOP, 0x00, \
+            ret = fx3_control_read(B200_VREQ_LOOP, 0x00, \
                     0x00, rx_data, total_length);
 
             if(ret < 0) {
@@ -211,7 +225,7 @@ public:
     {
         uint8_t buf[3];
         buf[0] = (0x80 | ((reg >> 8) & 0x3F));
-        buf[1] = (reg & 0xFF);
+        buf[1] = (reg & 0x00FF);
         buf[2] = val;
         transact_spi(buf, 24, NULL, 0);
     }
@@ -219,7 +233,7 @@ public:
     uint8_t read_reg(uint16_t reg) {
         uint8_t buf[3];
         buf[0] = (reg >> 8) & 0x3F;
-        buf[1] = (reg & 0xFF);
+        buf[1] = (reg & 0x00FF);
         transact_spi(buf, 16, buf, 24);
         return buf[2];
     }
