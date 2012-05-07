@@ -321,6 +321,10 @@ public:
             _b200_iface->write_reg(0x231, 0x50);
             _b200_iface->write_reg(0x005, 0x22);
 
+            _b200_iface->write_reg(0x236, 0x6b); //undoc vco settings
+            _b200_iface->write_reg(0x237, 0x65);
+            _b200_iface->write_reg(0x238, 0x71); //force vco tune <8
+
             boost::this_thread::sleep(boost::posix_time::milliseconds(2));
             if((_b200_iface->read_reg(0x247) & 0x02) == 0) {
                 std::cout << "RX PLL NOT LOCKED" << std::endl;
