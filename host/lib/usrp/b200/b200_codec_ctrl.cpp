@@ -51,11 +51,11 @@ public:
         _b200_iface->write_reg(0x009, 0b00010111);
 
         /**set up BBPLL*/
-        //64Msps ADC clock means:
-        //div 2 in RHB3 = 32Msps
-        //div 2 in RHB2 = 16Msps
-        //div 2 in RHB1 = 8Msps
-        //div 2 in RXFIR = 4Msps output
+        //245.76Msps ADC clock means:
+        //div 2 in RHB3 = 122.88Msps
+        //div 2 in RHB2 = 61.44Msps
+        //div 2 in RHB1 = 30.72sps
+        //div 2 in RXFIR = 15.36Msps output
         //eventually this should be done alongside FIR/HB setup
         set_adcclk(245.76e6); //for 15.36Msps
         //TX1/2 en, THB3 interp x2, THB2 interp x2 fil. en, THB1 en, TX FIR interp 2 en
@@ -71,7 +71,7 @@ public:
 
         /********setup data ports (FDD dual port DDR CMOS)*/
         //FDD dual port DDR CMOS no swap
-        _b200_iface->write_reg(0x010, 0b10101000); //FIXME 0b10101000 (swap TX IQ swap TX1/TX2)
+        _b200_iface->write_reg(0x010, 0b11001000); //FIXME 0b10101000 (swap TX IQ swap TX1/TX2)
         _b200_iface->write_reg(0x011, 0b00000000);
         _b200_iface->write_reg(0x012, 0b00000010); //force TX on one port, RX on the other
         _b200_iface->write_reg(0x013, 0b00000001); //enable ENSM
@@ -119,7 +119,15 @@ public:
         //set_clock_rate(40e6); //init ref clk (done above)
         tune("TX", 850e6);
         tune("RX", 800e6);
-
+        
+        std::cout << std::endl;
+        for(int i=0; i < 64; i++) {
+            std::cout << std::hex << i;
+            for(int j=0; j < 16; j++) {
+                std::cout << std::hex << _b200_iface->read_reg(i*16+j);
+            }
+            std::cout << std::endl;
+        }
         //output_test_tone();
     }
 
