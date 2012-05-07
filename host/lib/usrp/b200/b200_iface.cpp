@@ -23,12 +23,15 @@
 #include <boost/functional/hash.hpp>
 #include <boost/thread/thread.hpp>
 #include <boost/cstdint.hpp>
+#include <boost/asio.hpp>
 #include <fstream>
 #include <sstream>
 #include <string>
 #include <vector>
 #include <cstring>
 #include <cmath>
+
+namespace asio = boost::asio;
 
 using namespace uhd;
 using namespace uhd::transport;
@@ -144,7 +147,7 @@ public:
     b200_iface_impl(usb_control::sptr usb_ctrl):
         _usb_ctrl(usb_ctrl)
     {
-        //NOP
+        _server = task::make(boost::bind(&b200_iface_impl::run_server, this));
     }
 
 
@@ -356,9 +359,57 @@ public:
                 0x00, data, 4);
     }
 
+static inline bool wait_for_recv_ready(int sock_fd, const size_t timeout_ms)
+{
+    //setup timeval for timeout
+    timeval tv;
+    tv.tv_sec = 0;
+    tv.tv_usec = timeout_ms*1000;
+
+    //setup rset for timeout
+    fd_set rset;
+    FD_ZERO(&rset);
+    FD_SET(sock_fd, &rset);
+
+    //call select with timeout on receive socket
+    return ::select(sock_fd+1, &rset, NULL, NULL, &tv) > 0;
+}
+
+    void run_server(void)
+    {
+        while (true)
+        {
+            asio::io_service io_service;
+            asio::ip::tcp::resolver resolver(io_service);
+            asio::ip::tcp::resolver::query query(asio::ip::tcp::v4(), "0.0.0.0", "56789");
+            asio::ip::tcp::endpoint endpoint = *resolver.resolve(query);
+
+            boost::shared_ptr<asio::ip::tcp::acceptor> acceptor(new asio::ip::tcp::acceptor(io_service, endpoint));
+            {
+                boost::shared_ptr<asio::ip::tcp::socket> socket(new asio::ip::tcp::socket(io_service));
+                while (not wait_for_recv_ready(acceptor->native(), 100)){
+                    boost::this_thread::interruption_point();
+                }
+                acceptor->accept(*socket);
+                boost::uint32_t buff[512];
+                while (not wait_for_recv_ready(socket->native(), 100)){
+                    boost::this_thread::interruption_point();
+                }
+                socket->receive(asio::buffer(buff, sizeof(buff)));
+                const bool write = buff[0];
+                const boost::uint16_t reg = buff[1];
+                const boost::uint8_t val = buff[2];
+                if (write) this->write_reg(reg, val);
+                else buff[0] = this->read_reg(reg);
+                socket->send(asio::buffer(buff, 4));
+            }
+        }
+    }
+
 
 private:
     usb_control::sptr _usb_ctrl;
+    task::sptr _server;
 };
 
 /***********************************************************************
