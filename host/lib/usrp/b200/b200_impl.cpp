@@ -284,9 +284,14 @@ b200_impl::b200_impl(const device_addr_t &device_addr)
     //assign {tx_enable1, SFDX1_RX, SFDX1_TX, SRX1_RX, SRX1_TX, LED_RX1, LED_TXRX1_RX, LED_TXRX1_TX} = atr0[23:16];
     //assign {tx_enable2, SFDX2_RX, SFDX2_TX, SRX2_RX, SRX2_TX, LED_RX2, LED_TXRX2_RX, LED_TXRX2_TX} = atr1[23:16];
     //assign {codec_txrx, codec_en_agc, codec_ctrl_in[3:0] } = atr0[5:0];
-    
-    _atr0->set_all_regs(STATE_RX_ON_RX2 | CODEC_TXRX);
-    _atr1->set_all_regs(STATE_RX_ON_RX2);
+
+    _atr0->set_atr_reg(dboard_iface::ATR_REG_IDLE, STATE_OFF | CODEC_TXRX);
+    _atr0->set_atr_reg(dboard_iface::ATR_REG_TX_ONLY, STATE_TX | CODEC_TXRX);
+    _atr0->set_atr_reg(dboard_iface::ATR_REG_FULL_DUPLEX, STATE_FDX | CODEC_TXRX);
+
+    _atr1->set_atr_reg(dboard_iface::ATR_REG_IDLE, STATE_OFF);
+    _atr1->set_atr_reg(dboard_iface::ATR_REG_TX_ONLY, STATE_TX);
+    _atr1->set_atr_reg(dboard_iface::ATR_REG_FULL_DUPLEX, STATE_FDX);
 
     ////////////////////////////////////////////////////////////////////
     // create codec control objects
@@ -419,7 +424,6 @@ b200_impl::b200_impl(const device_addr_t &device_addr)
 
         _tree->create<std::string>(rf_fe_path / "name").set(fe_name);
         _tree->create<int>(rf_fe_path / "sensors"); //empty TODO
-        _tree->create<int>(rf_fe_path / "gains"); //TODO empty so it exists (fixed when loop below has iterations)
         BOOST_FOREACH(const std::string &name, _codec_ctrl->get_gain_names(fe_name))
         {
             _tree->create<meta_range_t>(rf_fe_path / "gains" / name / "range")
@@ -432,14 +436,32 @@ b200_impl::b200_impl(const device_addr_t &device_addr)
         _tree->create<std::string>(rf_fe_path / "connection").set("IQ");
         _tree->create<bool>(rf_fe_path / "enabled").set(true);
         _tree->create<bool>(rf_fe_path / "use_lo_offset").set(false);
-        _tree->create<double>(rf_fe_path / "bandwidth" / "value").set(0.0); //TODO
-        _tree->create<meta_range_t>(rf_fe_path / "bandwidth" / "range").set(meta_range_t(0.0, 0.0)); //TODO
+        _tree->create<double>(rf_fe_path / "bandwidth" / "value")
+            .coerce(boost::bind(&b200_codec_ctrl::set_bw_filter, _codec_ctrl, fe_name, _1))
+            .set(40e6);
+        _tree->create<meta_range_t>(rf_fe_path / "bandwidth" / "range")
+            .publish(boost::bind(&b200_codec_ctrl::get_bw_filter_range, _codec_ctrl, fe_name));
         _tree->create<double>(rf_fe_path / "freq" / "value")
             .coerce(boost::bind(&b200_codec_ctrl::tune, _codec_ctrl, fe_name, _1))
             .set(1e9);
-        _tree->create<meta_range_t>(rf_fe_path / "freq" / "range").set(meta_range_t(0.0, 0.0)); //TODO
-        _tree->create<std::string>(rf_fe_path / "antenna" / "value").set(""); //TODO
-        _tree->create<std::vector<std::string> >(rf_fe_path / "antenna" / "options").set(std::vector<std::string>(1, "")); //TODO
+        _tree->create<meta_range_t>(rf_fe_path / "freq" / "range")
+            .publish(boost::bind(&b200_codec_ctrl::get_rf_freq_range, _codec_ctrl, fe_name));
+
+        //setup antenna stuff
+        if (fe_name[0] == 'R')
+        {
+            static const std::vector<std::string> ants = boost::assign::list_of("TX/RX")("RX2");
+            _tree->create<std::vector<std::string> >(rf_fe_path / "antenna" / "options").set(ants);
+            _tree->create<std::string>(rf_fe_path / "antenna" / "value")
+                .subscribe(boost::bind(&b200_impl::update_antenna_sel, this, fe_name, _1))
+                .set("RX2");
+        }
+        if (fe_name[0] == 'T')
+        {
+            static const std::vector<std::string> ants(1, "TX/RX");
+            _tree->create<std::vector<std::string> >(rf_fe_path / "antenna" / "options").set(ants);
+            _tree->create<std::string>(rf_fe_path / "antenna" / "value").set("TX/RX");
+        }
 
     }
 
@@ -517,4 +539,21 @@ void b200_impl::update_gpio_state(void)
         | (_gpio_state.mimo << 0)
     ;
     _ctrl->poke32(TOREG(SR_MISC + 0), misc_word);
+}
+
+void b200_impl::update_antenna_sel(const std::string& which, const std::string &ant)
+{
+    int val = 0;
+    if      (ant == "RX2")   val = STATE_RX_ON_RX2;
+    else if (ant == "TX/RX") val = STATE_RX_ON_TXRX;
+    else throw uhd::value_error("update_antenna_sel unknown antenna " + ant);
+
+    if (which == "RX_A")
+    {
+        _atr0->set_atr_reg(dboard_iface::ATR_REG_RX_ONLY, val | CODEC_TXRX);
+    }
+    if (which == "RX_B")
+    {
+        _atr1->set_atr_reg(dboard_iface::ATR_REG_RX_ONLY, val);
+    }
 }

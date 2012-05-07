@@ -140,8 +140,7 @@ public:
 
     std::vector<std::string> get_gain_names(const std::string &which)
     {
-        //TODO
-        return std::vector<std::string>();
+        return std::vector<std::string>(1, "PGA");
     }
 
     double set_gain(const std::string &which, const std::string &name, const double value)
@@ -193,10 +192,25 @@ public:
     uhd::meta_range_t get_gain_range(const std::string &which, const std::string &name)
     {
         if(which[0] == 'R') {
-            return uhd::meta_range_t(0.0, 73.0);
+            return uhd::meta_range_t(0.0, 73.0, 1.0);
         } else {
-            return uhd::meta_range_t(0.0, 89.75);
+            return uhd::meta_range_t(0.0, 89.75, 0.25);
         }
+    }
+
+    uhd::meta_range_t get_rf_freq_range(const std::string &which)
+    {
+        return uhd::meta_range_t(0.0, 1e12); //FIXME TODO
+    }
+
+    uhd::meta_range_t get_bw_filter_range(const std::string &which)
+    {
+        return uhd::meta_range_t(0.0, 60e6); //FIXME TODO
+    }
+
+    double set_bw_filter(const std::string &which, const double bw)
+    {
+        return 0.0; //TODO
     }
 
     double set_clock_rate(const double rate)

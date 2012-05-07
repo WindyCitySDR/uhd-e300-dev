@@ -44,6 +44,15 @@ public:
     //! get the gain range for a particular gain element
     virtual uhd::meta_range_t get_gain_range(const std::string &which, const std::string &name) = 0;
 
+    //! get the freq range for the frontend which
+    virtual uhd::meta_range_t get_rf_freq_range(const std::string &which) = 0;
+
+    //! get the filter range for the frontend which
+    virtual uhd::meta_range_t get_bw_filter_range(const std::string &which) = 0;
+
+    //! set the filter bandwidth for the frontend
+    virtual double set_bw_filter(const std::string &which, const double bw) = 0;
+
     //! set a new clock rate, return the exact value
     virtual double set_clock_rate(const double rate) = 0;
 

@@ -51,29 +51,6 @@ static const boost::uint32_t B200_TX_SID_BASE = 40;
 static const size_t          B200_NUM_RX_FE = 2;
 static const size_t          B200_NUM_TX_FE = 2;
 
-/* ATR GPIO TX Output Settings */
-static const boost::uint32_t LED_TXRX_TX = (1 << 16);
-static const boost::uint32_t LED_TXRX_RX = (1 << 17);
-static const boost::uint32_t LED_RX = (1 << 18);
-static const boost::uint32_t SRX_TX = (1 << 19);
-static const boost::uint32_t SRX_RX = (1 << 20);
-static const boost::uint32_t SFDX_TX = (1 << 21);
-static const boost::uint32_t SFDX_RX = (1 << 22);
-static const boost::uint32_t TX_ENABLE = (1 << 23);
-
-static const boost::uint32_t STATE_OFF = 0x00;
-static const boost::uint32_t STATE_TX = (LED_TXRX_TX | SFDX_TX | TX_ENABLE);
-static const boost::uint32_t STATE_RX_ON_TXRX = (LED_TXRX_RX | SRX_TX | SRX_RX);
-static const boost::uint32_t STATE_RX_ON_RX2 = (LED_RX | SFDX_RX);
-static const boost::uint32_t STATE_FDX = (LED_TXRX_TX | LED_RX | SFDX_TX 
-                                  | SFDX_RX | TX_ENABLE);
-
-/* ATR GPIO RX Output Settings */
-//FIXME -- What do these do?
-static const boost::uint32_t CODEC_CTRL_IN = 0x0F;
-static const boost::uint32_t CODEC_EN_AGC = (1 << 4);
-static const boost::uint32_t CODEC_TXRX = (1 << 5);
-
 //! Implementation guts
 class b200_impl : public uhd::device {
 public:
@@ -123,6 +100,7 @@ private:
     void update_tx_samp_rate(const size_t, const double rate);
     void update_clock_source(const std::string &);
     void update_tick_rate(const double rate);
+    void update_antenna_sel(const std::string& which, const std::string &ant);
 
     struct gpio_state{
         boost::uint32_t ext_ref_enable, dac_shdn, pps_fpga_out_enable, pps_gps_out_enable, gps_out_enable, gps_ref_enable;
