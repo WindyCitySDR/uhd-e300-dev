@@ -511,6 +511,7 @@ public:
             _b200_iface->write_reg(0x0f0, addr);
             _b200_iface->write_reg(0x0f1, (filter_coeffs[addr] >> 8) & 0xff);
             _b200_iface->write_reg(0x0f2, filter_coeffs[addr] & 0xff);
+            _b200_iface->write_reg(0x0f5, 0xfe);
             _b200_iface->write_reg(0x0f4, 0x00);
             _b200_iface->write_reg(0x0f4, 0x00);
         }
@@ -519,6 +520,7 @@ public:
             _b200_iface->write_reg(0x0f0, addr);
             _b200_iface->write_reg(0x0f1, (filter_coeffs[128-addr] >> 8) & 0xff);
             _b200_iface->write_reg(0x0f2, filter_coeffs[128-addr] & 0xff);
+            _b200_iface->write_reg(0x0f5, 0xfe);
             _b200_iface->write_reg(0x0f4, 0x00);
             _b200_iface->write_reg(0x0f4, 0x00);
         }
