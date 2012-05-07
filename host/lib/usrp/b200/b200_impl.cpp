@@ -275,7 +275,7 @@ b200_impl::b200_impl(const device_addr_t &device_addr)
     //assign { /* 3'bX, */ tx_bandsel_a, tx_bandsel_b, rx_bandsel_a, rx_bandsel_b, rx_bandsel_c } = misc_outs[15:8];
     //assign { /* 7'bX, */ mimo } = misc_outs[7:0];
     _gpio_state.tx_bandsel_a = 1;
-    _gpio_state.rx_bandsel_a = 1;
+    _gpio_state.rx_bandsel_b = 1;
     _gpio_state.mimo = 0;
     update_gpio_state(); //first time init
 
