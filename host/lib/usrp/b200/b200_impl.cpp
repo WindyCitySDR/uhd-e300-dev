@@ -592,27 +592,30 @@ void b200_impl::run_server(void)
             }
             acceptor->accept(*socket);
             boost::uint32_t buff[512];
-            while (not wait_for_recv_ready(socket->native(), 100)){
-                if (boost::this_thread::interruption_requested()) return;
+            while (true)
+            {
+                while (not wait_for_recv_ready(socket->native(), 100)){
+                    if (boost::this_thread::interruption_requested()) return;
+                }
+                socket->receive(asio::buffer(buff, sizeof(buff)));
+                const boost::uint32_t action = buff[0];
+                const boost::uint32_t reg = buff[1];
+                const boost::uint32_t val = buff[2];
+                boost::uint32_t result = 0;
+                if (action == 0){ //read spi
+                    result = _iface->read_reg(reg);
+                }
+                if (action == 1){ //write spi
+                    _iface->write_reg(reg, val);
+                }
+                if (action == 2){ //peek32
+                    result = _ctrl->peek32(reg);
+                }
+                if (action == 3){ //poke32
+                    _ctrl->poke32(reg, val);
+                }
+                socket->send(asio::buffer(&result, 4));
             }
-            socket->receive(asio::buffer(buff, sizeof(buff)));
-            const boost::uint32_t action = buff[0];
-            const boost::uint32_t reg = buff[1];
-            const boost::uint32_t val = buff[2];
-            boost::uint32_t result = 0;
-            if (action == 0){ //read spi
-                result = _iface->read_reg(reg);
-            }
-            if (action == 1){ //write spi
-                _iface->write_reg(reg, val);
-            }
-            if (action == 2){ //peek32
-                result = _ctrl->peek32(reg);
-            }
-            if (action == 3){ //poke32
-                _ctrl->poke32(reg, val);
-            }
-            socket->send(asio::buffer(&result, 4));
         }
     }catch(...){}}
 }
