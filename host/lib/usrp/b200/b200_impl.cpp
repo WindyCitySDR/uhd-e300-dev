@@ -285,8 +285,8 @@ b200_impl::b200_impl(const device_addr_t &device_addr)
     //assign {tx_enable2, SFDX2_RX, SFDX2_TX, SRX2_RX, SRX2_TX, LED_RX2, LED_TXRX2_RX, LED_TXRX2_TX} = atr1[23:16];
     //assign {codec_txrx, codec_en_agc, codec_ctrl_in[3:0] } = atr0[5:0];
     
-    _atr0->set_all_regs(STATE_TX | CODEC_TXRX);
-    _atr1->set_all_regs(STATE_TX);
+    _atr0->set_all_regs(STATE_RX_ON_RX2 | CODEC_TXRX);
+    _atr1->set_all_regs(STATE_RX_ON_RX2);
 
     ////////////////////////////////////////////////////////////////////
     // create codec control objects
