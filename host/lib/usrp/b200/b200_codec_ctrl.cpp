@@ -18,6 +18,7 @@
 #include "b200_codec_ctrl.hpp"
 #include <uhd/exception.hpp>
 #include <iostream>
+#include <boost/thread.hpp>
 
 using namespace uhd;
 using namespace uhd::transport;
@@ -78,12 +79,15 @@ public:
         _b200_iface->write_reg(0x015, 0b00000111); //dual synth mode, synth en ctrl en
 
         //setup TX FIR
-
+        setup_tx_fir();
         //setup RX FIR
-
+        setup_rx_fir();
+        
         //set baseband filter BW
         set_filter_bw("TX_A", 6.0e6);
         set_filter_bw("RX_A", 6.0e6);
+
+        //adc setup
 
         //ian magic
         _b200_iface->write_reg(0x014, 0b00001111);
@@ -363,6 +367,47 @@ public:
             _b200_iface->write_reg(0x1de, 0x40);
             return 6.0e6;
         }
+    }
+
+    void setup_rx_fir()
+    {
+        //256 tap symmetric FIR filter for 12MHz RX bandwidth
+        uint16_t filter_coeffs[] = {
+            0x0001, 0xfff1, 0xffcf, 0xffc0, 0xffe8, 0x0020, 0x001a, 0x00e3,
+            0xffe1, 0x001f, 0x0028, 0xffdf, 0xffcc, 0x0024, 0x0043, 0xffdb,
+            0xffac, 0x0026, 0x0068, 0xffdb, 0xff80, 0x0022, 0x009a, 0xffe2,
+            0xff47, 0x0017, 0x00db, 0xfff3, 0xfeff, 0xffff, 0x012b, 0x0013,
+            0xfea5, 0xffd7, 0x0190, 0x0046, 0xfe35, 0xff97, 0x020e, 0x0095,
+            0xfda7, 0xff36, 0x02ae, 0x010d, 0xfcf0, 0xfea1, 0x0383, 0x01c6,
+            0xfbf3, 0xfdb6, 0x04b7, 0x02f8, 0xfa6d, 0xfc1a, 0x06be, 0x0541,
+            0xf787, 0xf898, 0x0b60, 0x0b6d, 0xee88, 0xea40, 0x2786, 0x7209
+            };
+
+        _b200_iface->write_reg(0x0f5, 0xfa); //enable filter clk
+        _b200_iface->write_reg(0x0f6, 0x02); //filter gain
+        boost::this_thread::sleep(boost::posix_time::milliseconds(1));
+        int addr = 0;
+        for(; addr < 128; addr++) {
+            _b200_iface->write_reg(0x0f0, addr);
+            _b200_iface->write_reg(0x0f1, (filter_coeffs[addr] >> 8) & 0xff);
+            _b200_iface->write_reg(0x0f2, filter_coeffs[addr] & 0xff);
+            _b200_iface->write_reg(0x0f4, 0x00);
+            _b200_iface->write_reg(0x0f4, 0x00);
+        }
+        //it's symmetric, so we write it out again backwards
+        for(; addr < 256; addr++) {
+            _b200_iface->write_reg(0x0f0, addr);
+            _b200_iface->write_reg(0x0f1, (filter_coeffs[128-addr] >> 8) & 0xff);
+            _b200_iface->write_reg(0x0f2, filter_coeffs[128-addr] & 0xff);
+            _b200_iface->write_reg(0x0f4, 0x00);
+            _b200_iface->write_reg(0x0f4, 0x00);
+        }
+        _b200_iface->write_reg(0x0f5, 0xf8); //disable filter clk
+    }
+
+    void setup_tx_fir()
+    {
+
     }
 
 
