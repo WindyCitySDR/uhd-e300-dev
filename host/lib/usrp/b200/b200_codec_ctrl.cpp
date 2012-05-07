@@ -220,7 +220,7 @@ public:
         _b200_iface->write_reg(0x043, nfrac & 0xFF); //Nfrac[7:0]
 
         //use XTALN input, CLKOUT=XTALN (40MHz ref out to FPGA)
-        _b200_iface->write_reg(0x00A, 0b00010000 | vcodiv); //set BBPLL divider
+        _b200_iface->write_reg(0x00A, 0b00010000 | i); //set BBPLL divider
 
         //CP filter recommended coefficients, don't change unless you have a clue
         _b200_iface->write_reg(0x048, 0xe8);
