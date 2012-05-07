@@ -151,6 +151,10 @@ public:
             //gain table index is dB+3 for 200-1300MHz,
             //db+5 for 1300-4000
             //db+14 for 4000-6000
+
+            //set some AGC crap
+            _b200_iface->write_reg(0x0fc, 0x23);
+            
             int gain_offset;
             if(_rx_freq < 1300) gain_offset = 3;
             else if(_rx_freq < 4000) gain_offset = 5;
@@ -476,6 +480,15 @@ public:
 
     void rx_cal(void)
     {
+        _b200_iface->write_reg(0x0a0, 0x3a);
+        _b200_iface->write_reg(0x0a3, 0x40);
+        _b200_iface->write_reg(0x0a1, 0x79);
+        _b200_iface->write_reg(0x0a9, 0xff);
+        _b200_iface->write_reg(0x0a2, 0x4f);
+        _b200_iface->write_reg(0x0a5, 0x03);
+        _b200_iface->write_reg(0x0a6, 0x03);
+        _b200_iface->write_reg(0x0aa, 0x33);
+        _b200_iface->write_reg(0x0a4, 0x20);
         _b200_iface->write_reg(0x193, 0x3f);
         _b200_iface->write_reg(0x190, 0x0f);
         _b200_iface->write_reg(0x194, 0x01);
