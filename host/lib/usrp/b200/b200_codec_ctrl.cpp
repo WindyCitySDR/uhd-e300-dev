@@ -50,6 +50,8 @@ public:
         _b200_iface->write_reg(0x2ac, 0xff);
         _b200_iface->write_reg(0x009, 0b00010111);
 
+        boost::this_thread::sleep(boost::posix_time::milliseconds(20));
+
         //set delay register
         _b200_iface->write_reg(0x03a, 0x27);
 
@@ -68,36 +70,38 @@ public:
         //select TX1A/TX2A, RX antennas in balanced mode on ch. A
         _b200_iface->write_reg(0x004, 0b00000011);
 
-        //data delay for TX and RX data clocks
-        _b200_iface->write_reg(0x006, 0x0F);
-        _b200_iface->write_reg(0x007, 0x00);
+        //setup TX FIR
+        setup_tx_fir();
+        //setup RX FIR
+        setup_rx_fir();
 
         /********setup data ports (FDD dual port DDR CMOS)*/
         //FDD dual port DDR CMOS no swap
         _b200_iface->write_reg(0x010, 0b11001000); //FIXME 0b10101000 (swap TX IQ swap TX1/TX2)
         _b200_iface->write_reg(0x011, 0b00000000);
         _b200_iface->write_reg(0x012, 0b00000010); //force TX on one port, RX on the other
-        _b200_iface->write_reg(0x013, 0b00000001); //enable ENSM
-        _b200_iface->write_reg(0x014, 0b00100001); //use SPI for TXNRX ctrl, to alert, TX on
+
+        //data delay for TX and RX data clocks
+        _b200_iface->write_reg(0x006, 0x0F);
+        _b200_iface->write_reg(0x007, 0x00);
+
         _b200_iface->write_reg(0x015, 0b00000111); //dual synth mode, synth en ctrl en
+        //_b200_iface->write_reg(0x014, 0b00100001); //use SPI for TXNRX ctrl, to alert, TX on
+        _b200_iface->write_reg(0x013, 0b00000001); //enable ENSM
 
-        //setup TX FIR
-        setup_tx_fir();
-        //setup RX FIR
-        setup_rx_fir();
-        
-        //set baseband filter BW
-        set_filter_bw("TX_A", 6.0e6);
-        set_filter_bw("RX_A", 6.0e6);
-
-        //adc setup
-        setup_adc();
-
-        rx_cal();
-
-        //ian magic
-        _b200_iface->write_reg(0x014, 0b00001111);
-        _b200_iface->write_reg(0x014, 0b00100001); //WAS 0b00101011
+        //RX CP CAL
+        boost::this_thread::sleep(boost::posix_time::milliseconds(1));
+        _b200_iface->write_reg(0x23d, 0x04);
+        boost::this_thread::sleep(boost::posix_time::milliseconds(1));
+        if(!(_b200_iface->read_reg(0x244) & 0x80)) {
+            std::cout << "RX charge pump cal failure" << std::endl;
+        }
+        //TX CP CAL
+        _b200_iface->write_reg(0x27d, 0x04);
+        boost::this_thread::sleep(boost::posix_time::milliseconds(1));
+        if(!(_b200_iface->read_reg(0x284) & 0x80)) {
+            std::cout << "TX charge pump cal failure" << std::endl;
+        }
 
         /**initial VCO setup*/
         _b200_iface->write_reg(0x261,0x00); //RX LO power
@@ -119,11 +123,41 @@ public:
         _b200_iface->write_reg(0x23d,0x04); //clear RX 1/2 VCO cal clk //FIXME 0x04 enable CP cal, "only change if apps eng. says so"
         _b200_iface->write_reg(0x27d,0x04); //"" TX //FIXME 0x04
 
+        tune("RX", 800e6);
+        tune("TX", 850e6);
+
+        //gm subtable here
+
+        //gain table here
+        
+        //set baseband filter BW
+        set_filter_bw("RX_A", 6.0e6);
+        set_filter_bw("TX_A", 6.0e6);
+
+        //setup RX TIA
+        _b200_iface->write_reg(0x1db, 0x60);
+        _b200_iface->write_reg(0x1dd, 0x08);
+        _b200_iface->write_reg(0x1df, 0x08);
+        _b200_iface->write_reg(0x1dc, 0x40);
+        _b200_iface->write_reg(0x1de, 0x40);
+
+        //setup TX secondary filter
+        _b200_iface->write_reg(0x0d2, 0x29);
+        _b200_iface->write_reg(0x0d1, 0x0c);
+        _b200_iface->write_reg(0x0d0, 0x56);
+
+        //adc setup
+        setup_adc();
+
+        quad_cal();
+
+        //ian magic
+        _b200_iface->write_reg(0x014, 0b00001111);
+        _b200_iface->write_reg(0x014, 0b00100001); //WAS 0b00101011
+
         //ATRs configured in b200_impl()
 
         //set_clock_rate(40e6); //init ref clk (done above)
-        tune("TX", 850e6);
-        tune("RX", 800e6);
         
         std::cout << std::endl;
         for(int i=0; i < 64; i++) {
@@ -382,13 +416,12 @@ public:
             _b200_iface->write_reg(0x0d9, 0x00);
             _b200_iface->write_reg(0x0ca, 0x22);
             _b200_iface->write_reg(0x016, 0x40);
-            //while(_b200_iface->read_reg(0x016) & 0x40);
+            boost::this_thread::sleep(boost::posix_time::milliseconds(1));
+            if(_b200_iface->read_reg(0x016) & 0x40) {
+                std::cout << "RX baseband filter cal failure" << std::endl;
+            }
             _b200_iface->write_reg(0x0ca, 0x26);
 
-            //setup TX secondary filter
-            _b200_iface->write_reg(0x0d2, 0x29);
-            _b200_iface->write_reg(0x0d1, 0x0c);
-            _b200_iface->write_reg(0x0d0, 0x56);
             return 6.0e6;
         } else {
             _b200_iface->write_reg(0x1fb, 0x06);
@@ -400,16 +433,13 @@ public:
             _b200_iface->write_reg(0x1e2, 0x02);
             _b200_iface->write_reg(0x1e3, 0x02);
             _b200_iface->write_reg(0x016, 0x80); //start tune
-            //while(_b200_iface->read_reg(0x016) & 0x80);
+            boost::this_thread::sleep(boost::posix_time::milliseconds(1));
+            if(_b200_iface->read_reg(0x016) & 0x80) {
+                std::cout << "RX baseband filter cal failure" << std::endl;
+            }
             _b200_iface->write_reg(0x1e2, 0x03);
             _b200_iface->write_reg(0x1e3, 0x03);
 
-            //setup RX TIA
-            _b200_iface->write_reg(0x1db, 0x60);
-            _b200_iface->write_reg(0x1dd, 0x08);
-            _b200_iface->write_reg(0x1df, 0x08);
-            _b200_iface->write_reg(0x1dc, 0x40);
-            _b200_iface->write_reg(0x1de, 0x40);
             return 6.0e6;
         }
     }
@@ -457,6 +487,11 @@ public:
 
     void setup_adc()
     {
+        _b200_iface->write_reg(0x1db, 0x60);
+        _b200_iface->write_reg(0x1dd, 0x08);
+        _b200_iface->write_reg(0x1df, 0x08);
+        _b200_iface->write_reg(0x1dc, 0x40);
+        _b200_iface->write_reg(0x1de, 0x40);
         uint8_t adc_regs[] = {
             0x00, 0x00, 0x00, 0x24, 0x24, 0x24, 0x00, 0x7c,
             0x52, 0x3c, 0x4c, 0x34, 0x4f, 0x32, 0x00, 0x7f,
@@ -478,8 +513,9 @@ public:
         _b200_iface->write_reg(0x3FE, 0x3F);
     }
 
-    void rx_cal(void)
+    void quad_cal(void)
     {
+        //tx quad cal
         _b200_iface->write_reg(0x0a0, 0x3a);
         _b200_iface->write_reg(0x0a3, 0x40);
         _b200_iface->write_reg(0x0a1, 0x79);
@@ -489,6 +525,8 @@ public:
         _b200_iface->write_reg(0x0a6, 0x03);
         _b200_iface->write_reg(0x0aa, 0x33);
         _b200_iface->write_reg(0x0a4, 0x20);
+
+        //rx quad cal
         _b200_iface->write_reg(0x193, 0x3f);
         _b200_iface->write_reg(0x190, 0x0f);
         _b200_iface->write_reg(0x194, 0x01);
