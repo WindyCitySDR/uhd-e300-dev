@@ -122,10 +122,12 @@ public:
         
         std::cout << std::endl;
         for(int i=0; i < 64; i++) {
-            std::cout << std::hex << i;
-            for(int j=0; j < 16; j++) {
-                std::cout << std::hex << _b200_iface->read_reg(i*16+j);
+            std::cout << std::hex << std::uppercase << int(i) << ",";
+            int j=0;
+            for(; j < 15; j++) {
+                std::cout << std::hex << std::uppercase << int(_b200_iface->read_reg(i*16+j)) << ",";
             }
+            std::cout << std::hex << std::uppercase << int(_b200_iface->read_reg(i*16+j));
             std::cout << std::endl;
         }
         //output_test_tone();
