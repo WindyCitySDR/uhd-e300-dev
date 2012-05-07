@@ -50,6 +50,9 @@ public:
         _b200_iface->write_reg(0x2ac, 0xff);
         _b200_iface->write_reg(0x009, 0b00010111);
 
+        //set delay register
+        _b200_iface->write_reg(0x03a, 0x27);
+
         /**set up BBPLL*/
         //245.76Msps ADC clock means:
         //div 2 in RHB3 = 122.88Msps
@@ -92,7 +95,7 @@ public:
 
         //ian magic
         _b200_iface->write_reg(0x014, 0b00001111);
-        _b200_iface->write_reg(0x014, 0b00101011);
+        _b200_iface->write_reg(0x014, 0b00100001); //WAS 0b00101011
 
         /**initial VCO setup*/
         _b200_iface->write_reg(0x261,0x00); //RX LO power
@@ -254,7 +257,8 @@ public:
         _b200_iface->write_reg(0x046, icp_reg & 0x3F);
 
         //calibrate freq (0x04B[7], toggle 0x03F[2] 1 then 0)
-        _b200_iface->write_reg(0x04B, 0xC0);
+        _b200_iface->write_reg(0x04e, 0x10); //slow down cal for better accuracy
+        _b200_iface->write_reg(0x04B, 0xE0);
         _b200_iface->write_reg(0x03F, 0x05);
         _b200_iface->write_reg(0x03F, 0x01); //keep bbpll on
 
