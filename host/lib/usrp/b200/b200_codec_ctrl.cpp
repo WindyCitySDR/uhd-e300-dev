@@ -15,6 +15,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 //
 
+#include "b200_regs.hpp"
 #include "b200_codec_ctrl.hpp"
 #include <uhd/exception.hpp>
 #include <iostream>
@@ -23,15 +24,24 @@
 using namespace uhd;
 using namespace uhd::transport;
 
+static const int RX_BANDSEL_C = (1 << 0);
+static const int RX_BANDSEL_B = (1 << 1);
+static const int RX_BANDSEL_A = (1 << 2);
+static const int TX_BANDSEL_B = (1 << 3);
+static const int TX_BANDSEL_A = (1 << 4);
+
+//TODO _ctrl->poke32(TOREG(SR_MISC+1), flags);
+
 /***********************************************************************
  * The implementation class
  **********************************************************************/
 class b200_codec_ctrl_impl : public b200_codec_ctrl{
 public:
 
-    b200_codec_ctrl_impl(b200_iface::sptr iface)
+    b200_codec_ctrl_impl(b200_iface::sptr iface, wb_iface::sptr ctrl)
     {
         _b200_iface = iface;
+        _ctrl = ctrl;
 
         //reset
         _b200_iface->write_reg(0x000,0x01);
@@ -585,13 +595,14 @@ public:
 
 private:
     b200_iface::sptr _b200_iface;
+    wb_iface::sptr _ctrl;
     double _rx_freq, _tx_freq;
 };
 
 /***********************************************************************
  * Make an instance of the implementation
  **********************************************************************/
-b200_codec_ctrl::sptr b200_codec_ctrl::make(b200_iface::sptr iface)
+b200_codec_ctrl::sptr b200_codec_ctrl::make(b200_iface::sptr iface, wb_iface::sptr ctrl)
 {
-    return sptr(new b200_codec_ctrl_impl(iface));
+    return sptr(new b200_codec_ctrl_impl(iface, ctrl));
 }

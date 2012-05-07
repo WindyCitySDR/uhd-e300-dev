@@ -18,6 +18,8 @@
 #ifndef INCLUDED_B200_REGS_HPP
 #define INCLUDED_B200_REGS_HPP
 
+#include <boost/cstdint.hpp>
+
 #define TOREG(x) ((x)*4)
 
 #define localparam static const int

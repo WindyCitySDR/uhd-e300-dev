@@ -274,8 +274,7 @@ b200_impl::b200_impl(const device_addr_t &device_addr)
     //assign { /* 2'bX, */ ext_ref_enable, dac_shdn, pps_fpga_out_enable, pps_gps_out_enable, gps_out_enable, gps_ref_enable } = misc_outs[23:16];
     //assign { /* 3'bX, */ tx_bandsel_a, tx_bandsel_b, rx_bandsel_a, rx_bandsel_b, rx_bandsel_c } = misc_outs[15:8];
     //assign { /* 7'bX, */ mimo } = misc_outs[7:0];
-    _gpio_state.tx_bandsel_a = 1;
-    _gpio_state.rx_bandsel_b = 1;
+
     _gpio_state.mimo = 0;
     update_gpio_state(); //first time init
 
@@ -296,7 +295,7 @@ b200_impl::b200_impl(const device_addr_t &device_addr)
     ////////////////////////////////////////////////////////////////////
     // create codec control objects
     ////////////////////////////////////////////////////////////////////
-    _codec_ctrl = b200_codec_ctrl::make(_iface);
+    _codec_ctrl = b200_codec_ctrl::make(_iface, _ctrl);
     static const std::vector<std::string> frontends = boost::assign::list_of
         ("TX_A")("TX_B")("RX_A")("RX_B")
     ;
@@ -523,21 +522,14 @@ void b200_impl::update_clock_source(const std::string &)
 
 void b200_impl::update_gpio_state(void)
 {
-    //TODO a lot more TODO
-
     const boost::uint32_t misc_word = 0
-        | (_gpio_state.ext_ref_enable << 21)
-        | (_gpio_state.dac_shdn << 20)
-        | (_gpio_state.pps_fpga_out_enable << 19)
-        | (_gpio_state.pps_gps_out_enable << 18)
-        | (_gpio_state.gps_out_enable << 17)
-        | (_gpio_state.gps_ref_enable << 16)
-        | (_gpio_state.tx_bandsel_a << 12)
-        | (_gpio_state.tx_bandsel_b << 11)
-        | (_gpio_state.rx_bandsel_a << 10)
-        | (_gpio_state.rx_bandsel_b << 9)
-        | (_gpio_state.rx_bandsel_c << 8)
-        | (_gpio_state.mimo << 0)
+        | (_gpio_state.mimo << 6)
+        | (_gpio_state.ext_ref_enable << 5)
+        | (_gpio_state.dac_shdn << 4)
+        | (_gpio_state.pps_fpga_out_enable << 3)
+        | (_gpio_state.pps_gps_out_enable << 2)
+        | (_gpio_state.gps_out_enable << 1)
+        | (_gpio_state.gps_ref_enable << 0)
     ;
     _ctrl->poke32(TOREG(SR_MISC + 0), misc_word);
 }
