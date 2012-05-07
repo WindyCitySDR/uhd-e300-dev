@@ -281,13 +281,13 @@ public:
             vcorate = rate * vcodiv;
             if(vcorate >= vcomin && vcorate <= vcomax) break;
         }
-        if(i == 7) throw uhd::runtime_error("Can't find valid VCO rate!");
+        if(i == 7) throw uhd::runtime_error("BBVCO can't find valid VCO rate!");
         //TODO this will pick the low rate for threshold values, should eval
         //whether vcomax or vcomin has better performance
 
         int nint = vcorate / fref;
         int nfrac = ((vcorate / fref) - nint) * modulus;
-        std::cout << "Nint: " << nint << " Nfrac: " << nfrac << " vcodiv: " << vcodiv << std::endl;
+        std::cout << "BB Nint: " << nint << " Nfrac: " << nfrac << " vcodiv: " << vcodiv << std::endl;
 
         double actual_vcorate = fref * (nint + double(nfrac)/modulus);
         
@@ -340,8 +340,35 @@ public:
         //setup VCO/RFPLL based on rx/tx freq
         //VCO cal
 
-        //this is the example 800MHz/850MHz stuff from the tuning document
-        //set rx to 800, tx to 850
+        //RFPLL runs from 6GHz-12GHz
+        const double fref = 80e6; //fixed for now
+        const int modulus = 8388593;
+
+        const double vcomax = 12e9;
+        const double vcomin = 6e9;
+        double vcorate;
+        int vcodiv;
+
+        //iterate over VCO dividers until appropriate divider is found
+        int i;
+        for(i=0; i<=6; i++) {
+            vcodiv = 2<<i;
+            vcorate = value * vcodiv;
+            if(vcorate >= vcomin && vcorate <= vcomax) break;
+        }
+        if(i == 7) throw uhd::runtime_error("RFVCO can't find valid VCO rate!");
+        //TODO this will pick the low rate for threshold values, should eval
+        //whether vcomax or vcomin has better performance
+
+        std::cout << "RF VCO rate: " << vcorate << std::endl;
+
+        int nint = vcorate / fref;
+        int nfrac = ((vcorate / fref) - nint) * modulus;
+        std::cout << "RF Nint: " << nint << " Nfrac: " << nfrac << " vcodiv: " << vcodiv << std::endl;
+
+        double actual_vcorate = fref * (nint + double(nfrac)/modulus);
+        double actual_lo = actual_vcorate / vcodiv;
+
         if(which[0] == 'R') {
             //set up synth
             _b200_iface->write_reg(0x23a, 0x4a);//vco output level
@@ -357,12 +384,12 @@ public:
             _b200_iface->write_reg(0x23b, 0x89);//Icp
 
             //tune that shit
-            _b200_iface->write_reg(0x233, 0x00);
-            _b200_iface->write_reg(0x234, 0x00);
-            _b200_iface->write_reg(0x235, 0x00);
-            _b200_iface->write_reg(0x232, 0x00);
-            _b200_iface->write_reg(0x231, 0x50);
-            _b200_iface->write_reg(0x005, 0x22);
+            _b200_iface->write_reg(0x233, nfrac & 0xFF);
+            _b200_iface->write_reg(0x234, (nfrac >> 8) & 0xFF);
+            _b200_iface->write_reg(0x235, (nfrac >> 16) & 0xFF);
+            _b200_iface->write_reg(0x232, (nint >> 8) & 0xFF);
+            _b200_iface->write_reg(0x231, nint & 0xFF);
+            _b200_iface->write_reg(0x005, 0x20 | (i & 0x07));
 
             _b200_iface->write_reg(0x236, 0x6b); //undoc vco settings
             _b200_iface->write_reg(0x237, 0x65);
@@ -372,7 +399,7 @@ public:
             if((_b200_iface->read_reg(0x247) & 0x02) == 0) {
                 std::cout << "RX PLL NOT LOCKED" << std::endl;
             }
-            _rx_freq = 800.0e6;
+            _rx_freq = actual_lo;
             return _rx_freq;
         } else {
             _b200_iface->write_reg(0x27a, 0x4a);//vco output level
@@ -389,18 +416,18 @@ public:
             _b200_iface->write_reg(0x27b, 0x88);//Icp //fixme 0x88
 
             //tuning yo
-            _b200_iface->write_reg(0x273, 0x00);
-            _b200_iface->write_reg(0x274, 0x00);
-            _b200_iface->write_reg(0x275, 0x00);
-            _b200_iface->write_reg(0x272, 0x00);
-            _b200_iface->write_reg(0x271, 0x55);
-            _b200_iface->write_reg(0x005, 0x22);
+            _b200_iface->write_reg(0x273, nfrac & 0xFF);
+            _b200_iface->write_reg(0x274, (nfrac >> 8) & 0xFF);
+            _b200_iface->write_reg(0x275, (nfrac >> 16) & 0xFF);
+            _b200_iface->write_reg(0x272, (nint >> 8) & 0xFF);
+            _b200_iface->write_reg(0x271, nint & 0xFF);
+            _b200_iface->write_reg(0x005, 0x20 | (i & 0x07));
 
             boost::this_thread::sleep(boost::posix_time::milliseconds(2));
             if((_b200_iface->read_reg(0x287) & 0x02) == 0) {
                 std::cout << "TX PLL NOT LOCKED" << std::endl;
             }
-            _tx_freq = 850.0e6;
+            _tx_freq = actual_lo;
             return _tx_freq;
         }
     }
