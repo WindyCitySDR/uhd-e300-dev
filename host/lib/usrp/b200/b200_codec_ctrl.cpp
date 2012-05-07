@@ -93,6 +93,8 @@ public:
         //adc setup
         setup_adc();
 
+        rx_cal();
+
         //ian magic
         _b200_iface->write_reg(0x014, 0b00001111);
         _b200_iface->write_reg(0x014, 0b00100001); //WAS 0b00101011
@@ -454,6 +456,30 @@ public:
         _b200_iface->write_reg(0x3FE, 0x3F);
     }
 
+    void rx_cal(void)
+    {
+        _b200_iface->write_reg(0x193, 0x3f);
+        _b200_iface->write_reg(0x190, 0x0f);
+        _b200_iface->write_reg(0x194, 0x01);
+        _b200_iface->write_reg(0x016, 0x01);
+        boost::this_thread::sleep(boost::posix_time::milliseconds(20));
+        _b200_iface->write_reg(0x185, 0x20);
+        _b200_iface->write_reg(0x186, 0x10);
+        _b200_iface->write_reg(0x187, 0x14);
+        _b200_iface->write_reg(0x18b, 0x83);
+        _b200_iface->write_reg(0x188, 0x64);
+        _b200_iface->write_reg(0x189, 0x30);
+        _b200_iface->write_reg(0x016, 0x02);
+        boost::this_thread::sleep(boost::posix_time::milliseconds(200));
+        _b200_iface->write_reg(0x016, 0x10);
+        boost::this_thread::sleep(boost::posix_time::milliseconds(1));
+        _b200_iface->write_reg(0x168, 0x03);
+        _b200_iface->write_reg(0x16e, 0x25);
+        _b200_iface->write_reg(0x16a, 0x75);
+        _b200_iface->write_reg(0x16b, 0x15);
+        _b200_iface->write_reg(0x169, 0xcf);
+        _b200_iface->write_reg(0x18b, 0xad);
+    }
 
 private:
     b200_iface::sptr _b200_iface;
