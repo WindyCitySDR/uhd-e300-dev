@@ -37,20 +37,16 @@ public:
         //clear reset
         _b200_iface->write_reg(0x000,0x00);
 
-        /********setup basic stuff (chip level setup 0-7)*/
-        _b200_iface->write_reg(0x001,0x00);
+        //there is not a WAT big enough for this
+        _b200_iface->write_reg(0x3df, 0x01);
 
-        //enable RX1, TX1 @ 4Msps
-        //select TX1A/TX2A, RX antennas in balanced mode on ch. A
-        _b200_iface->write_reg(0x004, 0b00000011);
+        //bandgap setup
+        _b200_iface->write_reg(0x2a6, 0x0e);
+        _b200_iface->write_reg(0x2a8, 0x0e);
 
-        //data delay for TX and RX data clocks
-        _b200_iface->write_reg(0x006, 0x0F);
-        _b200_iface->write_reg(0x007, 0x00);
-
-        /**set up clock interface*/
-        //enable BBPLL, clocks, external clk
-        _b200_iface->write_reg(0x00A, 0b00010010);
+        //rfpll refclk to REFCLKx2
+        _b200_iface->write_reg(0x2ab, 0x07);
+        _b200_iface->write_reg(0x2ac, 0xff);
         _b200_iface->write_reg(0x009, 0b00010111);
 
         /**set up BBPLL*/
@@ -60,11 +56,17 @@ public:
         //div 2 in RHB1 = 8Msps
         //div 2 in RXFIR = 4Msps output
         //eventually this should be done alongside FIR/HB setup
-        set_adcclk(64e6);
+        set_adcclk(245.76e6); //for 15.36Msps
         //TX1/2 en, THB3 interp x2, THB2 interp x2 fil. en, THB1 en, TX FIR interp 2 en
-        _b200_iface->write_reg(0x002, 0b11011110);
+        _b200_iface->write_reg(0x002, 0b01011110);
         //RX1/2 en, RHB3 decim x2, RHB2 decim x2 fil. en, RHB1 en, RX FIR decim 2 en
-        _b200_iface->write_reg(0x003, 0b11011110);
+        _b200_iface->write_reg(0x003, 0b01011110);
+        //select TX1A/TX2A, RX antennas in balanced mode on ch. A
+        _b200_iface->write_reg(0x004, 0b00000011);
+
+        //data delay for TX and RX data clocks
+        _b200_iface->write_reg(0x006, 0x0F);
+        _b200_iface->write_reg(0x007, 0x00);
 
         /********setup data ports (FDD dual port DDR CMOS)*/
         //FDD dual port DDR CMOS no swap
@@ -74,6 +76,14 @@ public:
         _b200_iface->write_reg(0x013, 0b00000001); //enable ENSM
         _b200_iface->write_reg(0x014, 0b00100001); //use SPI for TXNRX ctrl, to alert, TX on
         _b200_iface->write_reg(0x015, 0b00000111); //dual synth mode, synth en ctrl en
+
+        //setup TX FIR
+
+        //setup RX FIR
+
+        //set baseband filter BW
+        set_filter_bw("TX_A", 6.0e6);
+        set_filter_bw("RX_A", 6.0e6);
 
         //ian magic
         _b200_iface->write_reg(0x014, 0b00001111);
@@ -232,6 +242,12 @@ public:
         _b200_iface->write_reg(0x03F, 0x05);
         _b200_iface->write_reg(0x03F, 0x01); //keep bbpll on
 
+        _b200_iface->write_reg(0x04c, 0x86); //increase Kv and phase margin (?)
+        _b200_iface->write_reg(0x04d, 0x01);
+        _b200_iface->write_reg(0x04d, 0x05);
+
+        //TODO FIXME: check for lock and toss if unlocked
+
         return actual_vcorate;
     }
 
@@ -311,9 +327,41 @@ public:
         //set BBLPF1 to 1.6x bw
         //set BBLPF2 to 2x bw
         if(which == "TX") {
+            _b200_iface->write_reg(0x0d6, 0x0c);
+            _b200_iface->write_reg(0x0d7, 0x1e);
+            _b200_iface->write_reg(0x0d8, 0x06);
+            _b200_iface->write_reg(0x0d9, 0x00);
+            _b200_iface->write_reg(0x0ca, 0x22);
+            _b200_iface->write_reg(0x016, 0x40);
+            while(_b200_iface->read_reg(0x016) & 0x40);
+            _b200_iface->write_reg(0x0ca, 0x26);
 
+            //setup TX secondary filter
+            _b200_iface->write_reg(0x0d2, 0x29);
+            _b200_iface->write_reg(0x0d1, 0x0c);
+            _b200_iface->write_reg(0x0d0, 0x56);
+            return 6.0e6;
         } else {
+            _b200_iface->write_reg(0x1fb, 0x06);
+            _b200_iface->write_reg(0x1fc, 0x00);
+            _b200_iface->write_reg(0x1f8, 0x0d);
+            _b200_iface->write_reg(0x1f9, 0x1e);
+            _b200_iface->write_reg(0x1d5, 0x3f);
+            _b200_iface->write_reg(0x1c0, 0x03);
+            _b200_iface->write_reg(0x1e2, 0x02);
+            _b200_iface->write_reg(0x1e3, 0x02);
+            _b200_iface->write_reg(0x016, 0x80); //start tune
+            while(_b200_iface->read_reg(0x016) & 0x80);
+            _b200_iface->write_reg(0x1e2, 0x03);
+            _b200_iface->write_reg(0x1e3, 0x03);
 
+            //setup RX TIA
+            _b200_iface->write_reg(0x1db, 0x60);
+            _b200_iface->write_reg(0x1dd, 0x08);
+            _b200_iface->write_reg(0x1df, 0x08);
+            _b200_iface->write_reg(0x1dc, 0x40);
+            _b200_iface->write_reg(0x1de, 0x40);
+            return 6.0e6;
         }
     }
 
