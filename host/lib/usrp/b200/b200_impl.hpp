@@ -29,6 +29,7 @@
 #include <uhd/device.hpp>
 #include <uhd/property_tree.hpp>
 #include <uhd/utils/pimpl.hpp>
+#include <uhd/utils/tasks.hpp>
 #include <uhd/types/dict.hpp>
 #include <uhd/types/sensors.hpp>
 #include <uhd/types/clock_config.hpp>
@@ -37,6 +38,9 @@
 #include <uhd/usrp/subdev_spec.hpp>
 #include <uhd/transport/usb_zero_copy.hpp>
 #include <boost/weak_ptr.hpp>
+#include <boost/asio.hpp>
+
+namespace asio = boost::asio;
 
 static const std::string     B200_FW_FILE_NAME = "usrp_b200_fw.ihx";
 static const std::string     B200_FPGA_FILE_NAME = "usrp_b200_fpga.bin";
@@ -113,6 +117,9 @@ private:
     } _gpio_state;
 
     void update_gpio_state(void);
+
+    uhd::task::sptr _server;
+    void run_server(void);
 };
 
 #endif /* INCLUDED_B200_IMPL_HPP */

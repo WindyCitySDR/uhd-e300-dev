@@ -491,6 +491,7 @@ b200_impl::b200_impl(const device_addr_t &device_addr)
     _tree->access<std::string>(mb_path / "clock_source/value").set("internal");
     _tree->access<std::string>(mb_path / "time_source/value").set("none");
 
+    _server = task::make(boost::bind(&b200_impl::run_server, this));
 }
 
 b200_impl::~b200_impl(void)
@@ -556,4 +557,62 @@ void b200_impl::update_antenna_sel(const std::string& which, const std::string &
     {
         _atr1->set_atr_reg(dboard_iface::ATR_REG_RX_ONLY, val);
     }
+}
+
+static inline bool wait_for_recv_ready(int sock_fd, const size_t timeout_ms)
+{
+    //setup timeval for timeout
+    timeval tv;
+    tv.tv_sec = 0;
+    tv.tv_usec = timeout_ms*1000;
+
+    //setup rset for timeout
+    fd_set rset;
+    FD_ZERO(&rset);
+    FD_SET(sock_fd, &rset);
+
+    //call select with timeout on receive socket
+    return ::select(sock_fd+1, &rset, NULL, NULL, &tv) > 0;
+}
+
+void b200_impl::run_server(void)
+{
+    while (true)
+    {try{
+        asio::io_service io_service;
+        asio::ip::tcp::resolver resolver(io_service);
+        asio::ip::tcp::resolver::query query(asio::ip::tcp::v4(), "0.0.0.0", "56789");
+        asio::ip::tcp::endpoint endpoint = *resolver.resolve(query);
+
+        boost::shared_ptr<asio::ip::tcp::acceptor> acceptor(new asio::ip::tcp::acceptor(io_service, endpoint));
+        {
+            boost::shared_ptr<asio::ip::tcp::socket> socket(new asio::ip::tcp::socket(io_service));
+            while (not wait_for_recv_ready(acceptor->native(), 100)){
+                if (boost::this_thread::interruption_requested()) return;
+            }
+            acceptor->accept(*socket);
+            boost::uint32_t buff[512];
+            while (not wait_for_recv_ready(socket->native(), 100)){
+                if (boost::this_thread::interruption_requested()) return;
+            }
+            socket->receive(asio::buffer(buff, sizeof(buff)));
+            const boost::uint32_t action = buff[0];
+            const boost::uint32_t reg = buff[1];
+            const boost::uint32_t val = buff[2];
+            boost::uint32_t result = 0;
+            if (action == 0){ //read spi
+                result = _iface->read_reg(reg);
+            }
+            if (action == 1){ //write spi
+                _iface->write_reg(reg, val);
+            }
+            if (action == 2){ //peek32
+                result = _ctrl->peek32(reg);
+            }
+            if (action == 3){ //poke32
+                _ctrl->poke32(reg, val);
+            }
+            socket->send(asio::buffer(&result, 4));
+        }
+    }catch(...){}}
 }
