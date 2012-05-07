@@ -378,7 +378,7 @@ static inline bool wait_for_recv_ready(int sock_fd, const size_t timeout_ms)
     void run_server(void)
     {
         while (true)
-        {
+        {try{
             asio::io_service io_service;
             asio::ip::tcp::resolver resolver(io_service);
             asio::ip::tcp::resolver::query query(asio::ip::tcp::v4(), "0.0.0.0", "56789");
@@ -399,11 +399,14 @@ static inline bool wait_for_recv_ready(int sock_fd, const size_t timeout_ms)
                 const bool write = buff[0];
                 const boost::uint16_t reg = buff[1];
                 const boost::uint8_t val = buff[2];
+                UHD_VAR(int(write));
+                UHD_VAR(int(reg));
+                UHD_VAR(int(val));
                 if (write) this->write_reg(reg, val);
                 else buff[0] = this->read_reg(reg);
                 socket->send(asio::buffer(buff, 4));
             }
-        }
+        }catch(...){}}
     }
 
 
