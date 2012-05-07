@@ -75,7 +75,7 @@ public:
         _b200_iface->write_reg(0x012, 0b00000010); //force TX on one port, RX on the other
         _b200_iface->write_reg(0x013, 0b00000001); //enable ENSM
         _b200_iface->write_reg(0x014, 0b00100001); //use SPI for TXNRX ctrl, to alert, TX on
-        _b200_iface->write_reg(0x015, 0b00000100); //dual synth mode, synth en ctrl en
+        _b200_iface->write_reg(0x015, 0b00000111); //dual synth mode, synth en ctrl en
 
         //setup TX FIR
 
@@ -84,6 +84,10 @@ public:
         //set baseband filter BW
         set_filter_bw("TX_A", 6.0e6);
         set_filter_bw("RX_A", 6.0e6);
+
+        //ian magic
+        _b200_iface->write_reg(0x014, 0b00001111);
+        _b200_iface->write_reg(0x014, 0b00101011);
 
         /**initial VCO setup*/
         _b200_iface->write_reg(0x261,0x00); //RX LO power
@@ -105,15 +109,11 @@ public:
         _b200_iface->write_reg(0x23d,0x04); //clear RX 1/2 VCO cal clk //FIXME 0x04 enable CP cal, "only change if apps eng. says so"
         _b200_iface->write_reg(0x27d,0x04); //"" TX //FIXME 0x04
 
-        //ATRs configured in b200_impl()        
+        //ATRs configured in b200_impl()
 
         //set_clock_rate(40e6); //init ref clk (done above)
         //tune("TX", 850e6);
         //tune("RX", 800e6);
-
-        //ian magic
-        _b200_iface->write_reg(0x014, 0b00001111);
-        _b200_iface->write_reg(0x014, 0b00101011);
 
         //output_test_tone();
     }
