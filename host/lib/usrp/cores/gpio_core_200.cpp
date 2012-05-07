@@ -115,8 +115,8 @@ public:
 
     void set_atr_reg(const atr_reg_t atr, const boost::uint32_t value){
         if (atr == dboard_iface::ATR_REG_IDLE)        _iface->poke32(REG_GPIO_IDLE, value);
-        if (atr == dboard_iface::ATR_REG_TX_ONLY)     _iface->poke32(REG_GPIO_RX_ONLY, value);
-        if (atr == dboard_iface::ATR_REG_RX_ONLY)     _iface->poke32(REG_GPIO_TX_ONLY, value);
+        if (atr == dboard_iface::ATR_REG_TX_ONLY)     _iface->poke32(REG_GPIO_TX_ONLY, value);
+        if (atr == dboard_iface::ATR_REG_RX_ONLY)     _iface->poke32(REG_GPIO_RX_ONLY, value);
         if (atr == dboard_iface::ATR_REG_FULL_DUPLEX) _iface->poke32(REG_GPIO_BOTH, value);
     }
 

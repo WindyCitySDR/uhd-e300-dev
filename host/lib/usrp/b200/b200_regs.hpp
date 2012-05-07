@@ -55,10 +55,12 @@ localparam SR_GPIO1        = 232;     // 5
 #define REG_RB_SPI         TOREG(0)
 #define REG_RB_COMPAT      TOREG(1)
 
-/* ATR GPIO TX Output Settings */
+/* ATR GPIO TX Output Settings 
+ * N.B. The LED_RX and LED_TXRX_RX names are switched in the schematic and the
+ * FPGA nets. */
 static const boost::uint32_t LED_TXRX_TX = (1 << 16);
-static const boost::uint32_t LED_TXRX_RX = (1 << 17);
-static const boost::uint32_t LED_RX = (1 << 18);
+static const boost::uint32_t LED_RX = (1 << 17);
+static const boost::uint32_t LED_TXRX_RX = (1 << 18);
 static const boost::uint32_t SRX_TX = (1 << 19);
 static const boost::uint32_t SRX_RX = (1 << 20);
 static const boost::uint32_t SFDX_TX = (1 << 21);
