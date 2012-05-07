@@ -251,14 +251,18 @@ public:
         _b200_iface->write_reg(0x04d, 0x01);
         _b200_iface->write_reg(0x04d, 0x05);
 
-        //TODO FIXME: check for lock and toss if unlocked
+        //check for BBPLL lock
+        boost::this_thread::sleep(boost::posix_time::milliseconds(2));
+        if(!_b200_iface->read_reg(0x05e) & 0x80) {
+            uhd::runtime_error("BBPLL not locked");
+        }
 
         return actual_vcorate;
     }
 
     double tune(const std::string &which, const double value)
     {
-        //setup charge pump based on horrible PLL lock doc
+        //setup charge pump
         //setup VCO/RFPLL based on rx/tx freq
         //VCO cal
 
@@ -267,16 +271,16 @@ public:
         if(which[0] == 'R') {
             //set up synth
             _b200_iface->write_reg(0x23a, 0x4a);//vco output level
-            _b200_iface->write_reg(0x239, 0xc3);//init ALC value and VCO varactor
-            _b200_iface->write_reg(0x242, 0x1f);//vco bias and bias ref
-            _b200_iface->write_reg(0x238, 0x78);//vco cal offset
+            _b200_iface->write_reg(0x239, 0xc1);//init ALC value and VCO varactor
+            _b200_iface->write_reg(0x242, 0x17);//vco bias and bias ref
+            _b200_iface->write_reg(0x238, 0x70);//vco cal offset
             _b200_iface->write_reg(0x245, 0x00);//vco cal ref tcf
-            _b200_iface->write_reg(0x251, 0x0c);//varactor ref
+            _b200_iface->write_reg(0x251, 0x0e);//varactor ref
             _b200_iface->write_reg(0x250, 0x70);//vco varactor ref tcf
-            _b200_iface->write_reg(0x240, 0x09);//rx synth loop filter r3
-            _b200_iface->write_reg(0x23f, 0xdf);//r1 and c3
-            _b200_iface->write_reg(0x23e, 0xd4);//c2 and c1
-            _b200_iface->write_reg(0x23b, 0x92);//Icp
+            _b200_iface->write_reg(0x240, 0x0f);//rx synth loop filter r3
+            _b200_iface->write_reg(0x23f, 0xe7);//r1 and c3
+            _b200_iface->write_reg(0x23e, 0xf3);//c2 and c1
+            _b200_iface->write_reg(0x23b, 0x89);//Icp
 
             //tune that shit
             _b200_iface->write_reg(0x233, 0x00);
@@ -285,7 +289,8 @@ public:
             _b200_iface->write_reg(0x232, 0x00);
             _b200_iface->write_reg(0x231, 0x50);
             _b200_iface->write_reg(0x005, 0x22);
-            
+
+            boost::this_thread::sleep(boost::posix_time::milliseconds(2));
             if((_b200_iface->read_reg(0x247) & 0x02) == 0) {
                 std::cout << "RX PLL NOT LOCKED" << std::endl;
             }
@@ -311,7 +316,8 @@ public:
             _b200_iface->write_reg(0x272, 0x00);
             _b200_iface->write_reg(0x271, 0x55);
             _b200_iface->write_reg(0x005, 0x22);
-            
+
+            boost::this_thread::sleep(boost::posix_time::milliseconds(2));
             if((_b200_iface->read_reg(0x287) & 0x02) == 0) {
                 std::cout << "TX PLL NOT LOCKED" << std::endl;
             }
@@ -322,8 +328,7 @@ public:
 
     virtual double set_sample_rate(const double rate)
     {
-        //set up BBPLL
-        return 4e6;
+        uhd::runtime_error("don't do that");
     }
 
     virtual double set_filter_bw(const std::string &which, const double bw)
