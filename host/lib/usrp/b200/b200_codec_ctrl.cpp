@@ -38,6 +38,8 @@ public:
         //clear reset
         _b200_iface->write_reg(0x000,0x00);
 
+        boost::this_thread::sleep(boost::posix_time::milliseconds(20));
+
         //there is not a WAT big enough for this
         _b200_iface->write_reg(0x3df, 0x01);
 
@@ -51,9 +53,6 @@ public:
         _b200_iface->write_reg(0x009, 0b00010111);
 
         boost::this_thread::sleep(boost::posix_time::milliseconds(20));
-
-        //set delay register
-        _b200_iface->write_reg(0x03a, 0x27);
 
         /**set up BBPLL*/
         //245.76Msps ADC clock means:
@@ -85,8 +84,34 @@ public:
         _b200_iface->write_reg(0x006, 0x0F);
         _b200_iface->write_reg(0x007, 0x00);
 
+        //set delay register
+        _b200_iface->write_reg(0x03a, 0x27);
+
+        /**initial VCO setup*/
+        _b200_iface->write_reg(0x261,0x00); //RX LO power
+        _b200_iface->write_reg(0x2a1,0x00); //TX LO power
+        _b200_iface->write_reg(0x248,0x0b); //en RX VCO LDO
+        _b200_iface->write_reg(0x288,0x0b); //en TX VCO LDO
+        _b200_iface->write_reg(0x246,0x02); //pd RX cal Tcf
+        _b200_iface->write_reg(0x286,0x02); //pd TX cal Tcf
+        _b200_iface->write_reg(0x249,0x8e); //rx vco cal length
+        _b200_iface->write_reg(0x289,0x8e); //rx vco cal length
+        _b200_iface->write_reg(0x23b,0x80); //set RX MSB? //FIXME 0x89 magic charge pump current, undocumented
+        _b200_iface->write_reg(0x27b,0x80); //"" TX //FIXME 0x88 see above
+        _b200_iface->write_reg(0x243,0x0d); //set rx prescaler bias
+        _b200_iface->write_reg(0x283,0x0d); //"" TX
+        _b200_iface->write_reg(0x23d,0x00); //clear RX 1/2 VCO cal clk //FIXME 0x04 enable CP cal, "only change if apps eng. says so"
+        _b200_iface->write_reg(0x27d,0x00); //"" TX //FIXME 0x04
+        
+        _b200_iface->write_reg(0x245,0x00); //set RX VCO cal ref Tcf
+        _b200_iface->write_reg(0x250,0x70); //set RX VCO varactor ref Tcf
+        _b200_iface->write_reg(0x285,0x00); //"" TX
+        _b200_iface->write_reg(0x290,0x70); //"" TX
+        _b200_iface->write_reg(0x239,0xc1); //init RX ALC
+        _b200_iface->write_reg(0x279,0xc1); //"" TX
+
         _b200_iface->write_reg(0x015, 0b00000111); //dual synth mode, synth en ctrl en
-        //_b200_iface->write_reg(0x014, 0b00100001); //use SPI for TXNRX ctrl, to alert, TX on
+        _b200_iface->write_reg(0x014, 0b00100001); //use SPI for TXNRX ctrl, to alert, TX on
         _b200_iface->write_reg(0x013, 0b00000001); //enable ENSM
 
         //RX CP CAL
@@ -102,26 +127,6 @@ public:
         if(!(_b200_iface->read_reg(0x284) & 0x80)) {
             std::cout << "TX charge pump cal failure" << std::endl;
         }
-
-        /**initial VCO setup*/
-        _b200_iface->write_reg(0x261,0x00); //RX LO power
-        _b200_iface->write_reg(0x2a1,0x00); //TX LO power
-        _b200_iface->write_reg(0x248,0x0b); //en RX VCO LDO
-        _b200_iface->write_reg(0x288,0x0b); //en TX VCO LDO
-        _b200_iface->write_reg(0x246,0x02); //pd RX cal Tcf
-        _b200_iface->write_reg(0x286,0x02); //pd TX cal Tcf
-        _b200_iface->write_reg(0x243,0x0d); //set rx prescaler bias
-        _b200_iface->write_reg(0x283,0x0d); //"" TX
-        _b200_iface->write_reg(0x245,0x00); //set RX VCO cal ref Tcf
-        _b200_iface->write_reg(0x250,0x70); //set RX VCO varactor ref Tcf
-        _b200_iface->write_reg(0x285,0x00); //"" TX
-        _b200_iface->write_reg(0x290,0x70); //"" TX
-        _b200_iface->write_reg(0x239,0xc1); //init RX ALC
-        _b200_iface->write_reg(0x279,0xc1); //"" TX
-        _b200_iface->write_reg(0x23b,0x89); //set RX MSB? //FIXME 0x89 magic charge pump current, undocumented
-        _b200_iface->write_reg(0x27b,0x88); //"" TX //FIXME 0x88 see above
-        _b200_iface->write_reg(0x23d,0x04); //clear RX 1/2 VCO cal clk //FIXME 0x04 enable CP cal, "only change if apps eng. says so"
-        _b200_iface->write_reg(0x27d,0x04); //"" TX //FIXME 0x04
 
         tune("RX", 800e6);
         tune("TX", 850e6);
@@ -377,10 +382,11 @@ public:
             _b200_iface->write_reg(0x285, 0x00);//vco cal ref tcf
             _b200_iface->write_reg(0x291, 0x0e);//varactor ref
             _b200_iface->write_reg(0x290, 0x70);//vco varactor ref tcf
-            _b200_iface->write_reg(0x280, 0x09);//rx synth loop filter r3 //fixme 0x0F
-            _b200_iface->write_reg(0x27f, 0xdf);//r1 and c3 //fixme e7
-            _b200_iface->write_reg(0x27e, 0xd4);//c2 and c1 //fixme f3
-            _b200_iface->write_reg(0x27b, 0x98);//Icp //fixme 0x88
+            
+            _b200_iface->write_reg(0x280, 0x0f);//rx synth loop filter r3 //fixme 0x0F
+            _b200_iface->write_reg(0x27f, 0xe7);//r1 and c3 //fixme e7
+            _b200_iface->write_reg(0x27e, 0xf3);//c2 and c1 //fixme f3
+            _b200_iface->write_reg(0x27b, 0x88);//Icp //fixme 0x88
 
             //tuning yo
             _b200_iface->write_reg(0x273, 0x00);
