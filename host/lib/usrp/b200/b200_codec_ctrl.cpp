@@ -70,7 +70,7 @@ public:
 
         /********setup data ports (FDD dual port DDR CMOS)*/
         //FDD dual port DDR CMOS no swap
-        _b200_iface->write_reg(0x010, 0b11001000); //FIXME 0b10101000 (swap TX IQ swap TX1/TX2)
+        _b200_iface->write_reg(0x010, 0b10101000); //FIXME 0b10101000 (swap TX IQ swap TX1/TX2)
         _b200_iface->write_reg(0x011, 0b00000000);
         _b200_iface->write_reg(0x012, 0b00000010); //force TX on one port, RX on the other
         _b200_iface->write_reg(0x013, 0b00000001); //enable ENSM
@@ -112,10 +112,10 @@ public:
         //ATRs configured in b200_impl()        
 
         //set_clock_rate(40e6); //init ref clk (done above)
-        tune("TX", 850e6);
-        tune("RX", 800e6);
+        //tune("TX", 850e6);
+        //tune("RX", 800e6);
 
-        output_test_tone();
+        //output_test_tone();
     }
 
     std::vector<std::string> get_gain_names(const std::string &which)
@@ -210,7 +210,7 @@ public:
 
         int nint = vcorate / fref;
         int nfrac = ((vcorate / fref) - nint) * modulus;
-        std::cout << "Nint: " << nint << " Nfrac: " << nfrac << std::endl;
+        std::cout << "Nint: " << nint << " Nfrac: " << nfrac << " vcodiv: " << vcodiv << std::endl;
 
         double actual_vcorate = fref * (nint + double(nfrac)/modulus);
         
@@ -234,7 +234,7 @@ public:
         std::cout << "Settled on CP current: " << icp * 1e6 << "uA" << std::endl;
         int icp_reg = icp/25e-6 + 1;
 
-        //CP current to 150uA: FIXME this should change depending on the VCO rate
+        //CP current
         _b200_iface->write_reg(0x046, icp_reg & 0x3F);
 
         //calibrate freq (0x04B[7], toggle 0x03F[2] 1 then 0)
@@ -333,7 +333,7 @@ public:
             _b200_iface->write_reg(0x0d9, 0x00);
             _b200_iface->write_reg(0x0ca, 0x22);
             _b200_iface->write_reg(0x016, 0x40);
-            while(_b200_iface->read_reg(0x016) & 0x40);
+            //while(_b200_iface->read_reg(0x016) & 0x40);
             _b200_iface->write_reg(0x0ca, 0x26);
 
             //setup TX secondary filter
@@ -351,7 +351,7 @@ public:
             _b200_iface->write_reg(0x1e2, 0x02);
             _b200_iface->write_reg(0x1e3, 0x02);
             _b200_iface->write_reg(0x016, 0x80); //start tune
-            while(_b200_iface->read_reg(0x016) & 0x80);
+            //while(_b200_iface->read_reg(0x016) & 0x80);
             _b200_iface->write_reg(0x1e2, 0x03);
             _b200_iface->write_reg(0x1e3, 0x03);
 
