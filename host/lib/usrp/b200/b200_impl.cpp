@@ -326,45 +326,6 @@ b200_impl::b200_impl(const device_addr_t &device_addr)
         .subscribe(boost::bind(&b200_impl::update_tx_subdev_spec, this, _1));
 
     ////////////////////////////////////////////////////////////////////
-    // create rx frontend control objects
-    ////////////////////////////////////////////////////////////////////
-    _rx_fes.resize(B200_NUM_RX_FE);
-    for (size_t i = 0; i < _rx_fes.size(); i++)
-    {
-        _rx_fes[i] = rx_frontend_core_200::make(_ctrl, TOREG(SR_RX_FE(i)));
-        const std::string which = std::string(1, i+'A');
-        const fs_path rx_fe_path = mb_path / "rx_frontends" / which;
-
-        _tree->create<std::complex<double> >(rx_fe_path / "dc_offset" / "value")
-            .coerce(boost::bind(&rx_frontend_core_200::set_dc_offset, _rx_fes[i], _1))
-            .set(std::complex<double>(0.0, 0.0));
-        _tree->create<bool>(rx_fe_path / "dc_offset" / "enable")
-            .subscribe(boost::bind(&rx_frontend_core_200::set_dc_offset_auto, _rx_fes[i], _1))
-            .set(true);
-        _tree->create<std::complex<double> >(rx_fe_path / "iq_balance" / "value")
-            .subscribe(boost::bind(&rx_frontend_core_200::set_iq_balance, _rx_fes[i], _1))
-            .set(std::complex<double>(0.0, 0.0));
-    }
-
-    ////////////////////////////////////////////////////////////////////
-    // create tx frontend control objects
-    ////////////////////////////////////////////////////////////////////
-    _tx_fes.resize(B200_NUM_TX_FE);
-    for (size_t i = _tx_fes.size(); i < 2; i++)
-    {
-        _tx_fes[i] = tx_frontend_core_200::make(_ctrl, TOREG(SR_TX_FE(i)));
-        const std::string which = std::string(1, i+'A');
-        const fs_path tx_fe_path = mb_path / "tx_frontends" / which;
-
-        _tree->create<std::complex<double> >(tx_fe_path / "dc_offset" / "value")
-            .coerce(boost::bind(&tx_frontend_core_200::set_dc_offset, _tx_fes[i], _1))
-            .set(std::complex<double>(0.0, 0.0));
-        _tree->create<std::complex<double> >(tx_fe_path / "iq_balance" / "value")
-            .subscribe(boost::bind(&tx_frontend_core_200::set_iq_balance, _tx_fes[i], _1))
-            .set(std::complex<double>(0.0, 0.0));
-    }
-
-    ////////////////////////////////////////////////////////////////////
     // create rx dsp control objects
     ////////////////////////////////////////////////////////////////////
     _rx_dsps.resize(B200_NUM_RX_FE);

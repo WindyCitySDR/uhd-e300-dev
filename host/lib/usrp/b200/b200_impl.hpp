@@ -20,8 +20,6 @@
 #include "b200_iface.hpp"
 #include "b200_ctrl.hpp"
 #include "b200_codec_ctrl.hpp"
-#include "rx_frontend_core_200.hpp"
-#include "tx_frontend_core_200.hpp"
 #include "rx_dsp_core_200.hpp"
 #include "tx_dsp_core_200.hpp"
 #include "time64_core_200.hpp"
@@ -95,8 +93,6 @@ private:
     b200_iface::sptr _iface;
     b200_ctrl::sptr _ctrl;
     b200_codec_ctrl::sptr _codec_ctrl;
-    std::vector<rx_frontend_core_200::sptr> _rx_fes;
-    std::vector<tx_frontend_core_200::sptr> _tx_fes;
     std::vector<rx_dsp_core_200::sptr> _rx_dsps;
     std::vector<tx_dsp_core_200::sptr> _tx_dsps;
     time64_core_200::sptr _time64;

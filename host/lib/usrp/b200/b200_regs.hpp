@@ -27,27 +27,20 @@ localparam SR_USER_REGS    = 5;      // 2
 
 localparam SR_TX_CTRL0     = 32;     // 6
 localparam SR_TX_DSP0      = 40;     // 5
-localparam SR_TX_FE0       = 48;     // 5
 
 localparam SR_TX_CTRL1     = 64;      // 6
 localparam SR_TX_DSP1      = 72;      // 5
-localparam SR_TX_FE1       = 80;      // 5
 
 localparam SR_RX_CTRL0     = 96;      // 9
 localparam SR_RX_DSP0      = 106;     // 7
-localparam SR_RX_FE0       = 116;     // 5
 
 localparam SR_RX_CTRL1     = 128;     // 9
 localparam SR_RX_DSP1      = 138;     // 7
-localparam SR_RX_FE1       = 148;     // 5
 
 localparam SR_TIME64       = 192;     // 6
 localparam SR_SPI          = 208;     // 3
 localparam SR_GPIO0        = 224;     // 5
 localparam SR_GPIO1        = 232;     // 5
-
-#define SR_RX_FE(which) (SR_RX_FE0 + which*32)
-#define SR_TX_FE(which) (SR_TX_FE0 + which*32)
 
 #define SR_RX_DSP(which) (SR_RX_DSP0 + which*32)
 #define SR_TX_DSP(which) (SR_TX_DSP0 + which*32)
