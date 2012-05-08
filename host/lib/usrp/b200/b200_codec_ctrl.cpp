@@ -498,30 +498,41 @@ public:
         _b200_iface->write_reg(base+6, 0x02); //filter gain
         boost::this_thread::sleep(boost::posix_time::milliseconds(1));
         
-        int addr = 0;
-        for(; addr < 128; addr++) {
+        for(int addr=0; addr < 64; addr++) {
             _b200_iface->write_reg(base+0, addr);
-            _b200_iface->write_reg(base+1, (coeffs[addr] >> 8) & 0xff);
-            _b200_iface->write_reg(base+2, coeffs[addr] & 0xff);
+            _b200_iface->write_reg(base+1, (coeffs[addr]) & 0xff);
+            _b200_iface->write_reg(base+2, (coeffs[addr] >> 8) & 0xff);
             _b200_iface->write_reg(base+5, 0xfe);
             _b200_iface->write_reg(base+4, 0x00);
             _b200_iface->write_reg(base+4, 0x00);
         }
         //it's symmetric, so we write it out again backwards
-        for(addr=0; addr < 128; addr++) {
-            _b200_iface->write_reg(0x0f0, addr);
-            _b200_iface->write_reg(0x0f1, (coeffs[128-addr] >> 8) & 0xff);
-            _b200_iface->write_reg(0x0f2, coeffs[128-addr] & 0xff);
-            _b200_iface->write_reg(0x0f5, 0xfe);
-            _b200_iface->write_reg(0x0f4, 0x00);
-            _b200_iface->write_reg(0x0f4, 0x00);
+        for(int addr=0; addr < 64; addr++) {
+            _b200_iface->write_reg(base+0, addr+64);
+            _b200_iface->write_reg(base+1, (coeffs[64-addr]) & 0xff);
+            _b200_iface->write_reg(base+2, (coeffs[64-addr] >> 8) & 0xff);
+            _b200_iface->write_reg(base+5, 0xfe);
+            _b200_iface->write_reg(base+4, 0x00);
+            _b200_iface->write_reg(base+4, 0x00);
         }
-        _b200_iface->write_reg(0x0f5, 0xf8); //disable filter clk
+        _b200_iface->write_reg(base+5, 0xf8); //disable filter clk
     }
 
     void setup_rx_fir()
     {
+        /*
         //LTE 6MHz
+        uint16_t coeffs[] = {
+            0xffe2,0x0042,0x0024,0x0095,0x0056,0x004d,0xffcf,0xffb7,
+            0xffb1,0x0019,0x0059,0x006a,0x0004,0xff9d,0xff72,0xffd4,
+            0x0063,0x00b7,0x0062,0xffac,0xff21,0xff59,0x0032,0x0101,
+            0x00f8,0x0008,0xfeea,0xfeac,0xffa3,0x0117,0x01b5,0x00d0,
+            0xff05,0xfdea,0xfe9e,0x00ba,0x026f,0x0215,0xffb5,0xfd4a,
+            0xfd18,0xffa0,0x02de,0x03dc,0x0155,0xfd2a,0xfb0d,0xfd54,
+            0x0287,0x062f,0x048a,0xfe37,0xf862,0xf8c1,0x004d,0x0963,
+            0x0b88,0x02a4,0xf3e7,0xebdd,0xf5f8,0x1366,0x3830,0x518b
+        };
+        */
         uint16_t coeffs[] = {
             0xffe2,0x0042,0x0024,0x0095,0x0056,0x004d,0xffcf,0xffb7,
             0xffb1,0x0019,0x0059,0x006a,0x0004,0xff9d,0xff72,0xffd4,
