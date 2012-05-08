@@ -103,11 +103,13 @@ public:
             async_metadata_t metadata;
             load_metadata_from_buff(uhd::wtohx<boost::uint32_t>, metadata, packet_info, pkt, _tick_rate, 0);
             _async_fifo.push_with_pop_on_full(metadata);
+            standard_async_msg_prints(metadata);
         }
         else if (packet_info.has_sid and packet_info.sid == B200_ASYNC_SID_BASE+1){
             async_metadata_t metadata;
             load_metadata_from_buff(uhd::wtohx<boost::uint32_t>, metadata, packet_info, pkt, _tick_rate, 1);
             _async_fifo.push_with_pop_on_full(metadata);
+            standard_async_msg_prints(metadata);
         }
         else{
             UHD_MSG(error) << "B200 ctrl got unknown SID: " << packet_info.sid << std::endl;
