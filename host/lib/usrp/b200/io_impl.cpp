@@ -159,9 +159,6 @@ rx_streamer::sptr b200_impl::get_rx_stream(const uhd::stream_args_t &args_)
     //sets all tick and samp rates on this streamer
     this->update_rates();
 
-    //assume there is always one streamer and do global clear
-    _ctrl->poke32(TOREG(REG_RX_CLEAR), 1);
-
     return my_streamer;
 }
 
@@ -214,9 +211,6 @@ tx_streamer::sptr b200_impl::get_tx_stream(const uhd::stream_args_t &args_)
 
     //sets all tick and samp rates on this streamer
     this->update_rates();
-
-    //assume there is always one streamer and do global clear
-    _ctrl->poke32(TOREG(REG_TX_CLEAR), 1);
 
     return my_streamer;
 }

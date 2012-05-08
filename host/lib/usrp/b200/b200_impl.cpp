@@ -467,6 +467,10 @@ b200_impl::b200_impl(const device_addr_t &device_addr)
     // do some post-init tasks
     ////////////////////////////////////////////////////////////////////
 
+    //TODO global clears, maybe useful to move to streamer creation
+    _ctrl->poke32(TOREG(REG_RX_CLEAR), 1);
+    _ctrl->poke32(TOREG(REG_TX_CLEAR), 1);
+
     //allocate streamer weak ptrs containers
     _rx_streamers.resize(_rx_dsps.size());
     _tx_streamers.resize(_tx_dsps.size());
