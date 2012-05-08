@@ -107,7 +107,7 @@ private:
     void update_antenna_sel(const std::string& which, const std::string &ant);
 
     struct gpio_state{
-        boost::uint32_t mimo, ext_ref_enable, dac_shdn, pps_fpga_out_enable, pps_gps_out_enable, gps_out_enable, gps_ref_enable;
+        boost::uint32_t mimo_tx, mimo_rx, ext_ref_enable, dac_shdn, pps_fpga_out_enable, pps_gps_out_enable, gps_out_enable, gps_ref_enable;
         boost::uint32_t LED_RX1, LED_RX2, LED_TXRX1_RX, LED_TXRX1_TX, LED_TXRX2_RX, LED_TXRX2_TX;
         boost::uint32_t tx_enable1, tx_enable2;
         boost::uint32_t SFDX2_RX, SFDX2_TX, SRX2_RX, SRX2_TX, SFDX1_RX, SFDX1_TX, SRX1_RX, SRX1_TX;

@@ -15,6 +15,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 //
 
+#include "b200_regs.hpp"
 #include "b200_impl.hpp"
 #include "../../transport/super_recv_packet_handler.hpp"
 #include "../../transport/super_send_packet_handler.hpp"
@@ -56,16 +57,20 @@ void b200_impl::update_tick_rate(const double rate)
     }
 }
 
-void b200_impl::update_rx_subdev_spec(const uhd::usrp::subdev_spec_t &)
+void b200_impl::update_rx_subdev_spec(const uhd::usrp::subdev_spec_t &spec)
 {
     //TODO
-    //set muxing and enabled channels
+    //set muxing and other codec settings
+    _gpio_state.mimo_rx = (spec.size() == 2)? 1 : 0;
+    update_gpio_state();
 }
 
-void b200_impl::update_tx_subdev_spec(const uhd::usrp::subdev_spec_t &)
+void b200_impl::update_tx_subdev_spec(const uhd::usrp::subdev_spec_t &spec)
 {
     //TODO
-    //set muxing and enabled channels
+    //set muxing and other codec settings
+    _gpio_state.mimo_tx = (spec.size() == 2)? 1 : 0;
+    update_gpio_state();
 }
 
 
@@ -154,6 +159,9 @@ rx_streamer::sptr b200_impl::get_rx_stream(const uhd::stream_args_t &args_)
     //sets all tick and samp rates on this streamer
     this->update_rates();
 
+    //assume there is always one streamer and do global clear
+    _ctrl->poke32(TOREG(REG_RX_CLEAR), 1);
+
     return my_streamer;
 }
 
@@ -206,6 +214,9 @@ tx_streamer::sptr b200_impl::get_tx_stream(const uhd::stream_args_t &args_)
 
     //sets all tick and samp rates on this streamer
     this->update_rates();
+
+    //assume there is always one streamer and do global clear
+    _ctrl->poke32(TOREG(REG_TX_CLEAR), 1);
 
     return my_streamer;
 }

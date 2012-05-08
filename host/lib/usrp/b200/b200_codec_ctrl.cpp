@@ -43,7 +43,7 @@ public:
 
         //init bandsels (TODO based on settings)
         const int bs_flags = TX_BANDSEL_A | RX_BANDSEL_B;
-        _ctrl->poke32(TOREG(SR_MISC+1), bs_flags);
+        _ctrl->poke32(TOREG(REG_BANDSEL), bs_flags);
 
         //reset
         _b200_iface->write_reg(0x000,0x01);

@@ -57,6 +57,11 @@ localparam SR_GPIO1        = 232;     // 5
 #define REG_RB_SPI         TOREG(0)
 #define REG_RB_COMPAT      TOREG(1)
 
+#define REG_MISC_GPIO SR_MISC + 0
+#define REG_BANDSEL   SR_MISC + 1
+#define REG_RX_CLEAR  SR_MISC + 2
+#define REG_TX_CLEAR  SR_MISC + 3
+
 /* ATR GPIO TX Output Settings 
  * N.B. The LED_RX and LED_TXRX_RX names are switched in the schematic and the
  * FPGA nets. */

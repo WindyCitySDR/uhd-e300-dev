@@ -275,7 +275,6 @@ b200_impl::b200_impl(const device_addr_t &device_addr)
     //assign { /* 3'bX, */ tx_bandsel_a, tx_bandsel_b, rx_bandsel_a, rx_bandsel_b, rx_bandsel_c } = misc_outs[15:8];
     //assign { /* 7'bX, */ mimo } = misc_outs[7:0];
 
-    _gpio_state.mimo = 0;
     update_gpio_state(); //first time init
 
     //set ATR for FDX operation fixed GPIO, amps enabled, LEDs all on
@@ -467,6 +466,7 @@ b200_impl::b200_impl(const device_addr_t &device_addr)
     ////////////////////////////////////////////////////////////////////
     // do some post-init tasks
     ////////////////////////////////////////////////////////////////////
+
     //allocate streamer weak ptrs containers
     _rx_streamers.resize(_rx_dsps.size());
     _tx_streamers.resize(_tx_dsps.size());
@@ -523,7 +523,8 @@ void b200_impl::update_clock_source(const std::string &)
 void b200_impl::update_gpio_state(void)
 {
     const boost::uint32_t misc_word = 0
-        | (_gpio_state.mimo << 6)
+        | (_gpio_state.mimo_tx << 7)
+        | (_gpio_state.mimo_rx << 6)
         | (_gpio_state.ext_ref_enable << 5)
         | (_gpio_state.dac_shdn << 4)
         | (_gpio_state.pps_fpga_out_enable << 3)
@@ -531,7 +532,7 @@ void b200_impl::update_gpio_state(void)
         | (_gpio_state.gps_out_enable << 1)
         | (_gpio_state.gps_ref_enable << 0)
     ;
-    _ctrl->poke32(TOREG(SR_MISC + 0), misc_word);
+    _ctrl->poke32(TOREG(REG_MISC_GPIO), misc_word);
 }
 
 void b200_impl::update_antenna_sel(const std::string& which, const std::string &ant)
