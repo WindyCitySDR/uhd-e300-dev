@@ -42,8 +42,8 @@ public:
         _ctrl = ctrl;
 
         //init bandsels (TODO based on settings)
-        const int bs_flags = TX_BANDSEL_A | RX_BANDSEL_B;
-        _ctrl->poke32(TOREG(REG_BANDSEL), bs_flags);
+        const int bs_flags = TX_BANDSEL_A | RX_BANDSEL_A;
+        _ctrl->poke32(TOREG(SR_MISC+1), bs_flags);
 
         //reset
         _b200_iface->write_reg(0x000,0x01);
@@ -79,7 +79,7 @@ public:
         //RX1/2 en, RHB3 decim x2, RHB2 decim x2 fil. en, RHB1 en, RX FIR decim 2 en
         _b200_iface->write_reg(0x003, 0b01011110);
         //select TX1A/TX2A, RX antennas in balanced mode on ch. C
-        _b200_iface->write_reg(0x004, 0b01110000);
+        _b200_iface->write_reg(0x004, 0b01001100);
 
         //setup TX FIR
         setup_tx_fir();
@@ -153,13 +153,13 @@ public:
 
         //setup RX TIA
         _b200_iface->write_reg(0x1db, 0x60);
-        _b200_iface->write_reg(0x1dd, 0x08);
-        _b200_iface->write_reg(0x1df, 0x08);
-        _b200_iface->write_reg(0x1dc, 0x40);
-        _b200_iface->write_reg(0x1de, 0x40);
+        _b200_iface->write_reg(0x1dd, 0x00);
+        _b200_iface->write_reg(0x1df, 0x00);
+        _b200_iface->write_reg(0x1dc, 0x76);
+        _b200_iface->write_reg(0x1de, 0x76);
 
         //setup TX secondary filter
-        _b200_iface->write_reg(0x0d2, 0x29);
+        _b200_iface->write_reg(0x0d2, 0x21);
         _b200_iface->write_reg(0x0d1, 0x0c);
         _b200_iface->write_reg(0x0d0, 0x56);
 
@@ -455,10 +455,10 @@ public:
         //set BBLPF1 to 1.6x bw
         //set BBLPF2 to 2x bw
         if(which == "TX") {
-            _b200_iface->write_reg(0x0d6, 0x0c);
+            _b200_iface->write_reg(0x0d6, 0x08);
             _b200_iface->write_reg(0x0d7, 0x1e);
-            _b200_iface->write_reg(0x0d8, 0x06);
-            _b200_iface->write_reg(0x0d9, 0x00);
+//            _b200_iface->write_reg(0x0d8, 0x06);
+//            _b200_iface->write_reg(0x0d9, 0x00);
             _b200_iface->write_reg(0x0ca, 0x22);
             _b200_iface->write_reg(0x016, 0x40);
             boost::this_thread::sleep(boost::posix_time::milliseconds(1));
@@ -467,11 +467,11 @@ public:
             }
             _b200_iface->write_reg(0x0ca, 0x26);
 
-            return 6.0e6;
+            return 7.0e6;
         } else {
-            _b200_iface->write_reg(0x1fb, 0x06);
+            _b200_iface->write_reg(0x1fb, 0x07);
             _b200_iface->write_reg(0x1fc, 0x00);
-            _b200_iface->write_reg(0x1f8, 0x0d);
+            _b200_iface->write_reg(0x1f8, 0x09);
             _b200_iface->write_reg(0x1f9, 0x1e);
             _b200_iface->write_reg(0x1d5, 0x3f);
             _b200_iface->write_reg(0x1c0, 0x03);
@@ -485,7 +485,7 @@ public:
             _b200_iface->write_reg(0x1e2, 0x03);
             _b200_iface->write_reg(0x1e3, 0x03);
 
-            return 6.0e6;
+            return 7.0e6;
         }
     }
 
@@ -557,11 +557,11 @@ public:
         _b200_iface->write_reg(0x1dc, 0x40);
         _b200_iface->write_reg(0x1de, 0x40);
         uint8_t adc_regs[] = {
-            0x00, 0x00, 0x00, 0x24, 0x24, 0x24, 0x00, 0x7c,
-            0x52, 0x3c, 0x4c, 0x34, 0x4f, 0x32, 0x00, 0x7f,
-            0x7e, 0x7f, 0x4a, 0x49, 0x4a, 0x4d, 0x4c, 0x4d,
-            0x2e, 0x98, 0x1b, 0x13, 0x98, 0x1b, 0x13, 0x98,
-            0x1b, 0x27, 0x27, 0x40, 0x40, 0x2c, 0x00, 0x00};
+            0x00, 0x00, 0x00, 0x24, 0x24, 0x00, 0x00, 0x7c,
+            0x37, 0x3c, 0x4c, 0x23, 0x4e, 0x20, 0x00, 0x7f,
+            0x7e, 0x7f, 0x4a, 0x49, 0x4a, 0x4c, 0x4b, 0x4c,
+            0x2e, 0xa4, 0x26, 0x18, 0xa4, 0x26, 0x13, 0xa4,
+            0x26, 0x2f, 0x30, 0x40, 0x40, 0x2c, 0x00, 0x00};
         for(int i=0; i<40; i++) {
             _b200_iface->write_reg(0x200+i, adc_regs[i]);
         }
@@ -580,15 +580,19 @@ public:
     void quad_cal(void)
     {
         //tx quad cal
-        _b200_iface->write_reg(0x0a0, 0x3a);
-        _b200_iface->write_reg(0x0a3, 0x40);
-        _b200_iface->write_reg(0x0a1, 0x79);
+        _b200_iface->write_reg(0x014, 0x0f); //ENSM alert state
+        _b200_iface->write_reg(0x169, 0xC0); //disable RX cal free run
+        uint8_t maskbits = _b200_iface->read_reg(0x0a3) & 0x3F;
+        _b200_iface->write_reg(0x0a0, 0x15);
+        _b200_iface->write_reg(0x0a3, 0x00 | maskbits);
+        _b200_iface->write_reg(0x0a1, 0x7B);
         _b200_iface->write_reg(0x0a9, 0xff);
-        _b200_iface->write_reg(0x0a2, 0x4f);
-        _b200_iface->write_reg(0x0a5, 0x03);
-        _b200_iface->write_reg(0x0a6, 0x03);
-        _b200_iface->write_reg(0x0aa, 0x33);
-        _b200_iface->write_reg(0x0a4, 0x20);
+        _b200_iface->write_reg(0x0a2, 0x7f);
+        _b200_iface->write_reg(0x0a5, 0x01);
+        _b200_iface->write_reg(0x0a6, 0x01);
+        _b200_iface->write_reg(0x0aa, 0x22);
+        _b200_iface->write_reg(0x0a4, 0xf0);
+        _b200_iface->write_reg(0x0ae, 0x00);
 
         //rx quad cal
         _b200_iface->write_reg(0x193, 0x3f);
@@ -597,10 +601,10 @@ public:
         _b200_iface->write_reg(0x016, 0x01);
         boost::this_thread::sleep(boost::posix_time::milliseconds(20));
         _b200_iface->write_reg(0x185, 0x20);
-        _b200_iface->write_reg(0x186, 0x10);
-        _b200_iface->write_reg(0x187, 0x14);
+        _b200_iface->write_reg(0x186, 0x32);
+        _b200_iface->write_reg(0x187, 0x24);
         _b200_iface->write_reg(0x18b, 0x83);
-        _b200_iface->write_reg(0x188, 0x64);
+        _b200_iface->write_reg(0x188, 0x05);
         _b200_iface->write_reg(0x189, 0x30);
         _b200_iface->write_reg(0x016, 0x02);
         boost::this_thread::sleep(boost::posix_time::milliseconds(200));
@@ -612,6 +616,8 @@ public:
         _b200_iface->write_reg(0x16b, 0x15);
         _b200_iface->write_reg(0x169, 0xcf);
         _b200_iface->write_reg(0x18b, 0xad);
+
+        _b200_iface->write_reg(0x014,0x21);
     }
 
 private:
