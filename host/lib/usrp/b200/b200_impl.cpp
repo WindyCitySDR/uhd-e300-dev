@@ -39,7 +39,7 @@ using namespace uhd::transport;
 //const boost::uint16_t B200_PRODUCT_ID = 0x0003;
 
 const boost::uint16_t B200_VENDOR_ID  = 0x04b4;
-const boost::uint16_t FX3_PRODUCT_ID = 0x0053;
+const boost::uint16_t FX3_PRODUCT_ID = 0x00f3;
 const boost::uint16_t B200_PRODUCT_ID = 0x00f0;
 static const boost::posix_time::milliseconds REENUMERATION_TIMEOUT_MS(3000);
 
