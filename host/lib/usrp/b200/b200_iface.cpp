@@ -40,6 +40,7 @@ const static boost::uint8_t B200_VREQ_LOOP = 0x22;
 const static boost::uint8_t B200_VREQ_SPI_WRITE = 0x32;
 const static boost::uint8_t B200_VREQ_SPI_READ = 0x42;
 const static boost::uint8_t B200_VREQ_FPGA_RESET = 0x62;
+const static boost::uint8_t B200_VREQ_FX3_RESET = 0x72;
 
 typedef boost::uint32_t hash_type;
 
@@ -349,6 +350,18 @@ public:
 
         /* There was no valid EOF. */
         throw uhd::io_error("fx3_load_firmware: No EOF record found.");
+    }
+
+
+    void reset_fx3(void) {
+        unsigned char data[4];
+        data[0] = 1;
+        data[1] = 0;
+        data[2] = 0;
+        data[3] = 0;
+
+        fx3_control_write(B200_VREQ_FX3_RESET, 0x00, \
+                    0x00, data, 4);
     }
 
 

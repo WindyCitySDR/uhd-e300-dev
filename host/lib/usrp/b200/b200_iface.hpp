@@ -37,6 +37,9 @@ public:
     //! load a firmware image
     virtual void load_firmware(const std::string filestring) = 0;
 
+    //! reset the FX3
+    virtual void reset_fx3(void) = 0;
+
     //! load an FPGA image
     virtual void load_fpga(const std::string filestring) = 0;
 

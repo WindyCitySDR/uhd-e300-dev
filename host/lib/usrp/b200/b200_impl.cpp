@@ -191,6 +191,8 @@ b200_impl::b200_impl(const device_addr_t &device_addr)
 //    _iface->load_fpga(b200_fpga_image);
     _iface->load_fpga("");
 
+    _iface->reset_fx3();
+
 
     ////////////////////////////////////////////////////////////////////
     // Get the FPGA a clock from Catalina
