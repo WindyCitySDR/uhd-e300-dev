@@ -240,20 +240,22 @@ b200_impl::b200_impl(const device_addr_t &device_addr)
     _rx_demux = recv_packet_demuxer::make(_data_transport, B200_NUM_RX_FE, B200_RX_SID_BASE);
 
     ////////////////////////////////////////////////////////////////////
-    // Initialize control (settings regs and async messages)
-    ////////////////////////////////////////////////////////////////////
-    _ctrl = b200_ctrl::make(_ctrl_transport);
-    /*
-    this->check_fpga_compat(); //check after making
-    */
-
-    ////////////////////////////////////////////////////////////////////
     // Initialize the properties tree
     ////////////////////////////////////////////////////////////////////
     _tree->create<std::string>("/name").set("B-Series Device");
     const fs_path mb_path = "/mboards/0";
     _tree->create<std::string>(mb_path / "name").set("B200");
     _tree->create<std::string>(mb_path / "codename").set("Sasquatch");
+
+    ////////////////////////////////////////////////////////////////////
+    // Initialize control (settings regs and async messages)
+    ////////////////////////////////////////////////////////////////////
+    _ctrl = b200_ctrl::make(_ctrl_transport);
+    _tree->create<time_spec_t>(mb_path / "time/cmd")
+        .subscribe(boost::bind(&b200_ctrl::set_time, _ctrl, _1));
+    /*
+    this->check_fpga_compat(); //check after making
+    */
 
     ////////////////////////////////////////////////////////////////////
     // setup the mboard eeprom
