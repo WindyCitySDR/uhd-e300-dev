@@ -223,6 +223,7 @@ b200_impl::b200_impl(const device_addr_t &device_addr)
     ////////////////////////////////////////////////////////////////////
     device_addr_t data_xport_args;
     data_xport_args["recv_frame_size"] = device_addr.get("recv_frame_size", "16384");
+    data_xport_args["recv_frame_size"] = "16384";// hard coded in packet_padder36
     data_xport_args["num_recv_frames"] = device_addr.get("num_recv_frames", "16");
     data_xport_args["send_frame_size"] = device_addr.get("send_frame_size", "16384");
     data_xport_args["num_send_frames"] = device_addr.get("num_send_frames", "16");
