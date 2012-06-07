@@ -355,10 +355,7 @@ public:
 
     void reset_fx3(void) {
         unsigned char data[4];
-        data[0] = 1;
-        data[1] = 0;
-        data[2] = 0;
-        data[3] = 0;
+        memset(data, 0x00, sizeof(data));
 
         fx3_control_write(B200_VREQ_FX3_RESET, 0x00, \
                     0x00, data, 4);
