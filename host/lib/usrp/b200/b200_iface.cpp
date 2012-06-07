@@ -368,15 +368,12 @@ public:
     void load_fpga(const std::string filestring)
     {
         unsigned char data[4];
-        data[0] = 1;
-        data[1] = 0;
-        data[2] = 0;
-        data[3] = 0;
+        memset(data, 0xFF, sizeof(data));
 
         fx3_control_write(B200_VREQ_FPGA_RESET, 0x00, \
                 0x00, data, 4);
 
-        data[0] = 0;
+        memset(data, 0x00, sizeof(data));
 
         fx3_control_write(B200_VREQ_FPGA_RESET, 0x00, \
                 0x00, data, 4);
