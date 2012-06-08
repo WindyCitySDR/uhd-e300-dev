@@ -239,6 +239,7 @@ public:
     byte_vector_t read_i2c(boost::uint8_t addr, size_t num_bytes)
     {
         //TODO
+        return byte_vector_t();
     }
 
 

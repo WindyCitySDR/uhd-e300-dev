@@ -21,6 +21,7 @@
 #include <iostream>
 #include <boost/thread.hpp>
 #include <uhd/utils/msg.hpp>
+#include <boost/utility/binary.hpp>
 
 using namespace uhd;
 using namespace uhd::transport;
@@ -63,7 +64,7 @@ public:
         //rfpll refclk to REFCLKx2
         _b200_iface->write_reg(0x2ab, 0x07);
         _b200_iface->write_reg(0x2ac, 0xff);
-        _b200_iface->write_reg(0x009, 0b00010111);
+        _b200_iface->write_reg(0x009, BOOST_BINARY( 00010111 ));
 
         boost::this_thread::sleep(boost::posix_time::milliseconds(20));
 
@@ -76,11 +77,11 @@ public:
         //eventually this should be done alongside FIR/HB setup
         set_codec_rate(61.44e6);
         //TX1/2 en, THB3 interp x2, THB2 interp x2 fil. en, THB1 en, TX FIR interp 2 en
-        _b200_iface->write_reg(0x002, 0b01011110);
+        _b200_iface->write_reg(0x002, BOOST_BINARY( 01011110 ));
         //RX1/2 en, RHB3 decim x2, RHB2 decim x2 fil. en, RHB1 en, RX FIR decim 2 en
-        _b200_iface->write_reg(0x003, 0b01011110);
+        _b200_iface->write_reg(0x003, BOOST_BINARY( 01011110 ));
         //select TX1A/TX2A, RX antennas in balanced mode on ch. C
-        _b200_iface->write_reg(0x004, 0b01001100);
+        _b200_iface->write_reg(0x004, BOOST_BINARY( 01001100 ));
 
         //setup TX FIR
         setup_tx_fir();
@@ -89,9 +90,9 @@ public:
 
         /********setup data ports (FDD dual port DDR CMOS)*/
         //FDD dual port DDR CMOS no swap
-        _b200_iface->write_reg(0x010, 0b11001000); //FIXME 0b10101000 (swap TX IQ swap TX1/TX2)
-        _b200_iface->write_reg(0x011, 0b00000000);
-        _b200_iface->write_reg(0x012, 0b00000010); //force TX on one port, RX on the other
+        _b200_iface->write_reg(0x010, BOOST_BINARY( 11001000 )); //FIXME 0b10101000 (swap TX IQ swap TX1/TX2)
+        _b200_iface->write_reg(0x011, BOOST_BINARY( 00000000 ));
+        _b200_iface->write_reg(0x012, BOOST_BINARY( 00000010 )); //force TX on one port, RX on the other
 
         //data delay for TX and RX data clocks
         _b200_iface->write_reg(0x006, 0x0F);
@@ -123,9 +124,9 @@ public:
         _b200_iface->write_reg(0x239,0xc1); //init RX ALC
         _b200_iface->write_reg(0x279,0xc1); //"" TX
 
-        _b200_iface->write_reg(0x015, 0b00000111); //dual synth mode, synth en ctrl en
-        _b200_iface->write_reg(0x014, 0b00100001); //use SPI for TXNRX ctrl, to alert, TX on
-        _b200_iface->write_reg(0x013, 0b00000001); //enable ENSM
+        _b200_iface->write_reg(0x015, BOOST_BINARY( 00000111 )); //dual synth mode, synth en ctrl en
+        _b200_iface->write_reg(0x014, BOOST_BINARY( 00100001 )); //use SPI for TXNRX ctrl, to alert, TX on
+        _b200_iface->write_reg(0x013, BOOST_BINARY( 00000001 )); //enable ENSM
 
         //RX CP CAL
         boost::this_thread::sleep(boost::posix_time::milliseconds(1));
@@ -165,8 +166,8 @@ public:
         quad_cal();
 
         //ian magic
-        _b200_iface->write_reg(0x014, 0b00001111);
-        _b200_iface->write_reg(0x014, 0b00100001); //WAS 0b00101011
+        _b200_iface->write_reg(0x014, BOOST_BINARY( 00001111 ));
+        _b200_iface->write_reg(0x014, BOOST_BINARY( 00100001 )); //WAS 0b00101011
 
         //ATRs configured in b200_impl()
 
@@ -305,8 +306,8 @@ public:
         _b200_iface->write_reg(0x043, nfrac & 0xFF); //Nfrac[7:0]
 
         //use XTALN input, CLKOUT=XTALN (40MHz ref out to FPGA)
-        _b200_iface->write_reg(0x00A, 0b00010000 | i); //set BBPLL divider
-        std::cout << "BBPLL divider reg: " << std::hex << int(0b00010000 | i) << std::endl;
+        _b200_iface->write_reg(0x00A, BOOST_BINARY( 00010000 ) | i); //set BBPLL divider
+        std::cout << "BBPLL divider reg: " << std::hex << int(BOOST_BINARY( 00010000 ) | i) << std::endl;
 
         //CP filter recommended coefficients, don't change unless you have a clue
         _b200_iface->write_reg(0x048, 0xe8);

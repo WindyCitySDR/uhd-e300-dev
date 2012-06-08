@@ -197,8 +197,8 @@ b200_impl::b200_impl(const device_addr_t &device_addr)
     ////////////////////////////////////////////////////////////////////
     // Get the FPGA a clock from Catalina
     ////////////////////////////////////////////////////////////////////
-    _iface->write_reg(0x00A, 0b00010010);
-    _iface->write_reg(0x009, 0b00010111);
+    _iface->write_reg(0x00A, BOOST_BINARY( 00010010 ));
+    _iface->write_reg(0x009, BOOST_BINARY( 00010111 ));
 
 
     ////////////////////////////////////////////////////////////////////
