@@ -69,7 +69,7 @@ void benchmark_rx_rate(uhd::usrp::multi_usrp::sptr usrp, const std::string &rx_c
 
     uhd::stream_cmd_t cmd(uhd::stream_cmd_t::STREAM_MODE_START_CONTINUOUS);
     cmd.time_spec = usrp->get_time_now() + uhd::time_spec_t(0.05);
-    cmd.stream_now = (buffs.size() == 1);
+    cmd.stream_now = false;
     usrp->issue_stream_cmd(cmd);
     while (not boost::this_thread::interruption_requested()){
         num_rx_samps += rx_stream->recv(buffs, max_samps_per_packet, md);
@@ -176,7 +176,7 @@ int UHD_SAFE_MAIN(int argc, char *argv[]){
     //variables to be set by po
     std::string args;
     double duration;
-    double rx_rate, tx_rate;
+    double rx_rate, tx_rate, codec_rate;
     std::string rx_otw, tx_otw;
     std::string rx_cpu, tx_cpu;
     std::string mode;
@@ -187,6 +187,7 @@ int UHD_SAFE_MAIN(int argc, char *argv[]){
         ("help", "help message")
         ("args", po::value<std::string>(&args)->default_value(""), "single uhd device address args")
         ("duration", po::value<double>(&duration)->default_value(10.0), "duration for the test in seconds")
+        ("codec_rate", po::value<double>(&codec_rate), "codec rate")
         ("rx_rate", po::value<double>(&rx_rate), "specify to perform a RX rate test (sps)")
         ("tx_rate", po::value<double>(&tx_rate), "specify to perform a TX rate test (sps)")
         ("rx_otw", po::value<std::string>(&rx_otw)->default_value("sc16"), "specify the over-the-wire sample mode for RX")
@@ -220,6 +221,10 @@ int UHD_SAFE_MAIN(int argc, char *argv[]){
     std::cout << boost::format("Creating the usrp device with: %s...") % args << std::endl;
     uhd::usrp::multi_usrp::sptr usrp = uhd::usrp::multi_usrp::make(args);
     std::cout << boost::format("Using Device: %s") % usrp->get_pp_string() << std::endl;
+
+    if(vm.count("codec_rate")) {
+        usrp->set_master_clock_rate(codec_rate);
+    }
 
     if (mode == "mimo"){
         usrp->set_clock_source("mimo", 0);
