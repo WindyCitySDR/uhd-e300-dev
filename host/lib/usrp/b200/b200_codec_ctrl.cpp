@@ -20,6 +20,7 @@
 #include <uhd/exception.hpp>
 #include <iostream>
 #include <boost/thread.hpp>
+#include <uhd/utils/msg.hpp>
 
 using namespace uhd;
 using namespace uhd::transport;
@@ -73,7 +74,7 @@ public:
         //div 2 in RHB1 = 30.72sps
         //div 2 in RXFIR = 15.36Msps output
         //eventually this should be done alongside FIR/HB setup
-        set_adcclk(245.76e6); //for 15.36Msps
+        set_codec_rate(61.44e6);
         //TX1/2 en, THB3 interp x2, THB2 interp x2 fil. en, THB1 en, TX FIR interp 2 en
         _b200_iface->write_reg(0x002, 0b01011110);
         //RX1/2 en, RHB3 decim x2, RHB2 decim x2 fil. en, RHB1 en, RX FIR decim 2 en
@@ -169,8 +170,6 @@ public:
 
         //ATRs configured in b200_impl()
 
-        //set_clock_rate(40e6); //init ref clk (done above)
-        
         std::cout << std::endl;
         for(int i=0; i < 64; i++) {
             std::cout << std::hex << std::uppercase << int(i) << ",";
@@ -263,9 +262,11 @@ public:
         return 0.0; //TODO
     }
 
-    double set_clock_rate(const double rate)
+    double set_codec_rate(const double rate)
     {
-        return (61.44e6 / 4); //FIXME
+        double adcclk = set_adcclk(rate * 16);
+        UHD_VAR(adcclk);
+        return (adcclk / 16);
     }
 
     double set_adcclk(const double rate) {
@@ -338,7 +339,7 @@ public:
             uhd::runtime_error("BBPLL not locked");
         }
 
-        return actual_vcorate;
+        return (actual_vcorate / vcodiv);
     }
 
     double tune(const std::string &which, const double value)
@@ -437,11 +438,6 @@ public:
             _tx_freq = actual_lo;
             return _tx_freq;
         }
-    }
-
-    virtual double set_sample_rate(const double rate)
-    {
-        uhd::runtime_error("don't do that");
     }
 
     virtual double set_filter_bw(const std::string &which, const double bw)

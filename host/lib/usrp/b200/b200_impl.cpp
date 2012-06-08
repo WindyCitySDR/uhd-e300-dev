@@ -317,7 +317,7 @@ b200_impl::b200_impl(const device_addr_t &device_addr)
     ////////////////////////////////////////////////////////////////////
     //^^^ clock created up top, just reg props here... ^^^
     _tree->create<double>(mb_path / "tick_rate")
-        .coerce(boost::bind(&b200_codec_ctrl::set_clock_rate, _codec_ctrl, _1))
+        .coerce(boost::bind(&b200_codec_ctrl::set_codec_rate, _codec_ctrl, _1))
         .subscribe(boost::bind(&b200_impl::update_tick_rate, this, _1));
 
     ////////////////////////////////////////////////////////////////////
@@ -441,7 +441,7 @@ b200_impl::b200_impl(const device_addr_t &device_addr)
         _tree->create<bool>(rf_fe_path / "use_lo_offset").set(false);
         _tree->create<double>(rf_fe_path / "bandwidth" / "value")
             .coerce(boost::bind(&b200_codec_ctrl::set_bw_filter, _codec_ctrl, fe_name, _1))
-            .set(40e6);
+            .set(20.48e6);
         _tree->create<meta_range_t>(rf_fe_path / "bandwidth" / "range")
             .publish(boost::bind(&b200_codec_ctrl::get_bw_filter_range, _codec_ctrl, fe_name));
         _tree->create<double>(rf_fe_path / "freq" / "value")
