@@ -84,8 +84,14 @@ public:
     void handle_msg(void){
         managed_recv_buffer::sptr buff = _xport->get_recv_buff();
         if (not buff) return;
+        UHD_VAR(buff->size());
         const boost::uint32_t *pkt = buff->cast<const boost::uint32_t *>();
         vrt::if_packet_info_t packet_info;
+        UHD_MSG(status) << std::hex << pkt[0] << std::dec << std::endl;
+        UHD_MSG(status) << std::hex << pkt[1] << std::dec << std::endl;
+        UHD_MSG(status) << std::hex << pkt[2] << std::dec << std::endl;
+        UHD_MSG(status) << std::hex << pkt[3] << std::dec << std::endl;
+        UHD_MSG(status) << std::hex << pkt[4] << std::dec << std::endl;
         packet_info.num_packet_words32 = buff->size()/sizeof(boost::uint32_t);
         try{
             vrt::if_hdr_unpack_le(pkt, packet_info);
