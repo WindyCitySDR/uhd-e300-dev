@@ -38,6 +38,10 @@ public:
 
     b200_codec_ctrl_impl(b200_iface::sptr iface, wb_iface::sptr ctrl)
     {
+        /* Initialize shadow registers. */
+        reg_vcodivs = 0x00;
+
+        /* Initialize control interfaces. */
         _b200_iface = iface;
         _ctrl = ctrl;
 
@@ -376,12 +380,15 @@ public:
 
         int nint = vcorate / fref;
         int nfrac = ((vcorate / fref) - nint) * modulus;
-        std::cout << "RF Nint: " << nint << " Nfrac: " << nfrac << " vcodiv: " << vcodiv << std::endl;
+        std::cout << std::dec << "RF Nint: " << nint << " Nfrac: " << nfrac << " vcodiv: " << vcodiv << std::endl;
 
         double actual_vcorate = fref * (nint + double(nfrac)/modulus);
         double actual_lo = actual_vcorate / vcodiv;
 
         if(which[0] == 'R') {
+            /* Store vcodiv setting. */
+            reg_vcodivs = (reg_vcodivs & 0xF0) | (i & 0x0F);
+
             //set up synth
             _b200_iface->write_reg(0x23a, 0x4a);//vco output level
             _b200_iface->write_reg(0x239, 0xc1);//init ALC value and VCO varactor
@@ -401,7 +408,7 @@ public:
             _b200_iface->write_reg(0x235, (nfrac >> 16) & 0xFF);
             _b200_iface->write_reg(0x232, (nint >> 8) & 0xFF);
             _b200_iface->write_reg(0x231, nint & 0xFF);
-            _b200_iface->write_reg(0x005, 0x20 | (i & 0x07));
+            _b200_iface->write_reg(0x005, reg_vcodivs);
 
             _b200_iface->write_reg(0x236, 0x6b); //undoc vco settings
             _b200_iface->write_reg(0x237, 0x65);
@@ -414,6 +421,9 @@ public:
             _rx_freq = actual_lo;
             return _rx_freq;
         } else {
+            /* Store vcodiv setting. */
+            reg_vcodivs = (reg_vcodivs & 0x0F) | ((i & 0x0F) << 4);
+
             _b200_iface->write_reg(0x27a, 0x4a);//vco output level
             _b200_iface->write_reg(0x279, 0xc1);//init ALC value and VCO varactor
             _b200_iface->write_reg(0x282, 0x17);//vco bias and bias ref
@@ -433,7 +443,7 @@ public:
             _b200_iface->write_reg(0x275, (nfrac >> 16) & 0xFF);
             _b200_iface->write_reg(0x272, (nint >> 8) & 0xFF);
             _b200_iface->write_reg(0x271, nint & 0xFF);
-            _b200_iface->write_reg(0x005, 0x20 | (i & 0x07));
+            _b200_iface->write_reg(0x005, reg_vcodivs);
 
             boost::this_thread::sleep(boost::posix_time::milliseconds(2));
             if((_b200_iface->read_reg(0x287) & 0x02) == 0) {
@@ -624,6 +634,9 @@ private:
     b200_iface::sptr _b200_iface;
     wb_iface::sptr _ctrl;
     double _rx_freq, _tx_freq;
+
+    /* Shadow register fields.*/
+    boost::uint8_t reg_vcodivs;
 };
 
 /***********************************************************************
