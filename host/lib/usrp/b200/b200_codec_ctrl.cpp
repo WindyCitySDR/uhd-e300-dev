@@ -39,15 +39,13 @@ public:
     b200_codec_ctrl_impl(b200_iface::sptr iface, wb_iface::sptr ctrl)
     {
         /* Initialize shadow registers. */
+        fpga_bandsel = 0x00;
         reg_vcodivs = 0x00;
+        reg_inputsel = 0x00;
 
         /* Initialize control interfaces. */
         _b200_iface = iface;
         _ctrl = ctrl;
-
-        //init bandsels (TODO based on settings)
-        const int bs_flags = TX_BANDSEL_A | RX_BANDSEL_A;
-        _ctrl->poke32(TOREG(SR_MISC+1), bs_flags);
 
         //reset
         _b200_iface->write_reg(0x000,0x01);
@@ -380,12 +378,31 @@ public:
 
         int nint = vcorate / fref;
         int nfrac = ((vcorate / fref) - nint) * modulus;
-        std::cout << std::dec << "RF Nint: " << nint << " Nfrac: " << nfrac << " vcodiv: " << vcodiv << std::endl;
+        std::cout << std::dec << "RF Nint: " << nint << " Nfrac: "
+            << nfrac << " vcodiv: " << vcodiv << std::endl;
 
         double actual_vcorate = fref * (nint + double(nfrac)/modulus);
         double actual_lo = actual_vcorate / vcodiv;
 
         if(which[0] == 'R') {
+            if(value < 2.2e9) {
+                fpga_bandsel = (fpga_bandsel & 0xF8) | RX_BANDSEL_B;
+                reg_inputsel = (reg_inputsel & 0xC0) | 0x30;
+                std::cout << "FPGA BANDSEL_B; CAT BANDSEL C" << std::endl;
+            } else if((value >= 2.2e9) && (value < 4e9)) {
+                fpga_bandsel = (fpga_bandsel & 0xF8) | RX_BANDSEL_A;
+                reg_inputsel = (reg_inputsel & 0xC0) | 0x0C;
+                std::cout << "FPGA BANDSEL_A; CAT BANDSEL B" << std::endl;
+            } else if((value >= 4e9) && (value <= 6e9)) {
+                fpga_bandsel = (fpga_bandsel & 0xF8) | RX_BANDSEL_C;
+                reg_inputsel = (reg_inputsel & 0xC0) | 0x03;
+                std::cout << "FPGA BANDSEL_C; CAT BANDSEL A" << std::endl;
+            } else {
+                UHD_THROW_INVALID_CODE_PATH();
+            }
+            _ctrl->poke32(TOREG(SR_MISC+1), fpga_bandsel);
+            _b200_iface->write_reg(0x004, reg_inputsel);
+
             /* Store vcodiv setting. */
             reg_vcodivs = (reg_vcodivs & 0xF0) | (i & 0x0F);
 
@@ -420,7 +437,22 @@ public:
             }
             _rx_freq = actual_lo;
             return _rx_freq;
+
         } else {
+            if(value < 3e9) {
+                fpga_bandsel = (fpga_bandsel & 0xE7) | TX_BANDSEL_A;
+                reg_inputsel = reg_inputsel | 0x40;
+                std::cout << "FPGA BANDSEL_A; CAT BANDSEL B" << std::endl;
+            } else if((value >= 3e9) && (value <= 6e9)) {
+                fpga_bandsel = (fpga_bandsel & 0xE7) | TX_BANDSEL_B;
+                reg_inputsel = reg_inputsel & 0xBF;
+                std::cout << "FPGA BANDSEL_B; CAT BANDSEL A" << std::endl;
+            } else {
+                UHD_THROW_INVALID_CODE_PATH();
+            }
+            _ctrl->poke32(TOREG(SR_MISC+1), fpga_bandsel);
+            _b200_iface->write_reg(0x004, reg_inputsel);
+
             /* Store vcodiv setting. */
             reg_vcodivs = (reg_vcodivs & 0x0F) | ((i & 0x0F) << 4);
 
@@ -636,7 +668,9 @@ private:
     double _rx_freq, _tx_freq;
 
     /* Shadow register fields.*/
+    boost::uint32_t fpga_bandsel;
     boost::uint8_t reg_vcodivs;
+    boost::uint8_t reg_inputsel;
 };
 
 /***********************************************************************
