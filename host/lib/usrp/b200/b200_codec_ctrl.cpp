@@ -20,8 +20,6 @@
 #include <uhd/exception.hpp>
 #include <iostream>
 #include <boost/thread.hpp>
-#include <uhd/utils/msg.hpp>
-#include <boost/utility/binary.hpp>
 
 using namespace uhd;
 using namespace uhd::transport;
@@ -64,7 +62,7 @@ public:
         //rfpll refclk to REFCLKx2
         _b200_iface->write_reg(0x2ab, 0x07);
         _b200_iface->write_reg(0x2ac, 0xff);
-        _b200_iface->write_reg(0x009, BOOST_BINARY( 00010111 ));
+        _b200_iface->write_reg(0x009, 0b00010111);
 
         boost::this_thread::sleep(boost::posix_time::milliseconds(20));
 
@@ -75,13 +73,13 @@ public:
         //div 2 in RHB1 = 30.72sps
         //div 2 in RXFIR = 15.36Msps output
         //eventually this should be done alongside FIR/HB setup
-        set_codec_rate(61.44e6);
+        set_adcclk(245.76e6); //for 15.36Msps
         //TX1/2 en, THB3 interp x2, THB2 interp x2 fil. en, THB1 en, TX FIR interp 2 en
-        _b200_iface->write_reg(0x002, BOOST_BINARY( 01011110 ));
+        _b200_iface->write_reg(0x002, 0b01011110);
         //RX1/2 en, RHB3 decim x2, RHB2 decim x2 fil. en, RHB1 en, RX FIR decim 2 en
-        _b200_iface->write_reg(0x003, BOOST_BINARY( 01011110 ));
+        _b200_iface->write_reg(0x003, 0b01011110);
         //select TX1A/TX2A, RX antennas in balanced mode on ch. C
-        _b200_iface->write_reg(0x004, BOOST_BINARY( 01001100 ));
+        _b200_iface->write_reg(0x004, 0b01001100);
 
         //setup TX FIR
         setup_tx_fir();
@@ -90,9 +88,9 @@ public:
 
         /********setup data ports (FDD dual port DDR CMOS)*/
         //FDD dual port DDR CMOS no swap
-        _b200_iface->write_reg(0x010, BOOST_BINARY( 11001000 )); //FIXME 0b10101000 (swap TX IQ swap TX1/TX2)
-        _b200_iface->write_reg(0x011, BOOST_BINARY( 00000000 ));
-        _b200_iface->write_reg(0x012, BOOST_BINARY( 00000010 )); //force TX on one port, RX on the other
+        _b200_iface->write_reg(0x010, 0b11001000); //FIXME 0b10101000 (swap TX IQ swap TX1/TX2)
+        _b200_iface->write_reg(0x011, 0b00000000);
+        _b200_iface->write_reg(0x012, 0b00000010); //force TX on one port, RX on the other
 
         //data delay for TX and RX data clocks
         _b200_iface->write_reg(0x006, 0x0F);
@@ -124,9 +122,9 @@ public:
         _b200_iface->write_reg(0x239,0xc1); //init RX ALC
         _b200_iface->write_reg(0x279,0xc1); //"" TX
 
-        _b200_iface->write_reg(0x015, BOOST_BINARY( 00000111 )); //dual synth mode, synth en ctrl en
-        _b200_iface->write_reg(0x014, BOOST_BINARY( 00100001 )); //use SPI for TXNRX ctrl, to alert, TX on
-        _b200_iface->write_reg(0x013, BOOST_BINARY( 00000001 )); //enable ENSM
+        _b200_iface->write_reg(0x015, 0b00000111); //dual synth mode, synth en ctrl en
+        _b200_iface->write_reg(0x014, 0b00100001); //use SPI for TXNRX ctrl, to alert, TX on
+        _b200_iface->write_reg(0x013, 0b00000001); //enable ENSM
 
         //RX CP CAL
         boost::this_thread::sleep(boost::posix_time::milliseconds(1));
@@ -153,7 +151,12 @@ public:
         set_filter_bw("RX_A", 6.0e6);
         set_filter_bw("TX_A", 6.0e6);
 
-        setup_rx_tia();
+        //setup RX TIA
+        _b200_iface->write_reg(0x1db, 0x60);
+        _b200_iface->write_reg(0x1dd, 0x00);
+        _b200_iface->write_reg(0x1df, 0x00);
+        _b200_iface->write_reg(0x1dc, 0x76);
+        _b200_iface->write_reg(0x1de, 0x76);
 
         //setup TX secondary filter
         _b200_iface->write_reg(0x0d2, 0x21);
@@ -166,11 +169,13 @@ public:
         quad_cal();
 
         //ian magic
-        _b200_iface->write_reg(0x014, BOOST_BINARY( 00001111 ));
-        _b200_iface->write_reg(0x014, BOOST_BINARY( 00100001 )); //WAS 0b00101011
+        _b200_iface->write_reg(0x014, 0b00001111);
+        _b200_iface->write_reg(0x014, 0b00100001); //WAS 0b00101011
 
         //ATRs configured in b200_impl()
 
+        //set_clock_rate(40e6); //init ref clk (done above)
+        
         std::cout << std::endl;
         for(int i=0; i < 64; i++) {
             std::cout << std::hex << std::uppercase << int(i) << ",";
@@ -199,7 +204,7 @@ public:
             //db+14 for 4000-6000
 
             //set some AGC crap
-            //_b200_iface->write_reg(0x0fc, 0x23);
+            _b200_iface->write_reg(0x0fc, 0x23);
             
             int gain_offset;
             if(_rx_freq < 1300) gain_offset = 3;
@@ -263,11 +268,9 @@ public:
         return 0.0; //TODO
     }
 
-    double set_codec_rate(const double rate)
+    double set_clock_rate(const double rate)
     {
-        double adcclk = set_adcclk(rate * 16);
-        UHD_VAR(adcclk);
-        return (adcclk / 16);
+        return (61.44e6 / 4); //FIXME
     }
 
     double set_adcclk(const double rate) {
@@ -306,8 +309,8 @@ public:
         _b200_iface->write_reg(0x043, nfrac & 0xFF); //Nfrac[7:0]
 
         //use XTALN input, CLKOUT=XTALN (40MHz ref out to FPGA)
-        _b200_iface->write_reg(0x00A, BOOST_BINARY( 00010000 ) | i); //set BBPLL divider
-        std::cout << "BBPLL divider reg: " << std::hex << int(BOOST_BINARY( 00010000 ) | i) << std::endl;
+        _b200_iface->write_reg(0x00A, 0b00010000 | i); //set BBPLL divider
+        std::cout << "BBPLL divider reg: " << std::hex << int(0b00010000 | i) << std::endl;
 
         //CP filter recommended coefficients, don't change unless you have a clue
         _b200_iface->write_reg(0x048, 0xe8);
@@ -340,7 +343,7 @@ public:
             uhd::runtime_error("BBPLL not locked");
         }
 
-        return (actual_vcorate / vcodiv);
+        return actual_vcorate;
     }
 
     double tune(const std::string &which, const double value)
@@ -439,6 +442,11 @@ public:
             _tx_freq = actual_lo;
             return _tx_freq;
         }
+    }
+
+    virtual double set_sample_rate(const double rate)
+    {
+        uhd::runtime_error("don't do that");
     }
 
     virtual double set_filter_bw(const std::string &which, const double bw)
@@ -571,7 +579,6 @@ public:
 
     void quad_cal(void)
     {
-        //TODO: put ENSM in alert state (0x014 to 0x0F) before cal
         //tx quad cal
         _b200_iface->write_reg(0x014, 0x0f); //ENSM alert state
         _b200_iface->write_reg(0x169, 0xC0); //disable RX cal free run
@@ -612,41 +619,6 @@ public:
 
         _b200_iface->write_reg(0x014,0x21);
     }
-
-    void setup_rx_tia() {
-        //setup RX TIA
-        uint8_t reg1EB = _b200_iface->read_reg(0x1EB);
-        uint8_t reg1EC = _b200_iface->read_reg(0x1EC);
-        uint8_t reg1E6 = _b200_iface->read_reg(0x1E6);
-        //if (BBBW_MHz > 20) { BBBW_MHz = 20}; //coerce in this case
-        //else if (BBBW_MHz < 0.2) { BBBW_MHz=0.2};
-        uint16_t Cbbf = (reg1EB * 160) + (reg1EC * 10) + 140; //fF
-        uint16_t R2346 = 18300 * (reg1E6 & 7); //valid values of reg1E6 are 1, 2, or 4 (18300,36600,73200ohms)
-        uint16_t CTIA_fF = (Cbbf * R2346 * 0.56) / 3500;
-        uint8_t reg1DB = 0x06; //TODO FIXME BASED ON BB BW
-        uint8_t reg1DC, reg1DD, reg1DE, reg1DF, temp;
-        if (CTIA_fF > 2920) {
-            reg1DC = 0x40;
-            reg1DE = 0x40;
-            temp = std::min(127,int((CTIA_fF - 400) / 320));
-            reg1DD = temp;
-            reg1DF = temp;
-        }
-        else {
-            temp = int((CTIA_fF - 400) / 40) + 0x40;
-            reg1DC = temp;
-            reg1DE = temp;
-            reg1DD = 0;
-            reg1DF = 0;
-        }
-        
-        _b200_iface->write_reg(0x1db, reg1DB);
-        _b200_iface->write_reg(0x1dd, reg1DD);
-        _b200_iface->write_reg(0x1df, reg1DF);
-        _b200_iface->write_reg(0x1dc, reg1DC);
-        _b200_iface->write_reg(0x1de, reg1DE);
-    }
-
 
 private:
     b200_iface::sptr _b200_iface;

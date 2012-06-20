@@ -317,7 +317,7 @@ b200_impl::b200_impl(const device_addr_t &device_addr)
     ////////////////////////////////////////////////////////////////////
     //^^^ clock created up top, just reg props here... ^^^
     _tree->create<double>(mb_path / "tick_rate")
-        .coerce(boost::bind(&b200_codec_ctrl::set_codec_rate, _codec_ctrl, _1))
+        .coerce(boost::bind(&b200_codec_ctrl::set_clock_rate, _codec_ctrl, _1))
         .subscribe(boost::bind(&b200_impl::update_tick_rate, this, _1));
 
     ////////////////////////////////////////////////////////////////////
