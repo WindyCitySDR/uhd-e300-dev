@@ -43,6 +43,8 @@ public:
         fpga_bandsel = 0x00;
         reg_vcodivs = 0x00;
         reg_inputsel = 0x00;
+        reg_rxfilt = 0x00;
+        reg_txfilt = 0x00;
 
         /* Initialize control interfaces. */
         _b200_iface = iface;
@@ -71,12 +73,6 @@ public:
 
         /**set up BBPLL*/
         set_clock_rate(30.72e6);
-        //TX1/2 en, THB3 interp x2, THB2 interp x2 fil. en, THB1 en, TX FIR interp 2 en
-        _b200_iface->write_reg(0x002, 0b01011110);
-        //RX1/2 en, RHB3 decim x2, RHB2 decim x2 fil. en, RHB1 en, RX FIR decim 2 en
-        _b200_iface->write_reg(0x003, 0b01011110);
-        //select TX1A/TX2A, RX antennas in balanced mode on ch. C
-        _b200_iface->write_reg(0x004, 0b01001100);
 
         //setup TX FIR
         setup_tx_fir();
@@ -169,8 +165,7 @@ public:
         _b200_iface->write_reg(0x014, 0b00001111);
         _b200_iface->write_reg(0x014, 0b00100001); //WAS 0b00101011
 
-        //ATRs configured in b200_impl()
-
+        /*
         std::cout << std::endl;
         for(int i=0; i < 64; i++) {
             std::cout << std::hex << std::uppercase << int(i) << ",";
@@ -181,6 +176,7 @@ public:
             std::cout << std::hex << std::uppercase << int(_b200_iface->read_reg(i*16+j));
             std::cout << std::endl;
         }
+        */
         //output_test_tone();
     }
 
@@ -265,9 +261,49 @@ public:
 
     double set_clock_rate(const double rate)
     {
-        double adcclk = set_coreclk(rate * 16);
+        if(rate > 61.44e6) {
+            throw uhd::runtime_error("Requested master clock rate outside range!");
+        }
+
+        UHD_VAR(rate);
+
+        /* Set the decimation / interpolation values based on clock rate. */
+        int divfactor = 0;
+        if(rate < 41e6) {
+            // Both RX chains enabled, 2, 2, 2, 2
+            reg_rxfilt = 0b01011110;
+
+            // Both TX chains enabled, 2, 2, 2, 2
+            reg_txfilt = 0b01011110;
+
+            divfactor = 16;
+        } else if((rate >= 41e6) && (rate < 56e6)) {
+            // Both RX chains enabled, 3, 1, 2, 2
+            reg_rxfilt = 0b01100110;
+
+            // Both TX chains enabled, 3, 1, 2, 2
+            reg_txfilt = 0b01100110;
+
+            divfactor = 12;
+        } else if((rate >= 56e6) && (rate <= 61.44e6)) {
+            // Both RX chains enabled, 3, 1, 1, 2
+            reg_rxfilt = 0b01100010;
+
+            // Both TX chains enabled, 3, 1, 1, 2
+            reg_txfilt = 0b01100010;
+
+            divfactor = 6;
+        } else {
+            UHD_THROW_INVALID_CODE_PATH();
+        }
+
+        double adcclk = set_coreclk(rate * divfactor);
         UHD_VAR(adcclk);
-        return (adcclk / 16);
+
+        _b200_iface->write_reg(0x002, reg_txfilt);
+        _b200_iface->write_reg(0x003, reg_rxfilt);
+
+        return (adcclk / divfactor);
 //        return (61.44e6 / 4); //FIXME
     }
 
@@ -297,10 +333,16 @@ public:
 
         int nint = vcorate / fref;
         int nfrac = ((vcorate / fref) - nint) * modulus;
-        std::cout << "BB Nint: " << nint << " Nfrac: " << nfrac << " vcodiv: " << vcodiv << std::endl;
+//        std::cout << "BB Nint: " << nint << " Nfrac: " << nfrac << " vcodiv: " << vcodiv << std::endl;
 
         double actual_vcorate = fref * (nint + double(nfrac)/modulus);
         
+        UHD_VAR(vcodiv);
+        UHD_VAR(nint);
+        UHD_VAR(nfrac);
+        UHD_VAR(vcorate);
+        UHD_VAR(actual_vcorate);
+
         _b200_iface->write_reg(0x044, nint); //Nint
         _b200_iface->write_reg(0x041, (nfrac >> 16) & 0xFF); //Nfrac[23:16]
         _b200_iface->write_reg(0x042, (nfrac >> 8) & 0xFF); //Nfrac[15:8]
@@ -668,6 +710,8 @@ private:
     boost::uint32_t fpga_bandsel;
     boost::uint8_t reg_vcodivs;
     boost::uint8_t reg_inputsel;
+    boost::uint8_t reg_rxfilt;
+    boost::uint8_t reg_txfilt;
 };
 
 /***********************************************************************
