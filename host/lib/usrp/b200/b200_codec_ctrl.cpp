@@ -18,6 +18,7 @@
 #include "b200_regs.hpp"
 #include "b200_codec_ctrl.hpp"
 #include <uhd/exception.hpp>
+#include <uhd/utils/msg.hpp>
 #include <iostream>
 #include <boost/thread.hpp>
 
@@ -69,13 +70,7 @@ public:
         boost::this_thread::sleep(boost::posix_time::milliseconds(20));
 
         /**set up BBPLL*/
-        //245.76Msps ADC clock means:
-        //div 2 in RHB3 = 122.88Msps
-        //div 2 in RHB2 = 61.44Msps
-        //div 2 in RHB1 = 30.72sps
-        //div 2 in RXFIR = 15.36Msps output
-        //eventually this should be done alongside FIR/HB setup
-        set_adcclk(245.76e6); //for 15.36Msps
+        set_clock_rate(30.72e6);
         //TX1/2 en, THB3 interp x2, THB2 interp x2 fil. en, THB1 en, TX FIR interp 2 en
         _b200_iface->write_reg(0x002, 0b01011110);
         //RX1/2 en, RHB3 decim x2, RHB2 decim x2 fil. en, RHB1 en, RX FIR decim 2 en
@@ -176,8 +171,6 @@ public:
 
         //ATRs configured in b200_impl()
 
-        //set_clock_rate(40e6); //init ref clk (done above)
-        
         std::cout << std::endl;
         for(int i=0; i < 64; i++) {
             std::cout << std::hex << std::uppercase << int(i) << ",";
@@ -272,10 +265,13 @@ public:
 
     double set_clock_rate(const double rate)
     {
-        return (61.44e6 / 4); //FIXME
+        double adcclk = set_coreclk(rate * 16);
+        UHD_VAR(adcclk);
+        return (adcclk / 16);
+//        return (61.44e6 / 4); //FIXME
     }
 
-    double set_adcclk(const double rate) {
+    double set_coreclk(const double rate) {
         //this sets the ADC clock rate -- NOT the sample rate!
         //sample rate also depends on the HB and FIR filter decimation/interpolations
         //modulus is 2088960
@@ -345,7 +341,8 @@ public:
             uhd::runtime_error("BBPLL not locked");
         }
 
-        return actual_vcorate;
+        UHD_VAR(actual_vcorate / vcodiv);
+        return actual_vcorate / vcodiv;
     }
 
     double tune(const std::string &which, const double value)

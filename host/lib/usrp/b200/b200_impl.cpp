@@ -484,7 +484,7 @@ b200_impl::b200_impl(const device_addr_t &device_addr)
 
     _tree->access<double>(mb_path / "tick_rate") //now subscribe the clock rate setter
         .subscribe(boost::bind(&b200_ctrl::set_tick_rate, _ctrl, _1))
-        .set(61.44e6);
+        .set(30.72e6);
 
     this->update_rates();
 
