@@ -39,7 +39,7 @@ static const size_t POKE32_CMD = (1 << 8);
 static const size_t PEEK32_CMD = 0;
 static const double ACK_TIMEOUT = 0.5;
 static const double MASSIVE_TIMEOUT = 10.0; //for when we wait on a timed command
-static const boost::uint32_t MAX_SEQS_OUT = 16;
+static const boost::uint32_t MAX_SEQS_OUT = 15;
 
 #define SPI_DIV TOREG(SR_SPI + 0)
 #define SPI_CTRL TOREG(SR_SPI + 1)
@@ -60,7 +60,7 @@ public:
         _seq_ack(0),
         _timeout(ACK_TIMEOUT),
         _async_fifo(1000),
-        _ctrl_fifo(MAX_SEQS_OUT)
+        _ctrl_fifo(MAX_SEQS_OUT+1)
     {
         while (_xport->get_recv_buff(0.0)){} //flush
         this->set_time(uhd::time_spec_t(0.0));
@@ -84,20 +84,31 @@ public:
     void handle_msg(void){
         managed_recv_buffer::sptr buff = _xport->get_recv_buff();
         if (not buff) return;
-        UHD_VAR(buff->size());
+        if (not buff->size()) return;
+        
         const boost::uint32_t *pkt = buff->cast<const boost::uint32_t *>();
+        /*
+        if (buff->size())
+        {
+            UHD_VAR(buff->size());
+            UHD_MSG(status) << std::hex << pkt[0] << std::dec << std::endl;
+            UHD_MSG(status) << std::hex << pkt[1] << std::dec << std::endl;
+            UHD_MSG(status) << std::hex << pkt[2] << std::dec << std::endl;
+            UHD_MSG(status) << std::hex << pkt[3] << std::dec << std::endl;
+        }else return;
+        */
         vrt::if_packet_info_t packet_info;
-        UHD_MSG(status) << std::hex << pkt[0] << std::dec << std::endl;
-        UHD_MSG(status) << std::hex << pkt[1] << std::dec << std::endl;
-        UHD_MSG(status) << std::hex << pkt[2] << std::dec << std::endl;
-        UHD_MSG(status) << std::hex << pkt[3] << std::dec << std::endl;
-        UHD_MSG(status) << std::hex << pkt[4] << std::dec << std::endl;
         packet_info.num_packet_words32 = buff->size()/sizeof(boost::uint32_t);
         try{
             vrt::if_hdr_unpack_le(pkt, packet_info);
         }
         catch(const std::exception &ex){
             UHD_MSG(error) << "B200 ctrl bad VITA packet: " << ex.what() << std::endl;
+            UHD_VAR(buff->size());
+            UHD_MSG(status) << std::hex << pkt[0] << std::dec << std::endl;
+            UHD_MSG(status) << std::hex << pkt[1] << std::dec << std::endl;
+            UHD_MSG(status) << std::hex << pkt[2] << std::dec << std::endl;
+            UHD_MSG(status) << std::hex << pkt[3] << std::dec << std::endl;
         }
         if (packet_info.has_sid and packet_info.sid == B200_CTRL_MSG_SID){
             ctrl_result_t res = ctrl_result_t();
