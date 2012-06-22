@@ -34,6 +34,9 @@ public:
      */
     static sptr make(uhd::transport::usb_control::sptr usb_ctrl);
 
+    //! true to hold the fpga in reset
+    virtual void reset_fpga(const bool reset) = 0;
+
     //! load a firmware image
     virtual void load_firmware(const std::string filestring) = 0;
 

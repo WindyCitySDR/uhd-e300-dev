@@ -186,12 +186,15 @@ b200_impl::b200_impl(const device_addr_t &device_addr)
     _iface = b200_iface::make(control);
     this->check_fw_compat(); //check after making
 
+    _iface->reset_fpga(true);
     //load the fpga
     //TODO
 //    _iface->load_fpga(b200_fpga_image);
-    _iface->load_fpga("");
+    //_iface->load_fpga("");
 
+    _iface->reset_fpga(true);
     _iface->reset_fx3();
+    _iface->reset_fpga(true);
 
 
     ////////////////////////////////////////////////////////////////////
@@ -199,6 +202,8 @@ b200_impl::b200_impl(const device_addr_t &device_addr)
     ////////////////////////////////////////////////////////////////////
     _iface->write_reg(0x00A, BOOST_BINARY( 00010010 ));
     _iface->write_reg(0x009, BOOST_BINARY( 00010111 ));
+    boost::this_thread::sleep(boost::posix_time::seconds(1));
+    _iface->reset_fpga(false); //bring it out of reset
 
 
     ////////////////////////////////////////////////////////////////////

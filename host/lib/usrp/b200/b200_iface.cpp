@@ -362,19 +362,18 @@ public:
                     0x00, data, 4);
     }
 
+    void reset_fpga(const bool reset)
+    {
+        unsigned char data[4];
+        memset(data, (reset)? 0xFF : 0x00, sizeof(data));
+
+        fx3_control_write(B200_VREQ_FPGA_RESET, 0x00, \
+                0x00, data, 4);
+    }
+
 
     void load_fpga(const std::string filestring)
     {
-        unsigned char data[4];
-        memset(data, 0xFF, sizeof(data));
-
-        fx3_control_write(B200_VREQ_FPGA_RESET, 0x00, \
-                0x00, data, 4);
-
-        memset(data, 0x00, sizeof(data));
-
-        fx3_control_write(B200_VREQ_FPGA_RESET, 0x00, \
-                0x00, data, 4);
     }
 
 private:
