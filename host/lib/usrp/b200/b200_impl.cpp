@@ -205,6 +205,8 @@ b200_impl::b200_impl(const device_addr_t &device_addr)
     boost::this_thread::sleep(boost::posix_time::seconds(1));
     _iface->reset_fpga(false); //bring it out of reset
 
+    _iface->reset_fpga(true);
+    _iface->reset_fpga(false); //bring it out of reset
 
     ////////////////////////////////////////////////////////////////////
     // Create control transport
@@ -525,6 +527,7 @@ b200_impl::b200_impl(const device_addr_t &device_addr)
 b200_impl::~b200_impl(void)
 {
     //TODO kill any threads here
+    _iface->reset_fpga(true);
 }
 
 void b200_impl::set_mb_eeprom(const uhd::usrp::mboard_eeprom_t &mb_eeprom)

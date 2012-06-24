@@ -96,7 +96,7 @@ public:
             UHD_MSG(status) << std::hex << pkt[2] << std::dec << std::endl;
             UHD_MSG(status) << std::hex << pkt[3] << std::dec << std::endl;
         }else return;
-        */
+        //*/
         vrt::if_packet_info_t packet_info;
         packet_info.num_packet_words32 = buff->size()/sizeof(boost::uint32_t);
         try{
