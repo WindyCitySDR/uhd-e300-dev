@@ -74,11 +74,6 @@ public:
         /**set up BBPLL*/
         set_clock_rate(30.72e6);
 
-        //setup TX FIR
-        setup_tx_fir();
-        //setup RX FIR
-        setup_rx_fir();
-
         /********setup data ports (FDD dual port DDR CMOS)*/
         //FDD dual port DDR CMOS no swap
         _b200_iface->write_reg(0x010, 0b11001000); //FIXME 0b10101000 (swap TX IQ swap TX1/TX2)
@@ -297,11 +292,29 @@ public:
             UHD_THROW_INVALID_CODE_PATH();
         }
 
+        /* Tune the BBPLL to get the ADC and DAC clocks. */
         double adcclk = set_coreclk(rate * divfactor);
         UHD_VAR(adcclk);
 
+        /* Set the dividers / interpolators in Catalina. */
         _b200_iface->write_reg(0x002, reg_txfilt);
         _b200_iface->write_reg(0x003, reg_rxfilt);
+
+        /* Scale the number of taps based on the clock speed. */
+        int num_taps_list[] = {16, 32, 48, 64, 80, 96, 112, 128};
+        int max_num_taps = (32 * (adcclk / (2 * rate)));
+        int num_taps = 0;
+        for(int i = 1; i < 8; i++) {
+            if(max_num_taps >= num_taps_list[i]) {
+                continue;
+            } else {
+                num_taps = num_taps_list[i - 1];
+            }
+        } if(num_taps == 0) { num_taps = 128; }
+
+        /* Setup the RX and TX FIR filters. */
+        setup_tx_fir(num_taps);
+        setup_rx_fir(num_taps);
 
         return (adcclk / divfactor);
 //        return (61.44e6 / 4); //FIXME
@@ -350,7 +363,7 @@ public:
 
         //use XTALN input, CLKOUT=XTALN (40MHz ref out to FPGA)
         _b200_iface->write_reg(0x00A, 0b00010000 | i); //set BBPLL divider
-        std::cout << "BBPLL divider reg: " << std::hex << int(0b00010000 | i) << std::endl;
+//        std::cout << "BBPLL divider reg: " << std::hex << int(0b00010000 | i) << std::endl;
 
         //CP filter recommended coefficients, don't change unless you have a clue
         _b200_iface->write_reg(0x048, 0xe8);
@@ -475,6 +488,7 @@ public:
                 std::cout << "RX PLL NOT LOCKED" << std::endl;
             }
             _rx_freq = actual_lo;
+            quad_cal();
             return _rx_freq;
 
         } else {
@@ -521,6 +535,7 @@ public:
                 std::cout << "TX PLL NOT LOCKED" << std::endl;
             }
             _tx_freq = actual_lo;
+            quad_cal();
             return _tx_freq;
         }
     }
@@ -570,16 +585,20 @@ public:
         }
     }
 
-    void setup_fir(const std::string &which, uint16_t *coeffs)
+    void setup_fir(const std::string &which, uint8_t num_taps, uint16_t *coeffs)
     {
         uint16_t base;
         if(which == "RX") base = 0x0f0;
         else base = 0x060;
-        _b200_iface->write_reg(base+5, 0xfa); //enable filter clk
+
+        /* Write the filter configuration. */
+        uint8_t reg_numtaps = (((num_taps / 16) - 1) & 0x07) << 5;
+
+        _b200_iface->write_reg(base+5, reg_numtaps | 0x1a); //enable filter clk
         _b200_iface->write_reg(base+6, 0x02); //filter gain
         boost::this_thread::sleep(boost::posix_time::milliseconds(1));
-        
-        for(int addr=0; addr < 64; addr++) {
+
+        for(int addr=0; addr < (num_taps / 2); addr++) {
             _b200_iface->write_reg(base+0, addr);
             _b200_iface->write_reg(base+1, (coeffs[addr]) & 0xff);
             _b200_iface->write_reg(base+2, (coeffs[addr] >> 8) & 0xff);
@@ -588,7 +607,7 @@ public:
             _b200_iface->write_reg(base+4, 0x00);
         }
         //it's symmetric, so we write it out again backwards
-        for(int addr=0; addr < 64; addr++) {
+        for(int addr=0; addr < (num_taps / 2); addr++) {
             _b200_iface->write_reg(base+0, addr+64);
             _b200_iface->write_reg(base+1, (coeffs[64-addr]) & 0xff);
             _b200_iface->write_reg(base+2, (coeffs[64-addr] >> 8) & 0xff);
@@ -599,9 +618,9 @@ public:
         _b200_iface->write_reg(base+5, 0xf8); //disable filter clk
     }
 
-    void setup_rx_fir()
+    void setup_rx_fir(int total_num_taps)
     {
-        uint16_t coeffs[] = {
+        uint16_t master_coeffs[] = {
             0xffe2,0x0042,0x0024,0x0095,0x0056,0x004d,0xffcf,0xffb7,
             0xffb1,0x0019,0x0059,0x006a,0x0004,0xff9d,0xff72,0xffd4,
             0x0063,0x00b7,0x0062,0xffac,0xff21,0xff59,0x0032,0x0101,
@@ -611,13 +630,20 @@ public:
             0x0287,0x062f,0x048a,0xfe37,0xf862,0xf8c1,0x004d,0x0963,
             0x0b88,0x02a4,0xf3e7,0xebdd,0xf5f8,0x1366,0x3830,0x518b
         };
-        setup_fir("RX", coeffs);
+
+        int num_taps = total_num_taps / 2;
+        uint16_t coeffs[num_taps];
+        for(int i = 0; i < num_taps; i++) {
+            coeffs[num_taps - 1 - i] = master_coeffs[63 - i];
+        }
+
+        setup_fir("RX", total_num_taps, coeffs);
     }
 
-    void setup_tx_fir()
+    void setup_tx_fir(int total_num_taps)
     {
         //LTE 6MHz
-        uint16_t coeffs[] = {
+        uint16_t master_coeffs[] = {
             0xfffb,0x0000,0x0004,0x0017,0x0024,0x0028,0x0013,0xfff3,
             0xffdc,0xffe5,0x000b,0x0030,0x002e,0xfffe,0xffc4,0xffb8,
             0xfff0,0x0045,0x0068,0x002b,0xffb6,0xff72,0xffad,0x0047,
@@ -627,7 +653,14 @@ public:
             0x00d7,0x04e5,0x04cc,0xffd5,0xf9fe,0xf8fb,0xfef2,0x078c,
             0x0aae,0x036d,0xf5c0,0xed89,0xf685,0x12af,0x36a4,0x4faa
         };
-        setup_fir("TX", coeffs);
+
+        int num_taps = total_num_taps / 2;
+        uint16_t coeffs[num_taps];
+        for(int i = 0; i < num_taps; i++) {
+            coeffs[num_taps - 1 - i] = master_coeffs[63 - i];
+        }
+
+        setup_fir("TX", total_num_taps, coeffs);
     }
 
     void setup_adc()
