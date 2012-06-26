@@ -93,7 +93,7 @@ int UHD_SAFE_MAIN(int argc, char *argv[]){
     //variables to be set by po
     std::string args, wave_type, ant, subdev, ref, otw;
     size_t spb;
-    double rate, freq, gain, wave_freq, bw;
+    double rate, freq, gain, wave_freq, bw, clock_rate;
     float ampl;
 
     //setup the program options
@@ -103,6 +103,7 @@ int UHD_SAFE_MAIN(int argc, char *argv[]){
         ("args", po::value<std::string>(&args)->default_value(""), "single uhd device address args")
         ("spb", po::value<size_t>(&spb)->default_value(0), "samples per buffer, 0 for default")
         ("rate", po::value<double>(&rate), "rate of outgoing samples")
+        ("clock_rate", po::value<double>(&clock_rate), "clock rate")
         ("freq", po::value<double>(&freq), "RF center frequency in Hz")
         ("ampl", po::value<float>(&ampl)->default_value(float(0.3)), "amplitude of the waveform [0 to 0.7]")
         ("gain", po::value<double>(&gain), "gain for the RF chain")
@@ -131,6 +132,10 @@ int UHD_SAFE_MAIN(int argc, char *argv[]){
 
     //Lock mboard clocks
     usrp->set_clock_source(ref);
+
+    if(vm.count("clock_rate")) {
+        usrp->set_master_clock_rate(clock_rate);
+    }
 
     //always select the subdevice first, the channel mapping affects the other settings
     if (vm.count("subdev")) usrp->set_tx_subdev_spec(subdev);
