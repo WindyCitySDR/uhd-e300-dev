@@ -280,6 +280,11 @@ b200_impl::b200_impl(const device_addr_t &device_addr)
     //assign { /* 3'bX, */ tx_bandsel_a, tx_bandsel_b, rx_bandsel_a, rx_bandsel_b, rx_bandsel_c } = misc_outs[15:8];
     //assign { /* 7'bX, */ mimo } = misc_outs[7:0];
 
+    /*
+    _gpio_state.gps_ref_enable = 1;
+    _gpio_state.gps_out_enable = 1;
+    _gpio_state.ext_ref_enable = 0;
+    */
     update_gpio_state(); //first time init
 
     //set ATR for FDX operation fixed GPIO, amps enabled, LEDs all on
@@ -502,6 +507,14 @@ b200_impl::b200_impl(const device_addr_t &device_addr)
     _tree->access<std::string>(mb_path / "time_source/value").set("none");
 
     _server = task::make(boost::bind(&b200_impl::run_server, this));
+
+
+    /* Attempting to lock to external reference. */
+    /*
+    _ctrl->transact_spi(1<<1, spi_config_t::EDGE_RISE, 0x1F8083, 24, false);
+    _ctrl->transact_spi(1<<1, spi_config_t::EDGE_RISE, 0x4, 24, false);
+    _ctrl->transact_spi(1<<1, spi_config_t::EDGE_RISE, 0x401, 24, false);
+    */
 }
 
 b200_impl::~b200_impl(void)
