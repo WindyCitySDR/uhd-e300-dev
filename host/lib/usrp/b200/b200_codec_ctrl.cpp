@@ -309,8 +309,12 @@ public:
                 continue;
             } else {
                 num_taps = num_taps_list[i - 1];
+                break;
             }
         } if(num_taps == 0) { num_taps = 128; }
+
+        UHD_VAR(max_num_taps);
+        UHD_VAR(num_taps);
 
         /* Setup the RX and TX FIR filters. */
         setup_tx_fir(num_taps);
