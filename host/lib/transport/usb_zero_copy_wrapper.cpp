@@ -107,7 +107,7 @@ public:
         //extract VITA end of packet flag, we must force flush under eof conditions
         const bool eop = (uhd::wtohx(vita_header) & (0x1 << 24)) != 0;
         const bool full = _bytes_in_buffer >= (_last_send_buff->size() - _fragmentation_size);
-        if (eop or full){
+        if (eop or full or _auto_flush_timeout == 0.0){
             _last_send_buff->commit(_bytes_in_buffer);
             _last_send_buff.reset();
 
@@ -133,6 +133,8 @@ public:
 private:
     usb_zero_copy::sptr _internal;
     const size_t _fragmentation_size;
+    const double _auto_flush_timeout;
+    const boost::posix_time::time_duration _timeout;
     managed_send_buffer::sptr _last_send_buff;
     size_t _bytes_in_buffer;
     char *_mem_buffer_tip;
@@ -164,7 +166,7 @@ private:
  **********************************************************************/
 class usb_zero_copy_wrapper : public usb_zero_copy{
 public:
-    usb_zero_copy_wrapper(sptr usb_zc, const size_t frame_boundary):
+    usb_zero_copy_wrapper(sptr usb_zc, const size_t frame_boundary, const double auto_flush_timeout):
         _internal_zc(usb_zc),
         _frame_boundary(frame_boundary),
         _next_recv_buff_index(0)
@@ -172,7 +174,7 @@ public:
         for (size_t i = 0; i < this->get_num_recv_frames(); i++){
             _mrb_pool.push_back(boost::make_shared<usb_zero_copy_wrapper_mrb>());
         }
-        _the_only_msb = boost::make_shared<usb_zero_copy_wrapper_msb>(usb_zc, frame_boundary);
+        _the_only_msb = boost::make_shared<usb_zero_copy_wrapper_msb>(usb_zc, frame_boundary, auto_flush_timeout);
     }
 
     managed_recv_buffer::sptr get_recv_buff(double timeout){
@@ -225,7 +227,9 @@ private:
  * USB zero copy wrapper factory function
  **********************************************************************/
 usb_zero_copy::sptr usb_zero_copy::make_wrapper(
-    sptr usb_zc, size_t usb_frame_boundary
+    sptr usb_zc,
+    const size_t usb_frame_boundary,
+    const double auto_flush_timeout
 ){
-    return sptr(new usb_zero_copy_wrapper(usb_zc, usb_frame_boundary));
+    return sptr(new usb_zero_copy_wrapper(usb_zc, usb_frame_boundary, auto_flush_timeout));
 }
