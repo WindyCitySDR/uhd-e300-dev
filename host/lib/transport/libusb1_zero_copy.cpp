@@ -98,8 +98,7 @@ public:
     void release(void){
         completed = false;
         _lut->length = _frame_size; //always reset length
-        const int code = libusb_submit_transfer(_lut);
-        if (code != 0) throw uhd::io_error(libusb_error_name(code));
+        UHD_ASSERT_THROW(libusb_submit_transfer(_lut) == 0);
     }
 
     sptr get_new(const double timeout, size_t &index){
@@ -132,8 +131,7 @@ public:
     void release(void){
         completed = false;
         _lut->length = size();
-        const int code = libusb_submit_transfer(_lut);
-        if (code != 0) throw uhd::io_error(libusb_error_name(code));
+        UHD_ASSERT_THROW(libusb_submit_transfer(_lut) == 0);
     }
 
     sptr get_new(const double timeout, size_t &index){
