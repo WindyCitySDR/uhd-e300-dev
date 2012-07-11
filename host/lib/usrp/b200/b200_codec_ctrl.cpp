@@ -284,30 +284,48 @@ public:
          * change after the ADC clock has been set. */
         int divfactor = 0;
         int tfir = 0;
-        if(rate < 41e6) {
+        if(rate <= 20e6) {
             // RX1 enabled, 2, 2, 2, 2
             reg_rxfilt = 0b01011110;
 
             // TX1 enabled, 2, 2, 2, 2
-            reg_txfilt = 0b01011110;
+            reg_txfilt = 0b01010110;
 
             divfactor = 16;
             tfir = 2;
-        } else if((rate >= 41e6) && (rate < 56e6)) {
-            // RX1 enabled, 3, 1, 2, 2
-            reg_rxfilt = 0b01100110;
+        } else if((rate > 20e6) && (rate <= 22e6)) {
+           // RX1 enabled, 3, 2, 2, 2
+            reg_rxfilt = 0b01101110;
 
             // TX1 enabled, 3, 1, 2, 2
             reg_txfilt = 0b01100110;
 
-            divfactor = 12;
+            divfactor = 24;
             tfir = 2;
-        } else if((rate >= 56e6) && (rate <= 61.44e6)) {
-            // RX1 enabled, 3, 1, 1, 2
-            reg_rxfilt = 0b01100010;
+        } else if((rate > 22e6) && (rate <= 40e6)) {
+            // RX1 enabled, 2, 2, 2, 2
+            reg_rxfilt = 0b01011110;
+
+            // TX1 enabled, 1, 2, 2, 2
+            reg_txfilt = 0b01001110;
+
+            divfactor = 16;
+            tfir = 2;
+        } else if((rate > 40e6) && (rate <= 56e6)) {
+            // RX1 enabled, 3, 1, 2, 2
+            reg_rxfilt = 0b01100110;
 
             // TX1 enabled, 3, 1, 1, 2
             reg_txfilt = 0b01100010;
+
+            divfactor = 12;
+            tfir = 2;
+        } else if((rate > 56e6) && (rate <= 61.44e6)) {
+            // RX1 enabled, 3, 1, 1, 2
+            reg_rxfilt = 0b01100010;
+
+            // TX1 enabled, 3, 1, 1, 1
+            reg_txfilt = 0b01100001;
 
             divfactor = 6;
             tfir = 2;
