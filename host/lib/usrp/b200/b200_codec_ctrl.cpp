@@ -45,6 +45,7 @@ public:
         reg_inputsel = 0x00;
         reg_rxfilt = 0x00;
         reg_txfilt = 0x00;
+        reg_bbpll = 0x12; // Set by default in _impl for 40e6 reference
 
         /* Initialize control interfaces. */
         _b200_iface = iface;
@@ -254,56 +255,10 @@ public:
         return 0.0; //TODO
     }
 
-    double set_clock_rate(const double rate)
-    {
-        if(rate > 61.44e6) {
-            throw uhd::runtime_error("Requested master clock rate outside range!");
-        }
+    int get_num_taps(int max_num_taps) {
 
-        UHD_VAR(rate);
-
-        /* Set the decimation / interpolation values based on clock rate. */
-        int divfactor = 0;
-        if(rate < 41e6) {
-            // Both RX chains enabled, 2, 2, 2, 2
-            reg_rxfilt = 0b01011110;
-
-            // Both TX chains enabled, 2, 2, 2, 2
-            reg_txfilt = 0b01011110;
-
-            divfactor = 16;
-        } else if((rate >= 41e6) && (rate < 56e6)) {
-            // Both RX chains enabled, 3, 1, 2, 2
-            reg_rxfilt = 0b01100110;
-
-            // Both TX chains enabled, 3, 1, 2, 2
-            reg_txfilt = 0b01100110;
-
-            divfactor = 12;
-        } else if((rate >= 56e6) && (rate <= 61.44e6)) {
-            // Both RX chains enabled, 3, 1, 1, 2
-            reg_rxfilt = 0b01100010;
-
-            // Both TX chains enabled, 3, 1, 1, 2
-            reg_txfilt = 0b01100010;
-
-            divfactor = 6;
-        } else {
-            UHD_THROW_INVALID_CODE_PATH();
-        }
-
-        /* Tune the BBPLL to get the ADC and DAC clocks. */
-        double adcclk = set_coreclk(rate * divfactor);
-        UHD_VAR(adcclk);
-
-        /* Set the dividers / interpolators in Catalina. */
-        _b200_iface->write_reg(0x002, reg_txfilt);
-        _b200_iface->write_reg(0x003, reg_rxfilt);
-
-        /* Scale the number of taps based on the clock speed. */
-        int num_taps_list[] = {16, 32, 48, 64, 80, 96, 112, 128};
-        int max_num_taps = (32 * (adcclk / (2 * rate)));
         int num_taps = 0;
+        int num_taps_list[] = {16, 32, 48, 64, 80, 96, 112, 128};
         for(int i = 1; i < 8; i++) {
             if(max_num_taps >= num_taps_list[i]) {
                 continue;
@@ -313,12 +268,91 @@ public:
             }
         } if(num_taps == 0) { num_taps = 128; }
 
-        UHD_VAR(max_num_taps);
-        UHD_VAR(num_taps);
+        return num_taps;
+    }
+
+    double set_clock_rate(const double rate)
+    {
+        if(rate > 61.44e6) {
+            throw uhd::runtime_error("Requested master clock rate outside range!");
+        }
+
+        UHD_VAR(rate);
+
+        /* Set the decimation values based on clock rate. We are setting default
+         * values for the interpolation filters, as well, although they may
+         * change after the ADC clock has been set. */
+        int divfactor = 0;
+        int tfir = 0;
+        if(rate < 41e6) {
+            // RX1 enabled, 2, 2, 2, 2
+            reg_rxfilt = 0b01011110;
+
+            // TX1 enabled, 2, 2, 2, 2
+            reg_txfilt = 0b01011110;
+
+            divfactor = 16;
+            tfir = 2;
+        } else if((rate >= 41e6) && (rate < 56e6)) {
+            // RX1 enabled, 3, 1, 2, 2
+            reg_rxfilt = 0b01100110;
+
+            // TX1 enabled, 3, 1, 2, 2
+            reg_txfilt = 0b01100110;
+
+            divfactor = 12;
+            tfir = 2;
+        } else if((rate >= 56e6) && (rate <= 61.44e6)) {
+            // RX1 enabled, 3, 1, 1, 2
+            reg_rxfilt = 0b01100010;
+
+            // TX1 enabled, 3, 1, 1, 2
+            reg_txfilt = 0b01100010;
+
+            divfactor = 6;
+            tfir = 2;
+        } else {
+            UHD_THROW_INVALID_CODE_PATH();
+        }
+
+        /* Tune the BBPLL to get the ADC and DAC clocks. */
+        double adcclk = set_coreclk(rate * divfactor);
+        double dacclk = adcclk;
+        UHD_VAR(adcclk);
+
+        /* The DAC clock must be <= 336e6, and is either the ADC clock or 2x the
+         * ADC clock.*/
+        if(adcclk > 336e6) {
+            /* Make the DAC clock = ADC/2, and bypass the TXFIR. */
+            reg_bbpll = reg_bbpll | 0x08;
+            reg_txfilt = (reg_txfilt & 0xFC);//FIXME WTF? | 0x01;
+            tfir = 1;
+
+            dacclk = adcclk / 2.0;
+        }
+        UHD_VAR(dacclk);
+
+        /* Set the dividers / interpolators in Catalina. */
+        _b200_iface->write_reg(0x00A, reg_bbpll);
+        _b200_iface->write_reg(0x002, reg_txfilt);
+        _b200_iface->write_reg(0x003, reg_rxfilt);
+
+        /* Scale the number of taps based on the clock speed. */
+        int max_rx_taps = std::min((16 * int(adcclk / rate)), 128);
+        int max_tx_taps = 16 * std::min(int(std::floor(dacclk / rate)), \
+                std::min(4 * (1 << tfir), 8));
+        UHD_VAR(max_rx_taps);
+        UHD_VAR(max_tx_taps);
+
+        int num_rx_taps = get_num_taps(max_rx_taps);
+        int num_tx_taps = get_num_taps(max_tx_taps);
+
+        UHD_VAR(num_rx_taps);
+        UHD_VAR(num_tx_taps);
 
         /* Setup the RX and TX FIR filters. */
-        setup_tx_fir(num_taps);
-        setup_rx_fir(num_taps);
+        setup_rx_fir(num_rx_taps);
+        setup_tx_fir(num_tx_taps);
 
         return (adcclk / divfactor);
 //        return (61.44e6 / 4); //FIXME
@@ -366,7 +400,8 @@ public:
         _b200_iface->write_reg(0x043, nfrac & 0xFF); //Nfrac[7:0]
 
         //use XTALN input, CLKOUT=XTALN (40MHz ref out to FPGA)
-        _b200_iface->write_reg(0x00A, 0b00010000 | i); //set BBPLL divider
+        reg_bbpll = (reg_bbpll & 0xF8) | i;
+        _b200_iface->write_reg(0x00A, reg_bbpll); //set BBPLL divider
 //        std::cout << "BBPLL divider reg: " << std::hex << int(0b00010000 | i) << std::endl;
 
         //CP filter recommended coefficients, don't change unless you have a clue
@@ -749,6 +784,7 @@ private:
     boost::uint8_t reg_inputsel;
     boost::uint8_t reg_rxfilt;
     boost::uint8_t reg_txfilt;
+    boost::uint8_t reg_bbpll;
 };
 
 /***********************************************************************
