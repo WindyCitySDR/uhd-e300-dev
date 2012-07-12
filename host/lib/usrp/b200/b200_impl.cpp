@@ -291,7 +291,7 @@ b200_impl::b200_impl(const device_addr_t &device_addr)
     //assign { /* 3'bX, */ tx_bandsel_a, tx_bandsel_b, rx_bandsel_a, rx_bandsel_b, rx_bandsel_c } = misc_outs[15:8];
     //assign { /* 7'bX, */ mimo } = misc_outs[7:0];
 
-    /*
+    /* TODO lock to ext ref
     _gpio_state.gps_ref_enable = 1;
     _gpio_state.gps_out_enable = 1;
     _gpio_state.ext_ref_enable = 0;
@@ -366,9 +366,8 @@ b200_impl::b200_impl(const device_addr_t &device_addr)
             .set(1e6) //some default
             .coerce(boost::bind(&rx_dsp_core_200::set_host_rate, _rx_dsps[dspno], _1))
             .subscribe(boost::bind(&b200_impl::update_rx_samp_rate, this, dspno, _1));
-        _tree->create<double>(rx_dsp_path / "freq/value").set(0);
-//        _rx_dsps[dspno]->set_freq(0);
-//            .coerce(boost::bind(&rx_dsp_core_200::set_freq, _rx_dsps[dspno], _1));
+        _tree->create<double>(rx_dsp_path / "freq/value")
+            .coerce(boost::bind(&rx_dsp_core_200::set_freq, _rx_dsps[dspno], _1));
         _tree->create<meta_range_t>(rx_dsp_path / "freq/range")
             .publish(boost::bind(&rx_dsp_core_200::get_freq_range, _rx_dsps[dspno]));
         _tree->create<stream_cmd_t>(rx_dsp_path / "stream_cmd")
@@ -392,9 +391,8 @@ b200_impl::b200_impl(const device_addr_t &device_addr)
             .set(1e6) //some default
             .coerce(boost::bind(&tx_dsp_core_200::set_host_rate, _tx_dsps[dspno], _1))
             .subscribe(boost::bind(&b200_impl::update_tx_samp_rate, this, 0, _1));
-        _tree->create<double>(tx_dsp_path / "freq/value").set(0);
-//        _tx_dsps[dspno]->set_freq(0);
-//            .coerce(boost::bind(&tx_dsp_core_200::set_freq, _tx_dsps[dspno], _1));
+        _tree->create<double>(tx_dsp_path / "freq/value")
+            .coerce(boost::bind(&tx_dsp_core_200::set_freq, _tx_dsps[dspno], _1));
         _tree->create<meta_range_t>(tx_dsp_path / "freq/range")
             .publish(boost::bind(&tx_dsp_core_200::get_freq_range, _tx_dsps[dspno]));
     }
@@ -521,7 +519,7 @@ b200_impl::b200_impl(const device_addr_t &device_addr)
 
 
     /* Attempting to lock to external reference. */
-    /*
+    /* TODO lock to ext ref
     _ctrl->transact_spi(1<<1, spi_config_t::EDGE_RISE, 0x1F8083, 24, false);
     _ctrl->transact_spi(1<<1, spi_config_t::EDGE_RISE, 0x4, 24, false);
     _ctrl->transact_spi(1<<1, spi_config_t::EDGE_RISE, 0x401, 24, false);
