@@ -74,13 +74,10 @@ public:
      *
      * \param usb_zc a usb zero copy interface object
      * \param usb_frame_boundary bytes per frame
-     * \param auto_flush_timeout when to force flush
      * \return a new zero copy wrapper object
      */
     static sptr make_wrapper(
-        sptr usb_zc,
-        const size_t usb_frame_boundary = 512,
-        const double auto_flush_timeout = 0.001
+        sptr usb_zc, size_t usb_frame_boundary = 512
     );
 };
 

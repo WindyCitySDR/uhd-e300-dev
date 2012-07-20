@@ -217,15 +217,11 @@ b200_impl::b200_impl(const device_addr_t &device_addr)
     ctrl_xport_args["send_frame_size"] = "1024";
     ctrl_xport_args["num_send_frames"] = "16";
 
-    _ctrl_transport = usb_zero_copy::make_wrapper(
-        usb_zero_copy::make(
-            handle,
-            4, 8, //interface, endpoint
-            3, 4, //interface, endpoint
-            ctrl_xport_args
-        ),
-        1024, //all packets are this size (max USB 3.0)
-        0.0 //zero flush timeout -> flush/commit ASAP
+    _ctrl_transport = usb_zero_copy::make(
+        handle,
+        4, 8, //interface, endpoint
+        3, 4, //interface, endpoint
+        ctrl_xport_args
     );
     while (_ctrl_transport->get_recv_buff(0.0)){} //flush ctrl xport
 
