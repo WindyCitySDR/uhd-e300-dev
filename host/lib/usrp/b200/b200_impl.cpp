@@ -28,8 +28,10 @@
 #include <boost/filesystem.hpp>
 #include <boost/thread/thread.hpp>
 #include <boost/lexical_cast.hpp>
+#include <boost/functional/hash.hpp>
 #include <cstdio>
 #include <iomanip>
+#include <ctime>
 
 using namespace uhd;
 using namespace uhd::usrp;
@@ -264,6 +266,18 @@ b200_impl::b200_impl(const device_addr_t &device_addr)
     /*
     this->check_fpga_compat(); //check after making
     */
+
+    //Perform wishbone readback tests, these tests also write the hash
+    bool test_fail = false;
+    UHD_MSG(status) << "Performing control readback test... " << std::flush;
+    size_t hash = time(NULL);
+    for (size_t i = 0; i < 100; i++){
+        boost::hash_combine(hash, i);
+        _ctrl->poke32(TOREG(SR_MISC+4), boost::uint32_t(hash));
+        test_fail = _ctrl->peek32(TOREG(4)) != boost::uint32_t(hash);
+        if (test_fail) break; //exit loop on any failure
+    }
+    UHD_MSG(status) << ((test_fail)? " fail" : "pass") << std::endl;
 
     ////////////////////////////////////////////////////////////////////
     // setup the mboard eeprom
