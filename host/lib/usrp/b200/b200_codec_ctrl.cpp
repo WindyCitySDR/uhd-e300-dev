@@ -601,6 +601,7 @@ public:
     virtual double set_sample_rate(const double rate)
     {
         uhd::runtime_error("don't do that");
+        return 0.0;
     }
 
     virtual double set_filter_bw(const std::string &which, const double bw)
