@@ -21,6 +21,7 @@
 #include <uhd/utils/msg.hpp>
 #include <iostream>
 #include <boost/thread.hpp>
+#include <boost/utility.hpp>
 
 using namespace uhd;
 using namespace uhd::transport;
@@ -68,7 +69,7 @@ public:
         //rfpll refclk to REFCLKx2
         _b200_iface->write_reg(0x2ab, 0x07);
         _b200_iface->write_reg(0x2ac, 0xff);
-        _b200_iface->write_reg(0x009, 0b00010111);
+        _b200_iface->write_reg(0x009, BOOST_BINARY( 00010111 ) );
 
         boost::this_thread::sleep(boost::posix_time::milliseconds(20));
 
@@ -77,9 +78,9 @@ public:
 
         /********setup data ports (FDD dual port DDR CMOS)*/
         //FDD dual port DDR CMOS no swap
-        _b200_iface->write_reg(0x010, 0b11001000); //FIXME 0b10101000 (swap TX IQ swap TX1/TX2)
-        _b200_iface->write_reg(0x011, 0b00000000);
-        _b200_iface->write_reg(0x012, 0b00000010); //force TX on one port, RX on the other
+        _b200_iface->write_reg(0x010, BOOST_BINARY( 11001000 ) ); //FIXME 0b10101000 (swap TX IQ swap TX1/TX2)
+        _b200_iface->write_reg(0x011, BOOST_BINARY( 00000000 ) );
+        _b200_iface->write_reg(0x012, BOOST_BINARY( 00000010 ) ); //force TX on one port, RX on the other
 
         //data delay for TX and RX data clocks
         _b200_iface->write_reg(0x006, 0x0F);
@@ -111,9 +112,9 @@ public:
         _b200_iface->write_reg(0x239,0xc1); //init RX ALC
         _b200_iface->write_reg(0x279,0xc1); //"" TX
 
-        _b200_iface->write_reg(0x015, 0b00000111); //dual synth mode, synth en ctrl en
-        _b200_iface->write_reg(0x014, 0b00100001); //use SPI for TXNRX ctrl, to alert, TX on
-        _b200_iface->write_reg(0x013, 0b00000001); //enable ENSM
+        _b200_iface->write_reg(0x015, BOOST_BINARY( 00000111 ) ); //dual synth mode, synth en ctrl en
+        _b200_iface->write_reg(0x014, BOOST_BINARY( 00100001 ) ); //use SPI for TXNRX ctrl, to alert, TX on
+        _b200_iface->write_reg(0x013, BOOST_BINARY( 00000001 ) ); //enable ENSM
 
         //RX CP CAL
         boost::this_thread::sleep(boost::posix_time::milliseconds(1));
@@ -158,8 +159,8 @@ public:
         quad_cal();
 
         //ian magic
-        _b200_iface->write_reg(0x014, 0b00001111);
-        _b200_iface->write_reg(0x014, 0b00100001); //WAS 0b00101011
+        _b200_iface->write_reg(0x014, BOOST_BINARY( 00001111 ) );
+        _b200_iface->write_reg(0x014, BOOST_BINARY( 00100001 ) ); //WAS 0b00101011
 
         /*
         std::cout << std::endl;
@@ -286,46 +287,46 @@ public:
         int tfir = 0;
         if(rate <= 20e6) {
             // RX1 enabled, 2, 2, 2, 2
-            reg_rxfilt = 0b01011110;
+            reg_rxfilt = BOOST_BINARY( 01011110 ) ;
 
             // TX1 enabled, 2, 2, 2, 2
-            reg_txfilt = 0b01010110;
+            reg_txfilt = BOOST_BINARY( 01010110 ) ;
 
             divfactor = 16;
             tfir = 2;
         } else if((rate > 20e6) && (rate <= 22e6)) {
            // RX1 enabled, 3, 2, 2, 2
-            reg_rxfilt = 0b01101110;
+            reg_rxfilt = BOOST_BINARY( 01101110 ) ;
 
             // TX1 enabled, 3, 1, 2, 2
-            reg_txfilt = 0b01100110;
+            reg_txfilt = BOOST_BINARY( 01100110 ) ;
 
             divfactor = 24;
             tfir = 2;
         } else if((rate > 22e6) && (rate <= 40e6)) {
             // RX1 enabled, 2, 2, 2, 2
-            reg_rxfilt = 0b01011110;
+            reg_rxfilt = BOOST_BINARY( 01011110 ) ;
 
             // TX1 enabled, 1, 2, 2, 2
-            reg_txfilt = 0b01001110;
+            reg_txfilt = BOOST_BINARY( 01001110 ) ;
 
             divfactor = 16;
             tfir = 2;
         } else if((rate > 40e6) && (rate <= 56e6)) {
             // RX1 enabled, 3, 1, 2, 2
-            reg_rxfilt = 0b01100110;
+            reg_rxfilt = BOOST_BINARY( 01100110 ) ;
 
             // TX1 enabled, 3, 1, 1, 2
-            reg_txfilt = 0b01100010;
+            reg_txfilt = BOOST_BINARY( 01100010 ) ;
 
             divfactor = 12;
             tfir = 2;
         } else if((rate > 56e6) && (rate <= 61.44e6)) {
             // RX1 enabled, 3, 1, 1, 2
-            reg_rxfilt = 0b01100010;
+            reg_rxfilt = BOOST_BINARY( 01100010 ) ;
 
             // TX1 enabled, 3, 1, 1, 1
-            reg_txfilt = 0b01100001;
+            reg_txfilt = BOOST_BINARY( 01100001 ) ;
 
             divfactor = 6;
             tfir = 2;
@@ -373,7 +374,6 @@ public:
         setup_tx_fir(num_tx_taps);
 
         return (adcclk / divfactor);
-//        return (61.44e6 / 4); //FIXME
     }
 
     double set_coreclk(const double rate) {
