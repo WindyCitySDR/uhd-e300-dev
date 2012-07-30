@@ -22,6 +22,7 @@
 #include <iostream>
 #include <boost/thread.hpp>
 #include <boost/utility.hpp>
+#include <vector>
 
 using namespace uhd;
 using namespace uhd::transport;
@@ -689,12 +690,12 @@ public:
         };
 
         int num_taps = total_num_taps / 2;
-        uint16_t coeffs[num_taps];
+        std::vector<uint16_t> coeffs(num_taps);
         for(int i = 0; i < num_taps; i++) {
             coeffs[num_taps - 1 - i] = master_coeffs[63 - i];
         }
 
-        setup_fir("RX", total_num_taps, coeffs);
+        setup_fir("RX", total_num_taps, &coeffs[0]);
     }
 
     void setup_tx_fir(int total_num_taps)
@@ -712,12 +713,12 @@ public:
         };
 
         int num_taps = total_num_taps / 2;
-        uint16_t coeffs[num_taps];
+        std::vector<uint16_t> coeffs(num_taps);
         for(int i = 0; i < num_taps; i++) {
             coeffs[num_taps - 1 - i] = master_coeffs[63 - i];
         }
 
-        setup_fir("TX", total_num_taps, coeffs);
+        setup_fir("TX", total_num_taps, &coeffs[0]);
     }
 
     void setup_adc()
