@@ -315,6 +315,69 @@ public:
         return bbbw;
     }
 
+    void calibrate_secondary_tx_filter() {
+        /* For filter tuning, baseband BW is half the complex BW, and must be
+         * between 20e6 and 0.53e6. */
+        double bbbw = _baseband_bw / 2.0;
+        if(bbbw > 20e6) {
+            bbbw = 20e6;
+        } else if (bbbw < 0.53e6) {
+            bbbw = 0.53e6;
+        }
+
+        int bbbw_mhz = int((bbbw / 1e6));
+
+        /* Start with a resistor value of 100 Ohms. */
+        int res = 100;
+
+        /* Calculate target corner frequency. */
+        double corner_freq = 5 * bbbw_mhz * 2 * boost::math::constants::pi<double>();
+
+        /* Iterate through RC values to determine correct combination. */
+        int cap = 0;
+        for(int i = 0; i <= 3; i++) {
+            cap = int(std::floor(0.5 + (( 1 / ((corner_freq * res) * 1e6)) * 1e12))) - 12;
+
+            if(cap <= 63) {
+                break;
+            }
+
+            res = res * 2;
+        }
+        if(cap > 63) {
+            cap = 63;
+        }
+
+        uint8_t reg0d0, reg0d1, reg0d2;
+
+        if((bbbw_mhz * 2) <= 9) {
+            reg0d0 = 0x0c;
+        } else if(((bbbw_mhz * 2) > 9) && ((bbbw_mhz * 2) <= 24)) {
+            reg0d0 = 0x056;
+        } else if((bbbw_mhz * 2) > 24) {
+            reg0d0 = 0x57;
+        } else {
+            UHD_THROW_INVALID_CODE_PATH();
+        }
+
+        if(res == 100) {
+            reg0d1 = 0x0c;
+        } else if(res == 200) {
+            reg0d1 = 0x04;
+        } else if(res == 400) {
+            reg0d1 = 0x03;
+        } else if(res == 800) {
+            reg0d1 = 0x01;
+        }
+
+        reg0d2 = cap;
+
+        _b200_iface->write_reg(0x0d0, reg0d0);
+        _b200_iface->write_reg(0x0d1, reg0d1);
+        _b200_iface->write_reg(0x0d2, reg0d2);
+        _b200_iface->write_reg(0x0d3, 0x60);
+    }
+
     void quad_cal(void) {
         //tx quad cal
         _b200_iface->write_reg(0x014, 0x0f); //ENSM alert state
@@ -476,11 +539,6 @@ public:
         _b200_iface->write_reg(0x1df, 0x00);
         _b200_iface->write_reg(0x1dc, 0x76);
         _b200_iface->write_reg(0x1de, 0x76);
-
-        //setup TX secondary filter
-        _b200_iface->write_reg(0x0d2, 0x21);
-        _b200_iface->write_reg(0x0d1, 0x0c);
-        _b200_iface->write_reg(0x0d0, 0x56);
 
         //adc setup
         setup_adc();
@@ -877,7 +935,10 @@ public:
 
         //set up BB filter
         if(which == "TX") {
-            return calibrate_baseband_tx_analog_filter();
+            double bw = calibrate_baseband_tx_analog_filter();
+            calibrate_secondary_tx_filter();
+
+            return bw;
         } else {
             return calibrate_baseband_rx_analog_filter();
         }
