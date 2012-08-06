@@ -75,7 +75,7 @@ public:
      * Placeholders, unused, or test functions
      **********************************************************************/
 
-    virtual double set_sample_rate(const double rate) {
+    double set_sample_rate(const double rate) {
         uhd::runtime_error("don't do that");
         return 0.0;
     }
@@ -187,7 +187,7 @@ public:
 
         //check for BBPLL lock
         boost::this_thread::sleep(boost::posix_time::milliseconds(2));
-        if(!_b200_iface->read_reg(0x05e) & 0x80) {
+        if(!(_b200_iface->read_reg(0x05e) & 0x80)) {
             uhd::runtime_error("BBPLL not locked");
         }
     }
@@ -269,6 +269,52 @@ public:
         return bbbw;
     }
 
+    double calibrate_baseband_tx_analog_filter() {
+        /* If we aren't already in the ALERT state, we will need to return to
+         * the FDD state after calibration. */
+        bool not_in_alert = false;
+        if((_b200_iface->read_reg(0x017) & 0x0F) != 5) {
+            /* Force the device into the ALERT state. */
+            not_in_alert = true;
+            _b200_iface->write_reg(0x014, 0x0f);
+        }
+
+        /* For filter tuning, baseband BW is half the complex BW, and must be
+         * between 28e6 and 0.2e6. */
+        double bbbw = _baseband_bw / 2.0;
+        if(bbbw > 20e6) {
+            bbbw = 20e6;
+        } else if (bbbw < 0.625e6) {
+            bbbw = 0.625e6;
+        }
+
+        double txtune_clk = ((1.6 * bbbw *
+                boost::math::constants::pi<double>()) / std::log(2));
+
+        uint16_t txbbfdiv = std::min(511, int(std::ceil(_bbpll_freq / txtune_clk)));
+
+        reg_bbftune_mode = (reg_bbftune_mode & 0xFE) \
+                             | ((txbbfdiv >> 8) & 0x01);
+
+        _b200_iface->write_reg(0x0d6, (txbbfdiv & 0x000F));
+        _b200_iface->write_reg(0x0d7, reg_bbftune_mode);
+
+        _b200_iface->write_reg(0x0ca, 0x22);
+        _b200_iface->write_reg(0x016, 0x40);
+        boost::this_thread::sleep(boost::posix_time::milliseconds(1));
+        if(_b200_iface->read_reg(0x016) & 0x40) {
+            std::cout << "RX baseband filter cal failure" << std::endl;
+        }
+        _b200_iface->write_reg(0x0ca, 0x26);
+
+        /* If we were in the FDD state, return it now. */
+        if(not_in_alert) {
+            _b200_iface->write_reg(0x014, 0x21);
+        }
+
+        return bbbw;
+    }
+
     void quad_cal(void) {
         //tx quad cal
         _b200_iface->write_reg(0x014, 0x0f); //ENSM alert state
@@ -325,6 +371,7 @@ public:
         reg_txfilt = 0x00;
         reg_bbpll = 0x12; // Set by default in _impl for 40e6 reference
         reg_bbftune_config = 0x1e;
+        reg_bbftune_mode = 0x1e;
 
         /* Initialize internal fields. */
         _rx_freq = 0;
@@ -420,8 +467,8 @@ public:
         //gain table here
 
         //set baseband filter BW
-        set_filter_bw("RX_A", 6.0e6);
-        set_filter_bw("TX_A", 6.0e6);
+        set_filter_bw("RX_A");
+        set_filter_bw("TX_A");
 
         //setup RX TIA
         _b200_iface->write_reg(0x1db, 0x60);
@@ -822,24 +869,15 @@ public:
         }
     }
 
-    virtual double set_filter_bw(const std::string &which, const double bw) {
-        //set up BB filter
-        //set BBLPF1 to 1.6x bw
-        //set BBLPF2 to 2x bw
-        if(which == "TX") {
-            _b200_iface->write_reg(0x0d6, 0x08);
-            _b200_iface->write_reg(0x0d7, 0x1e);
-//            _b200_iface->write_reg(0x0d8, 0x06);
-//            _b200_iface->write_reg(0x0d9, 0x00);
-            _b200_iface->write_reg(0x0ca, 0x22);
-            _b200_iface->write_reg(0x016, 0x40);
-            boost::this_thread::sleep(boost::posix_time::milliseconds(1));
-            if(_b200_iface->read_reg(0x016) & 0x40) {
-                std::cout << "RX baseband filter cal failure" << std::endl;
-            }
-            _b200_iface->write_reg(0x0ca, 0x26);
+    double set_filter_bw(const std::string &which) {
+        /* If the BBPLL hasn't been tuned & calibrated yet, return. */
+        if(_bbpll_freq == 0) {
+            return 0.0;
+        }
 
-            return 7.0e6;
+        //set up BB filter
+        if(which == "TX") {
+            return calibrate_baseband_tx_analog_filter();
         } else {
             return calibrate_baseband_rx_analog_filter();
         }
@@ -877,6 +915,7 @@ private:
     boost::uint8_t reg_txfilt;
     boost::uint8_t reg_bbpll;
     boost::uint8_t reg_bbftune_config;
+    boost::uint8_t reg_bbftune_mode;
 };
 
 /***********************************************************************
