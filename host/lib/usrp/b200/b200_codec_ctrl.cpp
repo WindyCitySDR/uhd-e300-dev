@@ -55,7 +55,7 @@ public:
     }
 
     uhd::meta_range_t get_rf_freq_range(const std::string &which) {
-        return uhd::meta_range_t(0.0, 1e12); //FIXME TODO
+        return uhd::meta_range_t(100.0e6, 6.0e9);
     }
 
     uhd::meta_range_t get_bw_filter_range(const std::string &which) {
@@ -378,6 +378,59 @@ public:
         _b200_iface->write_reg(0x0d3, 0x60);
     }
 
+    void calibrate_rx_TIAs() {
+
+        uint8_t reg1eb = _b200_iface->read_reg(0x1eb);
+        uint8_t reg1ec = _b200_iface->read_reg(0x1ec);
+        uint8_t reg1e6 = _b200_iface->read_reg(0x1e6);
+        uint8_t reg1db, reg1dc, reg1dd, reg1de, reg1df;
+
+        /* For filter tuning, baseband BW is half the complex BW, and must be
+         * between 28e6 and 0.2e6. */
+        double bbbw = _baseband_bw / 2.0;
+        if(bbbw > 20e6) {
+            bbbw = 20e6;
+        } else if (bbbw < 0.20e6) {
+            bbbw = 0.20e6;
+        }
+        double ceil_bbbw_mhz = std::ceil(bbbw / 1e6);
+
+        int Cbbf = (reg1eb * 160) + (reg1ec * 10) + 140;
+        int R2346 = 18300 * (reg1e6 & 0x07);
+        double CTIA_fF = (Cbbf * R2346 * 0.56) / 3500;
+
+        if(ceil_bbbw_mhz <= 3) {
+            reg1db = 0xe0;
+        } else if((ceil_bbbw_mhz > 3) && (ceil_bbbw_mhz <= 10)) {
+            reg1db = 0x60;
+        } else if(ceil_bbbw_mhz > 10) {
+            reg1db = 0x20;
+        } else {
+            UHD_THROW_INVALID_CODE_PATH();
+        }
+
+        if(CTIA_fF > 2920) {
+            reg1dc = 0x40;
+            reg1de = 0x40;
+
+            uint8_t temp = std::min(127, int(std::floor(0.5 + ((CTIA_fF - 400) / 320))));
+            reg1dd = temp;
+            reg1df = temp;
+        } else {
+            uint8_t temp = std::floor(0.5 + ((CTIA_fF - 400) / 40)) + 0x40;
+            reg1dc = temp;
+            reg1de = temp;
+            reg1dd = 0;
+            reg1df = 0;
+        }
+
+        _b200_iface->write_reg(0x1db, reg1db);
+        _b200_iface->write_reg(0x1dc, reg1dc);
+        _b200_iface->write_reg(0x1dd, reg1dd);
+        _b200_iface->write_reg(0x1de, reg1de);
+        _b200_iface->write_reg(0x1df, reg1df);
+    }
+
     void quad_cal(void) {
         //tx quad cal
         _b200_iface->write_reg(0x014, 0x0f); //ENSM alert state
@@ -532,13 +585,6 @@ public:
         //set baseband filter BW
         set_filter_bw("RX_A");
         set_filter_bw("TX_A");
-
-        //setup RX TIA
-        _b200_iface->write_reg(0x1db, 0x60);
-        _b200_iface->write_reg(0x1dd, 0x00);
-        _b200_iface->write_reg(0x1df, 0x00);
-        _b200_iface->write_reg(0x1dc, 0x76);
-        _b200_iface->write_reg(0x1de, 0x76);
 
         //adc setup
         setup_adc();
@@ -940,7 +986,10 @@ public:
 
             return bw;
         } else {
-            return calibrate_baseband_rx_analog_filter();
+            double bw = calibrate_baseband_rx_analog_filter();
+            calibrate_rx_TIAs();
+
+            return bw;
         }
     }
 
