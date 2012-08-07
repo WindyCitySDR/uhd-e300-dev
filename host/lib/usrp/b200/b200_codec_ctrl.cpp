@@ -368,6 +368,8 @@ public:
             reg0d1 = 0x03;
         } else if(res == 800) {
             reg0d1 = 0x01;
+        } else {
+            reg0d1 = 0x0c;
         }
 
         reg0d2 = cap;
@@ -380,9 +382,9 @@ public:
 
     void calibrate_rx_TIAs() {
 
-        uint8_t reg1eb = _b200_iface->read_reg(0x1eb);
-        uint8_t reg1ec = _b200_iface->read_reg(0x1ec);
-        uint8_t reg1e6 = _b200_iface->read_reg(0x1e6);
+        uint8_t reg1eb = _b200_iface->read_reg(0x1eb) & 0x3F;
+        uint8_t reg1ec = _b200_iface->read_reg(0x1ec) & 0x7F;
+        uint8_t reg1e6 = _b200_iface->read_reg(0x1e6) & 0x07;
         uint8_t reg1db, reg1dc, reg1dd, reg1de, reg1df;
 
         /* For filter tuning, baseband BW is half the complex BW, and must be
@@ -433,7 +435,6 @@ public:
 
     void setup_adc() {
 
-        /*
         double bbbw = ((_bbpll_freq / _rx_bbf_tunediv) * std::log(2)) \
                       / (1.4 * 2 * boost::math::constants::pi<double>());
 
@@ -442,22 +443,102 @@ public:
         } else if (bbbw < 0.20e6) {
             bbbw = 0.20e6;
         }
-        */
 
+        uint8_t rxbbf_c3_msb = _b200_iface->read_reg(0x1eb) & 0x3F;
+        uint8_t rxbbf_c3_lsb = _b200_iface->read_reg(0x1ec) & 0x7F;
+        uint8_t rxbbf_r2346 = _b200_iface->read_reg(0x1e6) & 0x07;
 
-        _b200_iface->write_reg(0x1db, 0x60);
-        _b200_iface->write_reg(0x1dd, 0x08);
-        _b200_iface->write_reg(0x1df, 0x08);
-        _b200_iface->write_reg(0x1dc, 0x40);
-        _b200_iface->write_reg(0x1de, 0x40);
-        uint8_t adc_regs[] = {
-            0x00, 0x00, 0x00, 0x24, 0x24, 0x00, 0x00, 0x7c,
-            0x37, 0x3c, 0x4c, 0x23, 0x4e, 0x20, 0x00, 0x7f,
-            0x7e, 0x7f, 0x4a, 0x49, 0x4a, 0x4c, 0x4b, 0x4c,
-            0x2e, 0xa4, 0x26, 0x18, 0xa4, 0x26, 0x13, 0xa4,
-            0x26, 0x2f, 0x30, 0x40, 0x40, 0x2c, 0x00, 0x00};
+        double scale_snr_dB = (_bbpll_freq < 80e6) ? 0 : 2;
+
+        double rc_timeconst = 0.0;
+        if(bbbw < 18e6) {
+            rc_timeconst = (1 / ((1.4 * 2 * boost::math::constants::pi<double>()) \
+                                * (18300 * rxbbf_r2346)
+                                * ((160e-15 * rxbbf_c3_msb)
+                                    + (10e-15 * rxbbf_c3_lsb) + 140e-15)
+                                * (bbbw)));
+        } else {
+            rc_timeconst = (1 / ((1.4 * 2 * boost::math::constants::pi<double>()) \
+                                * (18300 * rxbbf_r2346)
+                                * ((160e-15 * rxbbf_c3_msb)
+                                    + (10e-15 * rxbbf_c3_lsb) + 140e-15)
+                                * (bbbw) * (1 + (0.01 * (bbbw - 18e6)))));
+        }
+
+        double scale_res = std::sqrt(1 / rc_timeconst);
+        double scale_cap = std::sqrt(1 / rc_timeconst);
+        double scale_snr = std::pow(10,(scale_snr_dB / 10));
+        double maxsnr = 640 / 160;
+
+        uint8_t data[40];
+        data[0] = 0;    data[1] = 0; data[2] = 0; data[3] = 0x24;
+        data[4] = 0x24; data[5] = 0; data[6] = 0;
+        data[7] = std::min(uint8_t(124), uint8_t(std::floor(-0.5
+                        + (80 * scale_snr * scale_res
+                        * std::min(1.0, std::sqrt(maxsnr * _bbpll_freq / 640))))));
+        data[8] = std::min(uint8_t(255), uint8_t(std::floor(0.5
+                        + (20 * (640 / _bbpll_freq) * (data[7] / 80)
+                        / (scale_res * scale_cap)))));
+        data[10] = std::min(uint8_t(127), uint8_t(std::floor(-0.5 + (77 * scale_res
+                        * std::min(1.0, std::sqrt(maxsnr * _bbpll_freq / 640))))));
+        data[9] = std::min(uint8_t(127), uint8_t(std::floor(0.8 * data[10])));
+        data[11] = std::min(uint8_t(255), uint8_t(std::floor(0.5
+                        + (20 * (640 / _bbpll_freq) * (data[10] / 77)
+                        / (scale_res * scale_cap)))));
+        data[12] = std::min(uint8_t(127), uint8_t(std::floor(-0.5
+                        + (80 * scale_res * std::min(1.0,
+                        std::sqrt(maxsnr * _bbpll_freq / 640))))));
+        data[13] = std::min(uint8_t(255), uint8_t(std::floor(-1.5
+                        + (20 * (640 / _bbpll_freq) * (data[12] / 80)
+                        / (scale_res * scale_cap)))));
+        data[14] = 21 * uint8_t(std::floor(0.1 * 640 / _bbpll_freq));
+        data[15] = std::min(uint8_t(127), uint8_t(1.025 * data[7]));
+        data[16] = std::min(uint8_t(127), uint8_t(std::floor(data[15]
+                        * (0.98 + (0.02 * std::max(1.0,
+                        (640 / _bbpll_freq) / maxsnr))))));
+        data[17] = data[15];
+        data[18] = std::min(uint8_t(127), uint8_t(0.975 * data[10]));
+        data[19] = std::min(uint8_t(127), uint8_t(std::floor(data[18]
+                        * (0.98 + (0.02 * std::max(1.0,
+                        (640 / _bbpll_freq) / maxsnr))))));
+        data[20] = data[18];
+        data[21] = std::min(uint8_t(127), uint8_t(0.975 * data[12]));
+        data[22] = std::min(uint8_t(127), uint8_t(std::floor(data[21]
+                        * (0.98 + (0.02 * std::max(1.0,
+                        (640 / _bbpll_freq) / maxsnr))))));
+        data[23] = data[21];
+        data[24] = 0x2e;
+        data[25] = uint8_t(std::floor(128 + std::min(63.0,
+                        63 * (_bbpll_freq / 640))));
+        data[26] = uint8_t(std::floor(std::min(63.0, 63 * (_bbpll_freq / 640)
+                        * (0.92 + (0.08 * (640 / _bbpll_freq))))));
+        data[27] = uint8_t(std::floor(std::min(63.0,
+                        32 * std::sqrt(_bbpll_freq / 640))));
+        data[28] = uint8_t(std::floor(128 + std::min(63.0,
+                        63 * (_bbpll_freq / 640))));
+        data[29] = uint8_t(std::floor(std::min(63.0,
+                        63 * (_bbpll_freq / 640)
+                        * (0.92 + (0.08 * (640 / _bbpll_freq))))));
+        data[30] = uint8_t(std::floor(std::min(63.0,
+                        32 * std::sqrt(_bbpll_freq / 640))));
+        data[31] = uint8_t(std::floor(128 + std::min(63.0,
+                        63 * (_bbpll_freq / 640))));
+        data[32] = uint8_t(std::floor(std::min(63.0,
+                        63 * (_bbpll_freq / 640) * (0.92
+                        + (0.08 * (640 / _bbpll_freq))))));
+        data[33] = uint8_t(std::floor(std::min(63.0,
+                        63 * std::sqrt(_bbpll_freq))));
+        data[34] = std::min(uint8_t(127), uint8_t(std::floor(64
+                        * std::sqrt(_bbpll_freq / 640))));
+        data[35] = 0x40;
+        data[36] = 0x40;
+        data[37] = 0x2c;
+        data[38] = 0x00;
+        data[39] = 0x00;
+
         for(int i=0; i<40; i++) {
-            _b200_iface->write_reg(0x200+i, adc_regs[i]);
+            _b200_iface->write_reg(0x200+i, data[i]);
+            UHD_VAR(((int) data[i]));
         }
     }
 
@@ -515,7 +596,7 @@ public:
         reg_inputsel = 0x00;
         reg_rxfilt = 0x00;
         reg_txfilt = 0x00;
-        reg_bbpll = 0x12; // Set by default in _impl for 40e6 reference
+        reg_bbpll = 0x02; // Set by default in _impl for 40e6 reference
         reg_bbftune_config = 0x1e;
         reg_bbftune_mode = 0x1e;
 
@@ -617,7 +698,6 @@ public:
         set_filter_bw("RX_A");
         set_filter_bw("TX_A");
 
-        //adc setup
         setup_adc();
 
         quad_cal();
@@ -775,6 +855,8 @@ public:
         _b200_iface->write_reg(0x00A, reg_bbpll);
         _b200_iface->write_reg(0x002, reg_txfilt);
         _b200_iface->write_reg(0x003, reg_rxfilt);
+
+        setup_adc();
 
         /* Scale the number of taps based on the clock speed. */
         int max_rx_taps = std::min((16 * int(adcclk / rate)), 128);
