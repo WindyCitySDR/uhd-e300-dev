@@ -234,20 +234,20 @@ public:
         double rxtune_clk = ((1.4 * bbbw *
                 boost::math::constants::pi<double>()) / std::log(2));
 
-        uint16_t rxbbfdiv = std::min(511, int(std::ceil(_bbpll_freq / rxtune_clk)));
+        _rx_bbf_tunediv = std::min(511, int(std::ceil(_bbpll_freq / rxtune_clk)));
 
         reg_bbftune_config = (reg_bbftune_config & 0xFE) \
-                             | ((rxbbfdiv >> 8) & 0x01);
+                             | ((_rx_bbf_tunediv >> 8) & 0x0001);
 
-        _b200_iface->write_reg(0x1f8, (rxbbfdiv & 0x000F));
+        _b200_iface->write_reg(0x1f8, (_rx_bbf_tunediv & 0x00FF));
         _b200_iface->write_reg(0x1f9, reg_bbftune_config);
 
-        uint8_t bbbw_mhz = uint8_t((bbbw / 1e6));
+        double bbbw_mhz = bbbw / 1e6;
 
         double temp = ((bbbw_mhz - std::floor(bbbw_mhz)) * 1000) / 7.8125;
         uint8_t bbbw_khz = std::min(127, int(std::floor(temp + 0.5)));
 
-        _b200_iface->write_reg(0x1fb, bbbw_mhz);
+        _b200_iface->write_reg(0x1fb, uint8_t(bbbw_mhz));
         _b200_iface->write_reg(0x1fc, bbbw_khz);
 
         _b200_iface->write_reg(0x1e2, 0x02);
@@ -294,9 +294,9 @@ public:
         uint16_t txbbfdiv = std::min(511, int(std::ceil(_bbpll_freq / txtune_clk)));
 
         reg_bbftune_mode = (reg_bbftune_mode & 0xFE) \
-                             | ((txbbfdiv >> 8) & 0x01);
+                             | ((txbbfdiv >> 8) & 0x0001);
 
-        _b200_iface->write_reg(0x0d6, (txbbfdiv & 0x000F));
+        _b200_iface->write_reg(0x0d6, (txbbfdiv & 0x00FF));
         _b200_iface->write_reg(0x0d7, reg_bbftune_mode);
 
         _b200_iface->write_reg(0x0ca, 0x22);
@@ -431,6 +431,36 @@ public:
         _b200_iface->write_reg(0x1df, reg1df);
     }
 
+    void setup_adc() {
+
+        /*
+        double bbbw = ((_bbpll_freq / _rx_bbf_tunediv) * std::log(2)) \
+                      / (1.4 * 2 * boost::math::constants::pi<double>());
+
+        if(bbbw > 28e6) {
+            bbbw = 28e6;
+        } else if (bbbw < 0.20e6) {
+            bbbw = 0.20e6;
+        }
+        */
+
+
+        _b200_iface->write_reg(0x1db, 0x60);
+        _b200_iface->write_reg(0x1dd, 0x08);
+        _b200_iface->write_reg(0x1df, 0x08);
+        _b200_iface->write_reg(0x1dc, 0x40);
+        _b200_iface->write_reg(0x1de, 0x40);
+        uint8_t adc_regs[] = {
+            0x00, 0x00, 0x00, 0x24, 0x24, 0x00, 0x00, 0x7c,
+            0x37, 0x3c, 0x4c, 0x23, 0x4e, 0x20, 0x00, 0x7f,
+            0x7e, 0x7f, 0x4a, 0x49, 0x4a, 0x4c, 0x4b, 0x4c,
+            0x2e, 0xa4, 0x26, 0x18, 0xa4, 0x26, 0x13, 0xa4,
+            0x26, 0x2f, 0x30, 0x40, 0x40, 0x2c, 0x00, 0x00};
+        for(int i=0; i<40; i++) {
+            _b200_iface->write_reg(0x200+i, adc_regs[i]);
+        }
+    }
+
     void quad_cal(void) {
         //tx quad cal
         _b200_iface->write_reg(0x014, 0x0f); //ENSM alert state
@@ -494,6 +524,7 @@ public:
         _tx_freq = 0;
         _baseband_bw = 0;
         _bbpll_freq = 0;
+        _rx_bbf_tunediv = 0;
 
         /* Initialize control interfaces. */
         _b200_iface = iface;
@@ -993,29 +1024,13 @@ public:
         }
     }
 
-    void setup_adc() {
-        _b200_iface->write_reg(0x1db, 0x60);
-        _b200_iface->write_reg(0x1dd, 0x08);
-        _b200_iface->write_reg(0x1df, 0x08);
-        _b200_iface->write_reg(0x1dc, 0x40);
-        _b200_iface->write_reg(0x1de, 0x40);
-        uint8_t adc_regs[] = {
-            0x00, 0x00, 0x00, 0x24, 0x24, 0x00, 0x00, 0x7c,
-            0x37, 0x3c, 0x4c, 0x23, 0x4e, 0x20, 0x00, 0x7f,
-            0x7e, 0x7f, 0x4a, 0x49, 0x4a, 0x4c, 0x4b, 0x4c,
-            0x2e, 0xa4, 0x26, 0x18, 0xa4, 0x26, 0x13, 0xa4,
-            0x26, 0x2f, 0x30, 0x40, 0x40, 0x2c, 0x00, 0x00};
-        for(int i=0; i<40; i++) {
-            _b200_iface->write_reg(0x200+i, adc_regs[i]);
-        }
-    }
-
 
 private:
     b200_iface::sptr _b200_iface;
     wb_iface::sptr _ctrl;
     double _rx_freq, _tx_freq;
     double _baseband_bw, _bbpll_freq;
+    uint16_t _rx_bbf_tunediv;
 
     /* Shadow register fields.*/
     boost::uint32_t fpga_bandsel;
