@@ -542,6 +542,18 @@ public:
         }
     }
 
+    void calibrate_baseband_dc_offset() {
+        _b200_iface->write_reg(0x193, 0x3f);
+        _b200_iface->write_reg(0x190, 0x0f);
+        _b200_iface->write_reg(0x194, 0x01);
+
+        _b200_iface->write_reg(0x016, 0x01);
+        boost::this_thread::sleep(boost::posix_time::milliseconds(20));
+        if(_b200_iface->read_reg(0x016) & 0x01) {
+            std::cout << "Baseband DC Offset Calibration Failure!" << std::endl;
+        }
+    }
+
     void quad_cal(void) {
         //tx quad cal
         _b200_iface->write_reg(0x014, 0x0f); //ENSM alert state
@@ -559,11 +571,7 @@ public:
         _b200_iface->write_reg(0x0ae, 0x00);
 
         //rx quad cal
-        _b200_iface->write_reg(0x193, 0x3f);
-        _b200_iface->write_reg(0x190, 0x0f);
-        _b200_iface->write_reg(0x194, 0x01);
-        _b200_iface->write_reg(0x016, 0x01);
-        boost::this_thread::sleep(boost::posix_time::milliseconds(20));
+
         _b200_iface->write_reg(0x185, 0x20);
         _b200_iface->write_reg(0x186, 0x32);
         _b200_iface->write_reg(0x187, 0x24);
@@ -701,6 +709,8 @@ public:
         setup_adc();
 
         quad_cal();
+
+        calibrate_baseband_dc_offset();
 
         //ian magic
         _b200_iface->write_reg(0x014, 0x0f);
