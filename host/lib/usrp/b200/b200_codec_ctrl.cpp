@@ -198,11 +198,15 @@ public:
     }
 
     void calibrate_synth_charge_pumps() {
+        /* If we aren't already in the ALERT state, we will need to return to
+         * the FDD state after calibration. */
+        if((_b200_iface->read_reg(0x017) & 0x0F) != 5) {
+            std::cout << "ERROR! Catalina not in ALERT during cal!" << std::endl;
+        }
+
         /* Should only be done the first time the device enters ALERT. */
         //RX CP CAL
         int count = 0;
-        std::cout << "Calibrating RX Synth Charge Pump... ";
-
         _b200_iface->write_reg(0x23d, 0x04);
         while(!(_b200_iface->read_reg(0x244) & 0x80)) {
             if(count > 5) {
@@ -212,13 +216,11 @@ public:
 
             count++;
             boost::this_thread::sleep(boost::posix_time::milliseconds(1));
-        } std::cout << "success!" << std::endl;
+        }
         _b200_iface->write_reg(0x23d, 0x00);
 
         //TX CP CAL
         count = 0;
-        std::cout << "Calibrating TX Synth Charge Pump... ";
-
         _b200_iface->write_reg(0x27d, 0x04);
         while(!(_b200_iface->read_reg(0x284) & 0x80)) {
             if(count > 5) {
@@ -228,7 +230,7 @@ public:
 
             count++;
             boost::this_thread::sleep(boost::posix_time::milliseconds(1));
-        } std::cout << "success!" << std::endl;
+        }
         _b200_iface->write_reg(0x27d, 0x00);
     }
 
@@ -274,17 +276,16 @@ public:
         _b200_iface->write_reg(0x1e3, 0x02);
 
         int count = 0;
-        std::cout << "Calibrating RX Baseband Filter... ";
-
         _b200_iface->write_reg(0x016, 0x80);
         while(_b200_iface->read_reg(0x016) & 0x80) {
             if(count > 5) {
-                std::cout << "RX baseband filter cal failure" << std::endl;
+                std::cout << "RX baseband filter cal FAILURE!" << std::endl;
                 break;
             }
+
             count++;
             boost::this_thread::sleep(boost::posix_time::milliseconds(1));
-        } std::cout << "success!" << std::endl;
+        }
 
         _b200_iface->write_reg(0x1e2, 0x03);
         _b200_iface->write_reg(0x1e3, 0x03);
@@ -330,18 +331,16 @@ public:
         _b200_iface->write_reg(0x0ca, 0x22);
 
         int count = 0;
-        std::cout << "Calibrating Baseband TX Filter... ";
-
         _b200_iface->write_reg(0x016, 0x40);
         while(_b200_iface->read_reg(0x016) & 0x40) {
             if(count > 5) {
-                std::cout << "TX baseband filter cal failure" << std::endl;
+                std::cout << "TX baseband filter cal FAILURE!" << std::endl;
                 break;
             }
 
             count++;
             boost::this_thread::sleep(boost::posix_time::milliseconds(1));
-        } std::cout << "success!" << std::endl;
+        }
 
         _b200_iface->write_reg(0x0ca, 0x26);
 
@@ -585,9 +584,7 @@ public:
         _b200_iface->write_reg(0x190, 0x0f);
         _b200_iface->write_reg(0x194, 0x01);
 
-        std::cout << "Calibrating Baseband DC Offset... ";
         int count = 0;
-
         _b200_iface->write_reg(0x016, 0x01);
         while(_b200_iface->read_reg(0x016) & 0x01) {
             if(count > 5) {
@@ -597,7 +594,7 @@ public:
 
             count++;
             boost::this_thread::sleep(boost::posix_time::milliseconds(5));
-        } std::cout << "success!" << std::endl;
+        }
     }
 
     void calibrate_rf_dc_offset() {
@@ -619,9 +616,7 @@ public:
         _b200_iface->write_reg(0x189, 0x30);
         _b200_iface->write_reg(0x18b, 0xad);
 
-        std::cout << "Calibrating RF DC Offset... ";
         int count = 0;
-
         _b200_iface->write_reg(0x016, 0x02);
         while(_b200_iface->read_reg(0x016) & 0x02) {
             if(count > 5) {
@@ -631,7 +626,7 @@ public:
 
             count++;
             boost::this_thread::sleep(boost::posix_time::milliseconds(50));
-        } std::cout << "success!" << std::endl;
+        }
 
         /* If we were in the FDD state, return it now. */
         if(not_in_alert) {
@@ -670,9 +665,7 @@ public:
         double old_tx_freq = _tx_freq;
         tune("CAL", (_rx_freq + (_baseband_bw / 4)));
 
-        std::cout << "Calibrating RX Quadrature Correction... ";
         int count = 0;
-
         _b200_iface->write_reg(0x016, 0x20);
         while(_b200_iface->read_reg(0x016) & 0x20) {
             if(count > 5) {
@@ -682,7 +675,7 @@ public:
 
             count++;
             boost::this_thread::sleep(boost::posix_time::milliseconds(10));
-        } std::cout << "success!" << std::endl;
+        }
 
         /* Re-enable TX mixer and re-tune TX LO. */
         if((old_tx_freq >= 100e6) && (old_tx_freq <= 6e9)) {
@@ -722,9 +715,7 @@ public:
         _b200_iface->write_reg(0x0a4, 0xf0);
         _b200_iface->write_reg(0x0ae, 0x00);
 
-        std::cout << "Calibrating TX Quadrature Correction... ";
         int count = 0;
-
         _b200_iface->write_reg(0x016, 0x10);
         while(_b200_iface->read_reg(0x016) & 0x10) {
             if(count > 5) {
@@ -734,7 +725,7 @@ public:
 
             count++;
             boost::this_thread::sleep(boost::posix_time::milliseconds(10));
-        } std::cout << "success!" << std::endl;
+        }
 
         /* If we were in the FDD state, return it now. */
         if(not_in_alert) {
@@ -748,7 +739,6 @@ public:
      ***********************************************************************/
 
     b200_codec_ctrl_impl(b200_iface::sptr iface, wb_iface::sptr ctrl) {
-        std::cout << "CONSTRUCTING NEW OBJECT" << std::endl;
         /* Initialize shadow registers. */
         fpga_bandsel = 0x00;
         reg_vcodivs = 0x00;
@@ -839,14 +829,13 @@ public:
         //dual synth mode, synth en ctrl en
         _b200_iface->write_reg(0x015, BOOST_BINARY( 00000111 ) );
         //use SPI for TXNRX ctrl, to ALERT, TX on
-        _b200_iface->write_reg(0x014, BOOST_BINARY( 00100001 ) );
+        _b200_iface->write_reg(0x014, BOOST_BINARY( 00100101 ) );
 
         /* RX Mix Voltage settings - only change with apps engineer help. */
         _b200_iface->write_reg(0x1d5, 0x3f);
         _b200_iface->write_reg(0x1c0, 0x03);
 
         calibrate_synth_charge_pumps();
-
         calibrate_baseband_dc_offset();
 
         tune("RX", 800e6);
