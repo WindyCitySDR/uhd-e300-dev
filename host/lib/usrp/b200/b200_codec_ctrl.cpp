@@ -303,7 +303,7 @@ public:
         _b200_iface->write_reg(0x016, 0x40);
         boost::this_thread::sleep(boost::posix_time::milliseconds(1));
         if(_b200_iface->read_reg(0x016) & 0x40) {
-            std::cout << "RX baseband filter cal failure" << std::endl;
+            std::cout << "TX baseband filter cal failure" << std::endl;
         }
         _b200_iface->write_reg(0x0ca, 0x26);
 
@@ -538,7 +538,7 @@ public:
 
         for(int i=0; i<40; i++) {
             _b200_iface->write_reg(0x200+i, data[i]);
-            UHD_VAR(((int) data[i]));
+//            UHD_VAR(((int) data[i]));
         }
     }
 
@@ -585,7 +585,7 @@ public:
         }
     }
 
-    void quad_cal(void) {
+    void calibrate_rx_quadrature(void) {
         _b200_iface->write_reg(0x186, 0x32);
         _b200_iface->write_reg(0x187, 0x24);
         _b200_iface->write_reg(0x188, 0x05);
@@ -623,8 +623,29 @@ public:
         }
 
         /* Re-enable TX mixer and re-tune TX LO. */
-        tune("CAL", old_tx_freq);
+        if((old_tx_freq >= 100e6) && (old_tx_freq <= 6e9)) {
+            tune("CAL", old_tx_freq);
+        }
         _b200_iface->write_reg(0x057, 0x30);
+
+        /* Enable Quad Cal Tracking. */
+        _b200_iface->write_reg(0x169, 0xcf);
+
+        /* If we were in the FDD state, return it now. */
+        if(not_in_alert) {
+            _b200_iface->write_reg(0x014, 0x21);
+        }
+    }
+
+    void calibrate_tx_quadrature(void) {
+        /* If we aren't already in the ALERT state, we will need to return to
+         * the FDD state after calibration. */
+        bool not_in_alert = false;
+        if((_b200_iface->read_reg(0x017) & 0x0F) != 5) {
+            /* Force the device into the ALERT state. */
+            not_in_alert = true;
+            _b200_iface->write_reg(0x014, 0x0f);
+        }
 
         /* TX Quad Cal: write settings, cal. */
         uint8_t maskbits = _b200_iface->read_reg(0x0a3) & 0x3F;
@@ -645,9 +666,6 @@ public:
             std::cout << "TX Quadrature Calibration Failure!" << std::endl;
         }
 
-        /* Enable Quad Cal Tracking. */
-        _b200_iface->write_reg(0x169, 0xcf);
-
         /* If we were in the FDD state, return it now. */
         if(not_in_alert) {
             _b200_iface->write_reg(0x014, 0x21);
@@ -660,6 +678,7 @@ public:
      ***********************************************************************/
 
     b200_codec_ctrl_impl(b200_iface::sptr iface, wb_iface::sptr ctrl) {
+        std::cout << "CONSTRUCTING NEW OBJECT" << std::endl;
         /* Initialize shadow registers. */
         fpga_bandsel = 0x00;
         reg_vcodivs = 0x00;
@@ -671,10 +690,11 @@ public:
         reg_bbftune_mode = 0x1e;
 
         /* Initialize internal fields. */
-        _rx_freq = 0;
-        _tx_freq = 0;
-        _baseband_bw = 0;
-        _bbpll_freq = 0;
+        _rx_freq = 0.0;
+        _tx_freq = 0.0;
+        _baseband_bw = 0.0;
+        _clock_rate = 0.0;
+        _bbpll_freq = 0.0;
         _rx_bbf_tunediv = 0;
 
         /* Initialize control interfaces. */
@@ -770,8 +790,6 @@ public:
 
         setup_adc();
 
-        quad_cal();
-
         calibrate_baseband_dc_offset();
 
         //ian magic
@@ -850,6 +868,10 @@ public:
             throw uhd::runtime_error("Requested master clock rate outside range!");
         }
 
+        if(rate == _clock_rate) {
+            return _clock_rate;
+        }
+
         UHD_VAR(rate);
 
         /* Set the decimation values based on clock rate. We are setting default
@@ -909,7 +931,6 @@ public:
         /* Tune the BBPLL to get the ADC and DAC clocks. */
         double adcclk = set_coreclk(rate * divfactor);
         double dacclk = adcclk;
-        UHD_VAR(adcclk);
 
         /* The DAC clock must be <= 336e6, and is either the ADC clock or 2x the
          * ADC clock.*/
@@ -921,7 +942,6 @@ public:
 
             dacclk = adcclk / 2.0;
         }
-        UHD_VAR(dacclk);
 
         /* Set the dividers / interpolators in Catalina. */
         _b200_iface->write_reg(0x00A, reg_bbpll);
@@ -934,20 +954,17 @@ public:
         int max_rx_taps = std::min((16 * int(adcclk / rate)), 128);
         int max_tx_taps = 16 * std::min(int(std::floor(dacclk / rate)), \
                 std::min(4 * (1 << tfir), 8));
-        UHD_VAR(max_rx_taps);
-        UHD_VAR(max_tx_taps);
 
         int num_rx_taps = get_num_taps(max_rx_taps);
         int num_tx_taps = get_num_taps(max_tx_taps);
 
-        UHD_VAR(num_rx_taps);
-        UHD_VAR(num_tx_taps);
 
         /* Setup the RX and TX FIR filters. */
         setup_rx_fir(num_rx_taps);
         setup_tx_fir(num_tx_taps);
 
         _baseband_bw = (adcclk / divfactor);
+        _clock_rate = rate;
 
         return _baseband_bw;
     }
@@ -982,12 +999,6 @@ public:
 
         double actual_vcorate = fref * (nint + double(nfrac)/modulus);
 
-        UHD_VAR(vcodiv);
-        UHD_VAR(nint);
-        UHD_VAR(nfrac);
-        UHD_VAR(vcorate);
-        UHD_VAR(actual_vcorate);
-
         _b200_iface->write_reg(0x044, nint); //Nint
         _b200_iface->write_reg(0x041, (nfrac >> 16) & 0xFF); //Nfrac[23:16]
         _b200_iface->write_reg(0x042, (nfrac >> 8) & 0xFF); //Nfrac[15:8]
@@ -1006,7 +1017,7 @@ public:
         const double icp_baseline = 150e-6;
         const double freq_baseline = 1280e6;
         double icp = icp_baseline * actual_vcorate / freq_baseline;
-        std::cout << "Settled on CP current: " << icp * 1e6 << "uA" << std::endl;
+//        std::cout << "Settled on CP current: " << icp * 1e6 << "uA" << std::endl;
         int icp_reg = icp/25e-6 + 1;
 
         //CP current
@@ -1015,7 +1026,6 @@ public:
         calibrate_lock_bbpll();
 
         _bbpll_freq = (actual_vcorate / vcodiv);
-        UHD_VAR(_bbpll_freq);
         return _bbpll_freq;
     }
 
@@ -1044,12 +1054,12 @@ public:
         //TODO this will pick the low rate for threshold values, should eval
         //whether vcomax or vcomin has better performance
 
-        std::cout << "RF VCO rate: " << vcorate << std::endl;
+//        std::cout << "RF VCO rate: " << vcorate << std::endl;
 
         int nint = vcorate / fref;
         int nfrac = ((vcorate / fref) - nint) * modulus;
-        std::cout << std::dec << "RF Nint: " << nint << " Nfrac: "
-            << nfrac << " vcodiv: " << vcodiv << std::endl;
+//        std::cout << std::dec << "RF Nint: " << nint << " Nfrac: "
+//            << nfrac << " vcodiv: " << vcodiv << std::endl;
 
         double actual_vcorate = fref * (nint + double(nfrac)/modulus);
         double actual_lo = actual_vcorate / vcodiv;
@@ -1059,15 +1069,15 @@ public:
             if(value < 2.2e9) {
                 fpga_bandsel = (fpga_bandsel & 0xF8) | RX_BANDSEL_B;
                 reg_inputsel = (reg_inputsel & 0xC0) | 0x30;
-                std::cout << "FPGA BANDSEL_B; CAT BANDSEL C" << std::endl;
+//                std::cout << "FPGA BANDSEL_B; CAT BANDSEL C" << std::endl;
             } else if((value >= 2.2e9) && (value < 4e9)) {
                 fpga_bandsel = (fpga_bandsel & 0xF8) | RX_BANDSEL_A;
                 reg_inputsel = (reg_inputsel & 0xC0) | 0x0C;
-                std::cout << "FPGA BANDSEL_A; CAT BANDSEL B" << std::endl;
+//                std::cout << "FPGA BANDSEL_A; CAT BANDSEL B" << std::endl;
             } else if((value >= 4e9) && (value <= 6e9)) {
                 fpga_bandsel = (fpga_bandsel & 0xF8) | RX_BANDSEL_C;
                 reg_inputsel = (reg_inputsel & 0xC0) | 0x03;
-                std::cout << "FPGA BANDSEL_C; CAT BANDSEL A" << std::endl;
+//                std::cout << "FPGA BANDSEL_C; CAT BANDSEL A" << std::endl;
             } else {
                 UHD_THROW_INVALID_CODE_PATH();
             }
@@ -1106,18 +1116,22 @@ public:
             if((_b200_iface->read_reg(0x247) & 0x02) == 0) {
                 std::cout << "RX PLL NOT LOCKED" << std::endl;
             }
+
             _rx_freq = actual_lo;
+
+            calibrate_rx_quadrature();
+
             return_freq = actual_lo;
 
         } else {
             if(value < 3e9) {
                 fpga_bandsel = (fpga_bandsel & 0xE7) | TX_BANDSEL_A;
                 reg_inputsel = reg_inputsel | 0x40;
-                std::cout << "FPGA BANDSEL_A; CAT BANDSEL B" << std::endl;
+//                std::cout << "FPGA BANDSEL_A; CAT BANDSEL B" << std::endl;
             } else if((value >= 3e9) && (value <= 6e9)) {
                 fpga_bandsel = (fpga_bandsel & 0xE7) | TX_BANDSEL_B;
                 reg_inputsel = reg_inputsel & 0xBF;
-                std::cout << "FPGA BANDSEL_B; CAT BANDSEL A" << std::endl;
+//                std::cout << "FPGA BANDSEL_B; CAT BANDSEL A" << std::endl;
             } else {
                 UHD_THROW_INVALID_CODE_PATH();
             }
@@ -1152,14 +1166,16 @@ public:
             if((_b200_iface->read_reg(0x287) & 0x02) == 0) {
                 std::cout << "TX PLL NOT LOCKED" << std::endl;
             }
-            _tx_freq = actual_lo;
-            return_freq = actual_lo;
-        }
 
-        /* If the tune call wasn't invoked during a calibration routine, run the
-         * quadrature calibration. */
-        if(which[0] != 'C') {
-            quad_cal();
+            _tx_freq = actual_lo;
+
+            /* If the tune call wasn't invoked during a calibration routine, run the
+             * quadrature calibration. */
+            if(which[0] != 'C') {
+                calibrate_tx_quadrature();
+            }
+
+            return_freq = actual_lo;
         }
 
         calibrate_rf_dc_offset();
@@ -1193,6 +1209,7 @@ private:
     wb_iface::sptr _ctrl;
     double _rx_freq, _tx_freq;
     double _baseband_bw, _bbpll_freq;
+    double _clock_rate;
     uint16_t _rx_bbf_tunediv;
 
     /* Shadow register fields.*/
