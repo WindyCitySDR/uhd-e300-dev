@@ -185,30 +185,50 @@ public:
         _b200_iface->write_reg(0x04d, 0x01);
         _b200_iface->write_reg(0x04d, 0x05);
 
-        //check for BBPLL lock
-        boost::this_thread::sleep(boost::posix_time::milliseconds(2));
-        if(!(_b200_iface->read_reg(0x05e) & 0x80)) {
-            uhd::runtime_error("BBPLL not locked");
+        /* Wait for BBPLL lock. */
+        int count = 0;
+        while(!(_b200_iface->read_reg(0x05e) & 0x80)) {
+            if(count > 5) {
+                uhd::runtime_error("BBPLL not locked");
+            }
+
+            count++;
+            boost::this_thread::sleep(boost::posix_time::milliseconds(2));
         }
     }
 
     void calibrate_synth_charge_pumps() {
         /* Should only be done the first time the device enters ALERT. */
         //RX CP CAL
-        boost::this_thread::sleep(boost::posix_time::milliseconds(1));
+        int count = 0;
+        std::cout << "Calibrating RX Synth Charge Pump... ";
+
         _b200_iface->write_reg(0x23d, 0x04);
-        boost::this_thread::sleep(boost::posix_time::milliseconds(1));
-        if(!(_b200_iface->read_reg(0x244) & 0x80)) {
-            std::cout << "RX charge pump cal failure" << std::endl;
-        }
+        while(!(_b200_iface->read_reg(0x244) & 0x80)) {
+            if(count > 5) {
+                std::cout << "RX charge pump cal failure!" << std::endl;
+                break;
+            }
+
+            count++;
+            boost::this_thread::sleep(boost::posix_time::milliseconds(1));
+        } std::cout << "success!" << std::endl;
         _b200_iface->write_reg(0x23d, 0x00);
 
         //TX CP CAL
+        count = 0;
+        std::cout << "Calibrating TX Synth Charge Pump... ";
+
         _b200_iface->write_reg(0x27d, 0x04);
-        boost::this_thread::sleep(boost::posix_time::milliseconds(1));
-        if(!(_b200_iface->read_reg(0x284) & 0x80)) {
-            std::cout << "TX charge pump cal failure" << std::endl;
-        }
+        while(!(_b200_iface->read_reg(0x284) & 0x80)) {
+            if(count > 5) {
+                std::cout << "TX charge pump cal failure" << std::endl;
+                break;
+            }
+
+            count++;
+            boost::this_thread::sleep(boost::posix_time::milliseconds(1));
+        } std::cout << "success!" << std::endl;
         _b200_iface->write_reg(0x27d, 0x00);
     }
 
@@ -253,11 +273,19 @@ public:
         _b200_iface->write_reg(0x1e2, 0x02);
         _b200_iface->write_reg(0x1e3, 0x02);
 
+        int count = 0;
+        std::cout << "Calibrating RX Baseband Filter... ";
+
         _b200_iface->write_reg(0x016, 0x80);
-        boost::this_thread::sleep(boost::posix_time::milliseconds(1));
-        if(_b200_iface->read_reg(0x016) & 0x80) {
-            std::cout << "RX baseband filter cal failure" << std::endl;
-        }
+        while(_b200_iface->read_reg(0x016) & 0x80) {
+            if(count > 5) {
+                std::cout << "RX baseband filter cal failure" << std::endl;
+                break;
+            }
+            count++;
+            boost::this_thread::sleep(boost::posix_time::milliseconds(1));
+        } std::cout << "success!" << std::endl;
+
         _b200_iface->write_reg(0x1e2, 0x03);
         _b200_iface->write_reg(0x1e3, 0x03);
 
@@ -300,11 +328,21 @@ public:
         _b200_iface->write_reg(0x0d7, reg_bbftune_mode);
 
         _b200_iface->write_reg(0x0ca, 0x22);
+
+        int count = 0;
+        std::cout << "Calibrating Baseband TX Filter... ";
+
         _b200_iface->write_reg(0x016, 0x40);
-        boost::this_thread::sleep(boost::posix_time::milliseconds(1));
-        if(_b200_iface->read_reg(0x016) & 0x40) {
-            std::cout << "TX baseband filter cal failure" << std::endl;
-        }
+        while(_b200_iface->read_reg(0x016) & 0x40) {
+            if(count > 5) {
+                std::cout << "TX baseband filter cal failure" << std::endl;
+                break;
+            }
+
+            count++;
+            boost::this_thread::sleep(boost::posix_time::milliseconds(1));
+        } std::cout << "success!" << std::endl;
+
         _b200_iface->write_reg(0x0ca, 0x26);
 
         /* If we were in the FDD state, return it now. */
@@ -547,11 +585,19 @@ public:
         _b200_iface->write_reg(0x190, 0x0f);
         _b200_iface->write_reg(0x194, 0x01);
 
+        std::cout << "Calibrating Baseband DC Offset... ";
+        int count = 0;
+
         _b200_iface->write_reg(0x016, 0x01);
-        boost::this_thread::sleep(boost::posix_time::milliseconds(20));
-        if(_b200_iface->read_reg(0x016) & 0x01) {
-            std::cout << "Baseband DC Offset Calibration Failure!" << std::endl;
-        }
+        while(_b200_iface->read_reg(0x016) & 0x01) {
+            if(count > 5) {
+                std::cout << "Baseband DC Offset Calibration Failure!" << std::endl;
+                break;
+            }
+
+            count++;
+            boost::this_thread::sleep(boost::posix_time::milliseconds(5));
+        } std::cout << "success!" << std::endl;
     }
 
     void calibrate_rf_dc_offset() {
@@ -573,11 +619,19 @@ public:
         _b200_iface->write_reg(0x189, 0x30);
         _b200_iface->write_reg(0x18b, 0xad);
 
+        std::cout << "Calibrating RF DC Offset... ";
+        int count = 0;
+
         _b200_iface->write_reg(0x016, 0x02);
-        boost::this_thread::sleep(boost::posix_time::milliseconds(200));
-        if(_b200_iface->read_reg(0x016) & 0x02) {
-            std::cout << "RF DC Offset Calibration Failure!" << std::endl;
-        }
+        while(_b200_iface->read_reg(0x016) & 0x02) {
+            if(count > 5) {
+                std::cout << "RF DC Offset Calibration Failure!" << std::endl;
+                break;
+            }
+
+            count++;
+            boost::this_thread::sleep(boost::posix_time::milliseconds(50));
+        } std::cout << "success!" << std::endl;
 
         /* If we were in the FDD state, return it now. */
         if(not_in_alert) {
@@ -616,11 +670,19 @@ public:
         double old_tx_freq = _tx_freq;
         tune("CAL", (_rx_freq + (_baseband_bw / 4)));
 
+        std::cout << "Calibrating RX Quadrature Correction... ";
+        int count = 0;
+
         _b200_iface->write_reg(0x016, 0x20);
-        boost::this_thread::sleep(boost::posix_time::milliseconds(20));
-        if(_b200_iface->read_reg(0x016) & 0x20) {
-            std::cout << "RX Quadrature Calibration Failure!" << std::endl;
-        }
+        while(_b200_iface->read_reg(0x016) & 0x20) {
+            if(count > 5) {
+                std::cout << "RX Quadrature Calibration Failure!" << std::endl;
+                break;
+            }
+
+            count++;
+            boost::this_thread::sleep(boost::posix_time::milliseconds(10));
+        } std::cout << "success!" << std::endl;
 
         /* Re-enable TX mixer and re-tune TX LO. */
         if((old_tx_freq >= 100e6) && (old_tx_freq <= 6e9)) {
@@ -660,11 +722,19 @@ public:
         _b200_iface->write_reg(0x0a4, 0xf0);
         _b200_iface->write_reg(0x0ae, 0x00);
 
+        std::cout << "Calibrating TX Quadrature Correction... ";
+        int count = 0;
+
         _b200_iface->write_reg(0x016, 0x10);
-        boost::this_thread::sleep(boost::posix_time::milliseconds(20));
-        if(_b200_iface->read_reg(0x016) & 0x10) {
-            std::cout << "TX Quadrature Calibration Failure!" << std::endl;
-        }
+        while(_b200_iface->read_reg(0x016) & 0x10) {
+            if(count > 5) {
+                std::cout << "TX Quadrature Calibration Failure!" << std::endl;
+                break;
+            }
+
+            count++;
+            boost::this_thread::sleep(boost::posix_time::milliseconds(10));
+        } std::cout << "success!" << std::endl;
 
         /* If we were in the FDD state, return it now. */
         if(not_in_alert) {
@@ -777,6 +847,8 @@ public:
 
         calibrate_synth_charge_pumps();
 
+        calibrate_baseband_dc_offset();
+
         tune("RX", 800e6);
         tune("TX", 850e6);
 
@@ -789,8 +861,6 @@ public:
         set_filter_bw("TX_A");
 
         setup_adc();
-
-        calibrate_baseband_dc_offset();
 
         //ian magic
         _b200_iface->write_reg(0x014, 0x0f);
