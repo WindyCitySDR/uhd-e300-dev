@@ -586,9 +586,47 @@ public:
     }
 
     void quad_cal(void) {
-        //tx quad cal
-        _b200_iface->write_reg(0x014, 0x0f); //ENSM alert state
-        _b200_iface->write_reg(0x169, 0xC0); //disable RX cal free run
+        _b200_iface->write_reg(0x186, 0x32);
+        _b200_iface->write_reg(0x187, 0x24);
+        _b200_iface->write_reg(0x188, 0x05);
+        _b200_iface->write_reg(0x189, 0x30);
+        _b200_iface->write_reg(0x18b, 0xad);
+
+        /* If we aren't already in the ALERT state, we will need to return to
+         * the FDD state after calibration. */
+        bool not_in_alert = false;
+        if((_b200_iface->read_reg(0x017) & 0x0F) != 5) {
+            /* Force the device into the ALERT state. */
+            not_in_alert = true;
+            _b200_iface->write_reg(0x014, 0x0f);
+        }
+
+         /* Disable RX cal free run, set other cal settings. */
+        _b200_iface->write_reg(0x168, 0x03);
+        _b200_iface->write_reg(0x169, 0xC0);
+        _b200_iface->write_reg(0x16a, 0x75);
+        _b200_iface->write_reg(0x16b, 0x15);
+        _b200_iface->write_reg(0x16e, 0x25);
+
+        /* RX Quad Cal: power down TX mixer, tune TX LO to passband of RX
+         * spectrum, run the calibration, retune the TX LO, re-enable the TX
+         * mixer. */
+        _b200_iface->write_reg(0x057, 0x33);
+
+        double old_tx_freq = _tx_freq;
+        tune("CAL", (_rx_freq + (_baseband_bw / 4)));
+
+        _b200_iface->write_reg(0x016, 0x20);
+        boost::this_thread::sleep(boost::posix_time::milliseconds(20));
+        if(_b200_iface->read_reg(0x016) & 0x20) {
+            std::cout << "RX Quadrature Calibration Failure!" << std::endl;
+        }
+
+        /* Re-enable TX mixer and re-tune TX LO. */
+        tune("CAL", old_tx_freq);
+        _b200_iface->write_reg(0x057, 0x30);
+
+        /* TX Quad Cal: write settings, cal. */
         uint8_t maskbits = _b200_iface->read_reg(0x0a3) & 0x3F;
         _b200_iface->write_reg(0x0a0, 0x15);
         _b200_iface->write_reg(0x0a3, 0x00 | maskbits);
@@ -601,17 +639,19 @@ public:
         _b200_iface->write_reg(0x0a4, 0xf0);
         _b200_iface->write_reg(0x0ae, 0x00);
 
-        //rx quad cal
-
         _b200_iface->write_reg(0x016, 0x10);
-        boost::this_thread::sleep(boost::posix_time::milliseconds(1));
-        _b200_iface->write_reg(0x168, 0x03);
-        _b200_iface->write_reg(0x16e, 0x25);
-        _b200_iface->write_reg(0x16a, 0x75);
-        _b200_iface->write_reg(0x16b, 0x15);
+        boost::this_thread::sleep(boost::posix_time::milliseconds(20));
+        if(_b200_iface->read_reg(0x016) & 0x10) {
+            std::cout << "TX Quadrature Calibration Failure!" << std::endl;
+        }
+
+        /* Enable Quad Cal Tracking. */
         _b200_iface->write_reg(0x169, 0xcf);
 
-        _b200_iface->write_reg(0x014,0x21);
+        /* If we were in the FDD state, return it now. */
+        if(not_in_alert) {
+            _b200_iface->write_reg(0x014, 0x21);
+        }
     }
 
 
@@ -1116,7 +1156,12 @@ public:
             return_freq = actual_lo;
         }
 
-        quad_cal();
+        /* If the tune call wasn't invoked during a calibration routine, run the
+         * quadrature calibration. */
+        if(which[0] != 'C') {
+            quad_cal();
+        }
+
         calibrate_rf_dc_offset();
 
         return return_freq;
