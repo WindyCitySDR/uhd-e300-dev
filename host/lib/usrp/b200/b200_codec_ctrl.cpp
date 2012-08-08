@@ -554,6 +554,37 @@ public:
         }
     }
 
+    void calibrate_rf_dc_offset() {
+        //FIXME Needs to be run for all bands, too???
+
+        /* If we aren't already in the ALERT state, we will need to return to
+         * the FDD state after calibration. */
+        bool not_in_alert = false;
+        if((_b200_iface->read_reg(0x017) & 0x0F) != 5) {
+            /* Force the device into the ALERT state. */
+            not_in_alert = true;
+            _b200_iface->write_reg(0x014, 0x0f);
+        }
+
+        _b200_iface->write_reg(0x185, 0x20);
+        _b200_iface->write_reg(0x186, 0x32);
+        _b200_iface->write_reg(0x187, 0x24);
+        _b200_iface->write_reg(0x188, 0x05);
+        _b200_iface->write_reg(0x189, 0x30);
+        _b200_iface->write_reg(0x18b, 0xad);
+
+        _b200_iface->write_reg(0x016, 0x02);
+        boost::this_thread::sleep(boost::posix_time::milliseconds(200));
+        if(_b200_iface->read_reg(0x016) & 0x02) {
+            std::cout << "RF DC Offset Calibration Failure!" << std::endl;
+        }
+
+        /* If we were in the FDD state, return it now. */
+        if(not_in_alert) {
+            _b200_iface->write_reg(0x014, 0x21);
+        }
+    }
+
     void quad_cal(void) {
         //tx quad cal
         _b200_iface->write_reg(0x014, 0x0f); //ENSM alert state
@@ -572,14 +603,6 @@ public:
 
         //rx quad cal
 
-        _b200_iface->write_reg(0x185, 0x20);
-        _b200_iface->write_reg(0x186, 0x32);
-        _b200_iface->write_reg(0x187, 0x24);
-        _b200_iface->write_reg(0x18b, 0x83);
-        _b200_iface->write_reg(0x188, 0x05);
-        _b200_iface->write_reg(0x189, 0x30);
-        _b200_iface->write_reg(0x016, 0x02);
-        boost::this_thread::sleep(boost::posix_time::milliseconds(200));
         _b200_iface->write_reg(0x016, 0x10);
         boost::this_thread::sleep(boost::posix_time::milliseconds(1));
         _b200_iface->write_reg(0x168, 0x03);
@@ -587,7 +610,6 @@ public:
         _b200_iface->write_reg(0x16a, 0x75);
         _b200_iface->write_reg(0x16b, 0x15);
         _b200_iface->write_reg(0x169, 0xcf);
-        _b200_iface->write_reg(0x18b, 0xad);
 
         _b200_iface->write_reg(0x014,0x21);
     }
@@ -992,6 +1014,7 @@ public:
         double actual_vcorate = fref * (nint + double(nfrac)/modulus);
         double actual_lo = actual_vcorate / vcodiv;
 
+        double return_freq = 0.0;
         if(which[0] == 'R') {
             if(value < 2.2e9) {
                 fpga_bandsel = (fpga_bandsel & 0xF8) | RX_BANDSEL_B;
@@ -1044,8 +1067,7 @@ public:
                 std::cout << "RX PLL NOT LOCKED" << std::endl;
             }
             _rx_freq = actual_lo;
-            quad_cal();
-            return _rx_freq;
+            return_freq = actual_lo;
 
         } else {
             if(value < 3e9) {
@@ -1072,7 +1094,7 @@ public:
             _b200_iface->write_reg(0x285, 0x00);//vco cal ref tcf
             _b200_iface->write_reg(0x291, 0x0e);//varactor ref
             _b200_iface->write_reg(0x290, 0x70);//vco varactor ref tcf
-            
+
             _b200_iface->write_reg(0x280, 0x0f);//rx synth loop filter r3 //fixme 0x0F
             _b200_iface->write_reg(0x27f, 0xe7);//r1 and c3 //fixme e7
             _b200_iface->write_reg(0x27e, 0xf3);//c2 and c1 //fixme f3
@@ -1091,9 +1113,13 @@ public:
                 std::cout << "TX PLL NOT LOCKED" << std::endl;
             }
             _tx_freq = actual_lo;
-            quad_cal();
-            return _tx_freq;
+            return_freq = actual_lo;
         }
+
+        quad_cal();
+        calibrate_rf_dc_offset();
+
+        return return_freq;
     }
 
     double set_filter_bw(const std::string &which) {
