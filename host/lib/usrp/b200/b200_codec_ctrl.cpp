@@ -787,8 +787,6 @@ public:
 
         boost::this_thread::sleep(boost::posix_time::milliseconds(20));
 
-        /**set up BBPLL*/
-        set_clock_rate(30.72e6);
 
         /* Setup data ports (FDD dual port DDR CMOS) */
         //FDD dual port DDR CMOS no swap
@@ -837,6 +835,9 @@ public:
         _b200_iface->write_reg(0x1c0, 0x03);
 
         calibrate_synth_charge_pumps();
+
+        set_clock_rate(30.72e6);
+
         calibrate_baseband_dc_offset();
 
         tune("RX", 800e6);
@@ -1002,8 +1003,6 @@ public:
         _b200_iface->write_reg(0x002, reg_txfilt);
         _b200_iface->write_reg(0x003, reg_rxfilt);
 
-        setup_adc();
-
         /* Scale the number of taps based on the clock speed. */
         int max_rx_taps = std::min((16 * int(adcclk / rate)), 128);
         int max_tx_taps = 16 * std::min(int(std::floor(dacclk / rate)), \
@@ -1021,9 +1020,12 @@ public:
         _clock_rate = rate;
 
         if((_rx_freq != 0.0) && (_tx_freq != 0.0)) {
+            calibrate_baseband_rx_analog_filter();
+            calibrate_baseband_tx_analog_filter();
+            calibrate_secondary_tx_filter();
+            calibrate_rx_TIAs();
+
             setup_adc();
-            set_filter_bw("RX_A");
-            set_filter_bw("TX_A");
         }
 
         return _baseband_bw;
@@ -1066,7 +1068,8 @@ public:
 
         //use XTALN input, CLKOUT=XTALN (40MHz ref out to FPGA)
         reg_bbpll = (reg_bbpll & 0xF8) | i;
-        _b200_iface->write_reg(0x00A, reg_bbpll); //set BBPLL divider
+        _b200_iface->write_reg(0x00A, reg_bbpll);   //set BBPLL divider
+        _b200_iface->write_reg(0x045, 0x00);        //REFCLK / 1 to BBPLL
 
         //CP filter recommended coefficients, don't change unless you have a clue
         _b200_iface->write_reg(0x048, 0xe8);
