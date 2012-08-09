@@ -229,28 +229,6 @@ b200_impl::b200_impl(const device_addr_t &device_addr)
     while (_ctrl_transport->get_recv_buff(0.0)){} //flush ctrl xport
 
     ////////////////////////////////////////////////////////////////////
-    // Create data transport
-    ////////////////////////////////////////////////////////////////////
-    device_addr_t data_xport_args;
-    data_xport_args["recv_frame_size"] = device_addr.get("recv_frame_size", "16384");
-    data_xport_args["recv_frame_size"] = "16384";// hard coded in packet_padder36
-    data_xport_args["num_recv_frames"] = device_addr.get("num_recv_frames", "16");
-    data_xport_args["send_frame_size"] = device_addr.get("send_frame_size", "16384");
-    data_xport_args["num_send_frames"] = device_addr.get("num_send_frames", "16");
-
-    _data_transport = usb_zero_copy::make_wrapper(
-        usb_zero_copy::make(
-            handle,        // identifier
-            2, 6,          // IN interface, endpoint
-            1, 2,          // OUT interface, endpoint
-            data_xport_args    // param hints
-        ),
-        B200_MAX_PKT_BYTE_LIMIT
-    );
-
-    _rx_demux = recv_packet_demuxer::make(_data_transport, B200_NUM_RX_FE, B200_RX_SID_BASE);
-
-    ////////////////////////////////////////////////////////////////////
     // Initialize the properties tree
     ////////////////////////////////////////////////////////////////////
     _tree->create<std::string>("/name").set("B-Series Device");
@@ -279,6 +257,34 @@ b200_impl::b200_impl(const device_addr_t &device_addr)
         if (test_fail) break; //exit loop on any failure
     }
     UHD_MSG(status) << ((test_fail)? " fail" : "pass") << std::endl;
+
+    ////////////////////////////////////////////////////////////////////
+    // Create data transport
+    // This happens after FPGA ctrl instantiated so any junk that might
+    // be in the FPGAs buffers doesn't get pulled into the transport
+    // before being cleared.
+    ////////////////////////////////////////////////////////////////////
+    device_addr_t data_xport_args;
+    data_xport_args["recv_frame_size"] = device_addr.get("recv_frame_size", "32768");
+    data_xport_args["num_recv_frames"] = device_addr.get("num_recv_frames", "16");
+    data_xport_args["send_frame_size"] = device_addr.get("send_frame_size", "32768");
+    data_xport_args["num_send_frames"] = device_addr.get("num_send_frames", "16");
+
+    //let packet padder know the LUT size in number of words32
+    const size_t rx_lut_size = size_t(data_xport_args.cast<double>("recv_frame_size", 0.0));
+    _ctrl->poke32(TOREG(SR_PADDER+0), rx_lut_size/sizeof(boost::uint32_t));
+
+    _data_transport = usb_zero_copy::make_wrapper(
+        usb_zero_copy::make(
+            handle,        // identifier
+            2, 6,          // IN interface, endpoint
+            1, 2,          // OUT interface, endpoint
+            data_xport_args    // param hints
+        ),
+        B200_MAX_PKT_BYTE_LIMIT
+    );
+
+    _rx_demux = recv_packet_demuxer::make(_data_transport, B200_NUM_RX_FE, B200_RX_SID_BASE);
 
     ////////////////////////////////////////////////////////////////////
     // setup the mboard eeprom

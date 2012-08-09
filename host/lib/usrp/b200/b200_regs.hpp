@@ -26,6 +26,7 @@
 
 localparam SR_MISC         = 0;      // 5
 localparam SR_USER_REGS    = 5;      // 2
+localparam SR_PADDER       = 10;     // 2
 
 localparam SR_TX_CTRL0     = 32;     // 6
 localparam SR_TX_DSP0      = 40;     // 5
