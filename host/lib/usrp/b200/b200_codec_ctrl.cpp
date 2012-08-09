@@ -272,6 +272,10 @@ public:
         _b200_iface->write_reg(0x1fb, uint8_t(bbbw_mhz));
         _b200_iface->write_reg(0x1fc, bbbw_khz);
 
+        /* RX Mix Voltage settings - only change with apps engineer help. */
+        _b200_iface->write_reg(0x1d5, 0x3f);
+        _b200_iface->write_reg(0x1c0, 0x03);
+
         _b200_iface->write_reg(0x1e2, 0x02);
         _b200_iface->write_reg(0x1e3, 0x02);
 
@@ -783,8 +787,8 @@ public:
         /* Disable all calibration bits. */
         _b200_iface->write_reg(0x1e2, 0x03);
         _b200_iface->write_reg(0x1e3, 0x03);
-        _b200_iface->write_reg(0x23d, 0x00);
-        _b200_iface->write_reg(0x27d, 0x00);
+
+        set_clock_rate(30.72e6);
 
         /* Setup data ports (FDD dual port DDR CMOS) */
         //FDD dual port DDR CMOS no swap
@@ -797,10 +801,9 @@ public:
         _b200_iface->write_reg(0x006, 0x0F);
         _b200_iface->write_reg(0x007, 0x00);
 
-        //set delay register
-        _b200_iface->write_reg(0x03a, 0x27);
 
         /**initial VCO setup*/
+        _b200_iface->write_reg(0x03a,0x27); //set delay register
         _b200_iface->write_reg(0x261,0x00); //RX LO power
         _b200_iface->write_reg(0x2a1,0x00); //TX LO power
         _b200_iface->write_reg(0x248,0x0b); //en RX VCO LDO
@@ -821,20 +824,17 @@ public:
         _b200_iface->write_reg(0x239,0xc1); //init RX ALC
         _b200_iface->write_reg(0x279,0xc1); //"" TX
 
-         //enable ENSM
-        _b200_iface->write_reg(0x013, BOOST_BINARY( 00000001 ) );
+        _b200_iface->write_reg(0x23d, 0x00);
+        _b200_iface->write_reg(0x27d, 0x00);
+
         //dual synth mode, synth en ctrl en
         _b200_iface->write_reg(0x015, BOOST_BINARY( 00000111 ) );
         //use SPI for TXNRX ctrl, to ALERT, TX on
         _b200_iface->write_reg(0x014, BOOST_BINARY( 00100101 ) );
-
-        /* RX Mix Voltage settings - only change with apps engineer help. */
-        _b200_iface->write_reg(0x1d5, 0x3f);
-        _b200_iface->write_reg(0x1c0, 0x03);
+         //enable ENSM
+        _b200_iface->write_reg(0x013, BOOST_BINARY( 00000001 ) );
 
         calibrate_synth_charge_pumps();
-
-        set_clock_rate(30.72e6);
 
         calibrate_baseband_dc_offset();
 
