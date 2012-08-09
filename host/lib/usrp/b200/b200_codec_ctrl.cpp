@@ -841,6 +841,13 @@ public:
         tune("RX", 800e6);
         tune("TX", 850e6);
 
+        setup_adc();
+
+        calibrate_baseband_rx_analog_filter();
+        calibrate_baseband_tx_analog_filter();
+        calibrate_secondary_tx_filter();
+        calibrate_rx_TIAs();
+
         //gm subtable here
 
         //gain table here
