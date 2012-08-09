@@ -778,15 +778,13 @@ public:
         _b200_iface->write_reg(0x2ab, 0x07);
         _b200_iface->write_reg(0x2ac, 0xff);
         _b200_iface->write_reg(0x009, BOOST_BINARY( 00010111 ) );
+        boost::this_thread::sleep(boost::posix_time::milliseconds(20));
 
         /* Disable all calibration bits. */
         _b200_iface->write_reg(0x1e2, 0x03);
         _b200_iface->write_reg(0x1e3, 0x03);
         _b200_iface->write_reg(0x23d, 0x00);
         _b200_iface->write_reg(0x27d, 0x00);
-
-        boost::this_thread::sleep(boost::posix_time::milliseconds(20));
-
 
         /* Setup data ports (FDD dual port DDR CMOS) */
         //FDD dual port DDR CMOS no swap
@@ -1003,7 +1001,11 @@ public:
         _b200_iface->write_reg(0x002, reg_txfilt);
         _b200_iface->write_reg(0x003, reg_rxfilt);
 
-        /* Scale the number of taps based on the clock speed. */
+        _baseband_bw = (adcclk / divfactor);
+        _clock_rate = rate;
+
+        /* Setup the RX and TX FIR filters. Scale the number of taps based on
+         * the clock speed. */
         int max_rx_taps = std::min((16 * int(adcclk / rate)), 128);
         int max_tx_taps = 16 * std::min(int(std::floor(dacclk / rate)), \
                 std::min(4 * (1 << tfir), 8));
@@ -1011,14 +1013,10 @@ public:
         int num_rx_taps = get_num_taps(max_rx_taps);
         int num_tx_taps = get_num_taps(max_tx_taps);
 
-
-        /* Setup the RX and TX FIR filters. */
         setup_rx_fir(num_rx_taps);
         setup_tx_fir(num_tx_taps);
 
-        _baseband_bw = (adcclk / divfactor);
-        _clock_rate = rate;
-
+        /* Run through other necessary calibrations after a BBPLL tune. */
         if((_rx_freq != 0.0) && (_tx_freq != 0.0)) {
             calibrate_baseband_rx_analog_filter();
             calibrate_baseband_tx_analog_filter();
