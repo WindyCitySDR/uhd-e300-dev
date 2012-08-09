@@ -845,12 +845,6 @@ public:
 
         //gain table here
 
-        //set baseband filter BW
-        set_filter_bw("RX_A");
-        set_filter_bw("TX_A");
-
-        setup_adc();
-
         //ian magic
         _b200_iface->write_reg(0x014, 0x0f);
         _b200_iface->write_reg(0x014, 0x21);
@@ -1024,6 +1018,12 @@ public:
 
         _baseband_bw = (adcclk / divfactor);
         _clock_rate = rate;
+
+        if((_rx_freq != 0.0) && (_tx_freq != 0.0)) {
+            setup_adc();
+            set_filter_bw("RX_A");
+            set_filter_bw("TX_A");
+        }
 
         return _baseband_bw;
     }
