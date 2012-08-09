@@ -733,6 +733,33 @@ public:
         }
     }
 
+    void program_mixer_gm_subtable() {
+        uint8_t gain[] = {0x78, 0x74, 0x70, 0x6C, 0x68, 0x64, 0x60, 0x5C, 0x58,
+                          0x54, 0x50, 0x4C, 0x48, 0x30, 0x18, 0x00};
+        uint8_t gm[] = {0x00, 0x0D, 0x15, 0x1B, 0x21, 0x25, 0x29, 0x2C, 0x2F,
+                        0x31, 0x33, 0x34, 0x35, 0x3A, 0x3D, 0x3E};
+
+        /* Start the clock. */
+        _b200_iface->write_reg(0x13f, 0x02);
+
+        /* Program the GM Sub-table. */
+        for(int i = 15; i >= 0; i--) {
+            _b200_iface->write_reg(0x138, i);
+            _b200_iface->write_reg(0x139, gain[(15 - i)]);
+            _b200_iface->write_reg(0x13A, 0x00);
+            _b200_iface->write_reg(0x13B, gm[(15 - i)]);
+            _b200_iface->write_reg(0x13F, 0x06);
+            _b200_iface->write_reg(0x13C, 0x00);
+            _b200_iface->write_reg(0x13C, 0x00);
+        }
+
+        /* Clear write bit and stop clock. */
+        _b200_iface->write_reg(0x13f, 0x02);
+        _b200_iface->write_reg(0x13C, 0x00);
+        _b200_iface->write_reg(0x13C, 0x00);
+        _b200_iface->write_reg(0x13f, 0x00);
+    }
+
 
     /***********************************************************************
      * Implementation
@@ -848,7 +875,7 @@ public:
         calibrate_secondary_tx_filter();
         calibrate_rx_TIAs();
 
-        //gm subtable here
+        program_mixer_gm_subtable();
 
         //gain table here
 
