@@ -236,6 +236,70 @@ b200_impl::b200_impl(const device_addr_t &device_addr)
     _tree->create<std::string>(mb_path / "name").set("B200");
     _tree->create<std::string>(mb_path / "codename").set("Sasquatch");
 
+
+/*
+
+
+    device_addr_t data_xport_argss;
+    data_xport_argss["recv_frame_size"] = device_addr.get("recv_frame_size", "4096");
+    data_xport_argss["num_recv_frames"] = device_addr.get("num_recv_frames", "16");
+    data_xport_argss["send_frame_size"] = device_addr.get("send_frame_size", "4096");
+    data_xport_argss["num_send_frames"] = device_addr.get("num_send_frames", "16");
+
+    _data_transport = usb_zero_copy::make(
+        handle,        // identifier
+        2, 6,          // IN interface, endpoint
+        1, 2,          // OUT interface, endpoint
+        data_xport_argss    // param hints
+    );
+
+
+    long count = 0;
+
+UHD_HERE();
+bool fail = false;
+    for (size_t i = 0; i < 10; i++)
+    {
+        for (size_t j = 0; j < 4; j++)
+        {
+            managed_send_buffer::sptr rb = _data_transport->get_send_buff();
+            for (size_t k = 0; k < rb->size()/4; k++)
+            {
+                rb->cast<uint32_t *>()[k] = count++;
+            }
+            rb->commit(rb->size());
+            rb.reset();
+        }
+        for (size_t j = 0; j < 4; j++)
+        {
+            managed_recv_buffer::sptr rb = _data_transport->get_recv_buff();
+            char src_buff[rb->size()];
+            std::memset(src_buff, (i << 4) + j, rb->size());
+            for (size_t k = 0; k < rb->size()/4; k++)
+            {
+                long num = (i*4 + j)*rb->size()/4 + k;
+                if (rb->cast<uint32_t *>()[k] != num)
+                {
+                    UHD_MSG(status) << boost::format("fail i=%d, j=%d, k=%d -> supposed to be %d but was %d\n") % i % j % k % num % rb->cast<uint32_t *>()[k];
+                    fail = true;
+                    break;
+                }
+            }
+            rb.reset();
+        }
+        UHD_ASSERT_THROW(not fail);
+    }
+
+UHD_HERE();
+
+
+_data_transport.reset();
+
+
+*/
+
+
+
     ////////////////////////////////////////////////////////////////////
     // Initialize control (settings regs and async messages)
     ////////////////////////////////////////////////////////////////////
