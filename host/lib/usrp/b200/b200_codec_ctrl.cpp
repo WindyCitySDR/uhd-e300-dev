@@ -254,7 +254,7 @@ public:
         }
 
         double rxtune_clk = ((1.4 * bbbw *
-                boost::math::constants::pi<double>()) / std::log(2));
+                boost::math::constants::pi<double>()) / std::log(2.0));
 
         _rx_bbf_tunediv = std::min(511, int(std::ceil(_bbpll_freq / rxtune_clk)));
 
@@ -318,7 +318,7 @@ public:
         }
 
         double txtune_clk = ((1.6 * bbbw *
-                boost::math::constants::pi<double>()) / std::log(2));
+                boost::math::constants::pi<double>()) / std::log(2.0));
 
         uint16_t txbbfdiv = std::min(511, int(std::ceil(_bbpll_freq / txtune_clk)));
 
@@ -472,7 +472,7 @@ public:
 
     void setup_adc() {
 
-        double bbbw = ((_bbpll_freq / _rx_bbf_tunediv) * std::log(2)) \
+        double bbbw = ((_bbpll_freq / _rx_bbf_tunediv) * std::log(2.0)) \
                       / (1.4 * 2 * boost::math::constants::pi<double>());
 
         if(bbbw > 28e6) {
