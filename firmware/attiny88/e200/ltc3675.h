@@ -7,6 +7,7 @@
 
 //#include "types.h"
 #include <stdbool.h>
+#include <stdint.h>
 
 bool ltc3675_init(void);
 

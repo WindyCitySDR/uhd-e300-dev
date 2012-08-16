@@ -19,14 +19,15 @@ CFLAGS = -O2 -std=gnu99 -fshort-enums -pedantic-errors -Wall -Werror \
 # Files
 ##################################################
 HDRS =
-SRCS =  main.c io.c spi.c power.c ltc3675.c
+SRCS =  main.c io.c spi.c power.c ltc3675.c i2c.c
 TARGET = main
 
 ##################################################
 # Device
 ##################################################
 MMCU = attiny88
-PROGRAMMER = avrisp2
+#PROGRAMMER = avrisp2
+PROGRAMMER = stk600
 PORT = usb
 AVRDUDE = avrdude -p $(MMCU) -c $(PROGRAMMER) -P $(PORT)
 

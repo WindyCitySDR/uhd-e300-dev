@@ -1,14 +1,19 @@
+#include "config.h"
+#include "power.h"
+
+#include <string.h>
 #include <util/delay.h>
+#include <avr/io.h>
 
 #include "io.h"
-#include "power.h"
+#include "ltc3675.h"
 
 #define BLINK_ERROR_DELAY   250  // ms
 
 #define POWER_DEFAULT_DELAY     50  // ms
 #define POWER_DEFAULT_RETRIES   10
 
-#define COUNT_ARRAY(a)      (sizeof(a)/sizeof(a[0]))
+#define ARRAY_SIZE(a)      (sizeof(a)/sizeof(a[0]))
 #define ZERO_MEMORY(s)      memset(&s, 0x00, sizeof(s))
 
 struct reg_config {
@@ -69,15 +74,28 @@ void charge_set_led(bool on)
 
 ///////////////////////////////////////////////////////////////////////////////
 
+void power_signal_interrupt(void)
+{
+    // FIXME
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
 static io_pin_t PS_POR      = IO_PD(6);
 static io_pin_t PS_SRST     = IO_PD(7);
 
-void fpga_reset(void)
-{
-    // FIXME
+#define FPGA_RESET_DELAY    10  // ms   // MAGIC
 
-    //io_enable_pin(PS_POR, true);
-    //io_enable_pin(PS_SRST, true);
+void fpga_reset(bool delay)
+{
+    io_clear_pin(PS_POR);
+    io_clear_pin(PS_SRST);
+
+    if (delay)
+        _delay_ms(FPGA_RESET_DELAY);
+
+    io_enable_pin(PS_POR, true);
+    io_enable_pin(PS_SRST, true);
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -177,7 +195,7 @@ static bool _power_up_reg(power_params_t* params)
     if ((params->subsys >= ARRAY_SIZE(default_reg_config)) || (params->subsys < 2))
         return false;
 
-    struct reg_config* cfg = default_reg_config[params->subsys];
+    struct reg_config* cfg = default_reg_config + params->subsys;
 
     if (params->enable == false) {
         return ltc3675_enable_reg(cfg->address, false);
@@ -206,6 +224,7 @@ static bool _power_enable_subsys(power_params_t* params)
 
 bool power_enable(power_subsystem_t subsys, bool on)
 {
+    power_params_t params;
     ZERO_MEMORY(params);
     params.subsys = subsys;
     params.enable = on;
@@ -241,6 +260,10 @@ void power_init(void)
 
     io_output_pin(PS_POR);
     io_output_pin(PS_SRST);
+
+    // Hold low until power is stable
+    io_clear_pin(PS_POR);
+    io_clear_pin(PS_SRST);
 /*
     USBPM_IRQ
 
@@ -264,7 +287,7 @@ bool power_on(void)
 
 	uint8_t step_count, retry;
 	for (step_count = 0; step_count < ARRAY_SIZE(boot_steps); step_count++) {
-	    struct boot_step* step = boot_steps[step_count];
+	    struct boot_step* step = boot_steps + step_count;
 	    if ((step->fn == NULL) && (step->subsys == PS_UNKNOWN))
             continue;
 

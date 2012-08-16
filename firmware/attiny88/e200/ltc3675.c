@@ -8,9 +8,12 @@
 */
 
 #include "ltc3675.h"
-#include "io.h"
+
 //#include <stdio.h>
-#include <util/delay.h>
+//#include <util/delay.h>
+
+#include "io.h"
+#include "i2c.h"
 
 static io_pin_t PWR_EN1     = IO_PC(1);
 static io_pin_t PWR_EN2     = IO_PC(2);
@@ -34,12 +37,14 @@ bool ltc3675_init(void)
     io_output_pin(PWR_EN4);
     io_output_pin(PWR_EN5);
 
-    io_output_pin(PWR_SDA);
+ /*   io_output_pin(PWR_SDA);
     io_output_pin(PWR_SCL);
 
     // Must remain HIGH when idle
     io_set_pin(PWR_SDA);
-    io_set_pin(PWD_SCL);
+    io_set_pin(PWR_SCL);
+*/
+    i2c_init(PWR_SDA, PWR_SCL);
 
     io_input_pin(PWR_IRQ);
     io_input_pin(WAKEUP);
@@ -64,7 +69,7 @@ bool ltc3675_init(void)
 #define LTC3675_STOP_TIME       1   // 0.6 us
 
 // Max I2C rate = 400kHz
-
+/*
 static bool _ltc3675_write_byte(uint8_t value)
 {
     // Assumes:
@@ -148,7 +153,7 @@ static void _ltc3675_i2c_start(void)
     io_clear_pin(PWR_SDA);
     _delay_us(LTC3675_SCL_LOW_PERIOD);  // Thd, sta
 
-    io_clear_pin(PWR_SDA);
+    io_clear_pin(PWR_SCL);
     _delay_us(LTC3675_SCL_LOW_PERIOD / 2);   // MAGIC
 }
 
@@ -205,7 +210,7 @@ static bool _ltc3675_read(uint8_t subaddr, uint8_t* value)
 
     return true;
 }
-
+*/
 bool ltc3675_enable_reg(ltc3675_regulator_t reg, bool on)
 {
     switch (reg)
@@ -219,7 +224,7 @@ bool ltc3675_enable_reg(ltc3675_regulator_t reg, bool on)
             io_enable_pin(PWR_EN3, on);
             break;
         case LTC3675_REG_5: // I2C only
-            return _ltc3675_write(0x05, 0x0F | (on ? 0x80 : 0x00));    // (Boost address, Default reg contents | Enable)
+            return i2c_write(PWR_SDA, PWR_SCL, LTC3675_WRITE_ADDRESS, 0x05, 0x0F | (on ? 0x80 : 0x00));    // (Boost address, Default reg contents | Enable)
         case LTC3675_REG_6: // Single
             io_enable_pin(PWR_EN5, on);
             break;
