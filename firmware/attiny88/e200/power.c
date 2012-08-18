@@ -7,6 +7,7 @@
 
 #include "io.h"
 #include "ltc3675.h"
+#include "debug.h"
 
 #define BLINK_ERROR_DELAY   250  // ms
 
@@ -36,21 +37,30 @@ static io_pin_t AVR_MOSI    = IO_PB(3);
 static io_pin_t AVR_MISO    = IO_PB(4);
 static io_pin_t AVR_SCK     = IO_PB(5);
 
+#ifndef ATTINY88_DIP
 static io_pin_t FTDI_BCD    = IO_PB(6);
 static io_pin_t FTDI_PWREN2 = IO_PB(7);
+#endif // ATTINY88_DIP
 
 static io_pin_t AVR_RESET   = IO_PC(6);
 static io_pin_t AVR_IRQ     = IO_PD(5);
 
 ///////////////////////////////////////////////////////////////////////////////
 
+#ifdef ATTINY88_DIP
+static io_pin_t CORE_PWR_EN = IO_PC(1);	// IO_PC(7) not routed by card, using PWER_EN1 instead
+#else
 static io_pin_t CORE_PWR_EN = IO_PA(3);
+#endif // ATTINY88_DIP
 static io_pin_t CORE_PGOOD = IO_PB(0);
 
 void tps54478_init(void)
 {
     io_output_pin(CORE_PWR_EN);
     io_input_pin(CORE_PGOOD);
+//#ifdef DEBUG
+//	io_enable_pin(CORE_PWR_EN, false);
+//#endif // DEBUG
 }
 
 void tps54478_set_power(bool on)
@@ -69,6 +79,9 @@ static io_pin_t CHARGE      = IO_PD(1);
 
 void charge_set_led(bool on)
 {
+#ifdef DEBUG
+	on = !on;
+#endif // DEBUG
     io_enable_pin(CHARGE, on);
 }
 
@@ -146,7 +159,7 @@ uint16_t battery_get_voltage(void)
 static void blink_error_sequence(uint8_t len)
 {
     charge_set_led(false);
-    _delay_ms(BLINK_ERROR_DELAY);
+    _delay_ms(BLINK_ERROR_DELAY * 2);
 
     for (; len > 0; len--) {
         charge_set_led(true);
@@ -253,6 +266,8 @@ void power_init(void)
     tps54478_init();
 
     ltc3675_init();
+	
+	ltc4155_init();
 
     battery_init();
 
@@ -276,9 +291,9 @@ void power_init(void)
     FTDI_PWREN2
 
     AVR_RESET
-
-    AVR_IRQ
 */
+    io_output_pin(AVR_IRQ);
+	io_set_pin(AVR_IRQ);	// FIXME: Active low?
 }
 
 bool power_on(void)
@@ -287,13 +302,15 @@ bool power_on(void)
 
 	uint8_t step_count, retry;
 	for (step_count = 0; step_count < ARRAY_SIZE(boot_steps); step_count++) {
+//		debug_blink(step_count);
+		
 	    struct boot_step* step = boot_steps + step_count;
 	    if ((step->fn == NULL) && (step->subsys == PS_UNKNOWN))
             continue;
 
         power_params_t params;
 
-	    for (retry = 0; retry <= step->retries; retry++) {
+	    for (retry = 0; retry < step->retries; retry++) {
 	        ZERO_MEMORY(params);
             params.subsys = step->subsys;
             params.enable = true;
@@ -311,6 +328,8 @@ bool power_on(void)
             if ((retry < step->retries) && (step->delay > 0))
                 _delay_ms(step->delay);
 	    }
+		
+//		debug_blink(step_count);
 
 	    if (retry == step->retries)
 	        break;
