@@ -45,6 +45,24 @@ void debug_blink(uint8_t count)
 	_delay_ms(DEBUG_BLINK_DELAY * 2);
 }
 
+void debug_blink_rev(uint8_t count)
+{
+	io_enable_pin(DEBUG_2, false);
+	io_enable_pin(DEBUG_1, true);
+	_delay_ms(DEBUG_BLINK_DELAY * 2);
+
+	for (; count > 0; count--) {
+		io_enable_pin(DEBUG_1, false);
+		_delay_ms(DEBUG_BLINK_DELAY);
+		io_enable_pin(DEBUG_1, true);
+		_delay_ms(DEBUG_BLINK_DELAY);
+	}
+
+	io_enable_pin(DEBUG_2, true);
+	io_enable_pin(DEBUG_1, true);
+	_delay_ms(DEBUG_BLINK_DELAY * 2);
+}
+
 void debug_blink2(uint8_t count)
 {
 	io_enable_pin(DEBUG_1, true);

@@ -19,6 +19,7 @@
 //#define HARDWIRE_ENABLE	// Use hardware enable pins instead of I2C on regulators that support it
 
 #ifdef ATTINY88_DIP
+
 #ifdef HARDWIRE_ENABLE
 static io_pin_t PWR_EN1     = IO_PC(7);	// Not routed by card
 static io_pin_t PWR_EN2     = IO_PA(0);	// Not available on DIP
@@ -36,6 +37,7 @@ static io_pin_t PWR_EN1     = IO_PC(1);
 static io_pin_t PWR_EN4     = IO_PA(1);
 static io_pin_t PWR_EN5     = IO_PA(2);
 #endif // HARDWIRE_ENABLE
+
 #endif // ATTINY88_DIP
 
 static io_pin_t PWR_SDA     = IO_PC(4);
@@ -63,7 +65,8 @@ bool ltc3675_init(void)
     io_set_pin(PWR_SDA);
     io_set_pin(PWR_SCL);
 */
-    i2c_init(PWR_SDA, PWR_SCL);
+	i2c_init(PWR_SDA, PWR_SCL);
+    //i2c_init_ex(PWR_SDA, PWR_SCL, true);
 
     io_input_pin(PWR_IRQ);
     io_input_pin(WAKEUP);
@@ -88,154 +91,15 @@ bool ltc3675_init(void)
 #define LTC3675_STOP_TIME       1   // 0.6 us
 
 // Max I2C rate = 400kHz
-/*
-static bool _ltc3675_write_byte(uint8_t value)
-{
-    // Assumes:
-    //  io_output_pin(PWR_SDA);
-    //  PWR_SCL is LOW
 
-    for (uint8_t i = 0; i < 8; ++i)
-    {
-        io_enable_pin(PWR_SDA, (value & (1 << (7 - i))));   // MSB first
-
-        io_set_pin(PWR_SCL);
-        _delay_us(LTC3675_SCL_HIGH_PERIOD);
-
-        io_clear_pin(PWR_SCL);
-        _delay_us(LTC3675_SCL_LOW_PERIOD);
-    }
-
-    io_input_pin(PWR_SDA);
-
-    _delay_us(LTC3675_SCL_HIGH_PERIOD);
-
-    uint8_t retries = 0;
-    while (io_test_pin(PWR_SDA))
-    {
-        if (retries == LTC3675_MAX_ACK_RETRIES) {
-            io_output_pin(PWR_SDA);
-            return false;
-        }
-
-        ++retries;
-        _delay_us(LTC3675_RETRY_DELAY);
-    }
-
-    // Clock away acknowledge
-    io_set_pin(PWR_SCL);
-    _delay_us(LTC3675_SCL_HIGH_PERIOD);
-
-    io_clear_pin(PWR_SCL);
-    _delay_us(LTC3675_SCL_LOW_PERIOD);
-
-    io_output_pin(PWR_SDA);
-
-    io_clear_pin(PWD_SDA);
-
-    return true;
-}
-
-static bool _ltc3675_read_byte(uint8_t* value)
-{
-    // Assumes:
-    //  io_output_pin(PWR_SDA);
-    //  PWR_SCL is LOW
-
-    (*value) = 0x00;
-
-    io_input_pin(PWD_SDA);
-
-    for (uint8_t i = 0; i < 8; ++i)
-    {
-        io_set_pin(PWR_SCL);
-        _delay_us(LTC3675_SCL_HIGH_PERIOD);
-
-        (*value) |= ((io_test_pin(PWR_SDA) ? 0x1 : 0x0) << (7 - i));   // MSB first
-
-        io_clear_pin(PWR_SCL);
-        _delay_us(LTC3675_SCL_LOW_PERIOD);
-    }
-
-    // Not necessary to ACK since it's only this one byte
-
-    io_output_pin(PWR_SDA);
-
-    io_clear_pin(PWD_SDA);
-
-    return true;
-}
-
-static void _ltc3675_i2c_start(void)
-{
-    // START condition
-    io_clear_pin(PWR_SDA);
-    _delay_us(LTC3675_SCL_LOW_PERIOD);  // Thd, sta
-
-    io_clear_pin(PWR_SCL);
-    _delay_us(LTC3675_SCL_LOW_PERIOD / 2);   // MAGIC
-}
-
-static void _ltc3675_i2c_stop(void)
-{
-    // STOP condition
-    io_set_pin(PWR_SCL);
-    _delay_us(LTC3675_STOP_TIME);
-
-    io_set_pin(PWD_SDA);
-    _delay_us(LTC3675_BUS_FREE_TIME);
-}
-
-static bool _ltc3675_write(uint8_t subaddr, uint8_t value)
-{
-    // Assumes:
-    //  PWR_SCL is HIGH
-    //  io_output_pin(PWR_SDA);
-
-    _ltc3675_i2c_start();
-
-    if (_ltc3675_write_byte(LTC3675_WRITE_ADDRESS) == false)
-        return false;
-
-    if (_ltc3675_write_byte(subaddr) == false)
-        return false;
-
-    if (_ltc3675_write_byte(value) == false)
-        return false;
-
-    _ltc3675_i2c_stop();
-
-    return true;
-}
-
-static bool _ltc3675_read(uint8_t subaddr, uint8_t* value)
-{
-    // Assumes:
-    //  PWR_SCL is HIGH
-    //  io_output_pin(PWR_SDA);
-
-    _ltc3675_i2c_start();
-
-    if (_ltc3675_write_byte(LTC3675_READ_ADDRESS) == false)
-        return false;
-
-    if (_ltc3675_write_byte(subaddr) == false)
-        return false;
-
-    if (_ltc3675_read_byte(value) == false)
-        return false;
-
-    _ltc3675_i2c_stop();
-
-    return true;
-}
-*/
 bool ltc3675_enable_reg(ltc3675_regulator_t reg, bool on)
 {
 	debug_blink2(reg + 1);
 	
 	// Sub-address: index of regulator
 	// Data: <default reg contents> | <enable>
+	
+	const bool pull_up = false;
 	
     switch (reg)
     {
@@ -245,7 +109,7 @@ bool ltc3675_enable_reg(ltc3675_regulator_t reg, bool on)
             io_enable_pin(PWR_EN1, on);
 			break;
 #else
-			return i2c_write(PWR_SDA, PWR_SCL, LTC3675_WRITE_ADDRESS, 0x01, 0x6F | (on ? 0x80 : 0x00));
+			return i2c_write_ex(PWR_SDA, PWR_SCL, LTC3675_WRITE_ADDRESS, 0x01, 0x6F | (on ? 0x80 : 0x00), pull_up);
 #endif // HARDWIRE_ENABLE
         case LTC3675_REG_3: // Master
         case LTC3675_REG_4: // Slave
@@ -253,16 +117,16 @@ bool ltc3675_enable_reg(ltc3675_regulator_t reg, bool on)
             io_enable_pin(PWR_EN3, on);
             break;
 #else
-			return i2c_write(PWR_SDA, PWR_SCL, LTC3675_WRITE_ADDRESS, 0x03, 0x6F | (on ? 0x80 : 0x00));
+			return i2c_write_ex(PWR_SDA, PWR_SCL, LTC3675_WRITE_ADDRESS, 0x03, 0x6F | (on ? 0x80 : 0x00), pull_up);
 #endif // HARDWIRE_ENABLE
         case LTC3675_REG_5: // I2C only
-            return i2c_write(PWR_SDA, PWR_SCL, LTC3675_WRITE_ADDRESS, 0x05, 0x0F | (on ? 0x80 : 0x00));    // (Boost address, Default reg contents | Enable)
+            return i2c_write_ex(PWR_SDA, PWR_SCL, LTC3675_WRITE_ADDRESS, 0x05, 0x0F | (on ? 0x80 : 0x00), pull_up);    // (Boost address, Default reg contents | Enable)
         case LTC3675_REG_6: // Single
 #ifdef HARDWIRE_ENABLE
             io_enable_pin(PWR_EN5, on);
             break;
 #else
-			return i2c_write(PWR_SDA, PWR_SCL, LTC3675_WRITE_ADDRESS, 0x06, 0x6F | (on ? 0x80 : 0x00));
+			return i2c_write_ex(PWR_SDA, PWR_SCL, LTC3675_WRITE_ADDRESS, 0x06, 0x6F | (on ? 0x80 : 0x00), pull_up);
 #endif // HARDWIRE_ENABLE
         default:
             return false;

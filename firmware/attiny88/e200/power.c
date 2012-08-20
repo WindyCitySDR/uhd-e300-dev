@@ -7,6 +7,7 @@
 
 #include "io.h"
 #include "ltc3675.h"
+#include "ltc4155.h"
 #include "debug.h"
 
 #define BLINK_ERROR_DELAY   250  // ms
@@ -279,9 +280,9 @@ void power_init(void)
     // Hold low until power is stable
     io_clear_pin(PS_POR);
     io_clear_pin(PS_SRST);
+	
+	io_input_pin(USBPM_IRQ);
 /*
-    USBPM_IRQ
-
     AVR_CS
     AVR_MOSI
     AVR_MISO
@@ -289,9 +290,9 @@ void power_init(void)
 
     FTDI_BCD
     FTDI_PWREN2
-
-    AVR_RESET
 */
+	io_input_pin(AVR_RESET);
+	
     io_output_pin(AVR_IRQ);
 	io_set_pin(AVR_IRQ);	// FIXME: Active low?
 }

@@ -18,9 +18,14 @@ typedef const uint8_t io_pin_t;
 
 void io_output_pin(io_pin_t pin);
 void io_input_pin(io_pin_t pin);
+bool io_is_output(io_pin_t pin);
+bool io_is_input(io_pin_t pin);
+
 void io_set_pin(io_pin_t pin);
 void io_clear_pin(io_pin_t pin);
 void io_enable_pin(io_pin_t pin, bool enable);
+bool io_is_pin_set(io_pin_t pin);
+
 bool io_test_pin(io_pin_t pin);
 
 #endif /* IO_H */
