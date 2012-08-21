@@ -59,7 +59,7 @@ public:
     }
 
     uhd::meta_range_t get_bw_filter_range(const std::string &which) {
-        return uhd::meta_range_t(0.0, 60e6); //FIXME TODO
+        return uhd::meta_range_t(0.0, 60e6); //TODO
     }
 
     double set_bw_filter(const std::string &which, const double bw) {
@@ -176,8 +176,6 @@ public:
 
     void calibrate_lock_bbpll() {
         //calibrate freq (0x04B[7], toggle 0x03F[2] 1 then 0)
-        _b200_iface->write_reg(0x04e, 0x10); //slow down cal for better accuracy
-        _b200_iface->write_reg(0x04B, 0xE0);
         _b200_iface->write_reg(0x03F, 0x05);
         _b200_iface->write_reg(0x03F, 0x01); //keep bbpll on
 
@@ -188,7 +186,7 @@ public:
         /* Wait for BBPLL lock. */
         int count = 0;
         while(!(_b200_iface->read_reg(0x05e) & 0x80)) {
-            if(count > 5) {
+            if(count > 1000) {
                 uhd::runtime_error("BBPLL not locked");
             }
 
@@ -261,9 +259,6 @@ public:
         reg_bbftune_config = (reg_bbftune_config & 0xFE) \
                              | ((_rx_bbf_tunediv >> 8) & 0x0001);
 
-        _b200_iface->write_reg(0x1f8, (_rx_bbf_tunediv & 0x00FF));
-        _b200_iface->write_reg(0x1f9, reg_bbftune_config);
-
         double bbbw_mhz = bbbw / 1e6;
 
         double temp = ((bbbw_mhz - std::floor(bbbw_mhz)) * 1000) / 7.8125;
@@ -271,6 +266,12 @@ public:
 
         _b200_iface->write_reg(0x1fb, uint8_t(bbbw_mhz));
         _b200_iface->write_reg(0x1fc, bbbw_khz);
+        _b200_iface->write_reg(0x1f8, (_rx_bbf_tunediv & 0x00FF));
+        _b200_iface->write_reg(0x1f9, reg_bbftune_config);
+
+        /* RX Mix Voltage settings - only change with apps engineer help. */
+        _b200_iface->write_reg(0x1d5, 0x3f);
+        _b200_iface->write_reg(0x1c0, 0x03);
 
         _b200_iface->write_reg(0x1e2, 0x02);
         _b200_iface->write_reg(0x1e3, 0x02);
@@ -411,10 +412,10 @@ public:
 
         reg0d2 = cap;
 
-        _b200_iface->write_reg(0x0d0, reg0d0);
-        _b200_iface->write_reg(0x0d1, reg0d1);
-        _b200_iface->write_reg(0x0d2, reg0d2);
         _b200_iface->write_reg(0x0d3, 0x60);
+        _b200_iface->write_reg(0x0d2, reg0d2);
+        _b200_iface->write_reg(0x0d1, reg0d1);
+        _b200_iface->write_reg(0x0d0, reg0d0);
     }
 
     void calibrate_rx_TIAs() {
@@ -464,10 +465,10 @@ public:
         }
 
         _b200_iface->write_reg(0x1db, reg1db);
-        _b200_iface->write_reg(0x1dc, reg1dc);
         _b200_iface->write_reg(0x1dd, reg1dd);
-        _b200_iface->write_reg(0x1de, reg1de);
         _b200_iface->write_reg(0x1df, reg1df);
+        _b200_iface->write_reg(0x1dc, reg1dc);
+        _b200_iface->write_reg(0x1de, reg1de);
     }
 
     void setup_adc() {
@@ -575,7 +576,6 @@ public:
 
         for(int i=0; i<40; i++) {
             _b200_iface->write_reg(0x200+i, data[i]);
-//            UHD_VAR(((int) data[i]));
         }
     }
 
@@ -598,8 +598,6 @@ public:
     }
 
     void calibrate_rf_dc_offset() {
-        //FIXME Needs to be run for all bands, too???
-
         /* If we aren't already in the ALERT state, we will need to return to
          * the FDD state after calibration. */
         bool not_in_alert = false;
@@ -612,9 +610,9 @@ public:
         _b200_iface->write_reg(0x185, 0x20);
         _b200_iface->write_reg(0x186, 0x32);
         _b200_iface->write_reg(0x187, 0x24);
+        _b200_iface->write_reg(0x18b, 0x83);
         _b200_iface->write_reg(0x188, 0x05);
         _b200_iface->write_reg(0x189, 0x30);
-        _b200_iface->write_reg(0x18b, 0xad);
 
         int count = 0;
         _b200_iface->write_reg(0x016, 0x02);
@@ -635,12 +633,6 @@ public:
     }
 
     void calibrate_rx_quadrature(void) {
-        _b200_iface->write_reg(0x186, 0x32);
-        _b200_iface->write_reg(0x187, 0x24);
-        _b200_iface->write_reg(0x188, 0x05);
-        _b200_iface->write_reg(0x189, 0x30);
-        _b200_iface->write_reg(0x18b, 0xad);
-
         /* If we aren't already in the ALERT state, we will need to return to
          * the FDD state after calibration. */
         bool not_in_alert = false;
@@ -652,11 +644,13 @@ public:
 
          /* Disable RX cal free run, set other cal settings. */
         _b200_iface->write_reg(0x168, 0x03);
-        _b200_iface->write_reg(0x169, 0xC0);
+        _b200_iface->write_reg(0x16e, 0x25);
         _b200_iface->write_reg(0x16a, 0x75);
         _b200_iface->write_reg(0x16b, 0x15);
-        _b200_iface->write_reg(0x16e, 0x25);
+        _b200_iface->write_reg(0x169, 0xC0);
+        _b200_iface->write_reg(0x18b, 0xad);
 
+#if 0
         /* RX Quad Cal: power down TX mixer, tune TX LO to passband of RX
          * spectrum, run the calibration, retune the TX LO, re-enable the TX
          * mixer. */
@@ -664,6 +658,7 @@ public:
 
         double old_tx_freq = _tx_freq;
         tune("CAL", (_rx_freq + (_baseband_bw / 4)));
+#endif
 
         int count = 0;
         _b200_iface->write_reg(0x016, 0x20);
@@ -677,11 +672,13 @@ public:
             boost::this_thread::sleep(boost::posix_time::milliseconds(10));
         }
 
+#if 0
         /* Re-enable TX mixer and re-tune TX LO. */
         if((old_tx_freq >= 100e6) && (old_tx_freq <= 6e9)) {
             tune("CAL", old_tx_freq);
         }
         _b200_iface->write_reg(0x057, 0x30);
+#endif
 
         /* Enable Quad Cal Tracking. */
         _b200_iface->write_reg(0x169, 0xcf);
@@ -711,10 +708,19 @@ public:
         _b200_iface->write_reg(0x0a2, 0x7f);
         _b200_iface->write_reg(0x0a5, 0x01);
         _b200_iface->write_reg(0x0a6, 0x01);
-        _b200_iface->write_reg(0x0aa, 0x22);
+            /* FIXME! */
+            _b200_iface->write_reg(0x0aa, 0x22);
         _b200_iface->write_reg(0x0a4, 0xf0);
         _b200_iface->write_reg(0x0ae, 0x00);
 
+
+        /* First, calibrate the baseband DC offset. */
+        calibrate_baseband_dc_offset();
+
+        /* Second, calibrate the RF DC offset. */
+        calibrate_rf_dc_offset();
+
+        /* Now, calibrate the TX quadrature! */
         int count = 0;
         _b200_iface->write_reg(0x016, 0x10);
         while(_b200_iface->read_reg(0x016) & 0x10) {
@@ -772,8 +778,8 @@ public:
         reg_inputsel = 0x00;
         reg_rxfilt = 0x00;
         reg_txfilt = 0x00;
-        //reg_bbpll = 0x02; // no clock Set by default in _impl for 40e6 reference
-        reg_bbpll = 0x12; // yes clock Set by default in _impl for 40e6 reference
+        reg_bbpll = 0x02; // no clock Set by default in _impl for 40e6 reference
+        //reg_bbpll = 0x12; // yes clock Set by default in _impl for 40e6 reference
         reg_bbftune_config = 0x1e;
         reg_bbftune_mode = 0x1e;
 
@@ -781,7 +787,8 @@ public:
         _rx_freq = 0.0;
         _tx_freq = 0.0;
         _baseband_bw = 0.0;
-        _clock_rate = 0.0;
+        _req_clock_rate = 0.0;
+        _req_coreclk = 0.0;
         _bbpll_freq = 0.0;
         _rx_bbf_tunediv = 0;
 
@@ -804,30 +811,26 @@ public:
         //rfpll refclk to REFCLKx2
         _b200_iface->write_reg(0x2ab, 0x07);
         _b200_iface->write_reg(0x2ac, 0xff);
+
+        //enable clocks
         _b200_iface->write_reg(0x009, BOOST_BINARY( 00010111 ) );
         boost::this_thread::sleep(boost::posix_time::milliseconds(20));
 
-        /* Disable all calibration bits. */
-        _b200_iface->write_reg(0x1e2, 0x03);
-        _b200_iface->write_reg(0x1e3, 0x03);
-        _b200_iface->write_reg(0x23d, 0x00);
-        _b200_iface->write_reg(0x27d, 0x00);
+        /* Tune the BBPLL, write TX and RX FIRS. */
+        set_clock_rate(30.72e6);
+        _b200_iface->write_reg(0x004, 0x03);
 
         /* Setup data ports (FDD dual port DDR CMOS) */
         //FDD dual port DDR CMOS no swap
-        _b200_iface->write_reg(0x010, BOOST_BINARY( 11001000 ) );
-        _b200_iface->write_reg(0x011, BOOST_BINARY( 00000000 ) );
+        _b200_iface->write_reg(0x010, 0xc8);
+        _b200_iface->write_reg(0x011, 0x00);
          //force TX on one port, RX on the other
-        _b200_iface->write_reg(0x012, BOOST_BINARY( 00000010 ) );
-
+        _b200_iface->write_reg(0x012, 0x02);
         //data delay for TX and RX data clocks
         _b200_iface->write_reg(0x006, 0x0F);
         _b200_iface->write_reg(0x007, 0x00);
 
-        //set delay register
-        _b200_iface->write_reg(0x03a, 0x27);
-
-        /**initial VCO setup*/
+        _b200_iface->write_reg(0x03a,0x27); //set delay register
         _b200_iface->write_reg(0x261,0x00); //RX LO power
         _b200_iface->write_reg(0x2a1,0x00); //TX LO power
         _b200_iface->write_reg(0x248,0x0b); //en RX VCO LDO
@@ -840,44 +843,89 @@ public:
         _b200_iface->write_reg(0x27b,0x80); //"" TX //FIXME 0x88 see above
         _b200_iface->write_reg(0x243,0x0d); //set rx prescaler bias
         _b200_iface->write_reg(0x283,0x0d); //"" TX
+        _b200_iface->write_reg(0x23d,0x00);
+        _b200_iface->write_reg(0x27d,0x00);
 
-        _b200_iface->write_reg(0x245,0x00); //set RX VCO cal ref Tcf
-        _b200_iface->write_reg(0x250,0x70); //set RX VCO varactor ref Tcf
-        _b200_iface->write_reg(0x285,0x00); //"" TX
-        _b200_iface->write_reg(0x290,0x70); //"" TX
-        _b200_iface->write_reg(0x239,0xc1); //init RX ALC
-        _b200_iface->write_reg(0x279,0xc1); //"" TX
-
-         //enable ENSM
-        _b200_iface->write_reg(0x013, BOOST_BINARY( 00000001 ) );
-        //dual synth mode, synth en ctrl en
-        _b200_iface->write_reg(0x015, BOOST_BINARY( 00000111 ) );
-        //use SPI for TXNRX ctrl, to ALERT, TX on
-        _b200_iface->write_reg(0x014, BOOST_BINARY( 00100101 ) );
-
-        /* RX Mix Voltage settings - only change with apps engineer help. */
-        _b200_iface->write_reg(0x1d5, 0x3f);
-        _b200_iface->write_reg(0x1c0, 0x03);
+        _b200_iface->write_reg(0x015, 0x04); //dual synth mode, synth en ctrl en
+        _b200_iface->write_reg(0x014, 0x05); //use SPI for TXNRX ctrl, to ALERT, TX on
+        _b200_iface->write_reg(0x013, 0x01); //enable ENSM
+        boost::this_thread::sleep(boost::posix_time::milliseconds(1));
 
         calibrate_synth_charge_pumps();
 
-        set_clock_rate(30.72e6);
 
-        calibrate_baseband_dc_offset();
+        _b200_iface->write_reg(0x23a, 0x4a);//vco output level
+            /* FIXME - These are different! */
+            _b200_iface->write_reg(0x239, 0xc1);//init ALC value and VCO varactor
+            _b200_iface->write_reg(0x242, 0x17);//vco bias and bias ref
+            _b200_iface->write_reg(0x238, 0x70);//vco cal offset
+            _b200_iface->write_reg(0x245, 0x00);//vco cal ref tcf
+            _b200_iface->write_reg(0x251, 0x0e);//varactor ref
+            _b200_iface->write_reg(0x250, 0x70);//vco varactor ref tcf
+            _b200_iface->write_reg(0x23b, 0x89);//Icp
+            _b200_iface->write_reg(0x23e, 0xf3);//c2 and c1
+            _b200_iface->write_reg(0x23f, 0xe7);//r1 and c3
+            _b200_iface->write_reg(0x240, 0x0f);//rx synth loop filter r3
 
-        tune("RX", 800e6);
-        tune("TX", 850e6);
+        _b200_iface->write_reg(0x27a, 0x4a);//vco output level
+        _b200_iface->write_reg(0x279, 0xc1);//init ALC value and VCO varactor
+        _b200_iface->write_reg(0x282, 0x17);//vco bias and bias ref
+            _b200_iface->write_reg(0x278, 0x70);//vco cal offset //fixme 0x71
+        _b200_iface->write_reg(0x285, 0x00);//vco cal ref tcf
+        _b200_iface->write_reg(0x291, 0x0e);//varactor ref
+        _b200_iface->write_reg(0x290, 0x70);//vco varactor ref tcf
 
-        setup_adc();
+            _b200_iface->write_reg(0x27b, 0x88);//Icp //fixme 0x88
+            _b200_iface->write_reg(0x27e, 0xf3);//c2 and c1 //fixme f3
+            _b200_iface->write_reg(0x27f, 0xe7);//r1 and c3 //fixme e7
+            _b200_iface->write_reg(0x280, 0x0f);//rx synth loop filter r3 //fixme 0x0F
 
-        calibrate_baseband_rx_analog_filter();
-        calibrate_baseband_tx_analog_filter();
-        calibrate_secondary_tx_filter();
-        calibrate_rx_TIAs();
+
+        /* Tune RX! */
+        _b200_iface->write_reg(0x233, 0x00);
+        _b200_iface->write_reg(0x234, 0x00);
+        _b200_iface->write_reg(0x235, 0x00);
+        _b200_iface->write_reg(0x232, 0x00);
+        _b200_iface->write_reg(0x231, 0x50);
+        _b200_iface->write_reg(0x005, 0x22);
+
+        /* Tune TX! */
+        _b200_iface->write_reg(0x273, 0x00);
+        _b200_iface->write_reg(0x274, 0x00);
+        _b200_iface->write_reg(0x275, 0x00);
+        _b200_iface->write_reg(0x272, 0x00);
+        _b200_iface->write_reg(0x271, 0x55);
+        _b200_iface->write_reg(0x005, 0x22);
+
+        boost::this_thread::sleep(boost::posix_time::milliseconds(2));
+        if((_b200_iface->read_reg(0x247) & 0x02) == 0) {
+            std::cout << "RX PLL NOT LOCKED" << std::endl;
+        }
+        if((_b200_iface->read_reg(0x287) & 0x02) == 0) {
+            std::cout << "TX PLL NOT LOCKED" << std::endl;
+        }
 
         program_mixer_gm_subtable();
 
-        //gain table here
+        calibrate_baseband_rx_analog_filter();
+        calibrate_baseband_tx_analog_filter();
+        calibrate_rx_TIAs();
+        calibrate_secondary_tx_filter();
+
+        setup_adc();
+
+        calibrate_tx_quadrature();
+        calibrate_rx_quadrature();
+
+        _b200_iface->write_reg(0x012, 0x02); //set PPORT config
+        _b200_iface->write_reg(0x013, 0x01); //set FDD
+        _b200_iface->write_reg(0x015, 0x04); //dual synth mode, synth en ctrl en
+
+        _rx_freq = 800e6;
+        _tx_freq = 850e6;
+
+        tune("RX", 800e6);
+        tune("TX", 850e6);
 
         //ian magic
         _b200_iface->write_reg(0x014, 0x0f);
@@ -955,9 +1003,11 @@ public:
             throw uhd::runtime_error("Requested master clock rate outside range!");
         }
 
-        if(rate == _clock_rate) {
-            return _clock_rate;
+        if(rate == _req_clock_rate) {
+            return _req_clock_rate;
         }
+
+        _req_clock_rate = rate;
 
         UHD_VAR(rate);
 
@@ -1031,12 +1081,11 @@ public:
         }
 
         /* Set the dividers / interpolators in Catalina. */
-        _b200_iface->write_reg(0x00A, reg_bbpll);
         _b200_iface->write_reg(0x002, reg_txfilt);
         _b200_iface->write_reg(0x003, reg_rxfilt);
+        _b200_iface->write_reg(0x00A, reg_bbpll);
 
         _baseband_bw = (adcclk / divfactor);
-        _clock_rate = rate;
 
         /* Setup the RX and TX FIR filters. Scale the number of taps based on
          * the clock speed. */
@@ -1047,15 +1096,15 @@ public:
         int num_rx_taps = get_num_taps(max_rx_taps);
         int num_tx_taps = get_num_taps(max_tx_taps);
 
-        setup_rx_fir(num_rx_taps);
         setup_tx_fir(num_tx_taps);
+        setup_rx_fir(num_rx_taps);
 
         /* Run through other necessary calibrations after a BBPLL tune. */
         if((_rx_freq != 0.0) && (_tx_freq != 0.0)) {
             calibrate_baseband_rx_analog_filter();
             calibrate_baseband_tx_analog_filter();
-            calibrate_secondary_tx_filter();
             calibrate_rx_TIAs();
+            calibrate_secondary_tx_filter();
 
             setup_adc();
         }
@@ -1064,6 +1113,12 @@ public:
     }
 
     double set_coreclk(const double rate) {
+        if(rate == _req_coreclk) {
+            return _req_coreclk;
+        }
+
+        _req_coreclk = rate;
+
         //this sets the ADC clock rate -- NOT the sample rate!
         //sample rate also depends on the HB and FIR filter decimation/interpolations
         //modulus is 2088960
@@ -1093,32 +1148,31 @@ public:
 
         double actual_vcorate = fref * (nint + double(nfrac)/modulus);
 
-        _b200_iface->write_reg(0x044, nint); //Nint
-        _b200_iface->write_reg(0x041, (nfrac >> 16) & 0xFF); //Nfrac[23:16]
-        _b200_iface->write_reg(0x042, (nfrac >> 8) & 0xFF); //Nfrac[15:8]
-        _b200_iface->write_reg(0x043, nfrac & 0xFF); //Nfrac[7:0]
-
-        //use XTALN input, CLKOUT=XTALN (40MHz ref out to FPGA)
-        reg_bbpll = (reg_bbpll & 0xF8) | i;
-        _b200_iface->write_reg(0x00A, reg_bbpll);   //set BBPLL divider
-        _b200_iface->write_reg(0x045, 0x00);        //REFCLK / 1 to BBPLL
-
-        //CP filter recommended coefficients, don't change unless you have a clue
-        _b200_iface->write_reg(0x048, 0xe8);
-        _b200_iface->write_reg(0x049, 0x5b);
-        _b200_iface->write_reg(0x04a, 0x35);
-
         //scale CP current according to VCO rate
         const double icp_baseline = 150e-6;
         const double freq_baseline = 1280e6;
         double icp = icp_baseline * actual_vcorate / freq_baseline;
-//        std::cout << "Settled on CP current: " << icp * 1e6 << "uA" << std::endl;
         int icp_reg = icp/25e-6 + 1;
 
-        //CP current
-        _b200_iface->write_reg(0x046, icp_reg & 0x3F);
+        _b200_iface->write_reg(0x045, 0x00);            //REFCLK / 1 to BBPLL
+        _b200_iface->write_reg(0x046, icp_reg & 0x3F);  //CP current
+        _b200_iface->write_reg(0x048, 0xe8);            //BBPLL loop filters
+        _b200_iface->write_reg(0x049, 0x5b);            //BBPLL loop filters
+        _b200_iface->write_reg(0x04a, 0x35);            //BBPLL loop filters
+
+        _b200_iface->write_reg(0x04B, 0xE0);
+        _b200_iface->write_reg(0x04e, 0x10);            //max accuracy
+
+        _b200_iface->write_reg(0x043, nfrac & 0xFF);        //Nfrac[7:0]
+        _b200_iface->write_reg(0x042, (nfrac >> 8) & 0xFF); //Nfrac[15:8]
+        _b200_iface->write_reg(0x041, (nfrac >> 16) & 0xFF);//Nfrac[23:16]
+        _b200_iface->write_reg(0x044, nint);                //Nint
 
         calibrate_lock_bbpll();
+
+        //use XTALN input, CLKOUT=XTALN (40MHz ref out to FPGA)
+        reg_bbpll = (reg_bbpll & 0xF8) | i;
+        _b200_iface->write_reg(0x00A, reg_bbpll);   //set BBPLL divider
 
         _bbpll_freq = (actual_vcorate / vcodiv);
         return _bbpll_freq;
@@ -1146,15 +1200,9 @@ public:
             if(vcorate >= vcomin && vcorate <= vcomax) break;
         }
         if(i == 7) throw uhd::runtime_error("RFVCO can't find valid VCO rate!");
-        //TODO this will pick the low rate for threshold values, should eval
-        //whether vcomax or vcomin has better performance
-
-//        std::cout << "RF VCO rate: " << vcorate << std::endl;
 
         int nint = vcorate / fref;
         int nfrac = ((vcorate / fref) - nint) * modulus;
-//        std::cout << std::dec << "RF Nint: " << nint << " Nfrac: "
-//            << nfrac << " vcodiv: " << vcodiv << std::endl;
 
         double actual_vcorate = fref * (nint + double(nfrac)/modulus);
         double actual_lo = actual_vcorate / vcodiv;
@@ -1164,15 +1212,15 @@ public:
             if(value < 2.2e9) {
                 fpga_bandsel = (fpga_bandsel & 0xF8) | RX_BANDSEL_B;
                 reg_inputsel = (reg_inputsel & 0xC0) | 0x30;
-//                std::cout << "FPGA BANDSEL_B; CAT BANDSEL C" << std::endl;
+                //std::cout << "FPGA BANDSEL_B; CAT BANDSEL C" << std::endl;
             } else if((value >= 2.2e9) && (value < 4e9)) {
                 fpga_bandsel = (fpga_bandsel & 0xF8) | RX_BANDSEL_A;
                 reg_inputsel = (reg_inputsel & 0xC0) | 0x0C;
-//                std::cout << "FPGA BANDSEL_A; CAT BANDSEL B" << std::endl;
+                //std::cout << "FPGA BANDSEL_A; CAT BANDSEL B" << std::endl;
             } else if((value >= 4e9) && (value <= 6e9)) {
                 fpga_bandsel = (fpga_bandsel & 0xF8) | RX_BANDSEL_C;
                 reg_inputsel = (reg_inputsel & 0xC0) | 0x03;
-//                std::cout << "FPGA BANDSEL_C; CAT BANDSEL A" << std::endl;
+                //std::cout << "FPGA BANDSEL_C; CAT BANDSEL A" << std::endl;
             } else {
                 UHD_THROW_INVALID_CODE_PATH();
             }
@@ -1181,19 +1229,6 @@ public:
 
             /* Store vcodiv setting. */
             reg_vcodivs = (reg_vcodivs & 0xF0) | (i & 0x0F);
-
-            //set up synth
-            _b200_iface->write_reg(0x23a, 0x4a);//vco output level
-            _b200_iface->write_reg(0x239, 0xc1);//init ALC value and VCO varactor
-            _b200_iface->write_reg(0x242, 0x17);//vco bias and bias ref
-            _b200_iface->write_reg(0x238, 0x70);//vco cal offset
-            _b200_iface->write_reg(0x245, 0x00);//vco cal ref tcf
-            _b200_iface->write_reg(0x251, 0x0e);//varactor ref
-            _b200_iface->write_reg(0x250, 0x70);//vco varactor ref tcf
-            _b200_iface->write_reg(0x240, 0x0f);//rx synth loop filter r3
-            _b200_iface->write_reg(0x23f, 0xe7);//r1 and c3
-            _b200_iface->write_reg(0x23e, 0xf3);//c2 and c1
-            _b200_iface->write_reg(0x23b, 0x89);//Icp
 
             //tune that shit
             _b200_iface->write_reg(0x233, nfrac & 0xFF);
@@ -1205,7 +1240,6 @@ public:
 
             _b200_iface->write_reg(0x236, 0x6b); //undoc vco settings
             _b200_iface->write_reg(0x237, 0x65);
-            _b200_iface->write_reg(0x238, 0x71); //force vco tune <8
 
             boost::this_thread::sleep(boost::posix_time::milliseconds(2));
             if((_b200_iface->read_reg(0x247) & 0x02) == 0) {
@@ -1214,7 +1248,7 @@ public:
 
             _rx_freq = actual_lo;
 
-            calibrate_rx_quadrature();
+//            calibrate_rx_quadrature();
 
             return_freq = actual_lo;
 
@@ -1222,11 +1256,11 @@ public:
             if(value < 3e9) {
                 fpga_bandsel = (fpga_bandsel & 0xE7) | TX_BANDSEL_A;
                 reg_inputsel = reg_inputsel | 0x40;
-//                std::cout << "FPGA BANDSEL_A; CAT BANDSEL B" << std::endl;
+                //std::cout << "FPGA BANDSEL_A; CAT BANDSEL B" << std::endl;
             } else if((value >= 3e9) && (value <= 6e9)) {
                 fpga_bandsel = (fpga_bandsel & 0xE7) | TX_BANDSEL_B;
                 reg_inputsel = reg_inputsel & 0xBF;
-//                std::cout << "FPGA BANDSEL_B; CAT BANDSEL A" << std::endl;
+                //std::cout << "FPGA BANDSEL_B; CAT BANDSEL A" << std::endl;
             } else {
                 UHD_THROW_INVALID_CODE_PATH();
             }
@@ -1235,19 +1269,6 @@ public:
 
             /* Store vcodiv setting. */
             reg_vcodivs = (reg_vcodivs & 0x0F) | ((i & 0x0F) << 4);
-
-            _b200_iface->write_reg(0x27a, 0x4a);//vco output level
-            _b200_iface->write_reg(0x279, 0xc1);//init ALC value and VCO varactor
-            _b200_iface->write_reg(0x282, 0x17);//vco bias and bias ref
-            _b200_iface->write_reg(0x278, 0x70);//vco cal offset //fixme 0x71
-            _b200_iface->write_reg(0x285, 0x00);//vco cal ref tcf
-            _b200_iface->write_reg(0x291, 0x0e);//varactor ref
-            _b200_iface->write_reg(0x290, 0x70);//vco varactor ref tcf
-
-            _b200_iface->write_reg(0x280, 0x0f);//rx synth loop filter r3 //fixme 0x0F
-            _b200_iface->write_reg(0x27f, 0xe7);//r1 and c3 //fixme e7
-            _b200_iface->write_reg(0x27e, 0xf3);//c2 and c1 //fixme f3
-            _b200_iface->write_reg(0x27b, 0x88);//Icp //fixme 0x88
 
             //tuning yo
             _b200_iface->write_reg(0x273, nfrac & 0xFF);
@@ -1266,14 +1287,16 @@ public:
 
             /* If the tune call wasn't invoked during a calibration routine, run the
              * quadrature calibration. */
+            /*
             if(which[0] != 'C') {
                 calibrate_tx_quadrature();
-            }
+            } */
 
             return_freq = actual_lo;
         }
 
-        calibrate_rf_dc_offset();
+        calibrate_tx_quadrature();
+        calibrate_rx_quadrature();
 
         return return_freq;
     }
@@ -1304,7 +1327,7 @@ private:
     wb_iface::sptr _ctrl;
     double _rx_freq, _tx_freq;
     double _baseband_bw, _bbpll_freq;
-    double _clock_rate;
+    double _req_clock_rate, _req_coreclk;
     uint16_t _rx_bbf_tunediv;
 
     /* Shadow register fields.*/
