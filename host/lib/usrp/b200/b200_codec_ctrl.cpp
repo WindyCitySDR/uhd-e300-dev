@@ -94,19 +94,24 @@ public:
      * Filter functions
      **********************************************************************/
 
-    void setup_fir(const std::string &which, uint8_t num_taps, uint16_t *coeffs) {
+    void setup_fir(const std::string &which, int num_taps, uint16_t *coeffs) {
         uint16_t base;
-        if(which == "RX") base = 0x0f0;
-        else base = 0x060;
+        if(which == "RX") {
+            base = 0x0f0;
+            _b200_iface->write_reg(base+6, 0x02); //filter gain
+        } else {
+            base = 0x060;
+        }
 
         /* Write the filter configuration. */
         uint8_t reg_numtaps = (((num_taps / 16) - 1) & 0x07) << 5;
 
         _b200_iface->write_reg(base+5, reg_numtaps | 0x1a); //enable filter clk
-        _b200_iface->write_reg(base+6, 0x02); //filter gain
         boost::this_thread::sleep(boost::posix_time::milliseconds(1));
 
-        for(int addr=0; addr < (num_taps / 2); addr++) {
+        int num_unique_coeffs = (num_taps / 2);
+
+        for(int addr=0; addr < num_unique_coeffs; addr++) {
             _b200_iface->write_reg(base+0, addr);
             _b200_iface->write_reg(base+1, (coeffs[addr]) & 0xff);
             _b200_iface->write_reg(base+2, (coeffs[addr] >> 8) & 0xff);
@@ -115,10 +120,10 @@ public:
             _b200_iface->write_reg(base+4, 0x00);
         }
         //it's symmetric, so we write it out again backwards
-        for(int addr=0; addr < (num_taps / 2); addr++) {
-            _b200_iface->write_reg(base+0, addr+64);
-            _b200_iface->write_reg(base+1, (coeffs[64-addr]) & 0xff);
-            _b200_iface->write_reg(base+2, (coeffs[64-addr] >> 8) & 0xff);
+        for(int addr=0; addr < num_unique_coeffs; addr++) {
+            _b200_iface->write_reg(base+0, addr+num_unique_coeffs);
+            _b200_iface->write_reg(base+1, (coeffs[num_unique_coeffs-1-addr]) & 0xff);
+            _b200_iface->write_reg(base+2, (coeffs[num_unique_coeffs-1-addr] >> 8) & 0xff);
             _b200_iface->write_reg(base+5, 0xfe);
             _b200_iface->write_reg(base+4, 0x00);
             _b200_iface->write_reg(base+4, 0x00);
@@ -175,7 +180,6 @@ public:
      ***********************************************************************/
 
     void calibrate_lock_bbpll() {
-        //calibrate freq (0x04B[7], toggle 0x03F[2] 1 then 0)
         _b200_iface->write_reg(0x03F, 0x05);
         _b200_iface->write_reg(0x03F, 0x01); //keep bbpll on
 
@@ -775,7 +779,7 @@ public:
         /* Initialize shadow registers. */
         fpga_bandsel = 0x00;
         reg_vcodivs = 0x00;
-        reg_inputsel = 0x00;
+        reg_inputsel = 0x70;
         reg_rxfilt = 0x00;
         reg_txfilt = 0x00;
         reg_bbpll = 0x02; // no clock Set by default in _impl for 40e6 reference
@@ -818,7 +822,7 @@ public:
 
         /* Tune the BBPLL, write TX and RX FIRS. */
         set_clock_rate(30.72e6);
-        _b200_iface->write_reg(0x004, 0x03);
+        _b200_iface->write_reg(0x004, reg_inputsel);
 
         /* Setup data ports (FDD dual port DDR CMOS) */
         //FDD dual port DDR CMOS no swap
@@ -1060,7 +1064,7 @@ public:
             reg_txfilt = BOOST_BINARY( 01100001 ) ;
 
             divfactor = 6;
-            tfir = 2;
+            tfir = 1;
         } else {
             UHD_THROW_INVALID_CODE_PATH();
         }
@@ -1074,8 +1078,10 @@ public:
         if(adcclk > 336e6) {
             /* Make the DAC clock = ADC/2, and bypass the TXFIR. */
             reg_bbpll = reg_bbpll | 0x08;
-            reg_txfilt = (reg_txfilt & 0xFC);//FIXME WTF? | 0x01;
-            tfir = 1;
+            // TODO: I do not believe the below line is still necessary after
+            // the complete rework of the above txfilt logic. Leaving it here in
+            // case we need to revisit later.
+            //reg_txfilt = (reg_txfilt & 0xFC);//FIXME WTF? | 0x01;
 
             dacclk = adcclk / 2.0;
         }
@@ -1089,12 +1095,12 @@ public:
 
         /* Setup the RX and TX FIR filters. Scale the number of taps based on
          * the clock speed. */
-        int max_rx_taps = std::min((16 * int(adcclk / rate)), 128);
-        int max_tx_taps = 16 * std::min(int(std::floor(dacclk / rate)), \
+        int max_tx_taps = 16 * std::min(int((dacclk / rate) + 0.5), \
                 std::min(4 * (1 << tfir), 8));
+        int max_rx_taps = std::min((16 * int(adcclk / rate)), 128);
 
-        int num_rx_taps = get_num_taps(max_rx_taps);
         int num_tx_taps = get_num_taps(max_tx_taps);
+        int num_rx_taps = get_num_taps(max_rx_taps);
 
         setup_tx_fir(num_tx_taps);
         setup_rx_fir(num_rx_taps);
@@ -1132,8 +1138,8 @@ public:
         int vcodiv;
 
         //iterate over VCO dividers until appropriate divider is found
-        int i=0;
-        for(i=0; i<=6; i++) {
+        int i=1;
+        for(; i<=6; i++) {
             vcodiv = 1<<i;
             vcorate = rate * vcodiv;
             if(vcorate >= vcomin && vcorate <= vcomax) break;
@@ -1144,7 +1150,7 @@ public:
 
         int nint = vcorate / fref;
         int nfrac = ((vcorate / fref) - nint) * modulus;
-//        std::cout << "BB Nint: " << nint << " Nfrac: " << nfrac << " vcodiv: " << vcodiv << std::endl;
+        //std::cout << "BB Nint: " << nint << " Nfrac: " << nfrac << " vcodiv: " << vcodiv << std::endl;
 
         double actual_vcorate = fref * (nint + double(nfrac)/modulus);
 
@@ -1160,7 +1166,7 @@ public:
         _b200_iface->write_reg(0x049, 0x5b);            //BBPLL loop filters
         _b200_iface->write_reg(0x04a, 0x35);            //BBPLL loop filters
 
-        _b200_iface->write_reg(0x04B, 0xE0);
+        _b200_iface->write_reg(0x04b, 0xe0);
         _b200_iface->write_reg(0x04e, 0x10);            //max accuracy
 
         _b200_iface->write_reg(0x043, nfrac & 0xFF);        //Nfrac[7:0]
@@ -1172,7 +1178,6 @@ public:
 
         //use XTALN input, CLKOUT=XTALN (40MHz ref out to FPGA)
         reg_bbpll = (reg_bbpll & 0xF8) | i;
-        _b200_iface->write_reg(0x00A, reg_bbpll);   //set BBPLL divider
 
         _bbpll_freq = (actual_vcorate / vcodiv);
         return _bbpll_freq;
@@ -1302,6 +1307,7 @@ public:
     }
 
     double set_filter_bw(const std::string &which) {
+#if 0
         /* If the BBPLL hasn't been tuned & calibrated yet, return. */
         if(_bbpll_freq == 0) {
             return 0.0;
@@ -1319,6 +1325,8 @@ public:
 
             return bw;
         }
+#endif
+        return 0.0;
     }
 
 
