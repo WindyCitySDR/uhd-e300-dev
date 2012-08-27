@@ -651,41 +651,8 @@ public:
         _b200_iface->write_reg(0x16e, 0x25);
         _b200_iface->write_reg(0x16a, 0x75);
         _b200_iface->write_reg(0x16b, 0x15);
-        _b200_iface->write_reg(0x169, 0xC0);
-        _b200_iface->write_reg(0x18b, 0xad);
-
-#if 0
-        /* RX Quad Cal: power down TX mixer, tune TX LO to passband of RX
-         * spectrum, run the calibration, retune the TX LO, re-enable the TX
-         * mixer. */
-        _b200_iface->write_reg(0x057, 0x33);
-
-        double old_tx_freq = _tx_freq;
-        tune("CAL", (_rx_freq + (_baseband_bw / 4)));
-#endif
-
-        int count = 0;
-        _b200_iface->write_reg(0x016, 0x20);
-        while(_b200_iface->read_reg(0x016) & 0x20) {
-            if(count > 5) {
-                std::cout << "RX Quadrature Calibration Failure!" << std::endl;
-                break;
-            }
-
-            count++;
-            boost::this_thread::sleep(boost::posix_time::milliseconds(10));
-        }
-
-#if 0
-        /* Re-enable TX mixer and re-tune TX LO. */
-        if((old_tx_freq >= 100e6) && (old_tx_freq <= 6e9)) {
-            tune("CAL", old_tx_freq);
-        }
-        _b200_iface->write_reg(0x057, 0x30);
-#endif
-
-        /* Enable Quad Cal Tracking. */
         _b200_iface->write_reg(0x169, 0xcf);
+        _b200_iface->write_reg(0x18b, 0xad);
 
         /* If we were in the FDD state, return it now. */
         if(not_in_alert) {
@@ -924,9 +891,6 @@ public:
         _b200_iface->write_reg(0x012, 0x02); //set PPORT config
         _b200_iface->write_reg(0x013, 0x01); //set FDD
         _b200_iface->write_reg(0x015, 0x04); //dual synth mode, synth en ctrl en
-
-        _rx_freq = 800e6;
-        _tx_freq = 850e6;
 
         tune("RX", 800e6);
         tune("TX", 850e6);
@@ -1243,17 +1207,12 @@ public:
             _b200_iface->write_reg(0x231, nint & 0xFF);
             _b200_iface->write_reg(0x005, reg_vcodivs);
 
-            _b200_iface->write_reg(0x236, 0x6b); //undoc vco settings
-            _b200_iface->write_reg(0x237, 0x65);
-
             boost::this_thread::sleep(boost::posix_time::milliseconds(2));
             if((_b200_iface->read_reg(0x247) & 0x02) == 0) {
                 std::cout << "RX PLL NOT LOCKED" << std::endl;
             }
 
             _rx_freq = actual_lo;
-
-//            calibrate_rx_quadrature();
 
             return_freq = actual_lo;
 
@@ -1289,13 +1248,6 @@ public:
             }
 
             _tx_freq = actual_lo;
-
-            /* If the tune call wasn't invoked during a calibration routine, run the
-             * quadrature calibration. */
-            /*
-            if(which[0] != 'C') {
-                calibrate_tx_quadrature();
-            } */
 
             return_freq = actual_lo;
         }
