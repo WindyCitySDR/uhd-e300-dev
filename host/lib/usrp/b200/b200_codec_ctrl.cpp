@@ -1013,7 +1013,7 @@ public:
 
             divfactor = 24;
             tfir = 2;
-        } else if((rate > 22e6) && (rate <= 40e6)) {
+        } else if((rate > 22e6) && (rate < 40e6)) {
             // RX1 enabled, 2, 2, 2, 2
             reg_rxfilt = BOOST_BINARY( 01011110 ) ;
 
@@ -1022,7 +1022,7 @@ public:
 
             divfactor = 16;
             tfir = 2;
-        } else if((rate > 40e6) && (rate <= 56e6)) {
+        } else if((rate >= 40e6) && (rate <= 56e6)) {
             // RX1 enabled, 3, 1, 2, 2
             reg_rxfilt = BOOST_BINARY( 01100110 ) ;
 
