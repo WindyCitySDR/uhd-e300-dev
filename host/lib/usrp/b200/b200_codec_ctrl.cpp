@@ -17,6 +17,7 @@
 
 #include "b200_regs.hpp"
 #include "b200_codec_ctrl.hpp"
+#include "ad9361_synth_lut.hpp"
 #include <uhd/exception.hpp>
 #include <uhd/utils/msg.hpp>
 #include <iostream>
@@ -710,6 +711,11 @@ public:
         }
     }
 
+
+    /***********************************************************************
+     * Other Misc Setup Functions
+     ***********************************************************************/
+
     void program_mixer_gm_subtable() {
         uint8_t gain[] = {0x78, 0x74, 0x70, 0x6C, 0x68, 0x64, 0x60, 0x5C, 0x58,
                           0x54, 0x50, 0x4C, 0x48, 0x30, 0x18, 0x00};
@@ -735,6 +741,63 @@ public:
         _b200_iface->write_reg(0x13C, 0x00);
         _b200_iface->write_reg(0x13C, 0x00);
         _b200_iface->write_reg(0x13f, 0x00);
+    }
+
+    void setup_synth(std::string which, double vcorate) {
+        /* The vcorates in the vco_index array represent lower boundaries for
+         * rates. Once we find a match, we use that index to look-up the rest of
+         * the register values in the LUT. */
+        int vcoindex = 0;
+        for(int i = 0; i < 53; i++) {
+            if(vcorate < vco_index[i]) {
+                vcoindex = i;
+            } else {
+                break;
+            }
+        }
+
+        UHD_ASSERT_THROW(vcoindex < 53);
+
+        uint8_t vco_output_level = synth_cal_lut[vcoindex][0];
+        uint8_t vco_varactor = synth_cal_lut[vcoindex][1];
+        uint8_t vco_bias_ref = synth_cal_lut[vcoindex][2];
+        uint8_t vco_bias_tcf = synth_cal_lut[vcoindex][3];
+        uint8_t vco_cal_offset = synth_cal_lut[vcoindex][4];
+        uint8_t vco_varactor_ref = synth_cal_lut[vcoindex][5];
+        uint8_t charge_pump_curr = synth_cal_lut[vcoindex][6];
+        uint8_t loop_filter_c2 = synth_cal_lut[vcoindex][7];
+        uint8_t loop_filter_c1 = synth_cal_lut[vcoindex][8];
+        uint8_t loop_filter_r1 = synth_cal_lut[vcoindex][9];
+        uint8_t loop_filter_c3 = synth_cal_lut[vcoindex][10];
+        uint8_t loop_filter_r3 = synth_cal_lut[vcoindex][11];
+
+        if(which == "RX") {
+            _b200_iface->write_reg(0x23a, 0x40 | vco_output_level);
+            _b200_iface->write_reg(0x239, 0xC0 | vco_varactor);
+            _b200_iface->write_reg(0x242, vco_bias_ref | (vco_bias_tcf << 3));
+            _b200_iface->write_reg(0x238, (vco_cal_offset << 3));
+            _b200_iface->write_reg(0x245, 0x00);
+            _b200_iface->write_reg(0x251, vco_varactor_ref);
+            _b200_iface->write_reg(0x250, 0x70);
+            _b200_iface->write_reg(0x23b, 0x80 | charge_pump_curr);
+            _b200_iface->write_reg(0x23e, loop_filter_c1 | (loop_filter_c2 << 4));
+            _b200_iface->write_reg(0x23f, loop_filter_c3 | (loop_filter_r1 << 4));
+            _b200_iface->write_reg(0x240, loop_filter_r3);
+        } else if(which == "TX") {
+            _b200_iface->write_reg(0x27a, 0x40 | vco_output_level);
+            _b200_iface->write_reg(0x279, 0xC0 | vco_varactor);
+            _b200_iface->write_reg(0x282, vco_bias_ref | (vco_bias_tcf << 3));
+            _b200_iface->write_reg(0x278, (vco_cal_offset << 3));
+            _b200_iface->write_reg(0x285, 0x00);
+            _b200_iface->write_reg(0x291, vco_varactor_ref);
+            _b200_iface->write_reg(0x290, 0x70);
+            _b200_iface->write_reg(0x27b, 0x80 | charge_pump_curr);
+            _b200_iface->write_reg(0x27e, loop_filter_c1 | (loop_filter_c2 << 4));
+            _b200_iface->write_reg(0x27f, loop_filter_c3 | (loop_filter_r1 << 4));
+            _b200_iface->write_reg(0x280, loop_filter_r3);
+        } else {
+            UHD_THROW_INVALID_CODE_PATH();
+        }
     }
 
 
@@ -824,57 +887,8 @@ public:
 
         calibrate_synth_charge_pumps();
 
-
-        _b200_iface->write_reg(0x23a, 0x4a);//vco output level
-            /* FIXME - These are different! */
-            _b200_iface->write_reg(0x239, 0xc1);//init ALC value and VCO varactor
-            _b200_iface->write_reg(0x242, 0x17);//vco bias and bias ref
-            _b200_iface->write_reg(0x238, 0x70);//vco cal offset
-            _b200_iface->write_reg(0x245, 0x00);//vco cal ref tcf
-            _b200_iface->write_reg(0x251, 0x0e);//varactor ref
-            _b200_iface->write_reg(0x250, 0x70);//vco varactor ref tcf
-            _b200_iface->write_reg(0x23b, 0x89);//Icp
-            _b200_iface->write_reg(0x23e, 0xf3);//c2 and c1
-            _b200_iface->write_reg(0x23f, 0xe7);//r1 and c3
-            _b200_iface->write_reg(0x240, 0x0f);//rx synth loop filter r3
-
-        _b200_iface->write_reg(0x27a, 0x4a);//vco output level
-        _b200_iface->write_reg(0x279, 0xc1);//init ALC value and VCO varactor
-        _b200_iface->write_reg(0x282, 0x17);//vco bias and bias ref
-            _b200_iface->write_reg(0x278, 0x70);//vco cal offset //fixme 0x71
-        _b200_iface->write_reg(0x285, 0x00);//vco cal ref tcf
-        _b200_iface->write_reg(0x291, 0x0e);//varactor ref
-        _b200_iface->write_reg(0x290, 0x70);//vco varactor ref tcf
-
-            _b200_iface->write_reg(0x27b, 0x88);//Icp //fixme 0x88
-            _b200_iface->write_reg(0x27e, 0xf3);//c2 and c1 //fixme f3
-            _b200_iface->write_reg(0x27f, 0xe7);//r1 and c3 //fixme e7
-            _b200_iface->write_reg(0x280, 0x0f);//rx synth loop filter r3 //fixme 0x0F
-
-
-        /* Tune RX! */
-        _b200_iface->write_reg(0x233, 0x00);
-        _b200_iface->write_reg(0x234, 0x00);
-        _b200_iface->write_reg(0x235, 0x00);
-        _b200_iface->write_reg(0x232, 0x00);
-        _b200_iface->write_reg(0x231, 0x50);
-        _b200_iface->write_reg(0x005, 0x22);
-
-        /* Tune TX! */
-        _b200_iface->write_reg(0x273, 0x00);
-        _b200_iface->write_reg(0x274, 0x00);
-        _b200_iface->write_reg(0x275, 0x00);
-        _b200_iface->write_reg(0x272, 0x00);
-        _b200_iface->write_reg(0x271, 0x55);
-        _b200_iface->write_reg(0x005, 0x22);
-
-        boost::this_thread::sleep(boost::posix_time::milliseconds(2));
-        if((_b200_iface->read_reg(0x247) & 0x02) == 0) {
-            std::cout << "RX PLL NOT LOCKED" << std::endl;
-        }
-        if((_b200_iface->read_reg(0x287) & 0x02) == 0) {
-            std::cout << "TX PLL NOT LOCKED" << std::endl;
-        }
+        tune("RX", 800e6);
+        tune("TX", 850e6);
 
         program_mixer_gm_subtable();
 
@@ -891,9 +905,6 @@ public:
         _b200_iface->write_reg(0x012, 0x02); //set PPORT config
         _b200_iface->write_reg(0x013, 0x01); //set FDD
         _b200_iface->write_reg(0x015, 0x04); //dual synth mode, synth en ctrl en
-
-        tune("RX", 800e6);
-        tune("TX", 850e6);
 
         //ian magic
         _b200_iface->write_reg(0x014, 0x0f);
@@ -1199,6 +1210,9 @@ public:
             /* Store vcodiv setting. */
             reg_vcodivs = (reg_vcodivs & 0xF0) | (i & 0x0F);
 
+            /* Setup the synthesizer. */
+            setup_synth("RX", actual_vcorate);
+
             //tune that shit
             _b200_iface->write_reg(0x233, nfrac & 0xFF);
             _b200_iface->write_reg(0x234, (nfrac >> 8) & 0xFF);
@@ -1234,6 +1248,9 @@ public:
             /* Store vcodiv setting. */
             reg_vcodivs = (reg_vcodivs & 0x0F) | ((i & 0x0F) << 4);
 
+            /* Setup the synthesizer. */
+            setup_synth("TX", actual_vcorate);
+
             //tuning yo
             _b200_iface->write_reg(0x273, nfrac & 0xFF);
             _b200_iface->write_reg(0x274, (nfrac >> 8) & 0xFF);
@@ -1252,8 +1269,10 @@ public:
             return_freq = actual_lo;
         }
 
-        calibrate_tx_quadrature();
-        calibrate_rx_quadrature();
+        if((_rx_freq != 0) && (_tx_freq != 0.0)) {
+            calibrate_tx_quadrature();
+            calibrate_rx_quadrature();
+        }
 
         return return_freq;
     }
