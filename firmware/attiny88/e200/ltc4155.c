@@ -12,5 +12,5 @@ static io_pin_t CHRG_SCL     = IO_PC(3);
 
 void ltc4155_init(void)
 {
-	i2c_init(CHRG_SDA, CHRG_SCL);
+	i2c_init_ex(CHRG_SDA, CHRG_SCL, true);	// FIXME: Disable pull-ups once board is re-worked
 }

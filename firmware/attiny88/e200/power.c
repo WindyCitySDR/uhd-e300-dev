@@ -1,14 +1,21 @@
+/*
+	* Test battery voltage code
+	* Charger error blinking uses busy wait - will drain battery if encounters error while unattended? Surely rest of H/W will pull more current.
+*/
 #include "config.h"
 #include "power.h"
 
 #include <string.h>
 #include <util/delay.h>
 #include <avr/io.h>
+#include <avr/interrupt.h>
+#include <avr/sleep.h>
 
 #include "io.h"
 #include "ltc3675.h"
 #include "ltc4155.h"
 #include "debug.h"
+#include "global.h"
 
 #define BLINK_ERROR_DELAY   250  // ms
 
@@ -17,6 +24,8 @@
 
 #define ARRAY_SIZE(a)      (sizeof(a)/sizeof(a[0]))
 #define ZERO_MEMORY(s)      memset(&s, 0x00, sizeof(s))
+
+//volatile bool powered = false;
 
 struct reg_config {
     int16_t voltage;    // mV
@@ -48,6 +57,8 @@ static io_pin_t AVR_IRQ     = IO_PD(5);
 
 ///////////////////////////////////////////////////////////////////////////////
 
+#define TPS54478_START_DELAY	3	// ms
+
 #ifdef ATTINY88_DIP
 static io_pin_t CORE_PWR_EN = IO_PC(1);	// IO_PC(7) not routed by card, using PWER_EN1 instead
 #else
@@ -55,10 +66,15 @@ static io_pin_t CORE_PWR_EN = IO_PA(3);
 #endif // ATTINY88_DIP
 static io_pin_t CORE_PGOOD = IO_PB(0);
 
-void tps54478_init(void)
+void tps54478_init(bool enable)
 {
-    io_output_pin(CORE_PWR_EN);
+	tps54478_set_power(enable);
+	io_clear_pin(CORE_PWR_EN);
+	
     io_input_pin(CORE_PGOOD);
+#ifndef DEBUG	// Don't enable pull-up when connected to a pulled-up switch
+	io_set_pin(CORE_PGOOD);	// Enable pull-up for Open Drain
+#endif // DEBUG
 //#ifdef DEBUG
 //	io_enable_pin(CORE_PWR_EN, false);
 //#endif // DEBUG
@@ -66,12 +82,25 @@ void tps54478_init(void)
 
 void tps54478_set_power(bool on)
 {
-    io_enable_pin(CORE_PWR_EN, on);
+	// Assumes: Hi-Z input/LOW output
+	
+	if (on)
+	{
+		io_input_pin(CORE_PWR_EN);
+		_delay_ms(TPS54478_START_DELAY);
+	}		
+	else
+	{
+		io_output_pin(CORE_PWR_EN);
+		// Don't delay here as we can't detect its state anyway
+	}		
+	
+	//io_enable_pin(CORE_PWR_EN, on);
 }
 
 bool tps54478_is_power_good(void)
 {
-    return io_test_pin(CORE_PGOOD);
+    return io_test_pin(CORE_PGOOD);	// This doesn't necessarily mean it's good - the chip might be malfunctioning (or switched off)
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -90,7 +119,7 @@ void charge_set_led(bool on)
 
 void power_signal_interrupt(void)
 {
-    // FIXME
+    io_set_pin(AVR_IRQ);	// FIXME: Active low?
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -140,7 +169,7 @@ uint16_t battery_get_voltage(void)
     // Vbat(mV) = 1000 * (((ADC * 3.3) / 1024) * (274k + 357k)) / 357k
     // Vbat(mV) ~= ADC * 6 (=5.70)
 
-    ADCSRA |= (1 << ADEN);        // FIXME: Turn on ADC (or leave on all the time)
+    ADCSRA |= (1 << ADEN);        // FIXME: Turn on ADC (or leave on all the time?)
 
     ADCSRA |= (1 << ADSC);  // Start conversion
 
@@ -157,7 +186,7 @@ uint16_t battery_get_voltage(void)
 
 ///////////////////////////////////////////////////////////////////////////////
 
-static void blink_error_sequence(uint8_t len)
+void blink_error_sequence(uint8_t len)
 {
     charge_set_led(false);
     _delay_ms(BLINK_ERROR_DELAY * 2);
@@ -187,13 +216,19 @@ static bool _power_up_fpga(power_params_t* params)
 
     if (params->enable == false)
     {
-        if (tps54478_is_power_good() == false)  // Already off
-            return true;
+        //if (tps54478_is_power_good() == false)  // Already off
+		//	return true;
 
         if (params->retry == 0)
+		{
+			io_clear_pin(PS_SRST);	// FIXME: Hold it low to stop 
+			io_clear_pin(PS_POR);	// Prepare it for shutdown, and then the potential next power cycle
+			
             tps54478_set_power(false);
+		}			
 
-        return (tps54478_is_power_good() == false);
+        //return (tps54478_is_power_good() == false);
+		return true;
     }
 
     //bool fpga_power_good = tps54478_is_power_good();  // TODO: Can it ever already be good?
@@ -264,7 +299,7 @@ struct boot_step {
 
 void power_init(void)
 {
-    tps54478_init();
+    tps54478_init(true);	// Will keep EN float (keep power on)
 
     ltc3675_init();
 	
@@ -276,12 +311,12 @@ void power_init(void)
 
     io_output_pin(PS_POR);
     io_output_pin(PS_SRST);
-
     // Hold low until power is stable
     io_clear_pin(PS_POR);
     io_clear_pin(PS_SRST);
 	
 	io_input_pin(USBPM_IRQ);
+	io_set_pin(USBPM_IRQ);	// Enable pull-up for Open Drain
 /*
     AVR_CS
     AVR_MOSI
@@ -291,10 +326,34 @@ void power_init(void)
     FTDI_BCD
     FTDI_PWREN2
 */
-	io_input_pin(AVR_RESET);
+	io_input_pin(AVR_RESET);	// Has external pull-up (won't do anything because this is configured at the hardware RESET pin)
 	
-    io_output_pin(AVR_IRQ);
-	io_set_pin(AVR_IRQ);	// FIXME: Active low?
+	io_output_pin(AVR_IRQ);		// Output here, input to FPGA
+    //io_input_pin(AVR_IRQ);
+	//io_set_pin(AVR_IRQ);	// FIXME: Active low?
+	
+	///////////////
+	
+	EICRA = _BV(ISC01) | _BV(ISC00) | _BV(ISC10)/* | _BV(ISC11)*/;	// Rising edge for INT0 (WAKEUP). [Falling for INT1.] Any logical change INT1 (ONSWITCH_DB)
+	//EIMSK = _BV(INT0);	// [Turn on WAKEUP interrupt] Don't do this, as unit will turn on anyway
+	EIMSK = _BV(INT1) | _BV(INT0);	// Turn on ONSWITCH_DB and WAKEUP
+	
+	PCMSK0 = _BV(PCINT1) | _BV(PCINT0);	// USBPM_IRQ | CORE_PGOOD
+	PCMSK2 = _BV(PCINT16)/* | _BV(PCINT20)*/;	// PWR_IRQ/* | PWR_RESET*/
+	PCICR = _BV(PCIE2) | _BV(PCIE0);
+
+	///////////////
+/*
+	TCNT0;
+	OCR0A = 0x;
+	TCCR0A = _BV(CTC0);
+	TIFR0;
+	TIMSK0;
+	TCCR0A |= 0x05;	// Switch on with 1024 prescaler
+*/
+	TCCR1B = _BV(WGM12);	// CTC mode
+	OCR1A = 15624 * 2;		// Hold button for 2 seconds to switch off
+	TIMSK1 = _BV(OCIE1A);	// Enable CTC on Timer 1
 }
 
 bool power_on(void)
@@ -337,12 +396,184 @@ bool power_on(void)
     }
 
     if (step_count != ARRAY_SIZE(boot_steps)) {
-        while (true) {
-            blink_error_sequence(step_count);
+		sei();	// For button press detection
+		
+        while (_state.powered == false) {
+            blink_error_sequence(step_count + 1);
         }
 
         return false;
     }
+	
+	///////////////////////////////////
+	
+	fpga_reset(false);  // Power has been brought up, so let FPGA run
+	
+	///////////////////////////////////
+	
+	// Turn off WAKEUP interrupt, enable ONSWITCH_DB
+	//EIMSK = _BV(INT1);
+	
+	_state.powered = true;
 
     return true;
+}
+
+uint8_t power_off(void)
+{
+	io_clear_pin(PS_SRST);	// FIXME: Hold it low to stop FPGA running
+	
+	///////////////////////////////////
+	
+	int8_t step_count, retry;
+	for (step_count = ARRAY_SIZE(boot_steps) - 1; step_count >= 0; step_count--) {
+//		debug_blink(step_count);
+		
+	    struct boot_step* step = boot_steps + step_count;
+	    if ((step->fn == NULL) && (step->subsys == PS_UNKNOWN))
+            continue;
+
+        power_params_t params;
+
+	    for (retry = 0; retry < step->retries; retry++) {
+	        ZERO_MEMORY(params);
+            params.subsys = step->subsys;
+            params.enable = false;
+	        params.retry = retry;
+
+	        if (step->fn != NULL) {
+                if (step->fn(&params))
+                    break;
+	        }
+	        else {
+	            if (_power_enable_subsys(&params))
+                    break;
+	        }
+
+            if ((retry < step->retries) && (step->delay > 0))
+                _delay_ms(step->delay);
+	    }
+		
+//		debug_blink(step_count);
+
+	    if (retry == step->retries)
+	        break;
+    }
+
+    if (step_count != -1) {
+		/*sei();
+		
+        while (_state.powered) {
+            blink_error_sequence(step_count);
+        }*/
+
+        return (step_count + 1);
+    }
+	
+	///////////////////////////////////
+	
+	// Turn off WAKEUP interrupt, enable ONSWITCH_DB
+	//EIMSK = _BV(INT1);
+
+	_state.powered = false;
+	
+	return 0;
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+#ifdef DEBUG
+
+#ifdef ATTINY88_DIP
+static io_pin_t DEBUG_1 = IO_PB(6);
+static io_pin_t DEBUG_2	= IO_PB(7);
+#endif // ATTINY88_DIP
+
+#endif // DEBUG
+
+ISR(INT0_vect)	// PD(2) WAKEUP: Rising edge
+{
+	cli();
+	
+	//power_on();
+	_state.wake_up = true;
+	
+	sei();
+}
+
+ISR(INT1_vect)	// PD(3) ONSWITCH_DB (PB_STAT): Any change
+{
+	cli();
+	
+	if (ltc3675_is_power_button_depressed())
+	{
+		TCNT1 = 0;
+		TCCR1B |= /*0x5*/0x3;	// [1024] 64 prescaler
+		_state.timers_running = true;
+		
+		//debug_set(DEBUG_1, true);
+		//debug_set(DEBUG_2, false);
+	}
+	else
+	{
+		//if (TIMSK1 & _BV(OCIE1A))	// If letting go of button and still running, stop timer
+		{
+			//TIMSK1 &= ~_BV(OCIE1A);
+			TCCR1B &= ~0x7;	// Disable timer
+			_state.timers_running = false;
+			
+			//debug_set(DEBUG_1, false);
+		}
+	}
+	
+	sei();
+}
+
+ISR(TIMER1_COMPA_vect)
+{
+	cli();
+
+	//TIMSK1 &= ~_BV(OCIE1A);	// Turn off timer
+	TCCR1B &= ~0x7;	// Disable timer
+	_state.timers_running = false;
+	_state.power_off = true;
+	
+	//debug_set(DEBUG_2, true);
+	
+	//power_off();
+	
+	sei();
+	
+	//sleep_mode();
+}
+
+ISR(PCINT0_vect)
+{
+	cli();
+	
+	// CORE_PGOOD
+	//	Assert low: power problem -> shutdown
+	// USBPM_IRQ
+	//	Charge status change? -> update LED
+	//	Power problem:	battery -> blink charge LED
+	//					major -> shutdown
+	
+	if (/*(_state.powered) && */(io_test_pin(CORE_PGOOD) == false))
+	{
+		_state.core_power_bad = true;
+	}
+	
+	sei();
+}
+
+ISR(PCINT2_vect)
+{
+	cli();
+	
+	// PWR_IRQ
+	//	Regulator problem: shutdown
+	// PWR_RESET
+	//	Ignored
+	
+	sei();
 }

@@ -58,7 +58,7 @@ bool ltc3675_init(void)
     io_output_pin(PWR_EN5);
 #endif // HARDWIRE_ENABLE
 
- /*   io_output_pin(PWR_SDA);
+ /*	io_output_pin(PWR_SDA);
     io_output_pin(PWR_SCL);
 
     // Must remain HIGH when idle
@@ -69,9 +69,16 @@ bool ltc3675_init(void)
     //i2c_init_ex(PWR_SDA, PWR_SCL, true);
 
     io_input_pin(PWR_IRQ);
+	io_set_pin(PWR_IRQ);	// Enable pull-up for Open Drain
+	
     io_input_pin(WAKEUP);
+	io_set_pin(WAKEUP);	// Enable pull-up for Open Drain
+	
     io_input_pin(ONSWITCH_DB);
+	io_set_pin(ONSWITCH_DB);	// Enable pull-up for Open Drain
+	
     io_input_pin(PWR_RESET);
+	io_set_pin(PWR_RESET);	// Enable pull-up for Open Drain
 
     // FIXME: Make 'power_init' bool if any I2C
 
@@ -94,7 +101,7 @@ bool ltc3675_init(void)
 
 bool ltc3675_enable_reg(ltc3675_regulator_t reg, bool on)
 {
-	debug_blink2(reg + 1);
+	//debug_blink2(reg + 1);
 	
 	// Sub-address: index of regulator
 	// Data: <default reg contents> | <enable>
@@ -143,4 +150,9 @@ bool ltc3675_set_voltage(ltc3675_regulator_t reg, uint16_t voltage)
     //  No: minimum FB step will put Vout < 1.35
 
     return true;
+}
+
+bool ltc3675_is_power_button_depressed(void)
+{
+	return (io_test_pin(ONSWITCH_DB) == false);
 }

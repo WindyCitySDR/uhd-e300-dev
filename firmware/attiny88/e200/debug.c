@@ -27,6 +27,11 @@ void debug_init()
 	io_enable_pin(DEBUG_2, true);
 }
 
+void debug_set(io_pin_t pin, bool enable)
+{
+	io_enable_pin(pin, !enable);
+}
+
 void debug_blink(uint8_t count)
 {
 	io_enable_pin(DEBUG_1, false);

@@ -4,7 +4,7 @@
 #include <stdbool.h>
 #include <stdint.h>
 
-void tps54478_init(void);
+void tps54478_init(bool enable);
 void tps54478_set_power(bool on);   // Zynq core power (1.0V for FPGA)
 bool tps54478_is_power_good(void);
 
@@ -30,5 +30,6 @@ uint16_t battery_get_voltage(void);  // mV
 
 void power_init(void);
 bool power_on(void);
+uint8_t power_off(void);
 
 #endif // POWER_H

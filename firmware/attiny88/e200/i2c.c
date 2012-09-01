@@ -9,7 +9,10 @@
 /*
 	- Reset bus on failure (lack of ACK, etc)
 	- Clock stretching
+	- In pull-up mode, much code was commented out to ever avoid driving the bus (for a fleeting moment) as this was visible on the scope as short peaks (instead the line will briefly go Hi Z).
 */
+
+// FIXME: Follow magic numbers should be in a struct that is passed into each function
 
 #define I2C_DEFAULT_RETRY_DELAY     1   // us MAGIC
 #define I2C_DEFAULT_MAX_ACK_RETRIES 10  // * I2C_DEFAULT_RETRY_DELAY us

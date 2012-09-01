@@ -23,5 +23,6 @@ typedef enum ltc3675_regulators {
 
 bool ltc3675_enable_reg(ltc3675_regulator_t reg, bool on);
 bool ltc3675_set_voltage(ltc3675_regulator_t reg, uint16_t voltage);
+bool ltc3675_is_power_button_depressed(void);
 
 #endif /* LTC3675_H */
