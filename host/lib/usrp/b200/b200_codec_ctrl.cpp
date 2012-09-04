@@ -18,6 +18,7 @@
 #include "b200_regs.hpp"
 #include "b200_codec_ctrl.hpp"
 #include "ad9361_synth_lut.hpp"
+#include "ad9361_gain_tables.hpp"
 #include <uhd/exception.hpp>
 #include <uhd/utils/msg.hpp>
 #include <iostream>
@@ -570,7 +571,7 @@ public:
                         63 * (_bbpll_freq / 640) * (0.92
                         + (0.08 * (640 / _bbpll_freq))))));
         data[33] = uint8_t(std::floor(std::min(63.0,
-                        63 * std::sqrt(_bbpll_freq))));
+                        63 * std::sqrt(_bbpll_freq / 640))));
         data[34] = std::min(uint8_t(127), uint8_t(std::floor(64
                         * std::sqrt(_bbpll_freq / 640))));
         data[35] = 0x40;
@@ -581,6 +582,8 @@ public:
 
         for(int i=0; i<40; i++) {
             _b200_iface->write_reg(0x200+i, data[i]);
+
+            std::cout << std::hex << (int) 0x200+i << ": " << (int) data[i] << std::endl;
         }
     }
 
@@ -743,6 +746,94 @@ public:
         _b200_iface->write_reg(0x13f, 0x00);
     }
 
+
+    void program_gain_table() {
+
+        uint8_t (*gain_table)[5] = NULL;
+
+        uint8_t new_gain_table;
+
+        if(_rx_freq  < 1300e6) {
+            gain_table = gain_table_sub_1300mhz;
+            new_gain_table = 1;
+        } else if(_rx_freq < 4e9) {
+            gain_table = gain_table_1300mhz_to_4000mhz;
+            new_gain_table = 2;
+        } else if(_rx_freq <= 6e9) {
+            gain_table = gain_table_4000mhz_to_6000mhz;
+            new_gain_table = 3;
+        } else {
+            UHD_THROW_INVALID_CODE_PATH();
+        }
+
+        /* Only re-program the gain table if there has been a band change. */
+        if(_curr_gain_table == new_gain_table) {
+            return;
+        } else {
+            _curr_gain_table = new_gain_table;
+        }
+
+        /* Start the gain table clock. */
+        _b200_iface->write_reg(0x137, 0x1A);
+
+        uint8_t index = 0;
+        for(; index < 77; index++) {
+            _b200_iface->write_reg(0x130, index);
+            _b200_iface->write_reg(0x131, gain_table[index][1]);
+            _b200_iface->write_reg(0x132, gain_table[index][2]);
+            _b200_iface->write_reg(0x133, gain_table[index][3]);
+            _b200_iface->write_reg(0x137, 0x1E);
+            _b200_iface->write_reg(0x134, 0x00);
+            _b200_iface->write_reg(0x134, 0x00);
+
+            /* FIXME remove the below once we are done debugging
+            std::cout.unsetf(std::ios::hex);
+            std::cout << "Index: " << (int) index << std::endl;
+            std::cout << "Word 1: " << std::hex << (int) gain_table[index][1] << std::endl;
+            std::cout << "Word 2: " << std::hex << (int) gain_table[index][2] << std::endl;
+            std::cout << "Word 3: " << std::hex << (int) gain_table[index][3] << std::endl;
+            */
+        }
+
+        for(; index < 91; index++) {
+            _b200_iface->write_reg(0x130, index);
+            _b200_iface->write_reg(0x131, 0x00);
+            _b200_iface->write_reg(0x132, 0x00);
+            _b200_iface->write_reg(0x133, 0x00);
+            _b200_iface->write_reg(0x137, 0x1E);
+            _b200_iface->write_reg(0x134, 0x00);
+            _b200_iface->write_reg(0x134, 0x00);
+        }
+
+        /* Clear the write bit and stop the gain clock. */
+        _b200_iface->write_reg(0x137, 0x1A);
+        _b200_iface->write_reg(0x134, 0x00);
+        _b200_iface->write_reg(0x134, 0x00);
+        _b200_iface->write_reg(0x137, 0x00);
+    }
+
+    void setup_gain_control() {
+        _b200_iface->write_reg(0x0FA,0xE0);// Gain Control Mode Select
+        _b200_iface->write_reg(0x0FB,0x08);// Table, Digital Gain, Man Gain Ctrl
+        _b200_iface->write_reg(0x0FC,0x23);// Incr Step Size, ADC Overrange Size
+        _b200_iface->write_reg(0x0FD,0x4C);// Max Full/LMT Gain Table Index
+        _b200_iface->write_reg(0x0FE,0x44);// Decr Step Size, Peak Overload Time
+        _b200_iface->write_reg(0x100,0x6F);// Max Digital Gain
+        _b200_iface->write_reg(0x104,0x2F);// ADC Small Overload Threshold
+        _b200_iface->write_reg(0x105,0x3A);// ADC Large Overload Threshold
+        _b200_iface->write_reg(0x107,0x08);// Large LMT Overload Threshold
+        _b200_iface->write_reg(0x108,0x1F);// Small LMT Overload Threshold
+        _b200_iface->write_reg(0x109,0x4C);// Rx1 Full/LMT Gain Index
+        _b200_iface->write_reg(0x10A,0xF8);// Rx1 LPF Gain Index
+        _b200_iface->write_reg(0x10B,0x00);// Rx1 Digital Gain Index
+        _b200_iface->write_reg(0x10C,0x4C);// Rx2 Full/LMT Gain Index
+        _b200_iface->write_reg(0x10D,0x18);// Rx2 LPF Gain Index
+        _b200_iface->write_reg(0x10E,0x00);// Rx2 Digital Gain Index
+        _b200_iface->write_reg(0x114,0x30);// Low Power Threshold
+        _b200_iface->write_reg(0x11A,0x1C);// Initial LMT Gain Limit
+        _b200_iface->write_reg(0x081,0x00);// Tx Symbol Gain Control
+    }
+
     void setup_synth(std::string which, double vcorate) {
         /* The vcorates in the vco_index array represent lower boundaries for
          * rates. Once we find a match, we use that index to look-up the rest of
@@ -812,8 +903,8 @@ public:
         reg_inputsel = 0x70;
         reg_rxfilt = 0x00;
         reg_txfilt = 0x00;
-        reg_bbpll = 0x02; // no clock Set by default in _impl for 40e6 reference
-        //reg_bbpll = 0x12; // yes clock Set by default in _impl for 40e6 reference
+        //reg_bbpll = 0x02; // no clock Set by default in _impl for 40e6 reference
+        reg_bbpll = 0x12; // yes clock Set by default in _impl for 40e6 reference
         reg_bbftune_config = 0x1e;
         reg_bbftune_mode = 0x1e;
 
@@ -825,6 +916,7 @@ public:
         _req_coreclk = 0.0;
         _bbpll_freq = 0.0;
         _rx_bbf_tunediv = 0;
+        _curr_gain_table = 0;
 
         /* Initialize control interfaces. */
         _b200_iface = iface;
@@ -891,6 +983,8 @@ public:
         tune("TX", 850e6);
 
         program_mixer_gm_subtable();
+        program_gain_table();
+        setup_gain_control();
 
         calibrate_baseband_rx_analog_filter();
         calibrate_baseband_tx_analog_filter();
@@ -913,37 +1007,39 @@ public:
 
     double set_gain(const std::string &which, const std::string &name, \
             const double value) {
-        //use Full Gain Table mode, default table
         if(which[0] == 'R') {
-            //reg 0x109 bits 6:0 for RX gain
-            //gain table index is dB+3 for 200-1300MHz,
-            //db+5 for 1300-4000
-            //db+14 for 4000-6000
-
-            //set some AGC crap
-            _b200_iface->write_reg(0x0fc, 0x23);
-
-            int gain_offset;
-            if(_rx_freq < 1300) gain_offset = 3;
-            else if(_rx_freq < 4000) gain_offset = 5;
-            else gain_offset = 14;
-
-            int gainreg = value + gain_offset;
-
-            if(gainreg > 76) gainreg = 76;
-            if(gainreg < 0) gainreg = 0;
-            if(which[3] == 'A') {
-                _b200_iface->write_reg(0x109, gainreg);
+            /* Indexing the gain tables requires an offset from the requested
+             * amount of total gain in dB:
+             *      < 1300MHz: dB + 3
+             *      >= 1300MHz and < 4000MHz: dB + 5
+             *      >= 4000MHz and <= 6000MHz: dB + 14
+             */
+            int gain_offset = 0;
+            if(_rx_freq < 1300) {
+                gain_offset = 3;
+            } else if(_rx_freq < 4000) {
+                gain_offset = 5;
             } else {
-                _b200_iface->write_reg(0x10c, gainreg);
+                gain_offset = 14;
             }
 
-            return gainreg - gain_offset;
+            int gain_index = value + gain_offset;
+
+            /* Clip the gain values to the proper min/max gain values. */
+            if(gain_index > 76) gain_index = 76;
+            if(gain_index < 0) gain_index = 0;
+
+            if(which[3] == 'A') {
+                _b200_iface->write_reg(0x109, gain_index);
+            } else {
+                _b200_iface->write_reg(0x10c, gain_index);
+            }
+
+            return gain_index - gain_offset;
         } else { //TX gain
-            //check 0x077 bit 6, make sure it's set
             _b200_iface->write_reg(0x077, 0x40);
-            //check 0x07c bit 7, make sure it's set
             _b200_iface->write_reg(0x07c, 0x40);
+
             //TX_A gain is 0x074[0], 0x073[7:0]
             //TX_B gain is 0x076[0], 0x075[7:0]
             //gain step is -0.25dB, make sure you set for 89.75 - (gain)
@@ -951,11 +1047,11 @@ public:
             double atten = get_gain_range("TX_A", "").stop() - value;
             int attenreg = atten * 4;
             if(which[3] == 'A') {
-                _b200_iface->write_reg(0x074, (attenreg >> 8) & 0x01);
                 _b200_iface->write_reg(0x073, attenreg & 0xFF);
+                _b200_iface->write_reg(0x074, (attenreg >> 8) & 0x01);
             } else {
-                _b200_iface->write_reg(0x076, (attenreg >> 8) & 0x01);
                 _b200_iface->write_reg(0x075, attenreg & 0xFF);
+                _b200_iface->write_reg(0x076, (attenreg >> 8) & 0x01);
             }
             return get_gain_range("TX_A", "").stop() - (double(attenreg)/ 4);
         }
@@ -1155,6 +1251,7 @@ public:
         reg_bbpll = (reg_bbpll & 0xF8) | i;
 
         _bbpll_freq = (actual_vcorate / vcodiv);
+        UHD_VAR(_bbpll_freq);
         return _bbpll_freq;
     }
 
@@ -1186,6 +1283,12 @@ public:
 
         double actual_vcorate = fref * (nint + double(nfrac)/modulus);
         double actual_lo = actual_vcorate / vcodiv;
+
+        /* If this is one of the initialization tunes, don't do the cal. */
+        bool do_cal = true;
+        if((_rx_freq == 0.0) || (_tx_freq == 0.0)) {
+            do_cal = false;
+        }
 
         double return_freq = 0.0;
         if(which[0] == 'R') {
@@ -1228,6 +1331,10 @@ public:
 
             _rx_freq = actual_lo;
 
+            if(do_cal) {
+                program_gain_table();
+            }
+
             return_freq = actual_lo;
 
         } else {
@@ -1269,7 +1376,7 @@ public:
             return_freq = actual_lo;
         }
 
-        if((_rx_freq != 0) && (_tx_freq != 0.0)) {
+        if(do_cal) {
             calibrate_tx_quadrature();
             calibrate_rx_quadrature();
         }
@@ -1308,6 +1415,7 @@ private:
     double _baseband_bw, _bbpll_freq;
     double _req_clock_rate, _req_coreclk;
     uint16_t _rx_bbf_tunediv;
+    uint8_t _curr_gain_table;
 
     /* Shadow register fields.*/
     boost::uint32_t fpga_bandsel;
