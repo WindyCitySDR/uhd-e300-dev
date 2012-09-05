@@ -12,6 +12,8 @@
 	- In pull-up mode, much code was commented out to ever avoid driving the bus (for a fleeting moment) as this was visible on the scope as short peaks (instead the line will briefly go Hi Z).
 */
 
+bool _i2c_disable_ack_check = false;
+
 // FIXME: Follow magic numbers should be in a struct that is passed into each function
 
 #define I2C_DEFAULT_RETRY_DELAY     1   // us MAGIC
@@ -284,7 +286,7 @@ static bool _i2c_write_byte_ex(io_pin_t sda, io_pin_t scl, uint8_t value, bool p
     I2C_DELAY(I2C_DEFAULT_SCL_HIGH_PERIOD);
 
     uint8_t retries = 0;
-    while (io_test_pin(sda))
+    while ((_i2c_disable_ack_check == false) && (io_test_pin(sda)))
     {
         if (retries == I2C_DEFAULT_MAX_ACK_RETRIES)
 		{
@@ -359,6 +361,39 @@ static bool _i2c_read_byte_ex(io_pin_t sda, io_pin_t scl, uint8_t* value, bool p
     // Not necessary to ACK since it's only this one byte
 
     return true;
+}
+
+bool i2c_read2_ex(io_pin_t sda, io_pin_t scl, uint8_t addr, uint8_t subaddr, uint8_t* value, bool pull_up)
+{
+	if (_i2c_start_ex(sda, scl, pull_up) == false)
+		return false;
+
+	if (_i2c_write_byte_ex(sda, scl, addr & ~0x01, pull_up) == false)
+		goto i2c_read2_fail;
+
+	if (_i2c_write_byte_ex(sda, scl, subaddr, pull_up) == false)
+		goto i2c_read2_fail;
+	
+	io_input_pin(scl);
+	if (pull_up)
+		io_set_pin(scl);
+	I2C_DELAY(I2C_DEFAULT_BUS_WAIT);
+	
+	if (_i2c_start_ex(sda, scl, pull_up) == false)
+		return false;
+	
+	if (_i2c_write_byte_ex(sda, scl, addr | 0x01, pull_up) == false)
+		goto i2c_read2_fail;
+
+	if (_i2c_read_byte_ex(sda, scl, value, pull_up) == false)
+		goto i2c_read2_fail;
+
+	_i2c_stop_ex(sda, scl, pull_up);
+
+	return true;
+i2c_read2_fail:
+	_i2c_abort_ex(sda, scl, pull_up);
+	return false;
 }
 
 bool i2c_write_ex(io_pin_t sda, io_pin_t scl, uint8_t addr, uint8_t subaddr, uint8_t value, bool pull_up)

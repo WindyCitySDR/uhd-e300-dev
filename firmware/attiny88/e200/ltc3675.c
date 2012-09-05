@@ -15,6 +15,13 @@
 #include "io.h"
 #include "i2c.h"
 #include "debug.h"
+#include "global.h"
+#include "error.h"
+#include <avr/interrupt.h>
+
+const bool _ltc3675_pull_up = false;
+
+volatile ltc3675_reg_helper_fn _ltc3675_reg_helper;
 
 //#define HARDWIRE_ENABLE	// Use hardware enable pins instead of I2C on regulators that support it
 
@@ -48,8 +55,207 @@ static io_pin_t WAKEUP      = IO_PD(2);
 static io_pin_t ONSWITCH_DB = IO_PD(3);
 static io_pin_t PWR_RESET   = IO_PD(4);
 
-bool ltc3675_init(void)
+#define LTC3675_BASE_ADDRESS    0x12
+#define LTC3675_WRITE_ADDRESS   (LTC3675_BASE_ADDRESS + 0)
+#define LTC3675_READ_ADDRESS    (LTC3675_BASE_ADDRESS + 1)
+
+#define LTC3675_RETRY_DELAY     1   // us MAGIC
+#define LTC3675_MAX_ACK_RETRIES 10  // * LTC3675_RETRY_DELAY us
+
+#define LTC3675_SCL_LOW_PERIOD  2   // 1.3 us
+#define LTC3675_SCL_HIGH_PERIOD 1   // 0.6 us
+#define LTC3675_BUS_FREE_TIME   2   // 1.3 us
+#define LTC3675_STOP_TIME       1   // 0.6 us
+
+enum LTC3675Registers
 {
+	LTC3675_REG_NONE			= 0x00,
+	LTC3675_REG_BUCK1			= 0x01,
+	LTC3675_REG_BUCK2			= 0x02,
+	LTC3675_REG_BUCK3			= 0x03,
+	LTC3675_REG_BUCK4			= 0x04,
+	LTC3675_REG_BOOST			= 0x05,
+	LTC3675_REG_BUCK_BOOST		= 0x06,
+	LTC3675_REG_LED_CONFIG		= 0x07,
+	LTC3675_REG_LED_DAC			= 0x08,
+	LTC3675_REG_UVOT			= 0x09,
+	LTC3675_REG_RSTB			= 0xA0,
+	LTC3675_REG_IRQB_MASK		= 0x0B,
+	LTC3675_REG_REALTIME_STATUS	= 0x0C,
+	LTC3675_REG_LATCHED_STATUS	= 0x0D,
+	LTC3675_REG_CLEAR_IRQ		= 0x0F
+};
+
+enum LTC3675StatusBits
+{
+	LTC3675_UnderVoltage	= 1 << 7,
+	LTC3675_OverTemperature	= 1 << 6,
+	LTC3675_BuckBoost_PGood	= 1 << 5,
+	LTC3675_Boost_PGood		= 1 << 4,
+	LTC3675_Buck4_PGood		= 1 << 3,
+	LTC3675_Buck3_PGood		= 1 << 2,
+	LTC3675_Buck2_PGood		= 1 << 1,
+	LTC3675_Buck1_PGood		= 1 << 0
+};
+
+#define LTC3675_DEFAULT_BUCK_REG_VAL		0x6F
+#define LTC3675_DEFAULT_BOOST_REG_VAL		0x0F
+#define LTC3675_DEFAULT_BUCK_BOOST_REG_VAL	0x0F
+
+#define LTC3675_ENABLE_REGISTER_BIT			0x80
+
+// Max I2C rate = 400kHz
+
+static void _ltc3675_clear_irq()
+{
+	// Two-stage clear
+	i2c_write_ex(PWR_SDA, PWR_SCL, LTC3675_WRITE_ADDRESS, LTC3675_REG_CLEAR_IRQ, 0x00, _ltc3675_pull_up);
+	i2c_write_ex(PWR_SDA, PWR_SCL, LTC3675_WRITE_ADDRESS, LTC3675_REG_NONE, 0x00, _ltc3675_pull_up);
+}
+
+volatile uint8_t _ltc3675_last_status = 0x00;
+
+uint8_t ltc3675_get_last_status(void)
+{
+	return _ltc3675_last_status;
+}
+
+uint8_t ltc3675_reg_status_to_error(uint8_t val)
+{
+	if (((val & LTC3675_BuckBoost_PGood) == 0) && ((_ltc3675_reg_helper)(LTC3675_REG_6)))
+		return BlinkError_3_3V_Peripherals_Power;
+	
+	if (((val & LTC3675_Boost_PGood) == 0) && ((_ltc3675_reg_helper)(LTC3675_REG_5)))
+		return BlinkError_TX_Power;
+	
+	//if (((val & LTC3675_Buck4_PGood) == 0) && ((_ltc3675_reg_helper)(LTC3675_REG_4)))
+	
+	if (((val & LTC3675_Buck3_PGood) == 0) && ((_ltc3675_reg_helper)(LTC3675_REG_3)))
+		return BlinkError_1_8V_Peripherals_Power;
+	
+	//if (((val & LTC3675_Buck2_PGood) == 0) && ((_ltc3675_reg_helper)(LTC3675_REG_2)))
+	
+	if (((val & LTC3675_Buck1_PGood) == 0) && ((_ltc3675_reg_helper)(LTC3675_REG_1)))
+		return BlinkError_DRAM_Power;
+	
+	return BlinkError_None;
+}
+
+bool ltc3675_is_power_good(uint8_t val)
+{
+	return (ltc3675_reg_status_to_error(val) == BlinkError_None);
+}
+
+uint8_t ltc3675_status_to_error(uint8_t val)
+{
+	if (val & LTC3675_UnderVoltage)
+		return BlinkError_LTC3675_UnderVoltage;
+	
+	if (val & LTC3675_OverTemperature)
+		return BlinkError_LTC3675_OverTemperature;
+	
+	uint8_t reg_error = ltc3675_reg_status_to_error(val);
+	if (reg_error != BlinkError_None)
+		return reg_error;
+	
+	return BlinkError_None;
+}
+
+bool _ltc3675_handle_irq(void)
+{
+	uint8_t val = 0x00;
+	bool result = false;
+	
+	if (i2c_read2_ex(PWR_SDA, PWR_SCL, LTC3675_READ_ADDRESS, /*LTC3675_REG_LATCHED_STATUS*/LTC3675_REG_REALTIME_STATUS, &val, _ltc3675_pull_up))
+	{
+		_ltc3675_last_status = val;
+		
+		uint8_t error = ltc3675_status_to_error(val);
+		
+		/*if (val & LTC3675_UnderVoltage)
+		{
+			pmc_set_blink_error(BlinkError_LTC3675_UnderVoltage);
+			//_state.low_battery = true;
+		}*/
+		
+		if (error)
+		{
+			pmc_set_blink_error(error);
+			
+			/*_i2c_disable_ack_check = true;
+			uint8_t chk = 0x00;
+			chk |= (_ltc3675_reg_helper)(LTC3675_REG_6) << 0;
+			chk |= (_ltc3675_reg_helper)(LTC3675_REG_5) << 1;
+			chk |= (_ltc3675_reg_helper)(LTC3675_REG_3) << 2;
+			chk |= (_ltc3675_reg_helper)(LTC3675_REG_1) << 3;
+			i2c_write_ex(PWR_SDA, PWR_SCL, 0xFE, 0xFF, chk, _ltc3675_pull_up);
+			_i2c_disable_ack_check = false;*/
+		}			
+		
+		result = true;
+	}
+	
+	_ltc3675_clear_irq();
+	
+	return result;
+}
+
+static bool _ltc3675_get_realtime_status(uint8_t* val)
+{
+	cli();
+	
+	if (i2c_read2_ex(PWR_SDA, PWR_SCL, LTC3675_READ_ADDRESS, LTC3675_REG_REALTIME_STATUS, val, _ltc3675_pull_up) == false)
+		return false;
+	
+	sei();
+	
+	return true;
+}
+
+int8_t ltc3675_check_status(void)
+{
+	uint8_t val = 0x00;
+	
+	if (_ltc3675_get_realtime_status(&val) == false)
+		return -1;
+	
+	//_ltc3675_last_status = val;
+	
+	/*if (val & LTC3675_UnderVoltage)
+		return BlinkError_LTC3675_UnderVoltage;
+	
+	if (val & LTC3675_OverTemperature)
+		return BlinkError_LTC3675_OverTemperature;
+	
+	return BlinkError_None;*/
+	
+	return ltc3675_status_to_error(val);
+}
+
+bool ltc3675_handle_irq(void)
+{
+	cli();
+	
+	/*uint8_t*/bool result = _ltc3675_handle_irq();
+	
+	sei();
+	
+	return result;
+}
+
+static bool _ltc3675_default_reg_helper(uint8_t address)
+{
+	uint8_t val = 0x00;
+	i2c_read2_ex(PWR_SDA, PWR_SCL, LTC3675_READ_ADDRESS, address, &val, _ltc3675_pull_up);
+	return ((val & LTC3675_ENABLE_REGISTER_BIT) == LTC3675_ENABLE_REGISTER_BIT);
+}
+
+bool ltc3675_init(ltc3675_reg_helper_fn helper)
+{
+	if (helper)
+		_ltc3675_reg_helper = helper;
+	else
+		_ltc3675_reg_helper = _ltc3675_default_reg_helper;
 #ifdef HARDWIRE_ENABLE
     io_output_pin(PWR_EN1);
     io_output_pin(PWR_EN2);
@@ -79,25 +285,46 @@ bool ltc3675_init(void)
 	
     io_input_pin(PWR_RESET);
 	io_set_pin(PWR_RESET);	// Enable pull-up for Open Drain
+	
+	_ltc3675_clear_irq();	// Clear old interrupt - state might have changed (e.g. undervoltage might have been resolved)
 
-    // FIXME: Make 'power_init' bool if any I2C
+    if (i2c_write_ex(PWR_SDA, PWR_SCL, LTC3675_WRITE_ADDRESS, LTC3675_REG_IRQB_MASK, 0xFF, _ltc3675_pull_up) == false)	// Any PGOOD fault will pull IRQB low
+		return false;
+	
+	if (i2c_write_ex(PWR_SDA, PWR_SCL, LTC3675_WRITE_ADDRESS, LTC3675_REG_UVOT, 0x70, _ltc3675_pull_up) == false)	// 3.4V UV
+		return false;
+	
+	if (ltc3675_has_interrupt())
+		_ltc3675_handle_irq();
+	
+	// Non-maskable:
+	//	UV warning threshold (default): 2.7V
+	//	Over temp warning threshold (default): 10 degrees below
 
     return true;
 }
 
-#define LTC3675_BASE_ADDRESS    0x12
-#define LTC3675_WRITE_ADDRESS   (LTC3675_BASE_ADDRESS + 0)
-#define LTC3675_READ_ADDRESS    (LTC3675_BASE_ADDRESS + 1)
+static bool _ltc3675_is_pgood(uint8_t reg)
+{
+	uint8_t val = 0x00;
+	if (_ltc3675_get_realtime_status(&val) == false)
+		return false;
+	return ((reg & val) == reg);
+}
 
-#define LTC3675_RETRY_DELAY     1   // us MAGIC
-#define LTC3675_MAX_ACK_RETRIES 10  // * LTC3675_RETRY_DELAY us
+static bool _ltc3675_toggle_reg(uint8_t addr, uint8_t def_reg, bool on)
+{
+	bool result = true;
+	
+	cli();
+	
+	if (i2c_write_ex(PWR_SDA, PWR_SCL, LTC3675_WRITE_ADDRESS, addr, def_reg | (on ? LTC3675_ENABLE_REGISTER_BIT : 0x00), _ltc3675_pull_up) == false)
+		result = false;
+	
+	sei();
 
-#define LTC3675_SCL_LOW_PERIOD  2   // 1.3 us
-#define LTC3675_SCL_HIGH_PERIOD 1   // 0.6 us
-#define LTC3675_BUS_FREE_TIME   2   // 1.3 us
-#define LTC3675_STOP_TIME       1   // 0.6 us
-
-// Max I2C rate = 400kHz
+	return result;
+}
 
 bool ltc3675_enable_reg(ltc3675_regulator_t reg, bool on)
 {
@@ -106,35 +333,41 @@ bool ltc3675_enable_reg(ltc3675_regulator_t reg, bool on)
 	// Sub-address: index of regulator
 	// Data: <default reg contents> | <enable>
 	
-	const bool pull_up = false;
-	
     switch (reg)
     {
         case LTC3675_REG_1: // Master
         case LTC3675_REG_2: // Slave
 #ifdef HARDWIRE_ENABLE
             io_enable_pin(PWR_EN1, on);
-			break;
+			//break;
 #else
-			return i2c_write_ex(PWR_SDA, PWR_SCL, LTC3675_WRITE_ADDRESS, 0x01, 0x6F | (on ? 0x80 : 0x00), pull_up);
+			if (_ltc3675_toggle_reg(LTC3675_REG_BUCK1, LTC3675_DEFAULT_BUCK_REG_VAL, on) == false)
+				return false;
 #endif // HARDWIRE_ENABLE
+			return (_ltc3675_is_pgood(LTC3675_Buck1_PGood) == on);
         case LTC3675_REG_3: // Master
         case LTC3675_REG_4: // Slave
 #ifdef HARDWIRE_ENABLE
             io_enable_pin(PWR_EN3, on);
-            break;
+            //break;
 #else
-			return i2c_write_ex(PWR_SDA, PWR_SCL, LTC3675_WRITE_ADDRESS, 0x03, 0x6F | (on ? 0x80 : 0x00), pull_up);
+			if (_ltc3675_toggle_reg(LTC3675_REG_BUCK3, LTC3675_DEFAULT_BUCK_REG_VAL, on) == false)
+				return false;
 #endif // HARDWIRE_ENABLE
+			return (_ltc3675_is_pgood(LTC3675_Buck3_PGood) == on);
         case LTC3675_REG_5: // I2C only
-            return i2c_write_ex(PWR_SDA, PWR_SCL, LTC3675_WRITE_ADDRESS, 0x05, 0x0F | (on ? 0x80 : 0x00), pull_up);    // (Boost address, Default reg contents | Enable)
+            if (_ltc3675_toggle_reg(LTC3675_REG_BOOST, LTC3675_DEFAULT_BOOST_REG_VAL, on) == false)    // (Boost address, Default reg contents | Enable)
+				return false;
+			return (_ltc3675_is_pgood(LTC3675_Boost_PGood) == on);
         case LTC3675_REG_6: // Single
 #ifdef HARDWIRE_ENABLE
             io_enable_pin(PWR_EN5, on);
-            break;
+            //break;
 #else
-			return i2c_write_ex(PWR_SDA, PWR_SCL, LTC3675_WRITE_ADDRESS, 0x06, 0x6F | (on ? 0x80 : 0x00), pull_up);
+			if (_ltc3675_toggle_reg(LTC3675_REG_BUCK_BOOST, LTC3675_DEFAULT_BUCK_BOOST_REG_VAL, on) == false)
+				return false;
 #endif // HARDWIRE_ENABLE
+			return (_ltc3675_is_pgood(LTC3675_BuckBoost_PGood) == on);
         default:
             return false;
     }
@@ -155,4 +388,9 @@ bool ltc3675_set_voltage(ltc3675_regulator_t reg, uint16_t voltage)
 bool ltc3675_is_power_button_depressed(void)
 {
 	return (io_test_pin(ONSWITCH_DB) == false);
+}
+
+bool ltc3675_has_interrupt(void)
+{
+	return (io_test_pin(PWR_IRQ) == false);
 }

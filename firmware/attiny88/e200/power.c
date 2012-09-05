@@ -16,6 +16,7 @@
 #include "ltc4155.h"
 #include "debug.h"
 #include "global.h"
+#include "error.h"
 
 #define BLINK_ERROR_DELAY   250  // ms
 
@@ -29,16 +30,42 @@
 
 struct reg_config {
     int16_t voltage;    // mV
+	uint8_t device;
     uint8_t address;    // Device specific
-    bool configured;    // Device specific
+    bool powered;
 } default_reg_config[] = {        // Index maps to 'power_subsystem_t'
-    { 0000, 0, true },          // PS_UNKNOWN
-    { 1000, 0, true },          // PS_FPGA
-    { 1350, LTC3675_REG_1 },    // PS_VDRAM
-    { 1800, LTC3675_REG_3 },    // PS_PERIPHERALS_1_8
-    { 3300, LTC3675_REG_6 },    // PS_PERIPHERALS_3_3
-    { 5000, LTC3675_REG_5 }     // PS_TX
+    { 0000, REG_UNKNOWN, 0/*, true*/ },          // PS_UNKNOWN
+    { 1000, REG_TPS54478, 0/*, true*/ },          // PS_FPGA
+    { 1350, REG_LTC3675, LTC3675_REG_1 },    // PS_VDRAM
+    { 1800, REG_LTC3675, LTC3675_REG_3 },    // PS_PERIPHERALS_1_8
+    { 3300, REG_LTC3675, LTC3675_REG_6 },    // PS_PERIPHERALS_3_3
+    { 5000, REG_LTC3675, LTC3675_REG_5 }     // PS_TX
 };
+/*
+int8_t power_get_regulator_index(uint8_t device, uint8_t address)
+{
+	for (int8_t i = 0; i < ARRAY_SIZE(default_reg_config); ++i)
+	{
+		struct reg_config* reg = default_reg_config + i;
+		if ((reg->device == device) && (reg->address == address))
+			return i;
+	}
+	
+	return -1;
+}
+*/
+static bool ltc3675_reg_helper(uint8_t address)
+{
+	for (int8_t i = 0; i < ARRAY_SIZE(default_reg_config); ++i)
+	{
+		struct reg_config* reg = default_reg_config + i;
+		if ((reg->device == REG_LTC3675) && (reg->address == address))
+			return reg->powered;
+	}
+	
+	return false;
+	//return power_is_subsys_on(power_get_regulator_index(REG_LTC3675, address) - 1);
+}
 
 static io_pin_t USBPM_IRQ   = IO_PB(1);
 
@@ -241,7 +268,7 @@ static bool _power_up_fpga(power_params_t* params)
 
 static bool _power_up_reg(power_params_t* params)
 {
-    if ((params->subsys >= ARRAY_SIZE(default_reg_config)) || (params->subsys < 2))
+    if ((params->subsys > PS_TX) || (params->subsys < PS_VDRAM))
         return false;
 
     struct reg_config* cfg = default_reg_config + params->subsys;
@@ -289,6 +316,7 @@ struct boot_step {
     uint8_t delay;
     uint8_t retries;
     //uint16_t opaque;
+	//bool powered;
 } boot_steps[] = {  // MAGIC: Retries/delays
     { PS_FPGA,              NULL, POWER_DEFAULT_DELAY, POWER_DEFAULT_RETRIES },
     { PS_VDRAM,             NULL, POWER_DEFAULT_DELAY, POWER_DEFAULT_RETRIES },
@@ -296,20 +324,32 @@ struct boot_step {
     { PS_PERIPHERALS_3_3,   NULL, POWER_DEFAULT_DELAY, POWER_DEFAULT_RETRIES },
     //{ PS_TX,              NULL, POWER_DEFAULT_DELAY, POWER_DEFAULT_RETRIES }  // CHECK: Leaving TX off
 };
-
+/*
+bool power_is_subsys_on(int8_t index)
+{
+	if ((index < 0) || (index >= ARRAY_SIZE(boot_steps)))
+		return false;
+	
+	struct boot_step* step = boot_steps + index;
+	
+	return step->powered;
+}
+*/
 void power_init(void)
 {
+    io_output_pin(CHARGE);
+	
+	charge_set_led(true);
+
     tps54478_init(true);	// Will keep EN float (keep power on)
 
-    ltc3675_init();
+    ltc3675_init(ltc3675_reg_helper);
 	
 	ltc4155_init();
 
     battery_init();
 
-    io_output_pin(CHARGE);
-
-    io_output_pin(PS_POR);
+	io_output_pin(PS_POR);
     io_output_pin(PS_SRST);
     // Hold low until power is stable
     io_clear_pin(PS_POR);
@@ -354,11 +394,15 @@ void power_init(void)
 	TCCR1B = _BV(WGM12);	// CTC mode
 	OCR1A = 15624 * 2;		// Hold button for 2 seconds to switch off
 	TIMSK1 = _BV(OCIE1A);	// Enable CTC on Timer 1
+	
+	charge_set_led(false);
 }
 
 bool power_on(void)
 {
-    charge_set_led(false);
+	cli();
+	
+    //charge_set_led(false);
 
 	uint8_t step_count, retry;
 	for (step_count = 0; step_count < ARRAY_SIZE(boot_steps); step_count++) {
@@ -378,11 +422,19 @@ bool power_on(void)
 
 	        if (step->fn != NULL) {
                 if (step->fn(&params))
+				{
+					//step->powered = true;
+					default_reg_config[step->subsys].powered = true;
                     break;
+				}					
 	        }
 	        else {
 	            if (_power_enable_subsys(&params))
+				{
+					//step->powered = true;
+					default_reg_config[step->subsys].powered = true;
                     break;
+				}					
 	        }
 
             if ((retry < step->retries) && (step->delay > 0))
@@ -396,11 +448,14 @@ bool power_on(void)
     }
 
     if (step_count != ARRAY_SIZE(boot_steps)) {
-		sei();	// For button press detection
+		//sei();	// For button press detection
 		
-        while (_state.powered == false) {
-            blink_error_sequence(step_count + 1);
-        }
+        /*while (_state.powered == false) {
+            blink_error_sequence(step_count + BlinkError_FPGA_Power);
+        }*/
+		pmc_set_blink_error(step_count + BlinkError_FPGA_Power);
+		
+		sei();
 
         return false;
     }
@@ -415,12 +470,16 @@ bool power_on(void)
 	//EIMSK = _BV(INT1);
 	
 	_state.powered = true;
+	
+	sei();
 
     return true;
 }
 
 uint8_t power_off(void)
 {
+	cli();
+	
 	io_clear_pin(PS_SRST);	// FIXME: Hold it low to stop FPGA running
 	
 	///////////////////////////////////
@@ -443,11 +502,19 @@ uint8_t power_off(void)
 
 	        if (step->fn != NULL) {
                 if (step->fn(&params))
+				{
+					//step->powered = false;
+					default_reg_config[step->subsys].powered = false;
                     break;
+				}					
 	        }
 	        else {
 	            if (_power_enable_subsys(&params))
+				{
+					//step->powered = false;
+					default_reg_config[step->subsys].powered = false;
                     break;
+				}					
 	        }
 
             if ((retry < step->retries) && (step->delay > 0))
@@ -464,8 +531,11 @@ uint8_t power_off(void)
 		/*sei();
 		
         while (_state.powered) {
-            blink_error_sequence(step_count);
+            blink_error_sequence(step_count + BlinkError_FPGA_Power);
         }*/
+		pmc_set_blink_error(step_count + BlinkError_FPGA_Power);
+		
+		sei();
 
         return (step_count + 1);
     }
@@ -476,6 +546,8 @@ uint8_t power_off(void)
 	//EIMSK = _BV(INT1);
 
 	_state.powered = false;
+	
+	sei();
 	
 	return 0;
 }
@@ -493,12 +565,12 @@ static io_pin_t DEBUG_2	= IO_PB(7);
 
 ISR(INT0_vect)	// PD(2) WAKEUP: Rising edge
 {
-	cli();
+	//cli();
 	
 	//power_on();
 	_state.wake_up = true;
 	
-	sei();
+	//sei();
 }
 
 ISR(INT1_vect)	// PD(3) ONSWITCH_DB (PB_STAT): Any change
@@ -509,7 +581,8 @@ ISR(INT1_vect)	// PD(3) ONSWITCH_DB (PB_STAT): Any change
 	{
 		TCNT1 = 0;
 		TCCR1B |= /*0x5*/0x3;	// [1024] 64 prescaler
-		_state.timers_running = true;
+		//_state.timers_running = true;
+		_state.active_timers++;
 		
 		//debug_set(DEBUG_1, true);
 		//debug_set(DEBUG_2, false);
@@ -520,7 +593,8 @@ ISR(INT1_vect)	// PD(3) ONSWITCH_DB (PB_STAT): Any change
 		{
 			//TIMSK1 &= ~_BV(OCIE1A);
 			TCCR1B &= ~0x7;	// Disable timer
-			_state.timers_running = false;
+			//_state.timers_running = false;
+			_state.active_timers--;
 			
 			//debug_set(DEBUG_1, false);
 		}
@@ -535,7 +609,8 @@ ISR(TIMER1_COMPA_vect)
 
 	//TIMSK1 &= ~_BV(OCIE1A);	// Turn off timer
 	TCCR1B &= ~0x7;	// Disable timer
-	_state.timers_running = false;
+	//_state.timers_running = false;
+	_state.active_timers--;
 	_state.power_off = true;
 	
 	//debug_set(DEBUG_2, true);
@@ -549,7 +624,7 @@ ISR(TIMER1_COMPA_vect)
 
 ISR(PCINT0_vect)
 {
-	cli();
+	//cli();
 	
 	// CORE_PGOOD
 	//	Assert low: power problem -> shutdown
@@ -563,17 +638,23 @@ ISR(PCINT0_vect)
 		_state.core_power_bad = true;
 	}
 	
-	sei();
+	//sei();
 }
 
 ISR(PCINT2_vect)
 {
-	cli();
+	//cli();
 	
 	// PWR_IRQ
 	//	Regulator problem: shutdown
 	// PWR_RESET
 	//	Ignored
 	
-	sei();
+	if (ltc3675_has_interrupt())
+	{
+		debug_set(IO_PB(6), true);
+		_state.ltc3675_irq = true;
+	}
+	
+	//sei();
 }
