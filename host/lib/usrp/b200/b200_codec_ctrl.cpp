@@ -1254,10 +1254,6 @@ public:
         _bbpll_freq = actual_vcorate;
         _adcclock_freq = (actual_vcorate / vcodiv);
 
-        UHD_VAR(_bbpll_freq);
-        std::cout << std::hex << "reg_bbpll: " << (int) reg_bbpll << std::endl;
-        UHD_VAR(_adcclock_freq);
-
         return _adcclock_freq;
     }
 
