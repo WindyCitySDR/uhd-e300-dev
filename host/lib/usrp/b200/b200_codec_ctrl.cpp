@@ -275,6 +275,13 @@ public:
         _b200_iface->write_reg(0x1f8, (_rx_bbf_tunediv & 0x00FF));
         _b200_iface->write_reg(0x1f9, reg_bbftune_config);
 
+        /* FIXME remove this after debug complete
+        std::cout << std::hex << "0x1fb: " << (int) uint8_t(bbbw_mhz) << std::endl;
+        std::cout << std::hex << "0x1fc: " << (int) bbbw_khz << std::endl;
+        std::cout << std::hex << "0x1f8: " << (int) (_rx_bbf_tunediv & 0x00FF) << std::endl;
+        std::cout << std::hex << "0x1f9: " << (int) reg_bbftune_config << std::endl;
+        */
+
         /* RX Mix Voltage settings - only change with apps engineer help. */
         _b200_iface->write_reg(0x1d5, 0x3f);
         _b200_iface->write_reg(0x1c0, 0x03);
@@ -459,11 +466,11 @@ public:
             reg1dc = 0x40;
             reg1de = 0x40;
 
-            uint8_t temp = std::min(127, int(std::floor(0.5 + ((CTIA_fF - 400) / 320))));
+            uint8_t temp = std::min(127, int(std::floor(0.5 + ((CTIA_fF - 400.0) / 320.0))));
             reg1dd = temp;
             reg1df = temp;
         } else {
-            uint8_t temp = std::floor(0.5 + ((CTIA_fF - 400) / 40)) + 0x40;
+            uint8_t temp = std::floor(0.5 + ((CTIA_fF - 400.0) / 40.0)) + 0x40;
             reg1dc = temp;
             reg1de = temp;
             reg1dd = 0;
@@ -957,6 +964,11 @@ public:
         _b200_iface->write_reg(0x006, 0x0F);
         _b200_iface->write_reg(0x007, 0x00);
 
+        /* Setup control outputs. */
+        _b200_iface->write_reg(0x035, 0x07);
+        _b200_iface->write_reg(0x036, 0xFF);
+
+        /* Setup GPO */
         _b200_iface->write_reg(0x03a,0x27); //set delay register
         _b200_iface->write_reg(0x261,0x00); //RX LO power
         _b200_iface->write_reg(0x2a1,0x00); //TX LO power
