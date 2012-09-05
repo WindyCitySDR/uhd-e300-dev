@@ -479,34 +479,36 @@ public:
 
     void setup_adc() {
 
-        double bbbw = ((_bbpll_freq / _rx_bbf_tunediv) * std::log(2.0)) \
+        double bbbw_mhz = (((_bbpll_freq / 1e6) / _rx_bbf_tunediv) * std::log(2.0)) \
                       / (1.4 * 2 * boost::math::constants::pi<double>());
 
-        if(bbbw > 28e6) {
-            bbbw = 28e6;
-        } else if (bbbw < 0.20e6) {
-            bbbw = 0.20e6;
+        if(bbbw_mhz > 28) {
+            bbbw_mhz = 28;
+        } else if (bbbw_mhz < 0.20) {
+            bbbw_mhz = 0.20;
         }
 
         uint8_t rxbbf_c3_msb = _b200_iface->read_reg(0x1eb) & 0x3F;
         uint8_t rxbbf_c3_lsb = _b200_iface->read_reg(0x1ec) & 0x7F;
         uint8_t rxbbf_r2346 = _b200_iface->read_reg(0x1e6) & 0x07;
 
-        double scale_snr_dB = (_bbpll_freq < 80e6) ? 0 : 2;
+        double scale_snr_dB = (_adcclock_freq < 80e6) ? 0 : 2;
+
+        double fsadc = _adcclock_freq / 1e6;
 
         double rc_timeconst = 0.0;
-        if(bbbw < 18e6) {
+        if(bbbw_mhz < 18) {
             rc_timeconst = (1 / ((1.4 * 2 * boost::math::constants::pi<double>()) \
                                 * (18300 * rxbbf_r2346)
                                 * ((160e-15 * rxbbf_c3_msb)
                                     + (10e-15 * rxbbf_c3_lsb) + 140e-15)
-                                * (bbbw)));
+                                * (bbbw_mhz * 1e6)));
         } else {
             rc_timeconst = (1 / ((1.4 * 2 * boost::math::constants::pi<double>()) \
                                 * (18300 * rxbbf_r2346)
                                 * ((160e-15 * rxbbf_c3_msb)
                                     + (10e-15 * rxbbf_c3_lsb) + 140e-15)
-                                * (bbbw) * (1 + (0.01 * (bbbw - 18e6)))));
+                                * (bbbw_mhz * 1e6) * (1 + (0.01 * (bbbw_mhz - 18)))));
         }
 
         double scale_res = std::sqrt(1 / rc_timeconst);
@@ -518,62 +520,62 @@ public:
         data[0] = 0;    data[1] = 0; data[2] = 0; data[3] = 0x24;
         data[4] = 0x24; data[5] = 0; data[6] = 0;
         data[7] = std::min(uint8_t(124), uint8_t(std::floor(-0.5
-                        + (80 * scale_snr * scale_res
-                        * std::min(1.0, std::sqrt(maxsnr * _bbpll_freq / 640))))));
+                        + (80.0 * scale_snr * scale_res
+                        * std::min(1.0, std::sqrt(maxsnr * fsadc / 640.0))))));
         data[8] = std::min(uint8_t(255), uint8_t(std::floor(0.5
-                        + (20 * (640 / _bbpll_freq) * (data[7] / 80)
+                        + ((20.0 * (640.0 / fsadc) * (((double)data[7]) / 80.0))
                         / (scale_res * scale_cap)))));
-        data[10] = std::min(uint8_t(127), uint8_t(std::floor(-0.5 + (77 * scale_res
-                        * std::min(1.0, std::sqrt(maxsnr * _bbpll_freq / 640))))));
-        data[9] = std::min(uint8_t(127), uint8_t(std::floor(0.8 * data[10])));
+        data[10] = std::min(uint8_t(127), uint8_t(std::floor(-0.5 + (77.0 * scale_res
+                        * std::min(1.0, std::sqrt(maxsnr * fsadc / 640.0))))));
+        data[9] = std::min(uint8_t(127), uint8_t(std::floor(0.8 * ((double)data[10]))));
         data[11] = std::min(uint8_t(255), uint8_t(std::floor(0.5
-                        + (20 * (640 / _bbpll_freq) * (data[10] / 77)
+                        + (20.0 * (640.0 / fsadc) * (((double)data[10]) / 77.0)
                         / (scale_res * scale_cap)))));
         data[12] = std::min(uint8_t(127), uint8_t(std::floor(-0.5
-                        + (80 * scale_res * std::min(1.0,
-                        std::sqrt(maxsnr * _bbpll_freq / 640))))));
+                        + (80.0 * scale_res * std::min(1.0,
+                        std::sqrt(maxsnr * fsadc / 640.0))))));
         data[13] = std::min(uint8_t(255), uint8_t(std::floor(-1.5
-                        + (20 * (640 / _bbpll_freq) * (data[12] / 80)
+                        + (20.0 * (640.0 / fsadc) * (((double)data[12]) / 80.0)
                         / (scale_res * scale_cap)))));
-        data[14] = 21 * uint8_t(std::floor(0.1 * 640 / _bbpll_freq));
-        data[15] = std::min(uint8_t(127), uint8_t(1.025 * data[7]));
-        data[16] = std::min(uint8_t(127), uint8_t(std::floor(data[15]
+        data[14] = 21 * uint8_t(std::floor(0.1 * 640.0 / fsadc));
+        data[15] = std::min(uint8_t(127), uint8_t(1.025 * ((double)data[7])));
+        data[16] = std::min(uint8_t(127), uint8_t(std::floor(((double)data[15])
                         * (0.98 + (0.02 * std::max(1.0,
-                        (640 / _bbpll_freq) / maxsnr))))));
+                        (640.0 / fsadc) / maxsnr))))));
         data[17] = data[15];
-        data[18] = std::min(uint8_t(127), uint8_t(0.975 * data[10]));
-        data[19] = std::min(uint8_t(127), uint8_t(std::floor(data[18]
+        data[18] = std::min(uint8_t(127), uint8_t(0.975 * ((double)data[10])));
+        data[19] = std::min(uint8_t(127), uint8_t(std::floor(((double)data[18])
                         * (0.98 + (0.02 * std::max(1.0,
-                        (640 / _bbpll_freq) / maxsnr))))));
+                        (640.0 / fsadc) / maxsnr))))));
         data[20] = data[18];
-        data[21] = std::min(uint8_t(127), uint8_t(0.975 * data[12]));
-        data[22] = std::min(uint8_t(127), uint8_t(std::floor(data[21]
+        data[21] = std::min(uint8_t(127), uint8_t(0.975 * ((double)data[12])));
+        data[22] = std::min(uint8_t(127), uint8_t(std::floor(((double)data[21])
                         * (0.98 + (0.02 * std::max(1.0,
-                        (640 / _bbpll_freq) / maxsnr))))));
+                        (640.0 / fsadc) / maxsnr))))));
         data[23] = data[21];
         data[24] = 0x2e;
-        data[25] = uint8_t(std::floor(128 + std::min(63.0,
-                        63 * (_bbpll_freq / 640))));
-        data[26] = uint8_t(std::floor(std::min(63.0, 63 * (_bbpll_freq / 640)
-                        * (0.92 + (0.08 * (640 / _bbpll_freq))))));
+        data[25] = uint8_t(std::floor(128.0 + std::min(63.0,
+                        63.0 * (fsadc / 640.0))));
+        data[26] = uint8_t(std::floor(std::min(63.0, 63.0 * (fsadc / 640.0)
+                        * (0.92 + (0.08 * (640.0 / fsadc))))));
         data[27] = uint8_t(std::floor(std::min(63.0,
-                        32 * std::sqrt(_bbpll_freq / 640))));
-        data[28] = uint8_t(std::floor(128 + std::min(63.0,
-                        63 * (_bbpll_freq / 640))));
+                        32.0 * std::sqrt(fsadc / 640.0))));
+        data[28] = uint8_t(std::floor(128.0 + std::min(63.0,
+                        63.0 * (fsadc / 640.0))));
         data[29] = uint8_t(std::floor(std::min(63.0,
-                        63 * (_bbpll_freq / 640)
-                        * (0.92 + (0.08 * (640 / _bbpll_freq))))));
+                        63.0 * (fsadc / 640.0)
+                        * (0.92 + (0.08 * (640.0 / fsadc))))));
         data[30] = uint8_t(std::floor(std::min(63.0,
-                        32 * std::sqrt(_bbpll_freq / 640))));
-        data[31] = uint8_t(std::floor(128 + std::min(63.0,
-                        63 * (_bbpll_freq / 640))));
+                        32.0 * std::sqrt(fsadc / 640.0))));
+        data[31] = uint8_t(std::floor(128.0 + std::min(63.0,
+                        63.0 * (fsadc / 640.0))));
         data[32] = uint8_t(std::floor(std::min(63.0,
-                        63 * (_bbpll_freq / 640) * (0.92
-                        + (0.08 * (640 / _bbpll_freq))))));
+                        63.0 * (fsadc / 640.0) * (0.92
+                        + (0.08 * (640.0 / fsadc))))));
         data[33] = uint8_t(std::floor(std::min(63.0,
-                        63 * std::sqrt(_bbpll_freq / 640))));
-        data[34] = std::min(uint8_t(127), uint8_t(std::floor(64
-                        * std::sqrt(_bbpll_freq / 640))));
+                        63.0 * std::sqrt(fsadc / 640.0))));
+        data[34] = std::min(uint8_t(127), uint8_t(std::floor(64.0
+                        * std::sqrt(fsadc / 640.0))));
         data[35] = 0x40;
         data[36] = 0x40;
         data[37] = 0x2c;
@@ -582,8 +584,6 @@ public:
 
         for(int i=0; i<40; i++) {
             _b200_iface->write_reg(0x200+i, data[i]);
-
-            std::cout << std::hex << (int) 0x200+i << ": " << (int) data[i] << std::endl;
         }
     }
 
@@ -915,6 +915,7 @@ public:
         _req_clock_rate = 0.0;
         _req_coreclk = 0.0;
         _bbpll_freq = 0.0;
+        _adcclock_freq = 0.0;
         _rx_bbf_tunediv = 0;
         _curr_gain_table = 0;
 
@@ -1250,9 +1251,14 @@ public:
         //use XTALN input, CLKOUT=XTALN (40MHz ref out to FPGA)
         reg_bbpll = (reg_bbpll & 0xF8) | i;
 
-        _bbpll_freq = (actual_vcorate / vcodiv);
+        _bbpll_freq = actual_vcorate;
+        _adcclock_freq = (actual_vcorate / vcodiv);
+
         UHD_VAR(_bbpll_freq);
-        return _bbpll_freq;
+        std::cout << std::hex << "reg_bbpll: " << (int) reg_bbpll << std::endl;
+        UHD_VAR(_adcclock_freq);
+
+        return _adcclock_freq;
     }
 
     double tune(const std::string &which, const double value) {
@@ -1412,7 +1418,7 @@ private:
     b200_iface::sptr _b200_iface;
     wb_iface::sptr _ctrl;
     double _rx_freq, _tx_freq;
-    double _baseband_bw, _bbpll_freq;
+    double _baseband_bw, _bbpll_freq, _adcclock_freq;
     double _req_clock_rate, _req_coreclk;
     uint16_t _rx_bbf_tunediv;
     uint8_t _curr_gain_table;
