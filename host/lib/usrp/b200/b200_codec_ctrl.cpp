@@ -257,7 +257,7 @@ public:
             bbbw = 0.20e6;
         }
 
-        double rxtune_clk = ((1.4 * bbbw *
+        double rxtune_clk = ((1.4 * bbbw * 2 *
                 boost::math::constants::pi<double>()) / std::log(2.0));
 
         _rx_bbf_tunediv = std::min(511, int(std::ceil(_bbpll_freq / rxtune_clk)));
