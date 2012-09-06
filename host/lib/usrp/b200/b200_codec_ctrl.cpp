@@ -793,7 +793,7 @@ public:
             _b200_iface->write_reg(0x134, 0x00);
             _b200_iface->write_reg(0x134, 0x00);
 
-            /* FIXME remove the below once we are done debugging
+            /* FIXME debug
             std::cout.unsetf(std::ios::hex);
             std::cout << "Index: " << (int) index << std::endl;
             std::cout << "Word 1: " << std::hex << (int) gain_table[index][1] << std::endl;
@@ -817,6 +817,27 @@ public:
         _b200_iface->write_reg(0x134, 0x00);
         _b200_iface->write_reg(0x134, 0x00);
         _b200_iface->write_reg(0x137, 0x00);
+
+
+
+        index = 0;
+        uint8_t word1, word2, word3;
+        for(; index < 77; index++) {
+            _b200_iface->write_reg(0x130, index);
+            word1 = _b200_iface->read_reg(0x134);
+            word2 = _b200_iface->read_reg(0x135);
+            word3 = _b200_iface->read_reg(0x136);
+            _b200_iface->write_reg(0x134, 0x00);
+            _b200_iface->write_reg(0x134, 0x00);
+
+            /* FIXME debug
+            std::cout.unsetf(std::ios::hex);
+            std::cout << "Index: " << (int) index << std::endl;
+            std::cout << "Word 1: " << std::hex << (int) word1 << std::endl;
+            std::cout << "Word 2: " << std::hex << (int) word2 << std::endl;
+            std::cout << "Word 3: " << std::hex << (int) word3 << std::endl;
+            */
+        }
     }
 
     void setup_gain_control() {
@@ -828,16 +849,16 @@ public:
         _b200_iface->write_reg(0x100,0x6F);// Max Digital Gain
         _b200_iface->write_reg(0x104,0x2F);// ADC Small Overload Threshold
         _b200_iface->write_reg(0x105,0x3A);// ADC Large Overload Threshold
-        _b200_iface->write_reg(0x107,0x08);// Large LMT Overload Threshold
-        _b200_iface->write_reg(0x108,0x1F);// Small LMT Overload Threshold
-        _b200_iface->write_reg(0x109,0x4C);// Rx1 Full/LMT Gain Index
-        _b200_iface->write_reg(0x10A,0xF8);// Rx1 LPF Gain Index
+        _b200_iface->write_reg(0x107,0x31);// Large LMT Overload Threshold
+        _b200_iface->write_reg(0x108,0x39);// Small LMT Overload Threshold
+        _b200_iface->write_reg(0x109,0x23);// Rx1 Full/LMT Gain Index
+        _b200_iface->write_reg(0x10A,0x58);// Rx1 LPF Gain Index
         _b200_iface->write_reg(0x10B,0x00);// Rx1 Digital Gain Index
-        _b200_iface->write_reg(0x10C,0x4C);// Rx2 Full/LMT Gain Index
+        _b200_iface->write_reg(0x10C,0x23);// Rx2 Full/LMT Gain Index
         _b200_iface->write_reg(0x10D,0x18);// Rx2 LPF Gain Index
         _b200_iface->write_reg(0x10E,0x00);// Rx2 Digital Gain Index
         _b200_iface->write_reg(0x114,0x30);// Low Power Threshold
-        _b200_iface->write_reg(0x11A,0x1C);// Initial LMT Gain Limit
+        _b200_iface->write_reg(0x11A,0x27);// Initial LMT Gain Limit
         _b200_iface->write_reg(0x081,0x00);// Tx Symbol Gain Control
     }
 
@@ -1028,15 +1049,17 @@ public:
              *      >= 4000MHz and <= 6000MHz: dB + 14
              */
             int gain_offset = 0;
-            if(_rx_freq < 1300) {
-                gain_offset = 3;
-            } else if(_rx_freq < 4000) {
+            if(_rx_freq < 1300e6) {
                 gain_offset = 5;
+            } else if(_rx_freq < 4000e6) {
+                gain_offset = 3;
             } else {
                 gain_offset = 14;
             }
 
             int gain_index = value + gain_offset;
+
+            UHD_VAR(gain_index);
 
             /* Clip the gain values to the proper min/max gain values. */
             if(gain_index > 76) gain_index = 76;
