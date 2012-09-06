@@ -868,9 +868,8 @@ public:
          * the register values in the LUT. */
         int vcoindex = 0;
         for(int i = 0; i < 53; i++) {
-            if(vcorate < vco_index[i]) {
-                vcoindex = i;
-            } else {
+            vcoindex = i;
+            if(vcorate > vco_index[i]) {
                 break;
             }
         }
