@@ -399,8 +399,6 @@ public:
             cap = 63;
         }
 
-        UHD_VAR(cap);
-
         uint8_t reg0d0, reg0d1, reg0d2;
 
         if((bbbw_mhz * 2) <= 9) {
@@ -1252,6 +1250,8 @@ public:
             //reg_txfilt = (reg_txfilt & 0xFC);//FIXME WTF? | 0x01;
 
             dacclk = adcclk / 2.0;
+        } else {
+            reg_bbpll = reg_bbpll & 0xF7;
         }
 
         /* Set the dividers / interpolators in Catalina. */
