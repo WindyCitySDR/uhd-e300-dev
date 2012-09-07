@@ -1003,12 +1003,43 @@ public:
         _b200_iface->write_reg(0x006, 0x0F);
         _b200_iface->write_reg(0x007, 0x00);
 
+        /* Setup AuxDAC */
+        _b200_iface->write_reg(0x018, 0x00); // AuxDAC1 Word[9:2]
+        _b200_iface->write_reg(0x019, 0x00); // AuxDAC2 Word[9:2]
+        _b200_iface->write_reg(0x01A, 0x00); // AuxDAC1 Config and Word[1:0]
+        _b200_iface->write_reg(0x01B, 0x00); // AuxDAC2 Config and Word[1:0]
+        _b200_iface->write_reg(0x023, 0xFF); // AuxDAC Manaul/Auto Control
+        _b200_iface->write_reg(0x026, 0x00); // AuxDAC Manual Select Bit/GPO Manual Select
+        _b200_iface->write_reg(0x030, 0x00); // AuxDAC1 Rx Delay
+        _b200_iface->write_reg(0x031, 0x00); // AuxDAC1 Tx Delay
+        _b200_iface->write_reg(0x032, 0x00); // AuxDAC2 Rx Delay
+        _b200_iface->write_reg(0x033, 0x00); // AuxDAC2 Tx Delay
+
+        /* Setup AuxADC */
+        _b200_iface->write_reg(0x00B, 0x00); // Temp Sensor Setup (Offset)
+        _b200_iface->write_reg(0x00C, 0x00); // Temp Sensor Setup (Temp Window)
+        _b200_iface->write_reg(0x00D, 0x03); // Temp Sensor Setup (Periodic Measure)
+        _b200_iface->write_reg(0x00F, 0x04); // Temp Sensor Setup (Decimation)
+        _b200_iface->write_reg(0x01C, 0x10); // AuxADC Setup (Clock Div)
+        _b200_iface->write_reg(0x01D, 0x01); // AuxADC Setup (Decimation/Enable)
+
         /* Setup control outputs. */
         _b200_iface->write_reg(0x035, 0x07);
         _b200_iface->write_reg(0x036, 0xFF);
 
         /* Setup GPO */
         _b200_iface->write_reg(0x03a,0x27); //set delay register
+        _b200_iface->write_reg(0x020, 0x00); // GPO Auto Enable Setup in RX and TX
+        _b200_iface->write_reg(0x027, 0x03); // GPO Manual and GPO auto value in ALERT
+        _b200_iface->write_reg(0x028, 0x00); // GPO_0 RX Delay
+        _b200_iface->write_reg(0x029, 0x00); // GPO_1 RX Delay
+        _b200_iface->write_reg(0x02A, 0x00); // GPO_2 RX Delay
+        _b200_iface->write_reg(0x02B, 0x00); // GPO_3 RX Delay
+        _b200_iface->write_reg(0x02C, 0x00); // GPO_0 TX Delay
+        _b200_iface->write_reg(0x02D, 0x00); // GPO_1 TX Delay
+        _b200_iface->write_reg(0x02E, 0x00); // GPO_2 TX Delay
+        _b200_iface->write_reg(0x02F, 0x00); // GPO_3 TX Delay
+
         _b200_iface->write_reg(0x261,0x00); //RX LO power
         _b200_iface->write_reg(0x2a1,0x00); //TX LO power
         _b200_iface->write_reg(0x248,0x0b); //en RX VCO LDO
