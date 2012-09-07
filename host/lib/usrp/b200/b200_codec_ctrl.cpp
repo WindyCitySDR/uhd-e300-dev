@@ -706,8 +706,7 @@ public:
         _b200_iface->write_reg(0x0a2, 0x7f);
         _b200_iface->write_reg(0x0a5, 0x01);
         _b200_iface->write_reg(0x0a6, 0x01);
-            /* FIXME! */
-            _b200_iface->write_reg(0x0aa, 0x22);
+        _b200_iface->write_reg(0x0aa, 0x25);
         _b200_iface->write_reg(0x0a4, 0xf0);
         _b200_iface->write_reg(0x0ae, 0x00);
 
