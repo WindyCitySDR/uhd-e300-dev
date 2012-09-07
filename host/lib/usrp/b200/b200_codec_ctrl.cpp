@@ -376,7 +376,7 @@ public:
             bbbw = 0.53e6;
         }
 
-        int bbbw_mhz = int((bbbw / 1e6));
+        double bbbw_mhz = bbbw / 1e6;
 
         /* Start with a resistor value of 100 Ohms. */
         int res = 100;
@@ -398,6 +398,8 @@ public:
         if(cap > 63) {
             cap = 63;
         }
+
+        UHD_VAR(cap);
 
         uint8_t reg0d0, reg0d1, reg0d2;
 
