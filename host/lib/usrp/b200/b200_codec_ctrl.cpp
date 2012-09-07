@@ -873,6 +873,12 @@ public:
         _b200_iface->write_reg(0x114,0x30);// Low Power Threshold
         _b200_iface->write_reg(0x11A,0x27);// Initial LMT Gain Limit
         _b200_iface->write_reg(0x081,0x00);// Tx Symbol Gain Control
+
+        /* Default TX attentuation to 10dB on both TX1 and TX2 */
+        _b200_iface->write_reg(0x073, 0x28);
+        _b200_iface->write_reg(0x074, 0x00);
+        _b200_iface->write_reg(0x075, 0x28);
+        _b200_iface->write_reg(0x076, 0x00);
     }
 
     void setup_synth(std::string which, double vcorate) {
@@ -1288,8 +1294,8 @@ public:
         //scale CP current according to VCO rate
         const double icp_baseline = 150e-6;
         const double freq_baseline = 1280e6;
-        double icp = icp_baseline * actual_vcorate / freq_baseline;
-        int icp_reg = icp/25e-6 + 1;
+        double icp = icp_baseline * (actual_vcorate / freq_baseline);
+        int icp_reg = (icp/25e-6) - 1;
 
         _b200_iface->write_reg(0x045, 0x00);            //REFCLK / 1 to BBPLL
         _b200_iface->write_reg(0x046, icp_reg & 0x3F);  //CP current
