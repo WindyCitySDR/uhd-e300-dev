@@ -331,7 +331,7 @@ public:
             bbbw = 0.625e6;
         }
 
-        double txtune_clk = ((1.6 * bbbw *
+        double txtune_clk = ((1.6 * bbbw * 2 *
                 boost::math::constants::pi<double>()) / std::log(2.0));
 
         uint16_t txbbfdiv = std::min(511, int(std::ceil(_bbpll_freq / txtune_clk)));
@@ -436,7 +436,11 @@ public:
         uint8_t reg1eb = _b200_iface->read_reg(0x1eb) & 0x3F;
         uint8_t reg1ec = _b200_iface->read_reg(0x1ec) & 0x7F;
         uint8_t reg1e6 = _b200_iface->read_reg(0x1e6) & 0x07;
-        uint8_t reg1db, reg1dc, reg1dd, reg1de, reg1df;
+        uint8_t reg1db = 0x00;
+        uint8_t reg1dc = 0x00;
+        uint8_t reg1dd = 0x00;
+        uint8_t reg1de = 0x00;
+        uint8_t reg1df = 0x00;
 
         /* For filter tuning, baseband BW is half the complex BW, and must be
          * between 28e6 and 0.2e6. */
@@ -477,11 +481,21 @@ public:
             reg1df = 0;
         }
 
+        std::cout << std::hex << "reg1dc: " << (int) reg1dc << std::endl;
+        std::cout << std::hex << "reg1de: " << (int) reg1de << std::endl;
+        std::cout << std::hex << "reg1dd: " << (int) reg1dd << std::endl;
+        std::cout << std::hex << "reg1df: " << (int) reg1df << std::endl;
+
         _b200_iface->write_reg(0x1db, reg1db);
         _b200_iface->write_reg(0x1dd, reg1dd);
         _b200_iface->write_reg(0x1df, reg1df);
         _b200_iface->write_reg(0x1dc, reg1dc);
         _b200_iface->write_reg(0x1de, reg1de);
+
+        std::cout << std::hex << "read reg1dc: " << (int) _b200_iface->read_reg(0x1dc) << std::endl;
+        std::cout << std::hex << "read reg1de: " << (int) _b200_iface->read_reg(0x1de) << std::endl;
+        std::cout << std::hex << "read reg1dd: " << (int) _b200_iface->read_reg(0x1dd) << std::endl;
+        std::cout << std::hex << "read reg1df: " << (int) _b200_iface->read_reg(0x1df) << std::endl;
     }
 
     void setup_adc() {
@@ -818,8 +832,7 @@ public:
         _b200_iface->write_reg(0x134, 0x00);
         _b200_iface->write_reg(0x137, 0x00);
 
-
-
+        /* FIXME debug
         index = 0;
         uint8_t word1, word2, word3;
         for(; index < 77; index++) {
@@ -830,14 +843,13 @@ public:
             _b200_iface->write_reg(0x134, 0x00);
             _b200_iface->write_reg(0x134, 0x00);
 
-            /* FIXME debug
             std::cout.unsetf(std::ios::hex);
             std::cout << "Index: " << (int) index << std::endl;
             std::cout << "Word 1: " << std::hex << (int) word1 << std::endl;
             std::cout << "Word 2: " << std::hex << (int) word2 << std::endl;
             std::cout << "Word 3: " << std::hex << (int) word3 << std::endl;
-            */
         }
+        */
     }
 
     void setup_gain_control() {
@@ -1028,6 +1040,18 @@ public:
 
         calibrate_tx_quadrature();
         calibrate_rx_quadrature();
+
+        /* Setup RSSI Measurements */
+        _b200_iface->write_reg(0x150, 0x0E); // RSSI Measurement Duration 0, 1
+        _b200_iface->write_reg(0x151, 0x00); // RSSI Measurement Duration 2, 3
+        _b200_iface->write_reg(0x152, 0xFF); // RSSI Weighted Multiplier 0
+        _b200_iface->write_reg(0x153, 0x00); // RSSI Weighted Multiplier 1
+        _b200_iface->write_reg(0x154, 0x00); // RSSI Weighted Multiplier 2
+        _b200_iface->write_reg(0x155, 0x00); // RSSI Weighted Multiplier 3
+        _b200_iface->write_reg(0x156, 0x00); // RSSI Delay
+        _b200_iface->write_reg(0x157, 0x00); // RSSI Wait
+        _b200_iface->write_reg(0x158, 0x0D); // RSSI Mode Select
+        _b200_iface->write_reg(0x15C, 0x67); // Power Measurement Duration
 
         _b200_iface->write_reg(0x012, 0x02); //set PPORT config
         _b200_iface->write_reg(0x013, 0x01); //set FDD
