@@ -636,8 +636,8 @@ public:
             _b200_iface->write_reg(0x014, 0x0f);
         }
 
-        _b200_iface->write_reg(0x185, 0x20);
-        _b200_iface->write_reg(0x186, 0x32);
+        _b200_iface->write_reg(0x185, 0x20);    // RF DC Offset wait count
+        _b200_iface->write_reg(0x186, 0x32);    // RF DC Offset count
         _b200_iface->write_reg(0x187, 0x24);
         _b200_iface->write_reg(0x18b, 0x83);
         _b200_iface->write_reg(0x188, 0x05);
@@ -671,9 +671,9 @@ public:
             _b200_iface->write_reg(0x014, 0x0f);
         }
 
-         /* Disable RX cal free run, set other cal settings. */
-        _b200_iface->write_reg(0x168, 0x03);
-        _b200_iface->write_reg(0x16e, 0x25);
+        /* Configure RX Quadrature calibration settings. */
+        _b200_iface->write_reg(0x168, 0x03);    // Set tone level for cal
+        _b200_iface->write_reg(0x16e, 0x25);    // RX Gain index to use for cal
         _b200_iface->write_reg(0x16a, 0x75);
         _b200_iface->write_reg(0x16b, 0x15);
         _b200_iface->write_reg(0x169, 0xcf);
@@ -1053,6 +1053,10 @@ public:
         _b200_iface->write_reg(0x23d,0x00);
         _b200_iface->write_reg(0x27d,0x00);
 
+        /* The order of the following process is EXTREMELY important. If the
+         * below functions are modified at all, device initialization and
+         * calibration might be broken in the process! */
+
         _b200_iface->write_reg(0x015, 0x04); //dual synth mode, synth en ctrl en
         _b200_iface->write_reg(0x014, 0x05); //use SPI for TXNRX ctrl, to ALERT, TX on
         _b200_iface->write_reg(0x013, 0x01); //enable ENSM
@@ -1103,8 +1107,8 @@ public:
         if(which[0] == 'R') {
             /* Indexing the gain tables requires an offset from the requested
              * amount of total gain in dB:
-             *      < 1300MHz: dB + 3
-             *      >= 1300MHz and < 4000MHz: dB + 5
+             *      < 1300MHz: dB + 5
+             *      >= 1300MHz and < 4000MHz: dB + 3
              *      >= 4000MHz and <= 6000MHz: dB + 14
              */
             int gain_offset = 0;
@@ -1132,13 +1136,14 @@ public:
 
             return gain_index - gain_offset;
         } else { //TX gain
+            /* Setting the below bits causes a change in the TX attenuation word
+             * to immediately take effect. */
             _b200_iface->write_reg(0x077, 0x40);
             _b200_iface->write_reg(0x07c, 0x40);
 
-            //TX_A gain is 0x074[0], 0x073[7:0]
-            //TX_B gain is 0x076[0], 0x075[7:0]
-            //gain step is -0.25dB, make sure you set for 89.75 - (gain)
-            //in order to get the correct direction
+            /* Each gain step is -0.25dB. Calculate the attenuation necessary
+             * for the requested gain, convert it into gain steps, then write
+             * the attenuation word. Max gain (so zero attenuation) is 89.75. */
             double atten = get_gain_range("TX_A", "").stop() - value;
             int attenreg = atten * 4;
             if(which[3] == 'A') {
