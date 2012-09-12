@@ -543,36 +543,42 @@ public:
         data[7] = std::min(uint8_t(124), uint8_t(std::floor(-0.5
                         + (80.0 * scale_snr * scale_res
                         * std::min(1.0, std::sqrt(maxsnr * fsadc / 640.0))))));
+        double data007 = data[7];
         data[8] = std::min(uint8_t(255), uint8_t(std::floor(0.5
-                        + ((20.0 * (640.0 / fsadc) * (((double)data[7]) / 80.0))
-                        / (scale_res * scale_cap)))));
+                        + ((20.0 * (640.0 / fsadc) * ((data007 / 80.0))
+                        / (scale_res * scale_cap))))));
         data[10] = std::min(uint8_t(127), uint8_t(std::floor(-0.5 + (77.0 * scale_res
                         * std::min(1.0, std::sqrt(maxsnr * fsadc / 640.0))))));
-        data[9] = std::min(uint8_t(127), uint8_t(std::floor(0.8 * ((double)data[10]))));
+        double data010 = data[10];
+        data[9] = std::min(uint8_t(127), uint8_t(std::floor(0.8 * data010)));
         data[11] = std::min(uint8_t(255), uint8_t(std::floor(0.5
-                        + (20.0 * (640.0 / fsadc) * (((double)data[10]) / 77.0)
-                        / (scale_res * scale_cap)))));
+                        + (20.0 * (640.0 / fsadc) * ((data010 / 77.0)
+                        / (scale_res * scale_cap))))));
         data[12] = std::min(uint8_t(127), uint8_t(std::floor(-0.5
                         + (80.0 * scale_res * std::min(1.0,
                         std::sqrt(maxsnr * fsadc / 640.0))))));
+        double data012 = data[12];
         data[13] = std::min(uint8_t(255), uint8_t(std::floor(-1.5
-                        + (20.0 * (640.0 / fsadc) * (((double)data[12]) / 80.0)
-                        / (scale_res * scale_cap)))));
+                        + (20.0 * (640.0 / fsadc) * ((data012 / 80.0)
+                        / (scale_res * scale_cap))))));
         data[14] = 21 * uint8_t(std::floor(0.1 * 640.0 / fsadc));
-        data[15] = std::min(uint8_t(127), uint8_t(1.025 * ((double)data[7])));
-        data[16] = std::min(uint8_t(127), uint8_t(std::floor(((double)data[15])
+        data[15] = std::min(uint8_t(127), uint8_t(1.025 * data007));
+        double data015 = data[15];
+        data[16] = std::min(uint8_t(127), uint8_t(std::floor((data015
                         * (0.98 + (0.02 * std::max(1.0,
-                        (640.0 / fsadc) / maxsnr))))));
+                        (640.0 / fsadc) / maxsnr)))))));
         data[17] = data[15];
-        data[18] = std::min(uint8_t(127), uint8_t(0.975 * ((double)data[10])));
-        data[19] = std::min(uint8_t(127), uint8_t(std::floor(((double)data[18])
+        data[18] = std::min(uint8_t(127), uint8_t(0.975 * (data010)));
+        double data018 = data[18];
+        data[19] = std::min(uint8_t(127), uint8_t(std::floor((data018
                         * (0.98 + (0.02 * std::max(1.0,
-                        (640.0 / fsadc) / maxsnr))))));
+                        (640.0 / fsadc) / maxsnr)))))));
         data[20] = data[18];
-        data[21] = std::min(uint8_t(127), uint8_t(0.975 * ((double)data[12])));
-        data[22] = std::min(uint8_t(127), uint8_t(std::floor(((double)data[21])
+        data[21] = std::min(uint8_t(127), uint8_t(0.975 * data012));
+        double data021 = data[21];
+        data[22] = std::min(uint8_t(127), uint8_t(std::floor((data021
                         * (0.98 + (0.02 * std::max(1.0,
-                        (640.0 / fsadc) / maxsnr))))));
+                        (640.0 / fsadc) / maxsnr)))))));
         data[23] = data[21];
         data[24] = 0x2e;
         data[25] = uint8_t(std::floor(128.0 + std::min(63.0,
