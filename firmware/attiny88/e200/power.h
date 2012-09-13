@@ -40,7 +40,12 @@ bool power_on(void);
 uint8_t power_off(void);
 
 bool power_is_subsys_on(int8_t index);
-int8_t power_get_regulator_index(uint8_t device, uint8_t address);
+//int8_t power_get_regulator_index(uint8_t device, uint8_t address);
 //bool ltc3675_reg_helper(uint8_t address);
+
+#ifndef I2C_REWORK
+extern io_pin_t PWR_SDA;
+extern io_pin_t PWR_SCL;
+#endif // I2C_REWORK
 
 #endif // POWER_H

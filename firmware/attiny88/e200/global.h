@@ -20,16 +20,19 @@ typedef struct State
 	bool power_off;
 	bool core_power_bad;
 	bool ltc3675_irq;
+	bool ltc4155_irq;
 	//bool low_battery;
 	uint8_t blink_error;
 	uint8_t blinker_state;
 	uint8_t blink_loops;
 	uint8_t blink_last_loop;
+	bool blink_stop;
 } STATE;
 
 //extern volatile bool _timers_running;
 extern volatile STATE _state;
 
 void pmc_set_blink_error(uint8_t count);
+uint8_t pmc_get_blink_error(void);
 
 #endif /* GLOBAL_H_ */

@@ -11,15 +11,15 @@
 
 //#include <stdio.h>
 //#include <util/delay.h>
+#include <avr/interrupt.h>
 
 #include "io.h"
 #include "i2c.h"
 #include "debug.h"
 #include "global.h"
 #include "error.h"
-#include <avr/interrupt.h>
 
-const bool _ltc3675_pull_up = false;
+const bool _ltc3675_pull_up = true;
 
 volatile ltc3675_reg_helper_fn _ltc3675_reg_helper;
 
@@ -35,6 +35,9 @@ static io_pin_t PWR_EN4     = IO_PB(6);	// Instead of FTDI_BCD
 static io_pin_t PWR_EN5     = IO_PB(7);	// Instead of FTDI_PWREN2
 #endif // HARDWIRE_ENABLE
 
+static io_pin_t PWR_SDA     = IO_PC(4);
+static io_pin_t PWR_SCL     = IO_PC(5);
+
 #else
 
 #ifdef HARDWIRE_ENABLE
@@ -45,10 +48,12 @@ static io_pin_t PWR_EN4     = IO_PA(1);
 static io_pin_t PWR_EN5     = IO_PA(2);
 #endif // HARDWIRE_ENABLE
 
-#endif // ATTINY88_DIP
+#ifdef I2C_REWORK
+static io_pin_t PWR_SDA     = IO_PC(2);		// Instead of EN5
+static io_pin_t PWR_SCL     = IO_PA(2);		// Instead of EN2
+#endif // I2C_REWORK
 
-static io_pin_t PWR_SDA     = IO_PC(4);
-static io_pin_t PWR_SCL     = IO_PC(5);
+#endif // ATTINY88_DIP
 
 static io_pin_t PWR_IRQ     = IO_PD(0);
 static io_pin_t WAKEUP      = IO_PD(2);
@@ -202,12 +207,12 @@ bool _ltc3675_handle_irq(void)
 
 static bool _ltc3675_get_realtime_status(uint8_t* val)
 {
-	cli();
+	//cli();
 	
 	if (i2c_read2_ex(PWR_SDA, PWR_SCL, LTC3675_READ_ADDRESS, LTC3675_REG_REALTIME_STATUS, val, _ltc3675_pull_up) == false)
 		return false;
 	
-	sei();
+	//sei();
 	
 	return true;
 }
@@ -216,7 +221,13 @@ int8_t ltc3675_check_status(void)
 {
 	uint8_t val = 0x00;
 	
-	if (_ltc3675_get_realtime_status(&val) == false)
+	cli();
+	
+	bool result = _ltc3675_get_realtime_status(&val);
+	
+	sei();
+	
+	if (result == false)
 		return -1;
 	
 	//_ltc3675_last_status = val;
@@ -271,9 +282,9 @@ bool ltc3675_init(ltc3675_reg_helper_fn helper)
     io_set_pin(PWR_SDA);
     io_set_pin(PWR_SCL);
 */
-	i2c_init(PWR_SDA, PWR_SCL);
-    //i2c_init_ex(PWR_SDA, PWR_SCL, true);
-
+ #ifdef I2C_REWORK
+	i2c_init_ex(PWR_SDA, PWR_SCL, _ltc3675_pull_up);
+#endif // I2C_REWORK
     io_input_pin(PWR_IRQ);
 	io_set_pin(PWR_IRQ);	// Enable pull-up for Open Drain
 	
@@ -316,12 +327,17 @@ static bool _ltc3675_toggle_reg(uint8_t addr, uint8_t def_reg, bool on)
 {
 	bool result = true;
 	
-	cli();
+	//cli();
 	
 	if (i2c_write_ex(PWR_SDA, PWR_SCL, LTC3675_WRITE_ADDRESS, addr, def_reg | (on ? LTC3675_ENABLE_REGISTER_BIT : 0x00), _ltc3675_pull_up) == false)
 		result = false;
 	
-	sei();
+	if (on)
+	{
+		// FIXME: Delay?
+	}		
+	
+	//sei();
 
 	return result;
 }

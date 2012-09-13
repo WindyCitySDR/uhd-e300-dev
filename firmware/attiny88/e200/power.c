@@ -26,6 +26,11 @@
 #define ARRAY_SIZE(a)      (sizeof(a)/sizeof(a[0]))
 #define ZERO_MEMORY(s)      memset(&s, 0x00, sizeof(s))
 
+#ifndef I2C_REWORK
+io_pin_t PWR_SDA     = IO_PC(4);
+io_pin_t PWR_SCL     = IO_PC(5);
+#endif // I2C_REWORK
+
 //volatile bool powered = false;
 
 struct reg_config {
@@ -67,8 +72,6 @@ static bool ltc3675_reg_helper(uint8_t address)
 	//return power_is_subsys_on(power_get_regulator_index(REG_LTC3675, address) - 1);
 }
 
-static io_pin_t USBPM_IRQ   = IO_PB(1);
-
 static io_pin_t AVR_CS      = IO_PB(2);
 static io_pin_t AVR_MOSI    = IO_PB(3);
 static io_pin_t AVR_MISO    = IO_PB(4);
@@ -105,6 +108,7 @@ void tps54478_init(bool enable)
 //#ifdef DEBUG
 //	io_enable_pin(CORE_PWR_EN, false);
 //#endif // DEBUG
+//_delay_ms(2500);
 }
 
 void tps54478_set_power(bool on)
@@ -151,20 +155,26 @@ void power_signal_interrupt(void)
 
 ///////////////////////////////////////////////////////////////////////////////
 
+#ifndef DEBUG
 static io_pin_t PS_POR      = IO_PD(6);
+#define PS_POR_AVAILABLE
+#endif // DEBUG
 static io_pin_t PS_SRST     = IO_PD(7);
 
 #define FPGA_RESET_DELAY    10  // ms   // MAGIC
 
 void fpga_reset(bool delay)
 {
+#ifdef PS_POR_AVAILABLE
     io_clear_pin(PS_POR);
+#endif // PS_POR_AVAILABLE
     io_clear_pin(PS_SRST);
 
     if (delay)
         _delay_ms(FPGA_RESET_DELAY);
-
+#ifdef PS_POR_AVAILABLE
     io_enable_pin(PS_POR, true);
+#endif // PS_POR_AVAILABLE
     io_enable_pin(PS_SRST, true);
 }
 
@@ -248,11 +258,12 @@ static bool _power_up_fpga(power_params_t* params)
 
         if (params->retry == 0)
 		{
-			io_clear_pin(PS_SRST);	// FIXME: Hold it low to stop 
+			io_clear_pin(PS_SRST);	// FIXME: Hold it low to stop
+#ifdef PS_POR_AVAILABLE
 			io_clear_pin(PS_POR);	// Prepare it for shutdown, and then the potential next power cycle
-			
+#endif // PS_POR_AVAILABLE			
             tps54478_set_power(false);
-		}			
+		}
 
         //return (tps54478_is_power_good() == false);
 		return true;
@@ -318,10 +329,10 @@ struct boot_step {
     //uint16_t opaque;
 	//bool powered;
 } boot_steps[] = {  // MAGIC: Retries/delays
-    { PS_FPGA,              NULL, POWER_DEFAULT_DELAY, POWER_DEFAULT_RETRIES },
-    { PS_VDRAM,             NULL, POWER_DEFAULT_DELAY, POWER_DEFAULT_RETRIES },
-    { PS_PERIPHERALS_1_8,   NULL, POWER_DEFAULT_DELAY, POWER_DEFAULT_RETRIES },
-    { PS_PERIPHERALS_3_3,   NULL, POWER_DEFAULT_DELAY, POWER_DEFAULT_RETRIES },
+    { PS_FPGA,              NULL, POWER_DEFAULT_DELAY, POWER_DEFAULT_RETRIES },	// 7..8
+    { PS_VDRAM,             NULL, POWER_DEFAULT_DELAY, POWER_DEFAULT_RETRIES },	// 9..10
+    { PS_PERIPHERALS_1_8,   NULL, POWER_DEFAULT_DELAY, POWER_DEFAULT_RETRIES },	// 11..12
+    { PS_PERIPHERALS_3_3,   NULL, POWER_DEFAULT_DELAY, POWER_DEFAULT_RETRIES },	// 13..14
     //{ PS_TX,              NULL, POWER_DEFAULT_DELAY, POWER_DEFAULT_RETRIES }  // CHECK: Leaving TX off
 };
 /*
@@ -342,21 +353,24 @@ void power_init(void)
 	charge_set_led(true);
 
     tps54478_init(true);	// Will keep EN float (keep power on)
+#ifndef I2C_REWORK
+	i2c_init(PWR_SDA, PWR_SCL);
+#endif // I2C_REWORK
 
-    ltc3675_init(ltc3675_reg_helper);
-	
 	ltc4155_init();
 
-    battery_init();
+    ltc3675_init(ltc3675_reg_helper);
 
+    battery_init();
+#ifdef PS_POR_AVAILABLE
 	io_output_pin(PS_POR);
+#endif // PS_POR_AVAILABLE
     io_output_pin(PS_SRST);
     // Hold low until power is stable
+#ifdef PS_POR_AVAILABLE
     io_clear_pin(PS_POR);
+#endif // PS_POR_AVAILABLE
     io_clear_pin(PS_SRST);
-	
-	io_input_pin(USBPM_IRQ);
-	io_set_pin(USBPM_IRQ);	// Enable pull-up for Open Drain
 /*
     AVR_CS
     AVR_MOSI
@@ -368,8 +382,8 @@ void power_init(void)
 */
 	io_input_pin(AVR_RESET);	// Has external pull-up (won't do anything because this is configured at the hardware RESET pin)
 	
-	io_output_pin(AVR_IRQ);		// Output here, input to FPGA
-    //io_input_pin(AVR_IRQ);
+	//io_output_pin(AVR_IRQ);		// Output here, input to FPGA
+    io_input_pin(AVR_IRQ);
 	//io_set_pin(AVR_IRQ);	// FIXME: Active low?
 	
 	///////////////
@@ -405,8 +419,10 @@ bool power_on(void)
     //charge_set_led(false);
 
 	uint8_t step_count, retry;
-	for (step_count = 0; step_count < ARRAY_SIZE(boot_steps); step_count++) {
+	for (step_count = 0; step_count < ARRAY_SIZE(boot_steps); step_count++)
+	{
 //		debug_blink(step_count);
+//		debug_blink_rev(7 + (step_count * 2) + 0);
 		
 	    struct boot_step* step = boot_steps + step_count;
 	    if ((step->fn == NULL) && (step->subsys == PS_UNKNOWN))
@@ -414,27 +430,20 @@ bool power_on(void)
 
         power_params_t params;
 
-	    for (retry = 0; retry < step->retries; retry++) {
+	    for (retry = 0; retry < step->retries; retry++)
+		{
 	        ZERO_MEMORY(params);
             params.subsys = step->subsys;
             params.enable = true;
 	        params.retry = retry;
 
-	        if (step->fn != NULL) {
-                if (step->fn(&params))
-				{
-					//step->powered = true;
-					default_reg_config[step->subsys].powered = true;
-                    break;
-				}					
-	        }
-	        else {
-	            if (_power_enable_subsys(&params))
-				{
-					//step->powered = true;
-					default_reg_config[step->subsys].powered = true;
-                    break;
-				}					
+	        if (((step->fn != NULL) && (step->fn(&params))) ||
+				((step->fn == NULL) && (_power_enable_subsys(&params))))
+			{
+				//step->powered = true;
+				default_reg_config[step->subsys].powered = true;
+//				debug_blink_rev(7 + (step_count * 2) + 1);
+                break;
 	        }
 
             if ((retry < step->retries) && (step->delay > 0))
@@ -447,7 +456,8 @@ bool power_on(void)
 	        break;
     }
 
-    if (step_count != ARRAY_SIZE(boot_steps)) {
+    if (step_count != ARRAY_SIZE(boot_steps))
+	{
 		//sei();	// For button press detection
 		
         /*while (_state.powered == false) {
@@ -470,7 +480,8 @@ bool power_on(void)
 	//EIMSK = _BV(INT1);
 	
 	_state.powered = true;
-	
+//debug_blink_rev(1);
+//_delay_ms(1000);	// Wait for FPGA PGOOD to stabilise
 	sei();
 
     return true;
@@ -485,7 +496,8 @@ uint8_t power_off(void)
 	///////////////////////////////////
 	
 	int8_t step_count, retry;
-	for (step_count = ARRAY_SIZE(boot_steps) - 1; step_count >= 0; step_count--) {
+	for (step_count = ARRAY_SIZE(boot_steps) - 1; step_count >= 0; step_count--)
+	{
 //		debug_blink(step_count);
 		
 	    struct boot_step* step = boot_steps + step_count;
@@ -494,28 +506,20 @@ uint8_t power_off(void)
 
         power_params_t params;
 
-	    for (retry = 0; retry < step->retries; retry++) {
+	    for (retry = 0; retry < step->retries; retry++)
+		{
 	        ZERO_MEMORY(params);
             params.subsys = step->subsys;
             params.enable = false;
 	        params.retry = retry;
-
-	        if (step->fn != NULL) {
-                if (step->fn(&params))
-				{
-					//step->powered = false;
-					default_reg_config[step->subsys].powered = false;
-                    break;
-				}					
-	        }
-	        else {
-	            if (_power_enable_subsys(&params))
-				{
-					//step->powered = false;
-					default_reg_config[step->subsys].powered = false;
-                    break;
-				}					
-	        }
+			
+			if (((step->fn != NULL) && (step->fn(&params))) ||
+				((step->fn == NULL) && (_power_enable_subsys(&params))))
+			{
+				//step->powered = false;
+				default_reg_config[step->subsys].powered = false;
+				break;
+			}
 
             if ((retry < step->retries) && (step->delay > 0))
                 _delay_ms(step->delay);
@@ -527,13 +531,15 @@ uint8_t power_off(void)
 	        break;
     }
 
-    if (step_count != -1) {
+    if (step_count != -1)
+	{
 		/*sei();
 		
         while (_state.powered) {
             blink_error_sequence(step_count + BlinkError_FPGA_Power);
         }*/
-		pmc_set_blink_error(step_count + BlinkError_FPGA_Power);
+		if (pmc_get_blink_error() == BlinkError_None)	// Only set blink error if no existing error
+			pmc_set_blink_error(step_count + BlinkError_FPGA_Power);
 		
 		sei();
 
@@ -575,14 +581,15 @@ ISR(INT0_vect)	// PD(2) WAKEUP: Rising edge
 
 ISR(INT1_vect)	// PD(3) ONSWITCH_DB (PB_STAT): Any change
 {
-	cli();
+	//cli();
 	
 	if (ltc3675_is_power_button_depressed())
 	{
 		TCNT1 = 0;
+		if ((TCCR1B & 0x07) == 0x00)
+			_state.active_timers++;
 		TCCR1B |= /*0x5*/0x3;	// [1024] 64 prescaler
 		//_state.timers_running = true;
-		_state.active_timers++;
 		
 		//debug_set(DEBUG_1, true);
 		//debug_set(DEBUG_2, false);
@@ -592,20 +599,21 @@ ISR(INT1_vect)	// PD(3) ONSWITCH_DB (PB_STAT): Any change
 		//if (TIMSK1 & _BV(OCIE1A))	// If letting go of button and still running, stop timer
 		{
 			//TIMSK1 &= ~_BV(OCIE1A);
+			if ((TCCR1B & 0x07) != 0x00)
+				_state.active_timers--;
 			TCCR1B &= ~0x7;	// Disable timer
 			//_state.timers_running = false;
-			_state.active_timers--;
 			
 			//debug_set(DEBUG_1, false);
 		}
 	}
 	
-	sei();
+	//sei();
 }
 
 ISR(TIMER1_COMPA_vect)
 {
-	cli();
+	//cli();
 
 	//TIMSK1 &= ~_BV(OCIE1A);	// Turn off timer
 	TCCR1B &= ~0x7;	// Disable timer
@@ -617,7 +625,7 @@ ISR(TIMER1_COMPA_vect)
 	
 	//power_off();
 	
-	sei();
+	//sei();
 	
 	//sleep_mode();
 }
@@ -633,9 +641,14 @@ ISR(PCINT0_vect)
 	//	Power problem:	battery -> blink charge LED
 	//					major -> shutdown
 	
-	if (/*(_state.powered) && */(io_test_pin(CORE_PGOOD) == false))
+	if (/*(_state.powered) && */(/*io_test_pin(CORE_PGOOD)*/tps54478_is_power_good() == false))
 	{
 		_state.core_power_bad = true;
+	}
+	
+	if (ltc4155_has_interrupt())
+	{
+		_state.ltc4155_irq = true;
 	}
 	
 	//sei();
@@ -652,7 +665,7 @@ ISR(PCINT2_vect)
 	
 	if (ltc3675_has_interrupt())
 	{
-		debug_set(IO_PB(6), true);
+		//debug_set(IO_PB(6), true);
 		_state.ltc3675_irq = true;
 	}
 	
