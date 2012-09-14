@@ -239,15 +239,6 @@ public:
     }
 
     double calibrate_baseband_rx_analog_filter() {
-        /* If we aren't already in the ALERT state, we will need to return to
-         * the FDD state after calibration. */
-        bool not_in_alert = false;
-        if((_b200_iface->read_reg(0x017) & 0x0F) != 5) {
-            /* Force the device into the ALERT state. */
-            not_in_alert = true;
-            _b200_iface->write_reg(0x014, 0x0f);
-        }
-
         /* For filter tuning, baseband BW is half the complex BW, and must be
          * between 28e6 and 0.2e6. */
         double bbbw = _baseband_bw / 2.0;
@@ -304,24 +295,10 @@ public:
         _b200_iface->write_reg(0x1e2, 0x03);
         _b200_iface->write_reg(0x1e3, 0x03);
 
-        /* If we were in the FDD state, return it now. */
-        if(not_in_alert) {
-            _b200_iface->write_reg(0x014, 0x21);
-        }
-
         return bbbw;
     }
 
     double calibrate_baseband_tx_analog_filter() {
-        /* If we aren't already in the ALERT state, we will need to return to
-         * the FDD state after calibration. */
-        bool not_in_alert = false;
-        if((_b200_iface->read_reg(0x017) & 0x0F) != 5) {
-            /* Force the device into the ALERT state. */
-            not_in_alert = true;
-            _b200_iface->write_reg(0x014, 0x0f);
-        }
-
         /* For filter tuning, baseband BW is half the complex BW, and must be
          * between 28e6 and 0.2e6. */
         double bbbw = _baseband_bw / 2.0;
@@ -357,11 +334,6 @@ public:
         }
 
         _b200_iface->write_reg(0x0ca, 0x26);
-
-        /* If we were in the FDD state, return it now. */
-        if(not_in_alert) {
-            _b200_iface->write_reg(0x014, 0x21);
-        }
 
         return bbbw;
     }
@@ -432,7 +404,6 @@ public:
     }
 
     void calibrate_rx_TIAs() {
-
         uint8_t reg1eb = _b200_iface->read_reg(0x1eb) & 0x3F;
         uint8_t reg1ec = _b200_iface->read_reg(0x1ec) & 0x7F;
         uint8_t reg1e6 = _b200_iface->read_reg(0x1e6) & 0x07;
@@ -499,7 +470,6 @@ public:
     }
 
     void setup_adc() {
-
         double bbbw_mhz = (((_bbpll_freq / 1e6) / _rx_bbf_tunediv) * std::log(2.0)) \
                       / (1.4 * 2 * boost::math::constants::pi<double>());
 
@@ -633,15 +603,6 @@ public:
     }
 
     void calibrate_rf_dc_offset() {
-        /* If we aren't already in the ALERT state, we will need to return to
-         * the FDD state after calibration. */
-        bool not_in_alert = false;
-        if((_b200_iface->read_reg(0x017) & 0x0F) != 5) {
-            /* Force the device into the ALERT state. */
-            not_in_alert = true;
-            _b200_iface->write_reg(0x014, 0x0f);
-        }
-
         _b200_iface->write_reg(0x185, 0x20);    // RF DC Offset wait count
         _b200_iface->write_reg(0x186, 0x32);    // RF DC Offset count
         _b200_iface->write_reg(0x187, 0x24);
@@ -660,23 +621,9 @@ public:
             count++;
             boost::this_thread::sleep(boost::posix_time::milliseconds(50));
         }
-
-        /* If we were in the FDD state, return it now. */
-        if(not_in_alert) {
-            _b200_iface->write_reg(0x014, 0x21);
-        }
     }
 
     void calibrate_rx_quadrature(void) {
-        /* If we aren't already in the ALERT state, we will need to return to
-         * the FDD state after calibration. */
-        bool not_in_alert = false;
-        if((_b200_iface->read_reg(0x017) & 0x0F) != 5) {
-            /* Force the device into the ALERT state. */
-            not_in_alert = true;
-            _b200_iface->write_reg(0x014, 0x0f);
-        }
-
         /* Configure RX Quadrature calibration settings. */
         _b200_iface->write_reg(0x168, 0x03);    // Set tone level for cal
         _b200_iface->write_reg(0x16e, 0x25);    // RX Gain index to use for cal
@@ -684,24 +631,9 @@ public:
         _b200_iface->write_reg(0x16b, 0x15);
         _b200_iface->write_reg(0x169, 0xcf);
         _b200_iface->write_reg(0x18b, 0xad);
-
-        /* If we were in the FDD state, return it now. */
-        if(not_in_alert) {
-            _b200_iface->write_reg(0x014, 0x21);
-        }
     }
 
     void calibrate_tx_quadrature(void) {
-        /* If we aren't already in the ALERT state, we will need to return to
-         * the FDD state after calibration. */
-        bool not_in_alert = false;
-        if((_b200_iface->read_reg(0x017) & 0x0F) != 5) {
-            /* Force the device into the ALERT state. */
-            not_in_alert = true;
-            _b200_iface->write_reg(0x014, 0x0f);
-            UHD_HERE();
-        }
-
         /* TX Quad Cal: write settings, cal. */
         UHD_HERE();
         uint8_t maskbits = _b200_iface->read_reg(0x0a3) & 0x3F;
@@ -739,12 +671,6 @@ public:
 
         std::cout << "0x08E: " << (int) _b200_iface->read_reg(0x08E) << std::endl;
         std::cout << "0x08F: " << (int) _b200_iface->read_reg(0x08F) << std::endl;
-
-        /* If we were in the FDD state, return it now. */
-        if(not_in_alert) {
-            _b200_iface->write_reg(0x014, 0x21);
-            UHD_HERE();
-        }
     }
 
 
@@ -1111,13 +1037,11 @@ public:
         _b200_iface->write_reg(0x158, 0x0D); // RSSI Mode Select
         _b200_iface->write_reg(0x15C, 0x67); // Power Measurement Duration
 
-        //std::cout << std::hex << "reg_txfilt: " << (int) reg_txfilt << std::endl;
-        //std::cout << std::hex <<"reg_rxfilt: " << (int) reg_rxfilt << std::endl;
-        //_b200_iface->write_reg(0x002, reg_txfilt);
-        //_b200_iface->write_reg(0x003, reg_rxfilt);
+        /* Not sure why we do this, but it's what ADI does. */
+        _b200_iface->write_reg(0x002, reg_txfilt);
+        _b200_iface->write_reg(0x003, reg_rxfilt);
 
-        //ian magic
-        _b200_iface->write_reg(0x014, 0x0f);
+        /* Set TXers & RXers on (only works in FDD mode) */
         _b200_iface->write_reg(0x014, 0x21);
     }
 
@@ -1303,12 +1227,26 @@ public:
 
         /* Run through other necessary calibrations after a BBPLL tune. */
         if((_rx_freq != 0.0) && (_tx_freq != 0.0)) {
+            /* If we aren't already in the ALERT state, we will need to return to
+             * the FDD state after calibration. */
+            bool not_in_alert = false;
+            if((_b200_iface->read_reg(0x017) & 0x0F) != 5) {
+                /* Force the device into the ALERT state. */
+                not_in_alert = true;
+                _b200_iface->write_reg(0x014, 0x05);
+            }
+
             calibrate_baseband_rx_analog_filter();
             calibrate_baseband_tx_analog_filter();
             calibrate_rx_TIAs();
             calibrate_secondary_tx_filter();
 
             setup_adc();
+
+            /* If we were in the FDD state, return it now. */
+            if(not_in_alert) {
+                _b200_iface->write_reg(0x014, 0x21);
+            }
         }
 
         return _baseband_bw;
@@ -1503,8 +1441,24 @@ public:
         }
 
         if(do_cal) {
+            /* If we aren't already in the ALERT state, we will need to return to
+             * the FDD state after calibration. */
+            bool not_in_alert = false;
+            if((_b200_iface->read_reg(0x017) & 0x0F) != 5) {
+                /* Force the device into the ALERT state. */
+                not_in_alert = true;
+                _b200_iface->write_reg(0x014, 0x05);
+                UHD_HERE();
+            }
+
             calibrate_tx_quadrature();
             calibrate_rx_quadrature();
+
+            /* If we were in the FDD state, return it now. */
+            if(not_in_alert) {
+                _b200_iface->write_reg(0x014, 0x21);
+                UHD_HERE();
+            }
         }
 
         return return_freq;
