@@ -1465,25 +1465,6 @@ public:
     }
 
     double set_filter_bw(const std::string &which) {
-#if 0
-        /* If the BBPLL hasn't been tuned & calibrated yet, return. */
-        if(_bbpll_freq == 0) {
-            return 0.0;
-        }
-
-        //set up BB filter
-        if(which == "TX") {
-            double bw = calibrate_baseband_tx_analog_filter();
-            calibrate_secondary_tx_filter();
-
-            return bw;
-        } else {
-            double bw = calibrate_baseband_rx_analog_filter();
-            calibrate_rx_TIAs();
-
-            return bw;
-        }
-#endif
         return 0.0;
     }
 
