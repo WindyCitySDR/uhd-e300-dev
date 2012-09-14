@@ -699,9 +699,11 @@ public:
             /* Force the device into the ALERT state. */
             not_in_alert = true;
             _b200_iface->write_reg(0x014, 0x0f);
+            UHD_HERE();
         }
 
         /* TX Quad Cal: write settings, cal. */
+        UHD_HERE();
         uint8_t maskbits = _b200_iface->read_reg(0x0a3) & 0x3F;
         _b200_iface->write_reg(0x0a0, 0x15);
         _b200_iface->write_reg(0x0a3, 0x00 | maskbits);
@@ -733,10 +735,15 @@ public:
             count++;
             boost::this_thread::sleep(boost::posix_time::milliseconds(10));
         }
+        UHD_HERE();
+
+        std::cout << "0x08E: " << (int) _b200_iface->read_reg(0x08E) << std::endl;
+        std::cout << "0x08F: " << (int) _b200_iface->read_reg(0x08F) << std::endl;
 
         /* If we were in the FDD state, return it now. */
         if(not_in_alert) {
             _b200_iface->write_reg(0x014, 0x21);
+            UHD_HERE();
         }
     }
 
@@ -877,12 +884,6 @@ public:
         _b200_iface->write_reg(0x114,0x30);// Low Power Threshold
         _b200_iface->write_reg(0x11A,0x27);// Initial LMT Gain Limit
         _b200_iface->write_reg(0x081,0x00);// Tx Symbol Gain Control
-
-        /* Default TX attentuation to 10dB on both TX1 and TX2 */
-        _b200_iface->write_reg(0x073, 0x28);
-        _b200_iface->write_reg(0x074, 0x00);
-        _b200_iface->write_reg(0x075, 0x28);
-        _b200_iface->write_reg(0x076, 0x00);
     }
 
     void setup_synth(std::string which, double vcorate) {
@@ -995,15 +996,15 @@ public:
 
         /* Tune the BBPLL, write TX and RX FIRS. */
         set_clock_rate(30.72e6);
-        _b200_iface->write_reg(0x004, reg_inputsel);
 
-        /* Setup data ports (FDD dual port DDR CMOS) */
-        //FDD dual port DDR CMOS no swap
+        /* Setup data ports (FDD dual port DDR CMOS):
+         *      FDD dual port DDR CMOS no swap.
+         *      Force TX on one port, RX on the other. */
         _b200_iface->write_reg(0x010, 0xc8);
         _b200_iface->write_reg(0x011, 0x00);
-         //force TX on one port, RX on the other
         _b200_iface->write_reg(0x012, 0x02);
-        //data delay for TX and RX data clocks
+
+        /* Data delay for TX and RX data clocks */
         _b200_iface->write_reg(0x006, 0x0F);
         _b200_iface->write_reg(0x007, 0x00);
 
@@ -1032,7 +1033,7 @@ public:
         _b200_iface->write_reg(0x036, 0xFF);
 
         /* Setup GPO */
-        _b200_iface->write_reg(0x03a,0x27); //set delay register
+        _b200_iface->write_reg(0x03a, 0x27); //set delay register
         _b200_iface->write_reg(0x020, 0x00); // GPO Auto Enable Setup in RX and TX
         _b200_iface->write_reg(0x027, 0x03); // GPO Manual and GPO auto value in ALERT
         _b200_iface->write_reg(0x028, 0x00); // GPO_0 RX Delay
@@ -1044,20 +1045,21 @@ public:
         _b200_iface->write_reg(0x02E, 0x00); // GPO_2 TX Delay
         _b200_iface->write_reg(0x02F, 0x00); // GPO_3 TX Delay
 
-        _b200_iface->write_reg(0x261,0x00); //RX LO power
-        _b200_iface->write_reg(0x2a1,0x00); //TX LO power
-        _b200_iface->write_reg(0x248,0x0b); //en RX VCO LDO
-        _b200_iface->write_reg(0x288,0x0b); //en TX VCO LDO
-        _b200_iface->write_reg(0x246,0x02); //pd RX cal Tcf
-        _b200_iface->write_reg(0x286,0x02); //pd TX cal Tcf
-        _b200_iface->write_reg(0x249,0x8e); //rx vco cal length
-        _b200_iface->write_reg(0x289,0x8e); //rx vco cal length
-        _b200_iface->write_reg(0x23b,0x80); //set RX MSB?, FIXME 0x89 magic cp
-        _b200_iface->write_reg(0x27b,0x80); //"" TX //FIXME 0x88 see above
-        _b200_iface->write_reg(0x243,0x0d); //set rx prescaler bias
-        _b200_iface->write_reg(0x283,0x0d); //"" TX
-        _b200_iface->write_reg(0x23d,0x00);
-        _b200_iface->write_reg(0x27d,0x00);
+        _b200_iface->write_reg(0x261, 0x00); //RX LO power
+        _b200_iface->write_reg(0x2a1, 0x00); //TX LO power
+        _b200_iface->write_reg(0x248, 0x0b); //en RX VCO LDO
+        _b200_iface->write_reg(0x288, 0x0b); //en TX VCO LDO
+        _b200_iface->write_reg(0x246, 0x02); //pd RX cal Tcf
+        _b200_iface->write_reg(0x286, 0x02); //pd TX cal Tcf
+        _b200_iface->write_reg(0x249, 0x8e); //rx vco cal length
+        _b200_iface->write_reg(0x289, 0x8e); //rx vco cal length
+        _b200_iface->write_reg(0x23b, 0x80); //set RX MSB?, FIXME 0x89 magic cp
+        _b200_iface->write_reg(0x27b, 0x80); //"" TX //FIXME 0x88 see above
+        _b200_iface->write_reg(0x243, 0x0d); //set rx prescaler bias
+        _b200_iface->write_reg(0x283, 0x0d); //"" TX
+
+        _b200_iface->write_reg(0x23d, 0x00); // Clear half VCO cal clock setting
+        _b200_iface->write_reg(0x27d, 0x00); // Clear half VCO cal clock setting
 
         /* The order of the following process is EXTREMELY important. If the
          * below functions are modified at all, device initialization and
@@ -1087,6 +1089,16 @@ public:
         calibrate_tx_quadrature();
         calibrate_rx_quadrature();
 
+        _b200_iface->write_reg(0x012, 0x02); // cals done, set PPORT config
+        _b200_iface->write_reg(0x013, 0x01); // Set ENSM FDD bit
+        _b200_iface->write_reg(0x015, 0x04); // dual synth mode, synth en ctrl en
+
+        /* Default TX attentuation to 10dB on both TX1 and TX2 */
+        _b200_iface->write_reg(0x073, 0x28);
+        _b200_iface->write_reg(0x074, 0x00);
+        _b200_iface->write_reg(0x075, 0x28);
+        _b200_iface->write_reg(0x076, 0x00);
+
         /* Setup RSSI Measurements */
         _b200_iface->write_reg(0x150, 0x0E); // RSSI Measurement Duration 0, 1
         _b200_iface->write_reg(0x151, 0x00); // RSSI Measurement Duration 2, 3
@@ -1099,9 +1111,10 @@ public:
         _b200_iface->write_reg(0x158, 0x0D); // RSSI Mode Select
         _b200_iface->write_reg(0x15C, 0x67); // Power Measurement Duration
 
-        _b200_iface->write_reg(0x012, 0x02); //set PPORT config
-        _b200_iface->write_reg(0x013, 0x01); //set FDD
-        _b200_iface->write_reg(0x015, 0x04); //dual synth mode, synth en ctrl en
+        //std::cout << std::hex << "reg_txfilt: " << (int) reg_txfilt << std::endl;
+        //std::cout << std::hex <<"reg_rxfilt: " << (int) reg_rxfilt << std::endl;
+        //_b200_iface->write_reg(0x002, reg_txfilt);
+        //_b200_iface->write_reg(0x003, reg_rxfilt);
 
         //ian magic
         _b200_iface->write_reg(0x014, 0x0f);
@@ -1202,11 +1215,11 @@ public:
             reg_rxfilt = BOOST_BINARY( 01011110 ) ;
 
             // TX1 enabled, 2, 2, 2, 2
-            reg_txfilt = BOOST_BINARY( 01010110 ) ;
+            reg_txfilt = BOOST_BINARY( 01011110 ) ;
 
             divfactor = 16;
             tfir = 2;
-        } else if((rate > 20e6) && (rate <= 22e6)) {
+        } else if((rate > 20e6) && (rate < 23e6)) {
            // RX1 enabled, 3, 2, 2, 2
             reg_rxfilt = BOOST_BINARY( 01101110 ) ;
 
@@ -1215,7 +1228,7 @@ public:
 
             divfactor = 24;
             tfir = 2;
-        } else if((rate > 22e6) && (rate < 40e6)) {
+        } else if((rate >= 23e6) && (rate < 41e6)) {
             // RX1 enabled, 2, 2, 2, 2
             reg_rxfilt = BOOST_BINARY( 01011110 ) ;
 
@@ -1224,7 +1237,7 @@ public:
 
             divfactor = 16;
             tfir = 2;
-        } else if((rate >= 40e6) && (rate <= 56e6)) {
+        } else if((rate >= 41e6) && (rate <= 56e6)) {
             // RX1 enabled, 3, 1, 2, 2
             reg_rxfilt = BOOST_BINARY( 01100110 ) ;
 
@@ -1265,9 +1278,13 @@ public:
             reg_bbpll = reg_bbpll & 0xF7;
         }
 
+        std::cout << std::hex << "reg_txfilt: " << (int) reg_txfilt << std::endl;
+        std::cout << std::hex << "reg_rxfilt: " << (int) reg_rxfilt << std::endl;
+
         /* Set the dividers / interpolators in Catalina. */
         _b200_iface->write_reg(0x002, reg_txfilt);
         _b200_iface->write_reg(0x003, reg_rxfilt);
+        _b200_iface->write_reg(0x004, reg_inputsel);
         _b200_iface->write_reg(0x00A, reg_bbpll);
 
         _baseband_bw = (adcclk / divfactor);
