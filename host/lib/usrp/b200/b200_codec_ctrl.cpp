@@ -374,9 +374,9 @@ public:
         uint8_t reg0d0, reg0d1, reg0d2;
 
         if((bbbw_mhz * 2) <= 9) {
-            reg0d0 = 0x0c;
+            reg0d0 = 0x59;
         } else if(((bbbw_mhz * 2) > 9) && ((bbbw_mhz * 2) <= 24)) {
-            reg0d0 = 0x056;
+            reg0d0 = 0x56;
         } else if((bbbw_mhz * 2) > 24) {
             reg0d0 = 0x57;
         } else {
