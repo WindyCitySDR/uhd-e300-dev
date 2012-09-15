@@ -11,15 +11,30 @@
 
 #include "io.h"
 #include "power.h"
+#include "global.h"
 
 #define DEBUG_BLINK_DELAY	250	// ms
 
-#ifdef DEBUG
+#ifdef ATTINY88_DIP
+
 static io_pin_t SERIAL_DEBUG      = IO_PD(6);
+
+#else
+
+#ifdef I2C_REWORK
+static io_pin_t SERIAL_DEBUG      = IO_PC(1);	// EN1
 #else
 //static io_pin_t SERIAL_DEBUG      = EN4;
-#endif // DEBUG
+#endif // I2C_REWORK
 
+#endif // ATTINY88_DIP
+/*
+#ifdef DEBUG
+
+#else
+
+#endif // DEBUG
+*/
 #ifdef DEBUG
 
 #ifdef ATTINY88_DIP
@@ -38,6 +53,10 @@ void debug_init()
 	io_set_pin(SERIAL_DEBUG);
 	io_output_pin(SERIAL_DEBUG);
 }
+
+#endif // DEBUG
+
+#if defined(DEBUG) && !defined(DEBUG_VOID)
 
 void debug_set(io_pin_t pin, bool enable)
 {
@@ -121,6 +140,8 @@ void debug_wait(void)
 
 #else
 
+#ifndef DEBUG_VOID
+
 void debug_blink_rev(uint8_t count)
 {
 	charge_set_led(true);
@@ -137,46 +158,45 @@ void debug_blink_rev(uint8_t count)
 	charge_set_led(false);
 	_delay_ms(DEBUG_BLINK_DELAY * 4);
 }
+#endif // DEBUG_VOID
 
 #endif // DEBUG
 
-void debug_log(/*const */char* message)
+void debug_log_byte_ex(uint8_t n, bool new_line)
 {
-	cli();
-	
-	const uint8_t max_buffer_length = 25;
-	if (strlen(message) > (max_buffer_length - 1))
-		message[max_buffer_length-1] = '\0';
-	
-	uint8_t buffer[max_buffer_length*10];	// START+8+STOP
-	uint8_t idx = 0, i = 0;
-	//buffer[i++] = 1;
-	buffer[i++] = 0;	// START
-	while (true)
-	{
-		if (*message == '\0')
-		{
-			buffer[i] = -1;
-			break;
-		}
-		
-		buffer[i++] = (((uint8_t)(*message) & ((uint8_t)1<<(/*7-*/(idx++)))) ? 0x01 : 0x00);
-		
-		if (idx == 8)
-		{
-			buffer[i++] = 1;	// STOP
-			idx = 0;
-			message++;
-			if (*message != '\0')
-				buffer[i++] = 0;	// START
-		}
-	}
-	
-	uint8_t time_fix = 0;
-	const uint16_t delay = /*3333/2 - 10*/650-2;
+	char ch[4];
+	ch[0] = '0' + (n / 100);
+	ch[1] = '0' + ((n % 100) / 10);
+	ch[2] = '0' + (n % 10);
+	ch[3] = '\0';
+	debug_log_ex(ch, new_line);
+}
+
+void debug_log_hex_ex(uint8_t n, bool new_line)
+{
+	char ch[4];
+	ch[0] = 'x';
+	uint8_t _n = n >> 4;
+	if (_n < 10)
+		ch[1] = '0' + _n;
+	else
+		ch[1] = 'A' + (_n - 10);
+	n &= 0x0F;
+	if (n < 10)
+		ch[2] = '0' + n;
+	else
+		ch[2] = 'A' + (n - 10);
+	ch[3] = '\0';
+	debug_log_ex(ch, new_line);
+}
+
+static void _serial_tx(uint8_t* buffer)
+{
+	//uint8_t time_fix = 0;
+	const uint16_t delay = 650-2;	// 3333/2 - 10
 	uint16_t countdown;
 	
-	for (uint8_t j = 0; j < i; ++j)
+	for (uint8_t j = 0; j < 10; ++j)
 	{
 		if (buffer[j])
 			PORTD |= _BV(6);
@@ -187,8 +207,37 @@ void debug_log(/*const */char* message)
 		while (--countdown)
 			__asm("nop");
 	}
+}
+
+static void _serial_tx_char(char c)
+{
+	uint8_t buffer[10];
+	uint8_t i = 0;
 	
+	buffer[i++] = 0;	// START
+	for (int idx = 0; idx < 8; ++idx)
+		buffer[i++] = (((uint8_t)(c) & ((uint8_t)1<<((idx)))) ? 0x01 : 0x00);	// Endianness: 7-
+	buffer[i++] = 1;	// STOP
+	
+	_serial_tx(buffer);
+}
+
+void debug_log_ex(const char* message, bool new_line)
+{
+	if (message[0] == '\0')
+		return;
+	
+	pmc_mask_irqs(true);
+
+	do 
+	{
+		_serial_tx_char(*message);
+	} while (*(++message) != '\0');
+	
+	if (new_line)
+		_serial_tx_char('\n');
+
 	io_set_pin(SERIAL_DEBUG);
 	
-	//sei();
+	pmc_mask_irqs(false);
 }

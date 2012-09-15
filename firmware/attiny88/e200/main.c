@@ -17,6 +17,7 @@
 #include "debug.h"
 #include "error.h"
 #include "ltc3675.h"
+#include "ltc4155.h"
 
 FUSES = {	// FIXME: & FUSE_CKSEL1 for low power 128 kHz clock
 	.low = (FUSE_CKSEL0 & FUSE_SUT0 & FUSE_CKDIV8),	// Internal 8MHz Oscillator, Slowly rising power (start-up time), Divide Clock by 8
@@ -39,16 +40,40 @@ volatile STATE _state;
 	* Instruction following SEI is executed before interrupts
 	* LTC3675 real-time status doesn't contain UV/OT
 	* LTC3675 PGOOD -> power down (no point in checking blink state)
+	* On WALL, use TX, on battry use OTG switcher
+*/
+
+bool pmc_mask_irqs(bool mask)
+{
+	if (_state.interrupts_enabled == false)
+		return false;
+	
+	if (mask)
+		cli();
+	else
+		sei();
+	
+	return true;
+}
+/*
+bool ltc4155_has_interrupt2(void)
+{
+	bool state = io_test_pin(USBPM_IRQ);
+	debug_log_ex("4155IRQ", false);
+	debug_log_byte(state);
+	return (state != 1);
+}
 */
 
 int main(void)
 {
-	memset(&_state, 0x00, sizeof(STATE));
+	memset((void*)&_state, 0x00, sizeof(STATE));
 	
 	debug_init();
-	//debug_blink(1);
+	debug_blink(1);
 	
-	debug_log("Hello world\n");
+	debug_log("#");	// Will not boot if this is 21 chars long?!
+	//debug_log("Hello world\n");
 	
     set_sleep_mode(SLEEP_MODE_PWR_DOWN);    // SLEEP_MODE_PWR_SAVE combination is documented as Reserved
 
@@ -60,18 +85,25 @@ int main(void)
 	TIMSK0 = _BV(OCIE0A);	// Enable CTC on Timer 0
 
 	power_init();
-	//debug_blink(2);
+	debug_log("Init");
+	debug_blink(2);
 	//debug_blink_rev(6);
 	
 	///////////////////////////////////
-
+	
 	power_on(); // Turn on immediately. Need to de-press power button to turn off.
-	//debug_blink(3);
+	debug_log("Power");
+	debug_blink(3);
 	//debug_blink_rev(10);
 	
 	//debug_wait();
 	
+	_state.interrupts_enabled = true;
 	sei();	// Enable interrupts
+	
+	asm("nop");
+	
+	_state.wake_up = false;
 	
 	bool one_more = false;
 	
@@ -79,10 +111,19 @@ int main(void)
 	{
 		one_more = false;
 		
+		if ((_state.ltc4155_irq)/* || ltc4155_has_interrupt()*/)	// [Don't know why PCINT ISR misses LTC4155 IRQ on power up, so double-check state of line]
+		{
+			ltc4155_handle_irq();
+			
+			_state.ltc4155_irq = false;
+		}
+		
 		if (_state.core_power_bad)	// FIXME: Check whether it's supposed to be on
 		{
+			debug_log("ML:FPGA!");
+			
 			//power_off();
-//			_state.power_off = true;
+			_state.power_off = true;
 			
 			/*while (_state.wake_up == false)
 			{
@@ -93,14 +134,18 @@ int main(void)
 			_state.core_power_bad = false;
 		}
 		
-		if (_state.ltc3675_irq)
+		if ((_state.ltc3675_irq)/* || ltc3675_has_interrupt()*/)	// This is fired on initial power up
 		{
+			debug_log("ML:3675+");
+			
 			ltc3675_handle_irq();
 			
 			if (ltc3675_is_power_good(ltc3675_get_last_status()) == false)
 			{
+				debug_log("ML:3675!");
+				
 				//power_off();
-//				_state.power_off = true;
+				_state.power_off = true;
 			}
 			
 			_state.ltc3675_irq = false;
@@ -108,15 +153,21 @@ int main(void)
 		
 		if (_state.power_off)
 		{
+			debug_log("ML:Off..");
+			
 			power_off();
 			
 			_state.power_off = false;
 			_state.wake_up = false;
 		}
 		else if (_state.wake_up)
-		{
-			if (_state.powered == false)
+		{			
+			//if (_state.powered == false)	// This will fire the first time the regs are turned on (so will ignore when 'powered')
+			{
+				debug_log("ML:On..");
+				
 				power_on();
+			}
 			
 			_state.wake_up = false;
 		}
@@ -148,10 +199,12 @@ int main(void)
 					if (((ltc3675_use_last_status) && (ltc3675_status_to_error(ltc3675_get_last_status()) != BlinkError_None)) || 
 						((ltc3675_use_last_status == false) && (ltc3675_check_status() != BlinkError_None)))
 						break;
+					debug_log("BE:3675-");
 					goto cancel_blink_error;
 				case BlinkError_FPGA_Power:
 					if (tps54478_is_power_good() == false)
 						break;
+					debug_log("BE:FPGA-");
 					goto cancel_blink_error;
 				default:
 cancel_blink_error:				
@@ -165,14 +218,26 @@ cancel_blink_error:
 			// Need to do this has some interrupts are on PCINT, and while GIE is disabled, might change & change back
 			//	E.g. LTC3675 IRQ due to UV, reset IRQ, re-asserts UV
 			
+			if (ltc4155_has_interrupt())
+			{
+				debug_log("BE:4155");
+				
+				_state.ltc4155_irq = true;
+				one_more = true;
+			}
+			
 			if (ltc3675_has_interrupt())
 			{
+				debug_log("BE:3675");
+				
 				_state.ltc3675_irq = true;
 				one_more = true;
 			}
 			
 			if (tps54478_is_power_good() == false)
 			{
+				debug_log("BE:FPGA!");
+				
 				_state.core_power_bad = true;
 				one_more = true;
 			}
@@ -184,7 +249,11 @@ cancel_blink_error:
 		
 		//if (_state.timers_running == false)
 		if ((_state.active_timers == 0) && (one_more == false))
+		{
+			debug_log("^");
 			sleep_mode();
+			debug_log("$");
+		}			
 	}
 
 	return 0;
@@ -204,9 +273,16 @@ void pmc_set_blink_error(uint8_t count)
 	
 	if (count == BlinkError_None)
 	{
+		debug_log("BLNK-");
 		_state.blink_stop = true;
 		return;
 	}
+	
+	//char msg[25];
+	//sprintf(msg, "Blink code = %i\n", count);
+	//debug_log(msg);
+	debug_log_ex("BLNK ", false);
+	debug_log_byte(count);
 	
 	_state.blink_error = count;
 	_state.blink_loops = 0;
@@ -240,6 +316,8 @@ ISR(TIMER0_COMPA_vect)	// Blink the sequence, and leave one slot at the beginnin
 			TCCR0A &= ~0x07;
 			
 			_state.blink_error = BlinkError_None;
+			
+			debug_log("BLNK.");
 		}
 		else
 		{

@@ -67,7 +67,10 @@ static bool ltc3675_reg_helper(uint8_t address)
 		if ((reg->device == REG_LTC3675) && (reg->address == address))
 			return reg->powered;
 	}
-	
+#ifdef DEBUG_SAFETY
+	debug_log_ex("!3675HLP ", false);
+	debug_log_hex(address);
+#endif // DEBUG_SAFETY
 	return false;
 	//return power_is_subsys_on(power_get_regulator_index(REG_LTC3675, address) - 1);
 }
@@ -113,17 +116,23 @@ void tps54478_init(bool enable)
 
 void tps54478_set_power(bool on)
 {
+	debug_log_ex("54478", false);
+	
 	// Assumes: Hi-Z input/LOW output
 	
 	if (on)
 	{
 		io_input_pin(CORE_PWR_EN);
 		_delay_ms(TPS54478_START_DELAY);
+		
+		debug_log("+");
 	}		
 	else
 	{
 		io_output_pin(CORE_PWR_EN);
 		// Don't delay here as we can't detect its state anyway
+		
+		debug_log("-");
 	}		
 	
 	//io_enable_pin(CORE_PWR_EN, on);
@@ -323,17 +332,17 @@ typedef bool (*boot_function_t)(power_params_t*);
 
 struct boot_step {
     power_subsystem_t subsys;
-    boot_function_t fn;
-    uint8_t delay;
-    uint8_t retries;
+	//boot_function_t fn;
+	//uint8_t delay;
+	//uint8_t retries;
     //uint16_t opaque;
 	//bool powered;
 } boot_steps[] = {  // MAGIC: Retries/delays
-    { PS_FPGA,              NULL, POWER_DEFAULT_DELAY, POWER_DEFAULT_RETRIES },	// 7..8
-    { PS_VDRAM,             NULL, POWER_DEFAULT_DELAY, POWER_DEFAULT_RETRIES },	// 9..10
-    { PS_PERIPHERALS_1_8,   NULL, POWER_DEFAULT_DELAY, POWER_DEFAULT_RETRIES },	// 11..12
-    { PS_PERIPHERALS_3_3,   NULL, POWER_DEFAULT_DELAY, POWER_DEFAULT_RETRIES },	// 13..14
-    //{ PS_TX,              NULL, POWER_DEFAULT_DELAY, POWER_DEFAULT_RETRIES }  // CHECK: Leaving TX off
+    { PS_FPGA,              /*NULL, POWER_DEFAULT_DELAY, POWER_DEFAULT_RETRIES*/ },	// 7..8						// 3..4
+    { PS_VDRAM,             /*NULL, POWER_DEFAULT_DELAY, POWER_DEFAULT_RETRIES*/ },	// 9..10					// 5..6
+    { PS_PERIPHERALS_1_8,   /*NULL, POWER_DEFAULT_DELAY, POWER_DEFAULT_RETRIES*/ },	// 11..12					// 7..8
+    { PS_PERIPHERALS_3_3,   /*NULL, POWER_DEFAULT_DELAY, POWER_DEFAULT_RETRIES*/ },	// 13..14					// 9..10
+    //{ PS_TX,              /*NULL, POWER_DEFAULT_DELAY, POWER_DEFAULT_RETRIES*/ }  // CHECK: Leaving TX off
 };
 /*
 bool power_is_subsys_on(int8_t index)
@@ -414,7 +423,7 @@ void power_init(void)
 
 bool power_on(void)
 {
-	cli();
+	pmc_mask_irqs(true);
 	
     //charge_set_led(false);
 
@@ -422,50 +431,62 @@ bool power_on(void)
 	for (step_count = 0; step_count < ARRAY_SIZE(boot_steps); step_count++)
 	{
 //		debug_blink(step_count);
+//		debug_blink(3 + (step_count * 2) + 0);
 //		debug_blink_rev(7 + (step_count * 2) + 0);
 		
 	    struct boot_step* step = boot_steps + step_count;
-	    if ((step->fn == NULL) && (step->subsys == PS_UNKNOWN))
+	    if (/*(step->fn == NULL) && */(step->subsys == PS_UNKNOWN))
             continue;
+		
+		debug_log_ex("PWR ", false);
+		debug_log_byte_ex(step->subsys, true);
 
         power_params_t params;
 
-	    for (retry = 0; retry < step->retries; retry++)
+	    for (retry = 0; retry < /*step->retries*/POWER_DEFAULT_RETRIES; retry++)
 		{
 	        ZERO_MEMORY(params);
             params.subsys = step->subsys;
             params.enable = true;
 	        params.retry = retry;
 
-	        if (((step->fn != NULL) && (step->fn(&params))) ||
-				((step->fn == NULL) && (_power_enable_subsys(&params))))
+	        if ((/*(step->fn != NULL) && (step->fn(&params))) ||
+				((step->fn == NULL) && */(_power_enable_subsys(&params))))
 			{
 				//step->powered = true;
 				default_reg_config[step->subsys].powered = true;
+				
+				debug_log("+");
+//				debug_blink(3 + (step_count * 2) + 1);
 //				debug_blink_rev(7 + (step_count * 2) + 1);
+
                 break;
 	        }
+			
+			debug_log("?");
 
-            if ((retry < step->retries) && (step->delay > 0))
-                _delay_ms(step->delay);
+            if ((retry < /*step->retries*/POWER_DEFAULT_RETRIES)/* && (step->delay > 0)*/)
+                _delay_ms(/*step->delay*/POWER_DEFAULT_DELAY);
 	    }
 		
 //		debug_blink(step_count);
 
-	    if (retry == step->retries)
+	    if (retry == /*step->retries*/POWER_DEFAULT_RETRIES)
 	        break;
     }
 
     if (step_count != ARRAY_SIZE(boot_steps))
 	{
-		//sei();	// For button press detection
+		debug_log("x");
 		
+		//sei();	// For button press detection
+
         /*while (_state.powered == false) {
             blink_error_sequence(step_count + BlinkError_FPGA_Power);
         }*/
 		pmc_set_blink_error(step_count + BlinkError_FPGA_Power);
-		
-		sei();
+
+		pmc_mask_irqs(false);
 
         return false;
     }
@@ -482,14 +503,14 @@ bool power_on(void)
 	_state.powered = true;
 //debug_blink_rev(1);
 //_delay_ms(1000);	// Wait for FPGA PGOOD to stabilise
-	sei();
+	pmc_mask_irqs(false);
 
     return true;
 }
 
 uint8_t power_off(void)
 {
-	cli();
+	pmc_mask_irqs(true);
 	
 	io_clear_pin(PS_SRST);	// FIXME: Hold it low to stop FPGA running
 	
@@ -501,39 +522,39 @@ uint8_t power_off(void)
 //		debug_blink(step_count);
 		
 	    struct boot_step* step = boot_steps + step_count;
-	    if ((step->fn == NULL) && (step->subsys == PS_UNKNOWN))
+	    if (/*(step->fn == NULL) && */(step->subsys == PS_UNKNOWN))
             continue;
 
         power_params_t params;
 
-	    for (retry = 0; retry < step->retries; retry++)
+	    for (retry = 0; retry < /*step->retries*/POWER_DEFAULT_RETRIES; retry++)
 		{
 	        ZERO_MEMORY(params);
             params.subsys = step->subsys;
             params.enable = false;
 	        params.retry = retry;
 			
-			if (((step->fn != NULL) && (step->fn(&params))) ||
-				((step->fn == NULL) && (_power_enable_subsys(&params))))
+			if ((/*(step->fn != NULL) && (step->fn(&params))) ||
+				((step->fn == NULL) && */(_power_enable_subsys(&params))))
 			{
 				//step->powered = false;
 				default_reg_config[step->subsys].powered = false;
 				break;
 			}
-
-            if ((retry < step->retries) && (step->delay > 0))
-                _delay_ms(step->delay);
+			
+            if ((retry < /*step->retries*/POWER_DEFAULT_RETRIES)/* && (step->delay > 0)*/)
+                _delay_ms(/*step->delay*/POWER_DEFAULT_DELAY);
 	    }
 		
 //		debug_blink(step_count);
 
-	    if (retry == step->retries)
+	    if (retry == /*step->retries*/POWER_DEFAULT_RETRIES)
 	        break;
     }
 
     if (step_count != -1)
 	{
-		/*sei();
+		/*pmc_mask_irqs(false);
 		
         while (_state.powered) {
             blink_error_sequence(step_count + BlinkError_FPGA_Power);
@@ -541,7 +562,7 @@ uint8_t power_off(void)
 		if (pmc_get_blink_error() == BlinkError_None)	// Only set blink error if no existing error
 			pmc_set_blink_error(step_count + BlinkError_FPGA_Power);
 		
-		sei();
+		pmc_mask_irqs(false);
 
         return (step_count + 1);
     }
@@ -553,7 +574,7 @@ uint8_t power_off(void)
 
 	_state.powered = false;
 	
-	sei();
+	pmc_mask_irqs(false);
 	
 	return 0;
 }
@@ -574,6 +595,7 @@ ISR(INT0_vect)	// PD(2) WAKEUP: Rising edge
 	//cli();
 	
 	//power_on();
+	debug_log("\nINT0\n");
 	_state.wake_up = true;
 	
 	//sei();

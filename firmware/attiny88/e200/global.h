@@ -13,6 +13,7 @@
 
 typedef struct State
 {
+	bool interrupts_enabled;
 	//bool timers_running;
 	uint8_t active_timers;
 	bool powered;
@@ -34,5 +35,7 @@ extern volatile STATE _state;
 
 void pmc_set_blink_error(uint8_t count);
 uint8_t pmc_get_blink_error(void);
+
+bool pmc_mask_irqs(bool mask);
 
 #endif /* GLOBAL_H_ */

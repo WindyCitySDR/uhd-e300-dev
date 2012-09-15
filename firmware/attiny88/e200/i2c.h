@@ -12,6 +12,6 @@ bool i2c_read_ex(io_pin_t sda, io_pin_t scl, uint8_t addr, uint8_t subaddr, uint
 bool i2c_read2_ex(io_pin_t sda, io_pin_t scl, uint8_t addr, uint8_t subaddr, uint8_t* value, bool pull_up);
 bool i2c_write_ex(io_pin_t sda, io_pin_t scl, uint8_t addr, uint8_t subaddr, uint8_t value, bool pull_up);
 
-extern bool _i2c_disable_ack_check;
+extern volatile bool _i2c_disable_ack_check;
 
 #endif // I2C_H

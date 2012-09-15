@@ -8,6 +8,9 @@
 #include "io.h"
 #include "i2c.h"
 #include "power.h"
+#include "debug.h"
+#include "global.h"
+#include "error.h"
 
 static io_pin_t USBPM_IRQ	= IO_PB(1);
 
@@ -117,23 +120,36 @@ enum LTC4155ThermistorStatuses
 };
 
 static uint8_t _ltc4155_interrupt_mask =
-	LTC4155_ENABLE_USB_OTG |// Enable +5V on USB connector
-	//LTC4155_INT_UVCL |
-	//LTC4155_INT_ILIMIT |
-	//LTC4155_INT_USB_OTG |
+//	LTC4155_ENABLE_USB_OTG |// Enable +5V on USB connector	// Is this causing the chip to power off the output?!
+	LTC4155_INT_UVCL |
+	LTC4155_INT_ILIMIT |
+	LTC4155_INT_USB_OTG |
 	LTC4155_INT_EXT_PWR |	// Turn up current limit
 	LTC4155_INT_FAULT |		// Blink error
 	LTC4155_INT_CHARGER;	// Illuminate charge LED
 
-static void _ltc4155_clear_irq(void)
+static bool _ltc4155_clear_irq(void)
 {
-	i2c_write_ex(CHRG_SDA, CHRG_SCL, LTC4155_WRITE_ADDRESS, LTC4155_REG_ENABLE, _ltc4155_interrupt_mask, _ltc4155_pull_up);
+	return i2c_write_ex(CHRG_SDA, CHRG_SCL, LTC4155_WRITE_ADDRESS, LTC4155_REG_ENABLE, _ltc4155_interrupt_mask, _ltc4155_pull_up);
+}
+
+bool ltc4155_clear_irq(void)
+{
+	pmc_mask_irqs(true);
+	
+	bool result = _ltc4155_clear_irq();
+	
+	pmc_mask_irqs(false);
+	
+	return result;
 }
 
 bool ltc4155_init(void)
 {
 	io_input_pin(USBPM_IRQ);
+#ifndef DEBUG
 	io_set_pin(USBPM_IRQ);	// Enable pull-up for Open Drain
+#endif // DEBUG
 #ifdef I2C_REWORK
 	i2c_init_ex(CHRG_SDA, CHRG_SCL, _ltc4155_pull_up);
 #endif // I2C_REWORK
@@ -157,7 +173,73 @@ bool ltc4155_init(void)
 
 bool ltc4155_has_interrupt(void)
 {
-	return (io_test_pin(USBPM_IRQ) == false);
+	bool state = io_test_pin(USBPM_IRQ);
+	debug_log_ex("4155IRQ", false);
+	debug_log_byte(state);
+	return (state != 1);
+}
+
+static uint8_t _ltc4155_last_good, _ltc4155_last_status;
+
+bool _ltc4155_handle_irq(void)
+{
+	uint8_t val = 0x00;
+	bool result = false;
+	
+	if (i2c_read2_ex(CHRG_SDA, CHRG_SCL, LTC4155_READ_ADDRESS, LTC4155_REG_GOOD, &val, _ltc4155_pull_up) == false)
+		goto handle_fail;
+	
+	debug_log_ex("4155GO ", false);
+	debug_log_hex(val);
+		
+	_ltc4155_last_good = val;
+	
+	if (i2c_read2_ex(CHRG_SDA, CHRG_SCL, LTC4155_READ_ADDRESS, LTC4155_REG_STATUS, &val, _ltc4155_pull_up) == false)
+		goto handle_fail;
+	
+	debug_log_ex("4155ST ", false);
+	debug_log_hex(val);
+	
+	_ltc4155_last_status = val;
+	
+	val >>= 5;
+	
+	if (_state.blink_error == BlinkError_None)
+	{
+		switch (val)
+		{
+			case LTC4155_CHARGER_CONSTANT_CURRENT:
+			case LTC4155_CHARGER_CONSTANT_VOLTAGE_VPROG_GT_VCX:
+			case LTC4155_CHARGER_CONSTANT_VOLTAGE_VPROG_LT_VCX:
+			case LTC4155_CHARGER_LOW_BATTERY_VOLTAGE:	// If this persists for more than 1/2hr, BAD_CELL_FAULT is enabled and FAULT interrupt is generated
+				charge_set_led(true);
+				break;
+			case LTC4155_CHARGER_NTC_TOO_WARM:
+			case LTC4155_CHARGER_NTC_TOO_COLD:
+			case LTC4155_CHARGER_NTC_HOT:
+				break;
+			case LTC4155_CHARGER_OFF:
+			default:
+				charge_set_led(false);
+		}				
+	}
+	
+	result = true;
+handle_fail:
+	_ltc4155_clear_irq();
+	
+	return result;
+}
+
+bool ltc4155_handle_irq(void)
+{
+	pmc_mask_irqs(true);
+	
+	bool result = _ltc4155_handle_irq();
+	
+	pmc_mask_irqs(false);
+	
+	return result;
 }
 
 bool ltc4155_arm_ship_and_store(void)

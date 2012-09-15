@@ -13,7 +13,9 @@ enum ErrorBlinkCount	// Lower number = higher priority
 {
 	BlinkError_None,
 	// Low power/battery
-	BlinkError_LTC3675_UnderVoltage,
+	BlinkError_LowVoltage,
+	BlinkError_LTC3675_UnderVoltage = BlinkError_LowVoltage,
+	BlinkError_LTC4155_UnderVoltage = BlinkError_LowVoltage,
 	// Should match power boot steps
 	BlinkError_FPGA_Power,
 	BlinkError_DRAM_Power,
@@ -23,6 +25,7 @@ enum ErrorBlinkCount	// Lower number = higher priority
 	// LTC3675
 	BlinkError_LTC3675_OverTemperature,
 	// LTC4155
+	BlinkError_LTC4155_BadCell
 };
 
 #endif /* ERROR_H_ */

@@ -173,6 +173,9 @@ bool _ltc3675_handle_irq(void)
 	
 	if (i2c_read2_ex(PWR_SDA, PWR_SCL, LTC3675_READ_ADDRESS, /*LTC3675_REG_LATCHED_STATUS*/LTC3675_REG_REALTIME_STATUS, &val, _ltc3675_pull_up))
 	{
+		debug_log_ex("3675LTCH ", false);
+		debug_log_hex(val);
+		
 		_ltc3675_last_status = val;
 		
 		uint8_t error = ltc3675_status_to_error(val);
@@ -212,6 +215,9 @@ static bool _ltc3675_get_realtime_status(uint8_t* val)
 	if (i2c_read2_ex(PWR_SDA, PWR_SCL, LTC3675_READ_ADDRESS, LTC3675_REG_REALTIME_STATUS, val, _ltc3675_pull_up) == false)
 		return false;
 	
+	debug_log_ex("3675RT ", false);
+	debug_log_hex(*val);
+	
 	//sei();
 	
 	return true;
@@ -221,11 +227,11 @@ int8_t ltc3675_check_status(void)
 {
 	uint8_t val = 0x00;
 	
-	cli();
+	pmc_mask_irqs(true);
 	
 	bool result = _ltc3675_get_realtime_status(&val);
 	
-	sei();
+	pmc_mask_irqs(false);
 	
 	if (result == false)
 		return -1;
@@ -245,11 +251,11 @@ int8_t ltc3675_check_status(void)
 
 bool ltc3675_handle_irq(void)
 {
-	cli();
+	pmc_mask_irqs(true);
 	
 	/*uint8_t*/bool result = _ltc3675_handle_irq();
 	
-	sei();
+	pmc_mask_irqs(false);
 	
 	return result;
 }
@@ -286,7 +292,9 @@ bool ltc3675_init(ltc3675_reg_helper_fn helper)
 	i2c_init_ex(PWR_SDA, PWR_SCL, _ltc3675_pull_up);
 #endif // I2C_REWORK
     io_input_pin(PWR_IRQ);
+#ifndef DEBUG
 	io_set_pin(PWR_IRQ);	// Enable pull-up for Open Drain
+#endif // DEBUG
 	
     io_input_pin(WAKEUP);
 	io_set_pin(WAKEUP);	// Enable pull-up for Open Drain
@@ -345,9 +353,13 @@ static bool _ltc3675_toggle_reg(uint8_t addr, uint8_t def_reg, bool on)
 bool ltc3675_enable_reg(ltc3675_regulator_t reg, bool on)
 {
 	//debug_blink2(reg + 1);
+	debug_log_ex("3675 ", false);
+	debug_log_byte_ex(reg, true);
 	
 	// Sub-address: index of regulator
 	// Data: <default reg contents> | <enable>
+	
+	bool result = false;
 	
     switch (reg)
     {
@@ -357,10 +369,15 @@ bool ltc3675_enable_reg(ltc3675_regulator_t reg, bool on)
             io_enable_pin(PWR_EN1, on);
 			//break;
 #else
-			if (_ltc3675_toggle_reg(LTC3675_REG_BUCK1, LTC3675_DEFAULT_BUCK_REG_VAL, on) == false)
+			//debug_blink2(reg + 1);
+			if (_ltc3675_toggle_reg(LTC3675_REG_BUCK1, LTC3675_DEFAULT_BUCK_REG_VAL, on) == false) {
+				//debug_blink2(reg + 1);
 				return false;
+			}
+			//debug_blink2(reg + 1);
 #endif // HARDWIRE_ENABLE
-			return (_ltc3675_is_pgood(LTC3675_Buck1_PGood) == on);
+			result = (_ltc3675_is_pgood(LTC3675_Buck1_PGood) == on);
+			break;
         case LTC3675_REG_3: // Master
         case LTC3675_REG_4: // Slave
 #ifdef HARDWIRE_ENABLE
@@ -370,11 +387,13 @@ bool ltc3675_enable_reg(ltc3675_regulator_t reg, bool on)
 			if (_ltc3675_toggle_reg(LTC3675_REG_BUCK3, LTC3675_DEFAULT_BUCK_REG_VAL, on) == false)
 				return false;
 #endif // HARDWIRE_ENABLE
-			return (_ltc3675_is_pgood(LTC3675_Buck3_PGood) == on);
+			result = (_ltc3675_is_pgood(LTC3675_Buck3_PGood) == on);
+			break;
         case LTC3675_REG_5: // I2C only
             if (_ltc3675_toggle_reg(LTC3675_REG_BOOST, LTC3675_DEFAULT_BOOST_REG_VAL, on) == false)    // (Boost address, Default reg contents | Enable)
 				return false;
-			return (_ltc3675_is_pgood(LTC3675_Boost_PGood) == on);
+			result = (_ltc3675_is_pgood(LTC3675_Boost_PGood) == on);
+			break;
         case LTC3675_REG_6: // Single
 #ifdef HARDWIRE_ENABLE
             io_enable_pin(PWR_EN5, on);
@@ -383,12 +402,15 @@ bool ltc3675_enable_reg(ltc3675_regulator_t reg, bool on)
 			if (_ltc3675_toggle_reg(LTC3675_REG_BUCK_BOOST, LTC3675_DEFAULT_BUCK_BOOST_REG_VAL, on) == false)
 				return false;
 #endif // HARDWIRE_ENABLE
-			return (_ltc3675_is_pgood(LTC3675_BuckBoost_PGood) == on);
-        default:
-            return false;
+			result = (_ltc3675_is_pgood(LTC3675_BuckBoost_PGood) == on);
+			break;
+        //default:
+		//	return false;
     }
+	
+	debug_log((result ? "+" : "-"));
 
-    return true;
+    return result;
 }
 
 bool ltc3675_set_voltage(ltc3675_regulator_t reg, uint16_t voltage)

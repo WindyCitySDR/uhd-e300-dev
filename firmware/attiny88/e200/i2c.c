@@ -12,7 +12,7 @@
 	- In pull-up mode, much code was commented out to ever avoid driving the bus (for a fleeting moment) as this was visible on the scope as short peaks (instead the line will briefly go Hi Z).
 */
 
-bool _i2c_disable_ack_check = false;
+volatile bool _i2c_disable_ack_check = false;
 
 // FIXME: Follow magic numbers should be in a struct that is passed into each function
 
@@ -81,14 +81,17 @@ static void _i2c_stop_ex(io_pin_t sda, io_pin_t scl, bool pull_up)
 	//	io_set_pin(sda);
 	
 	// SDA should be HIGH after ACK has been clocked away
-	bool skip_drive = false;
+//	bool skip_drive = false;
 	uint8_t retries = 0;
 	while (io_test_pin(sda) == false)
 	{
 		if (retries == I2C_DEFAULT_MAX_ACK_RETRIES)
 		{
+			debug_log_ex("I2C:STP ", false);
+			debug_log_hex(sda);
 			debug_blink_rev(4);
-			skip_drive = true;
+			
+//			skip_drive = true;
 			break;	// SDA is being held low?!
 		}
 
@@ -123,12 +126,12 @@ static void _i2c_stop_ex(io_pin_t sda, io_pin_t scl, bool pull_up)
 		io_set_pin(sda);
 	I2C_DELAY(I2C_DEFAULT_BUS_FREE_TIME);
 }
-
+/*
 static void _i2c_stop(io_pin_t sda, io_pin_t scl)
 {
 	_i2c_stop_ex(sda, scl, false);
 }
-
+*//*
 static void _i2c_abort_safe_ex(io_pin_t pin, bool pull_up)
 {
 	if (io_is_output(pin))
@@ -165,7 +168,7 @@ static void _i2c_abort_safe_ex(io_pin_t pin, bool pull_up)
 	// Normally: pin will be Hi-Z input
 	// With internal pull-up: pin will be input with pull-up enabled
 }
-
+*/
 static void _i2c_abort_safe(io_pin_t pin, bool pull_up)
 {
 	if (pull_up == false)
@@ -229,6 +232,8 @@ static bool _i2c_write_byte_ex(io_pin_t sda, io_pin_t scl, uint8_t value, bool p
 			
 			if (io_test_pin(sda) == false)
 			{
+				debug_log("I2C:WR ");
+				debug_log_hex(sda);
 				debug_blink_rev(1);
 				return false;
 			}			
@@ -258,7 +263,7 @@ static bool _i2c_write_byte_ex(io_pin_t sda, io_pin_t scl, uint8_t value, bool p
 		if (pull_up)
 			io_set_pin(scl);
         I2C_DELAY(I2C_DEFAULT_SCL_HIGH_PERIOD);
-		
+#ifdef I2C_ALLOW_CLOCK_STRETCH
 		uint8_t retries = I2C_DEFAULT_MAX_BUS_RETRIES;
 		while (io_test_pin(scl) == false)	// Clock stretch requested?
 		{
@@ -269,11 +274,13 @@ static bool _i2c_write_byte_ex(io_pin_t sda, io_pin_t scl, uint8_t value, bool p
 				if (pull_up)
 					io_set_pin(sda);
 				
+				debug_log_ex("I2C:STRTCH ", false);
+				debug_log_hex(scl);
 				debug_blink_rev(2);
 				return false;
 			}
 		}
-
+#endif // I2C_ALLOW_CLOCK_STRETCH
 		if (pull_up)
 			io_clear_pin(scl);
         io_output_pin(scl);	// Drive LOW
@@ -290,6 +297,9 @@ static bool _i2c_write_byte_ex(io_pin_t sda, io_pin_t scl, uint8_t value, bool p
     {
         if (retries == I2C_DEFAULT_MAX_ACK_RETRIES)
 		{
+			debug_log_ex("I2C:ACK ", false);
+			debug_log_hex_ex(sda, false);
+			debug_log_hex(value);
 			debug_blink_rev(3);
             return false;	// Will abort and not release bus - done by caller
 		}			
@@ -336,18 +346,20 @@ static bool _i2c_read_byte_ex(io_pin_t sda, io_pin_t scl, uint8_t* value, bool p
 		if (pull_up)
 			io_set_pin(scl);
         I2C_DELAY(I2C_DEFAULT_SCL_HIGH_PERIOD);
-		
+#ifdef I2C_ALLOW_CLOCK_STRETCH
 		uint8_t retries = I2C_DEFAULT_MAX_BUS_RETRIES;
 		while (io_test_pin(scl) == false)	// Clock stretch requested?
 		{
 			I2C_DELAY(I2C_DEFAULT_BUS_WAIT);
 			if (--retries == 0)
 			{
+				debug_log_ex("I2C:R ");
+				debug_log_hex(scl);
 				debug_blink_rev(5);
 				return false;
 			}				
 		}
-
+#endif // I2C_ALLOW_CLOCK_STRETCH
         (*value) |= ((io_test_pin(sda) ? 0x1 : 0x0) << (7 - i));   // MSB first
 
 		if (pull_up)

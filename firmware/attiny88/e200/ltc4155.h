@@ -13,5 +13,6 @@
 
 bool ltc4155_init(void);
 bool ltc4155_has_interrupt(void);
+bool ltc4155_handle_irq(void);
 
 #endif /* LTC4155_H_ */
