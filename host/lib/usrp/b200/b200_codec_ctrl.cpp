@@ -452,6 +452,7 @@ public:
             reg1df = 0;
         }
 
+        std::cout << std::hex << "reg1db: " << (int) reg1db << std::endl;
         std::cout << std::hex << "reg1dc: " << (int) reg1dc << std::endl;
         std::cout << std::hex << "reg1de: " << (int) reg1de << std::endl;
         std::cout << std::hex << "reg1dd: " << (int) reg1dd << std::endl;
@@ -463,6 +464,7 @@ public:
         _b200_iface->write_reg(0x1dc, reg1dc);
         _b200_iface->write_reg(0x1de, reg1de);
 
+        std::cout << std::hex << "read reg1db: " << (int) _b200_iface->read_reg(0x1db) << std::endl;
         std::cout << std::hex << "read reg1dc: " << (int) _b200_iface->read_reg(0x1dc) << std::endl;
         std::cout << std::hex << "read reg1de: " << (int) _b200_iface->read_reg(0x1de) << std::endl;
         std::cout << std::hex << "read reg1dd: " << (int) _b200_iface->read_reg(0x1dd) << std::endl;
@@ -636,6 +638,11 @@ public:
     void calibrate_tx_quadrature(void) {
         /* TX Quad Cal: write settings, cal. */
         UHD_HERE();
+
+        if((_b200_iface->read_reg(0x017) & 0x0F) != 5) {
+            throw uhd::runtime_error("TX Quad Cal started, but not in ALERT!");
+        }
+
         uint8_t maskbits = _b200_iface->read_reg(0x0a3) & 0x3F;
         _b200_iface->write_reg(0x0a0, 0x15);
         _b200_iface->write_reg(0x0a3, 0x00 | maskbits);
@@ -667,7 +674,6 @@ public:
             count++;
             boost::this_thread::sleep(boost::posix_time::milliseconds(10));
         }
-        UHD_HERE();
 
         std::cout << "0x08E: " << (int) _b200_iface->read_reg(0x08E) << std::endl;
         std::cout << "0x08F: " << (int) _b200_iface->read_reg(0x08F) << std::endl;
@@ -921,7 +927,7 @@ public:
         boost::this_thread::sleep(boost::posix_time::milliseconds(20));
 
         /* Tune the BBPLL, write TX and RX FIRS. */
-        set_clock_rate(30.72e6);
+        setup_rates(30.72e6);
 
         /* Setup data ports (FDD dual port DDR CMOS):
          *      FDD dual port DDR CMOS no swap.
@@ -998,8 +1004,8 @@ public:
 
         calibrate_synth_charge_pumps();
 
-        tune("RX", 800e6);
-        tune("TX", 850e6);
+        tune_helper("RX", 800e6, false);
+        tune_helper("TX", 850e6, false);
 
         program_mixer_gm_subtable();
         program_gain_table();
@@ -1116,7 +1122,83 @@ public:
         return num_taps;
     }
 
-    double set_clock_rate(const double rate) {
+
+    double set_clock_rate(const double req_rate) {
+
+        /* We must be in the SLEEP / WAIT state to do this. If we aren't already
+         * there, transition the ENSM to State 0. */
+        uint8_t current_state = _b200_iface->read_reg(0x017) & 0x0F;
+        switch(current_state) {
+            case 0x05:
+                /* We are in the ALERT state. */
+                _b200_iface->write_reg(0x014, 0x21);
+                boost::this_thread::sleep(boost::posix_time::milliseconds(5));
+                _b200_iface->write_reg(0x014, 0x00);
+                break;
+
+            case 0x0A:
+                /* We are in the FDD state. */
+                _b200_iface->write_reg(0x014, 0x00);
+                break;
+
+            default:
+                throw uhd::runtime_error("AD9361 is in unknown state!");
+                break;
+        };
+
+        double rate = setup_rates(req_rate);
+
+        /* Transition to the ALERT state and calibrate everything. */
+        _b200_iface->write_reg(0x015, 0x04); //dual synth mode, synth en ctrl en
+        _b200_iface->write_reg(0x014, 0x05); //use SPI for TXNRX ctrl, to ALERT, TX on
+        _b200_iface->write_reg(0x013, 0x01); //enable ENSM
+        boost::this_thread::sleep(boost::posix_time::milliseconds(1));
+
+        calibrate_synth_charge_pumps();
+
+        tune_helper("RX", _rx_freq, false);
+        tune_helper("TX", _tx_freq, false);
+
+        program_mixer_gm_subtable();
+        program_gain_table();
+        setup_gain_control();
+
+        calibrate_baseband_rx_analog_filter();
+        calibrate_baseband_tx_analog_filter();
+        calibrate_rx_TIAs();
+        calibrate_secondary_tx_filter();
+
+        setup_adc();
+
+        calibrate_tx_quadrature();
+        calibrate_rx_quadrature();
+
+        _b200_iface->write_reg(0x012, 0x02); // cals done, set PPORT config
+        _b200_iface->write_reg(0x013, 0x01); // Set ENSM FDD bit
+        _b200_iface->write_reg(0x015, 0x04); // dual synth mode, synth en ctrl en
+
+        /* End the function in the same state as the entry state. */
+        switch(current_state) {
+            case 0x05:
+                /* We are already in ALERT. */
+                break;
+
+            case 0x0A:
+                /* Transition back to FDD. */
+                _b200_iface->write_reg(0x002, reg_txfilt);
+                _b200_iface->write_reg(0x003, reg_rxfilt);
+                _b200_iface->write_reg(0x014, 0x21);
+                break;
+
+            default:
+                throw uhd::runtime_error("AD9361 is in unknown state!");
+                break;
+        };
+
+        return rate;
+    }
+
+    double setup_rates(const double rate) {
         if(rate > 61.44e6) {
             throw uhd::runtime_error("Requested master clock rate outside range!");
         }
@@ -1225,30 +1307,6 @@ public:
         setup_tx_fir(num_tx_taps);
         setup_rx_fir(num_rx_taps);
 
-        /* Run through other necessary calibrations after a BBPLL tune. */
-        if((_rx_freq != 0.0) && (_tx_freq != 0.0)) {
-            /* If we aren't already in the ALERT state, we will need to return to
-             * the FDD state after calibration. */
-            bool not_in_alert = false;
-            if((_b200_iface->read_reg(0x017) & 0x0F) != 5) {
-                /* Force the device into the ALERT state. */
-                not_in_alert = true;
-                _b200_iface->write_reg(0x014, 0x05);
-            }
-
-            calibrate_baseband_rx_analog_filter();
-            calibrate_baseband_tx_analog_filter();
-            calibrate_rx_TIAs();
-            calibrate_secondary_tx_filter();
-
-            setup_adc();
-
-            /* If we were in the FDD state, return it now. */
-            if(not_in_alert) {
-                _b200_iface->write_reg(0x014, 0x21);
-            }
-        }
-
         return _baseband_bw;
     }
 
@@ -1320,6 +1378,10 @@ public:
     }
 
     double tune(const std::string &which, const double value) {
+        return tune_helper(which, value, true);
+    }
+
+    double tune_helper(const std::string &which, const double value, bool do_cal) {
         //setup charge pump
         //setup VCO/RFPLL based on rx/tx freq
         //VCO cal
@@ -1347,12 +1409,6 @@ public:
 
         double actual_vcorate = fref * (nint + double(nfrac)/modulus);
         double actual_lo = actual_vcorate / vcodiv;
-
-        /* If this is one of the initialization tunes, don't do the cal. */
-        bool do_cal = true;
-        if((_rx_freq == 0.0) || (_tx_freq == 0.0)) {
-            do_cal = false;
-        }
 
         double return_freq = 0.0;
         if(which[0] == 'R') {
@@ -1447,8 +1503,7 @@ public:
             if((_b200_iface->read_reg(0x017) & 0x0F) != 5) {
                 /* Force the device into the ALERT state. */
                 not_in_alert = true;
-                _b200_iface->write_reg(0x014, 0x05);
-                UHD_HERE();
+                _b200_iface->write_reg(0x014, 0x01);
             }
 
             calibrate_tx_quadrature();
@@ -1457,7 +1512,6 @@ public:
             /* If we were in the FDD state, return it now. */
             if(not_in_alert) {
                 _b200_iface->write_reg(0x014, 0x21);
-                UHD_HERE();
             }
         }
 
