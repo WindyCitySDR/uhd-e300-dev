@@ -542,8 +542,7 @@ _data_transport.reset();
         _tree->create<meta_range_t>(rf_fe_path / "bandwidth" / "range")
             .publish(boost::bind(&b200_codec_ctrl::get_bw_filter_range, _codec_ctrl, fe_name));
         _tree->create<double>(rf_fe_path / "freq" / "value")
-            .coerce(boost::bind(&b200_codec_ctrl::tune, _codec_ctrl, fe_name, _1))
-            .set(1e9);
+            .coerce(boost::bind(&b200_codec_ctrl::tune, _codec_ctrl, fe_name, _1));
         _tree->create<meta_range_t>(rf_fe_path / "freq" / "range")
             .publish(boost::bind(&b200_codec_ctrl::get_rf_freq_range, _codec_ctrl, fe_name));
 

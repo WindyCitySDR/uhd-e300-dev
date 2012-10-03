@@ -91,8 +91,8 @@ public:
         _b200_iface->write_reg(0x3FE, 0x3F);
     }
 
-    bool double_is_equal(double a, double b) {
-        return std::fabs(a - b) < std::numeric_limits<double>::epsilon();
+    bool freq_is_nearly_equal(double a, double b) {
+        return std::fabs(a - b) < 1;
     }
 
 
@@ -1133,13 +1133,17 @@ public:
 
     double set_clock_rate(const double req_rate) {
 
+        UHD_VAR(req_rate);
+
         if(req_rate > 61.44e6) {
             throw uhd::runtime_error("Requested master clock rate outside range!");
         }
 
-        if(double_is_equal(req_rate, _req_clock_rate)) {
+        if(freq_is_nearly_equal(req_rate, _req_clock_rate)) {
             return _baseband_bw;
         }
+
+        UHD_VAR(_req_clock_rate);
 
         /* We must be in the SLEEP / WAIT state to do this. If we aren't already
          * there, transition the ENSM to State 0. */
@@ -1219,7 +1223,6 @@ public:
         _req_clock_rate = rate;
 
         UHD_VAR(rate);
-
 
         /* Turn off the receivers and transmitters. */
         _b200_iface->write_reg(0x002, (reg_txfilt & 0x3F));
@@ -1325,7 +1328,7 @@ public:
     }
 
     double set_coreclk(const double rate) {
-        if(double_is_equal(rate, _req_coreclk)) {
+        if(freq_is_nearly_equal(rate, _req_coreclk)) {
             return _adcclock_freq;
         }
 
@@ -1394,12 +1397,12 @@ public:
     double tune(const std::string &which, const double value) {
 
         if(which[0] == 'R') {
-            if(double_is_equal(value, _req_rx_freq)) {
+            if(freq_is_nearly_equal(value, _req_rx_freq)) {
                 return _rx_freq;
             }
 
         } else if(which[0] == 'T') {
-            if(double_is_equal(value, _req_tx_freq)) {
+            if(freq_is_nearly_equal(value, _req_tx_freq)) {
                 return _tx_freq;
             }
 
