@@ -1386,6 +1386,23 @@ public:
     }
 
     double tune(const std::string &which, const double value) {
+
+        if(which[0] == 'R') {
+            if(double_is_equal(value, _req_rx_freq)) {
+                return _rx_freq;
+            }
+            _req_rx_freq = value;
+
+        } else if(which[0] == 'T') {
+            if(double_is_equal(value, _req_tx_freq)) {
+                return _tx_freq;
+            }
+            _req_tx_freq = value;
+
+        } else {
+            UHD_THROW_INVALID_CODE_PATH();
+        }
+
         UHD_HERE();
         return tune_helper(which, value, true);
     }
@@ -1421,12 +1438,6 @@ public:
 
         double return_freq = 0.0;
         if(which[0] == 'R') {
-
-            if(double_is_equal(value, _req_rx_freq)) {
-                return _rx_freq;
-            }
-            _req_rx_freq = value;
-
             if(value < 2.2e9) {
                 fpga_bandsel = (fpga_bandsel & 0xF8) | RX_BANDSEL_B;
                 reg_inputsel = (reg_inputsel & 0xC0) | 0x30;
@@ -1473,12 +1484,6 @@ public:
             return_freq = actual_lo;
 
         } else {
-
-            if(double_is_equal(value, _req_tx_freq)) {
-                return _tx_freq;
-            }
-            _req_tx_freq = value;
-
             if(value < 3e9) {
                 fpga_bandsel = (fpga_bandsel & 0xE7) | TX_BANDSEL_A;
                 reg_inputsel = reg_inputsel | 0x40;
