@@ -26,6 +26,7 @@
 #include <boost/utility.hpp>
 #include <boost/math/constants/constants.hpp>
 #include <cmath>
+#include <limits>
 #include <vector>
 
 using namespace uhd;
@@ -90,6 +91,9 @@ public:
         _b200_iface->write_reg(0x3FE, 0x3F);
     }
 
+    bool double_is_equal(double a, double b) {
+        return std::fabs(a - b) < std::numeric_limits<double>::epsilon();
+    }
 
 
     /***********************************************************************
@@ -675,8 +679,8 @@ public:
             boost::this_thread::sleep(boost::posix_time::milliseconds(10));
         }
 
-        std::cout << "0x08E: " << (int) _b200_iface->read_reg(0x08E) << std::endl;
-        std::cout << "0x08F: " << (int) _b200_iface->read_reg(0x08F) << std::endl;
+        //std::cout << "0x08E: " << (int) _b200_iface->read_reg(0x08E) << std::endl;
+        //std::cout << "0x08F: " << (int) _b200_iface->read_reg(0x08F) << std::endl;
     }
 
 
@@ -894,6 +898,8 @@ public:
         /* Initialize internal fields. */
         _rx_freq = 0.0;
         _tx_freq = 0.0;
+        _req_rx_freq = 0.0;
+        _req_tx_freq = 0.0;
         _baseband_bw = 0.0;
         _req_clock_rate = 0.0;
         _req_coreclk = 0.0;
@@ -1004,6 +1010,7 @@ public:
 
         calibrate_synth_charge_pumps();
 
+        UHD_HERE();
         tune_helper("RX", 800e6, false);
         tune_helper("TX", 850e6, false);
 
@@ -1125,6 +1132,14 @@ public:
 
     double set_clock_rate(const double req_rate) {
 
+        if(req_rate > 61.44e6) {
+            throw uhd::runtime_error("Requested master clock rate outside range!");
+        }
+
+        if(double_is_equal(req_rate, _req_clock_rate)) {
+            return _baseband_bw;
+        }
+
         /* We must be in the SLEEP / WAIT state to do this. If we aren't already
          * there, transition the ENSM to State 0. */
         uint8_t current_state = _b200_iface->read_reg(0x017) & 0x0F;
@@ -1156,6 +1171,7 @@ public:
 
         calibrate_synth_charge_pumps();
 
+        UHD_HERE();
         tune_helper("RX", _rx_freq, false);
         tune_helper("TX", _tx_freq, false);
 
@@ -1199,14 +1215,6 @@ public:
     }
 
     double setup_rates(const double rate) {
-        if(rate > 61.44e6) {
-            throw uhd::runtime_error("Requested master clock rate outside range!");
-        }
-
-        if(rate == _req_clock_rate) {
-            return _req_clock_rate;
-        }
-
         _req_clock_rate = rate;
 
         UHD_VAR(rate);
@@ -1311,8 +1319,8 @@ public:
     }
 
     double set_coreclk(const double rate) {
-        if(rate == _req_coreclk) {
-            return _req_coreclk;
+        if(double_is_equal(rate, _req_coreclk)) {
+            return _adcclock_freq;
         }
 
         _req_coreclk = rate;
@@ -1378,6 +1386,7 @@ public:
     }
 
     double tune(const std::string &which, const double value) {
+        UHD_HERE();
         return tune_helper(which, value, true);
     }
 
@@ -1412,6 +1421,12 @@ public:
 
         double return_freq = 0.0;
         if(which[0] == 'R') {
+
+            if(double_is_equal(value, _req_rx_freq)) {
+                return _rx_freq;
+            }
+            _req_rx_freq = value;
+
             if(value < 2.2e9) {
                 fpga_bandsel = (fpga_bandsel & 0xF8) | RX_BANDSEL_B;
                 reg_inputsel = (reg_inputsel & 0xC0) | 0x30;
@@ -1458,6 +1473,12 @@ public:
             return_freq = actual_lo;
 
         } else {
+
+            if(double_is_equal(value, _req_tx_freq)) {
+                return _tx_freq;
+            }
+            _req_tx_freq = value;
+
             if(value < 3e9) {
                 fpga_bandsel = (fpga_bandsel & 0xE7) | TX_BANDSEL_A;
                 reg_inputsel = reg_inputsel | 0x40;
@@ -1506,6 +1527,7 @@ public:
                 _b200_iface->write_reg(0x014, 0x01);
             }
 
+            UHD_HERE();
             calibrate_tx_quadrature();
             calibrate_rx_quadrature();
 
@@ -1526,7 +1548,7 @@ public:
 private:
     b200_iface::sptr _b200_iface;
     wb_iface::sptr _ctrl;
-    double _rx_freq, _tx_freq;
+    double _rx_freq, _tx_freq, _req_rx_freq, _req_tx_freq;
     double _baseband_bw, _bbpll_freq, _adcclock_freq;
     double _req_clock_rate, _req_coreclk;
     uint16_t _rx_bbf_tunediv;
