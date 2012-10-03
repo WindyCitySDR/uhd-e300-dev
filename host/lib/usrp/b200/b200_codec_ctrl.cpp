@@ -408,6 +408,7 @@ public:
     }
 
     void calibrate_rx_TIAs() {
+
         uint8_t reg1eb = _b200_iface->read_reg(0x1eb) & 0x3F;
         uint8_t reg1ec = _b200_iface->read_reg(0x1ec) & 0x7F;
         uint8_t reg1e6 = _b200_iface->read_reg(0x1e6) & 0x07;
@@ -1218,6 +1219,11 @@ public:
         _req_clock_rate = rate;
 
         UHD_VAR(rate);
+
+
+        /* Turn off the receivers and transmitters. */
+        _b200_iface->write_reg(0x002, (reg_txfilt & 0x3F));
+        _b200_iface->write_reg(0x003, (reg_rxfilt & 0x3F));
 
         /* Set the decimation values based on clock rate. We are setting default
          * values for the interpolation filters, as well, although they may
