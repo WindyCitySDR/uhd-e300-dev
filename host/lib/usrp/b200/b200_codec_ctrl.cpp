@@ -1,19 +1,7 @@
 //
 // Copyright 2012 Ettus Research LLC
 //
-// This program is free software: you can redistribute it and/or modify
-// it under the terms of the GNU General Public License as published by
-// the Free Software Foundation, either version 3 of the License, or
-// (at your option) any later version.
-//
-// This program is distributed in the hope that it will be useful,
-// but WITHOUT ANY WARRANTY; without even the implied warranty of
-// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-// GNU General Public License for more details.
-//
-// You should have received a copy of the GNU General Public License
-// along with this program.  If not, see <http://www.gnu.org/licenses/>.
-//
+// NOT FOR DISTRIBUTION
 
 #include "b200_regs.hpp"
 #include "b200_codec_ctrl.hpp"
@@ -38,16 +26,13 @@ static const int RX_BANDSEL_A = (1 << 2);
 static const int TX_BANDSEL_B = (1 << 3);
 static const int TX_BANDSEL_A = (1 << 4);
 
-/***********************************************************************
- * The implementation class
- **********************************************************************/
-class b200_codec_ctrl_impl : public b200_codec_ctrl{
+
+class b200_codec_ctrl_impl : public b200_codec_ctrl {
 public:
 
     /***********************************************************************
      * Information retrieval functions
      **********************************************************************/
-
     uhd::meta_range_t get_gain_range(const std::string &which, \
             const std::string &name) {
         if(which[0] == 'R') {
@@ -78,11 +63,7 @@ public:
      * Placeholders, unused, or test functions
      **********************************************************************/
 
-    double set_sample_rate(const double rate) {
-        uhd::runtime_error("don't do that");
-        return 0.0;
-    }
-
+    /* Make Catalina output its test tone. */
     void output_test_tone(void) {
         /* Output a 480 kHz tone at 800 MHz */
         _b200_iface->write_reg(0x3F4, 0x0B);
@@ -91,6 +72,28 @@ public:
         _b200_iface->write_reg(0x3FE, 0x3F);
     }
 
+    /* Read and print the currently-programed gain table. */
+    void read_gain_table(void) {
+        uint8_t index, word1, word2, word3;
+        for(index = 0; index < 77; index++) {
+            _b200_iface->write_reg(0x130, index);
+            word1 = _b200_iface->read_reg(0x134);
+            word2 = _b200_iface->read_reg(0x135);
+            word3 = _b200_iface->read_reg(0x136);
+            _b200_iface->write_reg(0x134, 0x00);
+            _b200_iface->write_reg(0x134, 0x00);
+
+            std::cout.unsetf(std::ios::hex);
+            std::cout << "Index: " << (int) index << std::endl;
+            std::cout << "\tWord 1: " << std::hex << (int) word1 << std::endl;
+            std::cout << "\tWord 2: " << std::hex << (int) word2 << std::endl;
+            std::cout << "\tWord 3: " << std::hex << (int) word3 << std::endl;
+        }
+    }
+
+    /* This is a simple comparison for very large double-precision floating
+     * point numbers. It is used to prevent re-tunes for frequencies that are
+     * the same but not 'exactly' because of data precision issues. */
     bool freq_is_nearly_equal(double a, double b) {
         return std::fabs(a - b) < 1;
     }
@@ -100,7 +103,15 @@ public:
      * Filter functions
      **********************************************************************/
 
-    void setup_fir(const std::string &which, int num_taps, uint16_t *coeffs) {
+    /* Program either the RX or TX FIR filter.
+     *
+     * The process is the same for both filters, but the function must be told
+     * how many taps are in the filter, and given a vector of the taps
+     * themselves. Note that the filters are symmetric, so value of 'num_taps'
+     * should actually be twice the length of the tap vector. */
+    void program_fir_filter(const std::string &which, int num_taps, \
+            uint16_t *coeffs) {
+
         uint16_t base;
         if(which == "RX") {
             base = 0x0f0;
@@ -112,11 +123,15 @@ public:
         /* Write the filter configuration. */
         uint8_t reg_numtaps = (((num_taps / 16) - 1) & 0x07) << 5;
 
-        _b200_iface->write_reg(base+5, reg_numtaps | 0x1a); //enable filter clk
+        /* Turn on the filter clock. */
+        _b200_iface->write_reg(base+5, reg_numtaps | 0x1a);
         boost::this_thread::sleep(boost::posix_time::milliseconds(1));
 
         int num_unique_coeffs = (num_taps / 2);
 
+        /* The filters are symmetric, so iterate over the tap vector,
+         * programming each index, and then iterate backwards, repeating the
+         * process. */
         for(int addr=0; addr < num_unique_coeffs; addr++) {
             _b200_iface->write_reg(base+0, addr);
             _b200_iface->write_reg(base+1, (coeffs[addr]) & 0xff);
@@ -125,7 +140,7 @@ public:
             _b200_iface->write_reg(base+4, 0x00);
             _b200_iface->write_reg(base+4, 0x00);
         }
-        //it's symmetric, so we write it out again backwards
+
         for(int addr=0; addr < num_unique_coeffs; addr++) {
             _b200_iface->write_reg(base+0, addr+num_unique_coeffs);
             _b200_iface->write_reg(base+1, (coeffs[num_unique_coeffs-1-addr]) & 0xff);
@@ -134,9 +149,15 @@ public:
             _b200_iface->write_reg(base+4, 0x00);
             _b200_iface->write_reg(base+4, 0x00);
         }
-        _b200_iface->write_reg(base+5, 0xf8); //disable filter clk
+
+        /* Disable the filter clock. */
+        _b200_iface->write_reg(base+5, 0xf8);
     }
 
+    /* Program the RX FIR Filter.
+     *
+     * TODO Right now, the taps are fixed. This function should swap the tap
+     * vectors for different BBWs. */
     void setup_rx_fir(int total_num_taps) {
         uint16_t master_coeffs[] = {
             0xffe2,0x0042,0x0024,0x0095,0x0056,0x004d,0xffcf,0xffb7,
@@ -155,11 +176,14 @@ public:
             coeffs[num_taps - 1 - i] = master_coeffs[63 - i];
         }
 
-        setup_fir("RX", total_num_taps, &coeffs[0]);
+        program_fir_filter("RX", total_num_taps, &coeffs[0]);
     }
 
+    /* Program the RX FIR Filter.
+     *
+     * TODO Right now, the taps are fixed. This function should swap the tap
+     * vectors for different BBWs. */
     void setup_tx_fir(int total_num_taps) {
-        //LTE 6MHz
         uint16_t master_coeffs[] = {
             0xfffb,0x0000,0x0004,0x0017,0x0024,0x0028,0x0013,0xfff3,
             0xffdc,0xffe5,0x000b,0x0030,0x002e,0xfffe,0xffc4,0xffb8,
@@ -177,7 +201,7 @@ public:
             coeffs[num_taps - 1 - i] = master_coeffs[63 - i];
         }
 
-        setup_fir("TX", total_num_taps, &coeffs[0]);
+        program_fir_filter("TX", total_num_taps, &coeffs[0]);
     }
 
 
@@ -185,11 +209,15 @@ public:
      * Calibration functions
      ***********************************************************************/
 
+    /* Calibrate and lock the BBPLL.
+     *
+     * This function should be called anytime the BBPLL is tuned. */
     void calibrate_lock_bbpll() {
-        _b200_iface->write_reg(0x03F, 0x05);
-        _b200_iface->write_reg(0x03F, 0x01); //keep bbpll on
+        _b200_iface->write_reg(0x03F, 0x05); // Start the BBPLL calibration
+        _b200_iface->write_reg(0x03F, 0x01); // Clear the 'start' bit
 
-        _b200_iface->write_reg(0x04c, 0x86); //increase Kv and phase margin (?)
+        /* Increase BBPLL KV and phase margin. */
+        _b200_iface->write_reg(0x04c, 0x86);
         _b200_iface->write_reg(0x04d, 0x01);
         _b200_iface->write_reg(0x04d, 0x05);
 
@@ -205,15 +233,18 @@ public:
         }
     }
 
+    /* Calibrate the synthesizer charge pumps.
+     *
+     * Technically, this calibration only needs to be done once, at device
+     * initialization. */
     void calibrate_synth_charge_pumps() {
-        /* If we aren't already in the ALERT state, we will need to return to
-         * the FDD state after calibration. */
+        /* If this function ever gets called, and the ENSM isn't already in the
+         * ALERT state, then something has gone horribly wrong. */
         if((_b200_iface->read_reg(0x017) & 0x0F) != 5) {
             std::cout << "ERROR! Catalina not in ALERT during cal!" << std::endl;
         }
 
-        /* Should only be done the first time the device enters ALERT. */
-        //RX CP CAL
+        /* Calibrate the RX synthesizer charge pump. */
         int count = 0;
         _b200_iface->write_reg(0x23d, 0x04);
         while(!(_b200_iface->read_reg(0x244) & 0x80)) {
@@ -227,7 +258,7 @@ public:
         }
         _b200_iface->write_reg(0x23d, 0x00);
 
-        //TX CP CAL
+        /* Calibrate the TX synthesizer charge pump. */
         count = 0;
         _b200_iface->write_reg(0x27d, 0x04);
         while(!(_b200_iface->read_reg(0x284) & 0x80)) {
@@ -242,6 +273,11 @@ public:
         _b200_iface->write_reg(0x27d, 0x00);
     }
 
+    /* Calibrate the analog BB RX filter.
+     *
+     * Note that the filter calibration depends heavily on the baseband
+     * bandwidth, so this must be re-done after any change to the RX sample
+     * rate. */
     double calibrate_baseband_rx_analog_filter() {
         /* For filter tuning, baseband BW is half the complex BW, and must be
          * between 28e6 and 0.2e6. */
@@ -265,25 +301,21 @@ public:
         double temp = ((bbbw_mhz - std::floor(bbbw_mhz)) * 1000) / 7.8125;
         uint8_t bbbw_khz = std::min(127, int(std::floor(temp + 0.5)));
 
+        /* Set corner frequencies and dividers. */
         _b200_iface->write_reg(0x1fb, uint8_t(bbbw_mhz));
         _b200_iface->write_reg(0x1fc, bbbw_khz);
         _b200_iface->write_reg(0x1f8, (_rx_bbf_tunediv & 0x00FF));
         _b200_iface->write_reg(0x1f9, reg_bbftune_config);
 
-        /* FIXME remove this after debug complete
-        std::cout << std::hex << "0x1fb: " << (int) uint8_t(bbbw_mhz) << std::endl;
-        std::cout << std::hex << "0x1fc: " << (int) bbbw_khz << std::endl;
-        std::cout << std::hex << "0x1f8: " << (int) (_rx_bbf_tunediv & 0x00FF) << std::endl;
-        std::cout << std::hex << "0x1f9: " << (int) reg_bbftune_config << std::endl;
-        */
-
         /* RX Mix Voltage settings - only change with apps engineer help. */
         _b200_iface->write_reg(0x1d5, 0x3f);
         _b200_iface->write_reg(0x1c0, 0x03);
 
+        /* Enable RX1 & RX2 filter tuners. */
         _b200_iface->write_reg(0x1e2, 0x02);
         _b200_iface->write_reg(0x1e3, 0x02);
 
+        /* Run the calibration! */
         int count = 0;
         _b200_iface->write_reg(0x016, 0x80);
         while(_b200_iface->read_reg(0x016) & 0x80) {
@@ -296,12 +328,18 @@ public:
             boost::this_thread::sleep(boost::posix_time::milliseconds(1));
         }
 
+        /* Disable RX1 & RX2 filter tuners. */
         _b200_iface->write_reg(0x1e2, 0x03);
         _b200_iface->write_reg(0x1e3, 0x03);
 
         return bbbw;
     }
 
+    /* Calibrate the analog BB TX filter.
+     *
+     * Note that the filter calibration depends heavily on the baseband
+     * bandwidth, so this must be re-done after any change to the TX sample
+     * rate. */
     double calibrate_baseband_tx_analog_filter() {
         /* For filter tuning, baseband BW is half the complex BW, and must be
          * between 28e6 and 0.2e6. */
@@ -320,11 +358,14 @@ public:
         reg_bbftune_mode = (reg_bbftune_mode & 0xFE) \
                              | ((txbbfdiv >> 8) & 0x0001);
 
+        /* Program the divider values. */
         _b200_iface->write_reg(0x0d6, (txbbfdiv & 0x00FF));
         _b200_iface->write_reg(0x0d7, reg_bbftune_mode);
 
+        /* Enable the filter tuner. */
         _b200_iface->write_reg(0x0ca, 0x22);
 
+        /* Calibrate! */
         int count = 0;
         _b200_iface->write_reg(0x016, 0x40);
         while(_b200_iface->read_reg(0x016) & 0x40) {
@@ -337,11 +378,16 @@ public:
             boost::this_thread::sleep(boost::posix_time::milliseconds(1));
         }
 
+        /* Disable the filter tuner. */
         _b200_iface->write_reg(0x0ca, 0x26);
 
         return bbbw;
     }
 
+    /* Calibrate the secondary TX filter.
+     *
+     * This filter also depends on the TX sample rate, so if a rate change is
+     * made, the previous calibration will no longer be valid. */
     void calibrate_secondary_tx_filter() {
         /* For filter tuning, baseband BW is half the complex BW, and must be
          * between 20e6 and 0.53e6. */
@@ -377,6 +423,7 @@ public:
 
         uint8_t reg0d0, reg0d1, reg0d2;
 
+        /* Translate baseband bandwidths to register settings. */
         if((bbbw_mhz * 2) <= 9) {
             reg0d0 = 0x59;
         } else if(((bbbw_mhz * 2) > 9) && ((bbbw_mhz * 2) <= 24)) {
@@ -387,6 +434,7 @@ public:
             UHD_THROW_INVALID_CODE_PATH();
         }
 
+        /* Translate resistor values to register settings. */
         if(res == 100) {
             reg0d1 = 0x0c;
         } else if(res == 200) {
@@ -401,12 +449,17 @@ public:
 
         reg0d2 = cap;
 
+        /* Program the above-calculated values. Sweet. */
         _b200_iface->write_reg(0x0d3, 0x60);
         _b200_iface->write_reg(0x0d2, reg0d2);
         _b200_iface->write_reg(0x0d1, reg0d1);
         _b200_iface->write_reg(0x0d0, reg0d0);
     }
 
+    /* Calibrate the RX TIAs.
+     *
+     * Note that the values in the TIA register, after calibration, vary with
+     * the RX gain settings. */
     void calibrate_rx_TIAs() {
 
         uint8_t reg1eb = _b200_iface->read_reg(0x1eb) & 0x3F;
@@ -418,7 +471,7 @@ public:
         uint8_t reg1de = 0x00;
         uint8_t reg1df = 0x00;
 
-        /* For filter tuning, baseband BW is half the complex BW, and must be
+        /* For calibration, baseband BW is half the complex BW, and must be
          * between 28e6 and 0.2e6. */
         double bbbw = _baseband_bw / 2.0;
         if(bbbw > 20e6) {
@@ -428,10 +481,12 @@ public:
         }
         double ceil_bbbw_mhz = std::ceil(bbbw / 1e6);
 
+        /* Do some crazy resistor and capacitor math. */
         int Cbbf = (reg1eb * 160) + (reg1ec * 10) + 140;
         int R2346 = 18300 * (reg1e6 & 0x07);
         double CTIA_fF = (Cbbf * R2346 * 0.56) / 3500;
 
+        /* Translate baseband BW to register settings. */
         if(ceil_bbbw_mhz <= 3) {
             reg1db = 0xe0;
         } else if((ceil_bbbw_mhz > 3) && (ceil_bbbw_mhz <= 10)) {
@@ -457,29 +512,26 @@ public:
             reg1df = 0;
         }
 
-        std::cout << std::hex << "reg1db: " << (int) reg1db << std::endl;
-        std::cout << std::hex << "reg1dc: " << (int) reg1dc << std::endl;
-        std::cout << std::hex << "reg1de: " << (int) reg1de << std::endl;
-        std::cout << std::hex << "reg1dd: " << (int) reg1dd << std::endl;
-        std::cout << std::hex << "reg1df: " << (int) reg1df << std::endl;
-
+        /* w00t. Settings calculated. Program them and roll out. */
         _b200_iface->write_reg(0x1db, reg1db);
         _b200_iface->write_reg(0x1dd, reg1dd);
         _b200_iface->write_reg(0x1df, reg1df);
         _b200_iface->write_reg(0x1dc, reg1dc);
         _b200_iface->write_reg(0x1de, reg1de);
-
-        std::cout << std::hex << "read reg1db: " << (int) _b200_iface->read_reg(0x1db) << std::endl;
-        std::cout << std::hex << "read reg1dc: " << (int) _b200_iface->read_reg(0x1dc) << std::endl;
-        std::cout << std::hex << "read reg1de: " << (int) _b200_iface->read_reg(0x1de) << std::endl;
-        std::cout << std::hex << "read reg1dd: " << (int) _b200_iface->read_reg(0x1dd) << std::endl;
-        std::cout << std::hex << "read reg1df: " << (int) _b200_iface->read_reg(0x1df) << std::endl;
     }
 
+    /* Setup the Catalina ADC.
+     *
+     * There are 40 registers that control the ADC's operation, most of the
+     * values of which must be derived mathematically, dependent on the current
+     * setting of the BBPLL. Note that the order of calculation is critical, as
+     * some of the 40 registers depend on the values in others. */
     void setup_adc() {
         double bbbw_mhz = (((_bbpll_freq / 1e6) / _rx_bbf_tunediv) * std::log(2.0)) \
                       / (1.4 * 2 * boost::math::constants::pi<double>());
 
+        /* For calibration, baseband BW is half the complex BW, and must be
+         * between 28e6 and 0.2e6. */
         if(bbbw_mhz > 28) {
             bbbw_mhz = 28;
         } else if (bbbw_mhz < 0.20) {
@@ -494,6 +546,7 @@ public:
 
         double fsadc = _adcclock_freq / 1e6;
 
+        /* Sort out the RC time constant for our baseband bandwidth... */
         double rc_timeconst = 0.0;
         if(bbbw_mhz < 18) {
             rc_timeconst = (1 / ((1.4 * 2 * boost::math::constants::pi<double>()) \
@@ -514,6 +567,9 @@ public:
         double scale_snr = std::pow(10,(scale_snr_dB / 10));
         double maxsnr = 640 / 160;
 
+        /* Calculate the values for all 40 settings registers.
+         *
+         * DO NOT TOUCH THIS UNLESS YOU KNOW EXACTLY WHAT YOU ARE DOING. kthx.*/
         uint8_t data[40];
         data[0] = 0;    data[1] = 0; data[2] = 0; data[3] = 0x24;
         data[4] = 0x24; data[5] = 0; data[6] = 0;
@@ -586,16 +642,22 @@ public:
         data[38] = 0x00;
         data[39] = 0x00;
 
+        /* Program the registers! */
         for(int i=0; i<40; i++) {
             _b200_iface->write_reg(0x200+i, data[i]);
         }
     }
 
+    /* Calibrate the baseband DC offset.
+     *
+     * Note that this function is called from within the TX quadrature
+     * calibration function! */
     void calibrate_baseband_dc_offset() {
-        _b200_iface->write_reg(0x193, 0x3f);
-        _b200_iface->write_reg(0x190, 0x0f);
-        _b200_iface->write_reg(0x194, 0x01);
+        _b200_iface->write_reg(0x193, 0x3f); // Calibration settings
+        _b200_iface->write_reg(0x190, 0x0f); // Set tracking coefficient
+        _b200_iface->write_reg(0x194, 0x01); // More calibration settings
 
+        /* Start that calibration, baby. */
         int count = 0;
         _b200_iface->write_reg(0x016, 0x01);
         while(_b200_iface->read_reg(0x016) & 0x01) {
@@ -609,14 +671,19 @@ public:
         }
     }
 
+    /* Calibrate the RF DC offset.
+     *
+     * Note that this function is called from within the TX quadrature
+     * calibration function. */
     void calibrate_rf_dc_offset() {
-        _b200_iface->write_reg(0x185, 0x20);    // RF DC Offset wait count
-        _b200_iface->write_reg(0x186, 0x32);    // RF DC Offset count
-        _b200_iface->write_reg(0x187, 0x24);
+        _b200_iface->write_reg(0x185, 0x20); // RF DC Offset wait count
+        _b200_iface->write_reg(0x186, 0x32); // RF DC Offset count
+        _b200_iface->write_reg(0x187, 0x24); // All calibration settings VVVV
         _b200_iface->write_reg(0x18b, 0x83);
         _b200_iface->write_reg(0x188, 0x05);
         _b200_iface->write_reg(0x189, 0x30);
 
+        /* Run the calibration! */
         int count = 0;
         _b200_iface->write_reg(0x016, 0x02);
         while(_b200_iface->read_reg(0x016) & 0x02) {
@@ -630,36 +697,43 @@ public:
         }
     }
 
+    /* Start the RX quadrature calibration.
+     *
+     * Note that we are using Catalina's 'tracking' feature for RX quadrature
+     * calibration, so once it starts it continues to free-run during operation.
+     * It should be re-run for large frequency changes. */
     void calibrate_rx_quadrature(void) {
         /* Configure RX Quadrature calibration settings. */
-        _b200_iface->write_reg(0x168, 0x03);    // Set tone level for cal
-        _b200_iface->write_reg(0x16e, 0x25);    // RX Gain index to use for cal
-        _b200_iface->write_reg(0x16a, 0x75);
-        _b200_iface->write_reg(0x16b, 0x15);
+        _b200_iface->write_reg(0x168, 0x03); // Set tone level for cal
+        _b200_iface->write_reg(0x16e, 0x25); // RX Gain index to use for cal
+        _b200_iface->write_reg(0x16a, 0x75); // Set Kexp phase
+        _b200_iface->write_reg(0x16b, 0x15); // Set Kexp amplitude
         _b200_iface->write_reg(0x169, 0xcf);
         _b200_iface->write_reg(0x18b, 0xad);
     }
 
+    /* Run the TX quadrature calibration.
+     *
+     * Note that from within this function we are also triggering the baseband
+     * and RF DC calibrations. */
     void calibrate_tx_quadrature(void) {
-        /* TX Quad Cal: write settings, cal. */
-        UHD_HERE();
-
+        /* Make sure we are, in fact, in the ALERT state. If not, something is
+         * terribly wrong in the driver execution flow. */
         if((_b200_iface->read_reg(0x017) & 0x0F) != 5) {
             throw uhd::runtime_error("TX Quad Cal started, but not in ALERT!");
         }
 
         uint8_t maskbits = _b200_iface->read_reg(0x0a3) & 0x3F;
-        _b200_iface->write_reg(0x0a0, 0x15);
+        _b200_iface->write_reg(0x0a0, 0x15); // Set NCO freq VVVV
         _b200_iface->write_reg(0x0a3, 0x00 | maskbits);
-        _b200_iface->write_reg(0x0a1, 0x7B);
-        _b200_iface->write_reg(0x0a9, 0xff);
-        _b200_iface->write_reg(0x0a2, 0x7f);
-        _b200_iface->write_reg(0x0a5, 0x01);
+        _b200_iface->write_reg(0x0a1, 0x7B); // Set tracking coefficient
+        _b200_iface->write_reg(0x0a9, 0xff); // Cal count
+        _b200_iface->write_reg(0x0a2, 0x7f); // Cal Kexp
+        _b200_iface->write_reg(0x0a5, 0x01); // Cal magnitude threshold VVVV
         _b200_iface->write_reg(0x0a6, 0x01);
-        _b200_iface->write_reg(0x0aa, 0x25);
-        _b200_iface->write_reg(0x0a4, 0xf0);
-        _b200_iface->write_reg(0x0ae, 0x00);
-
+        _b200_iface->write_reg(0x0aa, 0x25); // Cal gain table index
+        _b200_iface->write_reg(0x0a4, 0xf0); // Cal setting conut
+        _b200_iface->write_reg(0x0ae, 0x00); // Cal LPF gain index (split mode)
 
         /* First, calibrate the baseband DC offset. */
         calibrate_baseband_dc_offset();
@@ -680,8 +754,9 @@ public:
             boost::this_thread::sleep(boost::posix_time::milliseconds(10));
         }
 
-        //std::cout << "0x08E: " << (int) _b200_iface->read_reg(0x08E) << std::endl;
-        //std::cout << "0x08F: " << (int) _b200_iface->read_reg(0x08F) << std::endl;
+        std::cout << "Y U NO TX QUAD CAL?!" << std::endl;
+        std::cout << "\t0x08E: " << (int) _b200_iface->read_reg(0x08E) << std::endl;
+        std::cout << "\t0x08F: " << (int) _b200_iface->read_reg(0x08F) << std::endl;
     }
 
 
@@ -689,6 +764,9 @@ public:
      * Other Misc Setup Functions
      ***********************************************************************/
 
+    /* Program the mixer gain table.
+     *
+     * Note that this table is fixed for all frequency settings. */
     void program_mixer_gm_subtable() {
         uint8_t gain[] = {0x78, 0x74, 0x70, 0x6C, 0x68, 0x64, 0x60, 0x5C, 0x58,
                           0x54, 0x50, 0x4C, 0x48, 0x30, 0x18, 0x00};
@@ -716,13 +794,15 @@ public:
         _b200_iface->write_reg(0x13f, 0x00);
     }
 
-
+    /* Program the gain table.
+     *
+     * There are three different gain tables for different frequency ranges! */
     void program_gain_table() {
 
+        /* Figure out which gain table we should be using for our current
+         * frequency band. */
         uint8_t (*gain_table)[5] = NULL;
-
         uint8_t new_gain_table;
-
         if(_rx_freq  < 1300e6) {
             gain_table = gain_table_sub_1300mhz;
             new_gain_table = 1;
@@ -743,9 +823,11 @@ public:
             _curr_gain_table = new_gain_table;
         }
 
-        /* Start the gain table clock. */
+        /* Okay, we have to program a new gain table. Sucks, brah. Start the
+         * gain table clock. */
         _b200_iface->write_reg(0x137, 0x1A);
 
+        /* IT'S PROGRAMMING TIME. */
         uint8_t index = 0;
         for(; index < 77; index++) {
             _b200_iface->write_reg(0x130, index);
@@ -755,16 +837,9 @@ public:
             _b200_iface->write_reg(0x137, 0x1E);
             _b200_iface->write_reg(0x134, 0x00);
             _b200_iface->write_reg(0x134, 0x00);
-
-            /* FIXME debug
-            std::cout.unsetf(std::ios::hex);
-            std::cout << "Index: " << (int) index << std::endl;
-            std::cout << "Word 1: " << std::hex << (int) gain_table[index][1] << std::endl;
-            std::cout << "Word 2: " << std::hex << (int) gain_table[index][2] << std::endl;
-            std::cout << "Word 3: " << std::hex << (int) gain_table[index][3] << std::endl;
-            */
         }
 
+        /* Everything above the 77th index is zero. */
         for(; index < 91; index++) {
             _b200_iface->write_reg(0x130, index);
             _b200_iface->write_reg(0x131, 0x00);
@@ -780,49 +855,38 @@ public:
         _b200_iface->write_reg(0x134, 0x00);
         _b200_iface->write_reg(0x134, 0x00);
         _b200_iface->write_reg(0x137, 0x00);
-
-        /* FIXME debug
-        index = 0;
-        uint8_t word1, word2, word3;
-        for(; index < 77; index++) {
-            _b200_iface->write_reg(0x130, index);
-            word1 = _b200_iface->read_reg(0x134);
-            word2 = _b200_iface->read_reg(0x135);
-            word3 = _b200_iface->read_reg(0x136);
-            _b200_iface->write_reg(0x134, 0x00);
-            _b200_iface->write_reg(0x134, 0x00);
-
-            std::cout.unsetf(std::ios::hex);
-            std::cout << "Index: " << (int) index << std::endl;
-            std::cout << "Word 1: " << std::hex << (int) word1 << std::endl;
-            std::cout << "Word 2: " << std::hex << (int) word2 << std::endl;
-            std::cout << "Word 3: " << std::hex << (int) word3 << std::endl;
-        }
-        */
     }
 
+    /* Setup gain control registers.
+     *
+     * This really only needs to be done once, at initialization. */
     void setup_gain_control() {
-        _b200_iface->write_reg(0x0FA,0xE0);// Gain Control Mode Select
-        _b200_iface->write_reg(0x0FB,0x08);// Table, Digital Gain, Man Gain Ctrl
-        _b200_iface->write_reg(0x0FC,0x23);// Incr Step Size, ADC Overrange Size
-        _b200_iface->write_reg(0x0FD,0x4C);// Max Full/LMT Gain Table Index
-        _b200_iface->write_reg(0x0FE,0x44);// Decr Step Size, Peak Overload Time
-        _b200_iface->write_reg(0x100,0x6F);// Max Digital Gain
-        _b200_iface->write_reg(0x104,0x2F);// ADC Small Overload Threshold
-        _b200_iface->write_reg(0x105,0x3A);// ADC Large Overload Threshold
-        _b200_iface->write_reg(0x107,0x31);// Large LMT Overload Threshold
-        _b200_iface->write_reg(0x108,0x39);// Small LMT Overload Threshold
-        _b200_iface->write_reg(0x109,0x23);// Rx1 Full/LMT Gain Index
-        _b200_iface->write_reg(0x10A,0x58);// Rx1 LPF Gain Index
-        _b200_iface->write_reg(0x10B,0x00);// Rx1 Digital Gain Index
-        _b200_iface->write_reg(0x10C,0x23);// Rx2 Full/LMT Gain Index
-        _b200_iface->write_reg(0x10D,0x18);// Rx2 LPF Gain Index
-        _b200_iface->write_reg(0x10E,0x00);// Rx2 Digital Gain Index
-        _b200_iface->write_reg(0x114,0x30);// Low Power Threshold
-        _b200_iface->write_reg(0x11A,0x27);// Initial LMT Gain Limit
-        _b200_iface->write_reg(0x081,0x00);// Tx Symbol Gain Control
+        _b200_iface->write_reg(0x0FA, 0xE0); // Gain Control Mode Select
+        _b200_iface->write_reg(0x0FB, 0x08); // Table, Digital Gain, Man Gain Ctrl
+        _b200_iface->write_reg(0x0FC, 0x23); // Incr Step Size, ADC Overrange Size
+        _b200_iface->write_reg(0x0FD, 0x4C); // Max Full/LMT Gain Table Index
+        _b200_iface->write_reg(0x0FE, 0x44); // Decr Step Size, Peak Overload Time
+        _b200_iface->write_reg(0x100, 0x6F); // Max Digital Gain
+        _b200_iface->write_reg(0x104, 0x2F); // ADC Small Overload Threshold
+        _b200_iface->write_reg(0x105, 0x3A); // ADC Large Overload Threshold
+        _b200_iface->write_reg(0x107, 0x31); // Large LMT Overload Threshold
+        _b200_iface->write_reg(0x108, 0x39); // Small LMT Overload Threshold
+        _b200_iface->write_reg(0x109, 0x23); // Rx1 Full/LMT Gain Index
+        _b200_iface->write_reg(0x10A, 0x58); // Rx1 LPF Gain Index
+        _b200_iface->write_reg(0x10B, 0x00); // Rx1 Digital Gain Index
+        _b200_iface->write_reg(0x10C, 0x23); // Rx2 Full/LMT Gain Index
+        _b200_iface->write_reg(0x10D, 0x18); // Rx2 LPF Gain Index
+        _b200_iface->write_reg(0x10E, 0x00); // Rx2 Digital Gain Index
+        _b200_iface->write_reg(0x114, 0x30); // Low Power Threshold
+        _b200_iface->write_reg(0x11A, 0x27); // Initial LMT Gain Limit
+        _b200_iface->write_reg(0x081, 0x00); // Tx Symbol Gain Control
     }
 
+    /* Setup the RX or TX synthesizers.
+     *
+     * This setup depends on a fixed look-up table, which is stored in an
+     * included header file. The table is indexed based on the passed VCO rate.
+     */
     void setup_synth(std::string which, double vcorate) {
         /* The vcorates in the vco_index array represent lower boundaries for
          * rates. Once we find a match, we use that index to look-up the rest of
@@ -837,6 +901,7 @@ public:
 
         UHD_ASSERT_THROW(vcoindex < 53);
 
+        /* Parse the values out of the LUT based on our calculated index... */
         uint8_t vco_output_level = synth_cal_lut[vcoindex][0];
         uint8_t vco_varactor = synth_cal_lut[vcoindex][1];
         uint8_t vco_bias_ref = synth_cal_lut[vcoindex][2];
@@ -850,6 +915,7 @@ public:
         uint8_t loop_filter_c3 = synth_cal_lut[vcoindex][10];
         uint8_t loop_filter_r3 = synth_cal_lut[vcoindex][11];
 
+        /* ... annnd program! */
         if(which == "RX") {
             _b200_iface->write_reg(0x23a, 0x40 | vco_output_level);
             _b200_iface->write_reg(0x239, 0xC0 | vco_varactor);
@@ -881,9 +947,10 @@ public:
 
 
     /***********************************************************************
-     * Implementation
+     * Core Implementation Functions
      ***********************************************************************/
 
+    /* Catalina initialization routine. */
     b200_codec_ctrl_impl(b200_iface::sptr iface, wb_iface::sptr ctrl) {
         /* Initialize shadow registers. */
         fpga_bandsel = 0x00;
@@ -896,7 +963,7 @@ public:
         reg_bbftune_config = 0x1e;
         reg_bbftune_mode = 0x1e;
 
-        /* Initialize internal fields. */
+        /* Initialize class fields. */
         _rx_freq = 0.0;
         _tx_freq = 0.0;
         _req_rx_freq = 0.0;
@@ -918,18 +985,17 @@ public:
         _b200_iface->write_reg(0x000,0x00);
         boost::this_thread::sleep(boost::posix_time::milliseconds(20));
 
-        //there is not a WAT big enough for this
+        /* There is not a WAT big enough for this. */
         _b200_iface->write_reg(0x3df, 0x01);
 
-        //bandgap setup
-        _b200_iface->write_reg(0x2a6, 0x0e);
-        _b200_iface->write_reg(0x2a8, 0x0e);
+        _b200_iface->write_reg(0x2a6, 0x0e); // Enable master bias
+        _b200_iface->write_reg(0x2a8, 0x0e); // Set bandgap trim
 
-        //rfpll refclk to REFCLKx2
+        /* Set RFPLL ref clock scale to REFCLK * 2 */
         _b200_iface->write_reg(0x2ab, 0x07);
         _b200_iface->write_reg(0x2ac, 0xff);
 
-        //enable clocks
+        /* Enable clocks. */
         _b200_iface->write_reg(0x009, BOOST_BINARY( 00010111 ) );
         boost::this_thread::sleep(boost::posix_time::milliseconds(20));
 
@@ -984,18 +1050,18 @@ public:
         _b200_iface->write_reg(0x02E, 0x00); // GPO_2 TX Delay
         _b200_iface->write_reg(0x02F, 0x00); // GPO_3 TX Delay
 
-        _b200_iface->write_reg(0x261, 0x00); //RX LO power
-        _b200_iface->write_reg(0x2a1, 0x00); //TX LO power
-        _b200_iface->write_reg(0x248, 0x0b); //en RX VCO LDO
-        _b200_iface->write_reg(0x288, 0x0b); //en TX VCO LDO
-        _b200_iface->write_reg(0x246, 0x02); //pd RX cal Tcf
-        _b200_iface->write_reg(0x286, 0x02); //pd TX cal Tcf
-        _b200_iface->write_reg(0x249, 0x8e); //rx vco cal length
-        _b200_iface->write_reg(0x289, 0x8e); //rx vco cal length
-        _b200_iface->write_reg(0x23b, 0x80); //set RX MSB?, FIXME 0x89 magic cp
-        _b200_iface->write_reg(0x27b, 0x80); //"" TX //FIXME 0x88 see above
-        _b200_iface->write_reg(0x243, 0x0d); //set rx prescaler bias
-        _b200_iface->write_reg(0x283, 0x0d); //"" TX
+        _b200_iface->write_reg(0x261, 0x00); // RX LO power
+        _b200_iface->write_reg(0x2a1, 0x00); // TX LO power
+        _b200_iface->write_reg(0x248, 0x0b); // en RX VCO LDO
+        _b200_iface->write_reg(0x288, 0x0b); // en TX VCO LDO
+        _b200_iface->write_reg(0x246, 0x02); // pd RX cal Tcf
+        _b200_iface->write_reg(0x286, 0x02); // pd TX cal Tcf
+        _b200_iface->write_reg(0x249, 0x8e); // rx vco cal length
+        _b200_iface->write_reg(0x289, 0x8e); // rx vco cal length
+        _b200_iface->write_reg(0x23b, 0x80); // set RX MSB?, FIXME 0x89 magic cp
+        _b200_iface->write_reg(0x27b, 0x80); // "" TX //FIXME 0x88 see above
+        _b200_iface->write_reg(0x243, 0x0d); // set rx prescaler bias
+        _b200_iface->write_reg(0x283, 0x0d); // "" TX
 
         _b200_iface->write_reg(0x23d, 0x00); // Clear half VCO cal clock setting
         _b200_iface->write_reg(0x27d, 0x00); // Clear half VCO cal clock setting
@@ -1004,14 +1070,13 @@ public:
          * below functions are modified at all, device initialization and
          * calibration might be broken in the process! */
 
-        _b200_iface->write_reg(0x015, 0x04); //dual synth mode, synth en ctrl en
-        _b200_iface->write_reg(0x014, 0x05); //use SPI for TXNRX ctrl, to ALERT, TX on
-        _b200_iface->write_reg(0x013, 0x01); //enable ENSM
+        _b200_iface->write_reg(0x015, 0x04); // dual synth mode, synth en ctrl en
+        _b200_iface->write_reg(0x014, 0x05); // use SPI for TXNRX ctrl, to ALERT, TX on
+        _b200_iface->write_reg(0x013, 0x01); // enable ENSM
         boost::this_thread::sleep(boost::posix_time::milliseconds(1));
 
         calibrate_synth_charge_pumps();
 
-        UHD_HERE();
         tune_helper("RX", 800e6, false);
         tune_helper("TX", 850e6, false);
 
@@ -1061,6 +1126,7 @@ public:
 
     double set_gain(const std::string &which, const std::string &name, \
             const double value) {
+
         if(which[0] == 'R') {
             /* Indexing the gain tables requires an offset from the requested
              * amount of total gain in dB:
@@ -1176,7 +1242,6 @@ public:
 
         calibrate_synth_charge_pumps();
 
-        UHD_HERE();
         tune_helper("RX", _rx_freq, false);
         tune_helper("TX", _tx_freq, false);
 
@@ -1301,9 +1366,6 @@ public:
             reg_bbpll = reg_bbpll & 0xF7;
         }
 
-        std::cout << std::hex << "reg_txfilt: " << (int) reg_txfilt << std::endl;
-        std::cout << std::hex << "reg_rxfilt: " << (int) reg_rxfilt << std::endl;
-
         /* Set the dividers / interpolators in Catalina. */
         _b200_iface->write_reg(0x002, reg_txfilt);
         _b200_iface->write_reg(0x003, reg_rxfilt);
@@ -1410,7 +1472,6 @@ public:
             UHD_THROW_INVALID_CODE_PATH();
         }
 
-        UHD_HERE();
         return tune_helper(which, value, true);
     }
 
@@ -1545,7 +1606,6 @@ public:
                 _b200_iface->write_reg(0x014, 0x01);
             }
 
-            UHD_HERE();
             calibrate_tx_quadrature();
             calibrate_rx_quadrature();
 
@@ -1556,10 +1616,6 @@ public:
         }
 
         return return_freq;
-    }
-
-    double set_filter_bw(const std::string &which) {
-        return 0.0;
     }
 
 

@@ -60,12 +60,6 @@ public:
     //! tune the given frontend, return the exact value
     virtual double tune(const std::string &which, const double value) = 0;
 
-    //! set codec sample rate via BBPLL, return rate
-    virtual double set_sample_rate(const double rate) = 0;
-
-    //! set codec filter bandwidth, return the exact value
-    virtual double set_filter_bw(const std::string &which) = 0;
-
     //! output a ~480 kHz test tone at 800 MHz
     virtual void output_test_tone(void) = 0;
 
