@@ -103,6 +103,24 @@ public:
      * Filter functions
      **********************************************************************/
 
+    /* This function takes in the calculated maximum number of FIR taps, and
+     * returns a number of taps that makes Catalina happy. */
+    int get_num_taps(int max_num_taps) {
+
+        int num_taps = 0;
+        int num_taps_list[] = {16, 32, 48, 64, 80, 96, 112, 128};
+        for(int i = 1; i < 8; i++) {
+            if(max_num_taps >= num_taps_list[i]) {
+                continue;
+            } else {
+                num_taps = num_taps_list[i - 1];
+                break;
+            }
+        } if(num_taps == 0) { num_taps = 128; }
+
+        return num_taps;
+    }
+
     /* Program either the RX or TX FIR filter.
      *
      * The process is the same for both filters, but the function must be told
@@ -1077,8 +1095,8 @@ public:
 
         calibrate_synth_charge_pumps();
 
-        tune_helper("RX", 800e6, false);
-        tune_helper("TX", 850e6, false);
+        tune_helper("RX", 800e6);
+        tune_helper("TX", 850e6);
 
         program_mixer_gm_subtable();
         program_gain_table();
@@ -1124,167 +1142,15 @@ public:
         _b200_iface->write_reg(0x014, 0x21);
     }
 
-    double set_gain(const std::string &which, const std::string &name, \
-            const double value) {
-
-        if(which[0] == 'R') {
-            /* Indexing the gain tables requires an offset from the requested
-             * amount of total gain in dB:
-             *      < 1300MHz: dB + 5
-             *      >= 1300MHz and < 4000MHz: dB + 3
-             *      >= 4000MHz and <= 6000MHz: dB + 14
-             */
-            int gain_offset = 0;
-            if(_rx_freq < 1300e6) {
-                gain_offset = 5;
-            } else if(_rx_freq < 4000e6) {
-                gain_offset = 3;
-            } else {
-                gain_offset = 14;
-            }
-
-            int gain_index = value + gain_offset;
-
-            UHD_VAR(gain_index);
-
-            /* Clip the gain values to the proper min/max gain values. */
-            if(gain_index > 76) gain_index = 76;
-            if(gain_index < 0) gain_index = 0;
-
-            if(which[3] == 'A') {
-                _b200_iface->write_reg(0x109, gain_index);
-            } else {
-                _b200_iface->write_reg(0x10c, gain_index);
-            }
-
-            return gain_index - gain_offset;
-        } else { //TX gain
-            /* Setting the below bits causes a change in the TX attenuation word
-             * to immediately take effect. */
-            _b200_iface->write_reg(0x077, 0x40);
-            _b200_iface->write_reg(0x07c, 0x40);
-
-            /* Each gain step is -0.25dB. Calculate the attenuation necessary
-             * for the requested gain, convert it into gain steps, then write
-             * the attenuation word. Max gain (so zero attenuation) is 89.75. */
-            double atten = get_gain_range("TX_A", "").stop() - value;
-            int attenreg = atten * 4;
-            if(which[3] == 'A') {
-                _b200_iface->write_reg(0x073, attenreg & 0xFF);
-                _b200_iface->write_reg(0x074, (attenreg >> 8) & 0x01);
-            } else {
-                _b200_iface->write_reg(0x075, attenreg & 0xFF);
-                _b200_iface->write_reg(0x076, (attenreg >> 8) & 0x01);
-            }
-            return get_gain_range("TX_A", "").stop() - (double(attenreg)/ 4);
-        }
-    }
-
-    int get_num_taps(int max_num_taps) {
-
-        int num_taps = 0;
-        int num_taps_list[] = {16, 32, 48, 64, 80, 96, 112, 128};
-        for(int i = 1; i < 8; i++) {
-            if(max_num_taps >= num_taps_list[i]) {
-                continue;
-            } else {
-                num_taps = num_taps_list[i - 1];
-                break;
-            }
-        } if(num_taps == 0) { num_taps = 128; }
-
-        return num_taps;
-    }
-
-
-    double set_clock_rate(const double req_rate) {
-
-        UHD_VAR(req_rate);
-
-        if(req_rate > 61.44e6) {
-            throw uhd::runtime_error("Requested master clock rate outside range!");
-        }
-
-        if(freq_is_nearly_equal(req_rate, _req_clock_rate)) {
-            return _baseband_bw;
-        }
-
-        UHD_VAR(_req_clock_rate);
-
-        /* We must be in the SLEEP / WAIT state to do this. If we aren't already
-         * there, transition the ENSM to State 0. */
-        uint8_t current_state = _b200_iface->read_reg(0x017) & 0x0F;
-        switch(current_state) {
-            case 0x05:
-                /* We are in the ALERT state. */
-                _b200_iface->write_reg(0x014, 0x21);
-                boost::this_thread::sleep(boost::posix_time::milliseconds(5));
-                _b200_iface->write_reg(0x014, 0x00);
-                break;
-
-            case 0x0A:
-                /* We are in the FDD state. */
-                _b200_iface->write_reg(0x014, 0x00);
-                break;
-
-            default:
-                throw uhd::runtime_error("AD9361 is in unknown state!");
-                break;
-        };
-
-        double rate = setup_rates(req_rate);
-
-        /* Transition to the ALERT state and calibrate everything. */
-        _b200_iface->write_reg(0x015, 0x04); //dual synth mode, synth en ctrl en
-        _b200_iface->write_reg(0x014, 0x05); //use SPI for TXNRX ctrl, to ALERT, TX on
-        _b200_iface->write_reg(0x013, 0x01); //enable ENSM
-        boost::this_thread::sleep(boost::posix_time::milliseconds(1));
-
-        calibrate_synth_charge_pumps();
-
-        tune_helper("RX", _rx_freq, false);
-        tune_helper("TX", _tx_freq, false);
-
-        program_mixer_gm_subtable();
-        program_gain_table();
-        setup_gain_control();
-
-        calibrate_baseband_rx_analog_filter();
-        calibrate_baseband_tx_analog_filter();
-        calibrate_rx_TIAs();
-        calibrate_secondary_tx_filter();
-
-        setup_adc();
-
-        calibrate_tx_quadrature();
-        calibrate_rx_quadrature();
-
-        _b200_iface->write_reg(0x012, 0x02); // cals done, set PPORT config
-        _b200_iface->write_reg(0x013, 0x01); // Set ENSM FDD bit
-        _b200_iface->write_reg(0x015, 0x04); // dual synth mode, synth en ctrl en
-
-        /* End the function in the same state as the entry state. */
-        switch(current_state) {
-            case 0x05:
-                /* We are already in ALERT. */
-                break;
-
-            case 0x0A:
-                /* Transition back to FDD. */
-                _b200_iface->write_reg(0x002, reg_txfilt);
-                _b200_iface->write_reg(0x003, reg_rxfilt);
-                _b200_iface->write_reg(0x014, 0x21);
-                break;
-
-            default:
-                throw uhd::runtime_error("AD9361 is in unknown state!");
-                break;
-        };
-
-        return rate;
-    }
-
+    /* Configure the various clock / sample rates in the RX and TX chains.
+     *
+     * Functionally, this function configures Catalina's RX and TX rates. For
+     * a requested TX & RX rate, it sets the interpolation & decimation filters,
+     * and tunes the VCO that feeds the ADCs and DACs. */
     double setup_rates(const double rate) {
+
+        /* If we make it into this function, then we are tuning to a new rate.
+         * Store the new rate. */
         _req_clock_rate = rate;
 
         UHD_VAR(rate);
@@ -1293,9 +1159,8 @@ public:
         _b200_iface->write_reg(0x002, (reg_txfilt & 0x3F));
         _b200_iface->write_reg(0x003, (reg_rxfilt & 0x3F));
 
-        /* Set the decimation values based on clock rate. We are setting default
-         * values for the interpolation filters, as well, although they may
-         * change after the ADC clock has been set. */
+        /* Set the decimation and interpolation values in the RX and TX chains.
+         * This also switches filters in / out. */
         int divfactor = 0;
         int tfir = 0;
         if(rate <= 20e6) {
@@ -1348,7 +1213,7 @@ public:
         }
 
         /* Tune the BBPLL to get the ADC and DAC clocks. */
-        double adcclk = set_coreclk(rate * divfactor);
+        double adcclk = tune_bbvco(rate * divfactor);
         double dacclk = adcclk;
 
         /* The DAC clock must be <= 336e6, and is either the ADC clock or 2x the
@@ -1389,65 +1254,64 @@ public:
         return _baseband_bw;
     }
 
-    double set_coreclk(const double rate) {
+    /* Tune the baseband VCO.
+     *
+     * This clock signal is what gets fed to the ADCs and DACs. This function is
+     * not accessible outside of this class, and is invoked based on the rate
+     * fed to the public set_clock_rate function. */
+    double tune_bbvco(const double rate) {
+
+        /* Let's not re-tune to the same frequency over and over... */
         if(freq_is_nearly_equal(rate, _req_coreclk)) {
             return _adcclock_freq;
         }
 
         _req_coreclk = rate;
 
-        //this sets the ADC clock rate -- NOT the sample rate!
-        //sample rate also depends on the HB and FIR filter decimation/interpolations
-        //modulus is 2088960
-        //fo = fref * (Nint + Nfrac/mod)
         const double fref = 40e6;
         const int modulus = 2088960;
-
         const double vcomax = 1430e6;
         const double vcomin = 715e6;
         double vcorate;
         int vcodiv;
 
-        //iterate over VCO dividers until appropriate divider is found
-        int i=1;
-        for(; i<=6; i++) {
-            vcodiv = 1<<i;
+        /* Iterate over VCO dividers until appropriate divider is found. */
+        int i = 1;
+        for(; i <= 6; i++) {
+            vcodiv = 1 << i;
             vcorate = rate * vcodiv;
             if(vcorate >= vcomin && vcorate <= vcomax) break;
         }
         if(i == 7) throw uhd::runtime_error("BBVCO can't find valid VCO rate!");
-        //TODO this will pick the low rate for threshold values, should eval
-        //whether vcomax or vcomin has better performance
 
+        /* Fo = Fref * (Nint + Nfrac / mod) */
         int nint = vcorate / fref;
         int nfrac = ((vcorate / fref) - nint) * modulus;
-        //std::cout << "BB Nint: " << nint << " Nfrac: " << nfrac << " vcodiv: " << vcodiv << std::endl;
 
-        double actual_vcorate = fref * (nint + double(nfrac)/modulus);
+        double actual_vcorate = fref * (nint + double(nfrac) / modulus);
 
-        //scale CP current according to VCO rate
+        /* Scale CP current according to VCO rate */
         const double icp_baseline = 150e-6;
         const double freq_baseline = 1280e6;
         double icp = icp_baseline * (actual_vcorate / freq_baseline);
-        int icp_reg = (icp/25e-6) - 1;
+        int icp_reg = (icp / 25e-6) - 1;
 
-        _b200_iface->write_reg(0x045, 0x00);            //REFCLK / 1 to BBPLL
-        _b200_iface->write_reg(0x046, icp_reg & 0x3F);  //CP current
-        _b200_iface->write_reg(0x048, 0xe8);            //BBPLL loop filters
-        _b200_iface->write_reg(0x049, 0x5b);            //BBPLL loop filters
-        _b200_iface->write_reg(0x04a, 0x35);            //BBPLL loop filters
+        _b200_iface->write_reg(0x045, 0x00);            // REFCLK / 1 to BBPLL
+        _b200_iface->write_reg(0x046, icp_reg & 0x3F);  // CP current
+        _b200_iface->write_reg(0x048, 0xe8);            // BBPLL loop filters
+        _b200_iface->write_reg(0x049, 0x5b);            // BBPLL loop filters
+        _b200_iface->write_reg(0x04a, 0x35);            // BBPLL loop filters
 
         _b200_iface->write_reg(0x04b, 0xe0);
-        _b200_iface->write_reg(0x04e, 0x10);            //max accuracy
+        _b200_iface->write_reg(0x04e, 0x10);            // Max accuracy
 
-        _b200_iface->write_reg(0x043, nfrac & 0xFF);        //Nfrac[7:0]
-        _b200_iface->write_reg(0x042, (nfrac >> 8) & 0xFF); //Nfrac[15:8]
-        _b200_iface->write_reg(0x041, (nfrac >> 16) & 0xFF);//Nfrac[23:16]
-        _b200_iface->write_reg(0x044, nint);                //Nint
+        _b200_iface->write_reg(0x043, nfrac & 0xFF);         // Nfrac[7:0]
+        _b200_iface->write_reg(0x042, (nfrac >> 8) & 0xFF);  // Nfrac[15:8]
+        _b200_iface->write_reg(0x041, (nfrac >> 16) & 0xFF); // Nfrac[23:16]
+        _b200_iface->write_reg(0x044, nint);                 // Nint
 
         calibrate_lock_bbpll();
 
-        //use XTALN input, CLKOUT=XTALN (40MHz ref out to FPGA)
         reg_bbpll = (reg_bbpll & 0xF8) | i;
 
         _bbpll_freq = actual_vcorate;
@@ -1456,43 +1320,25 @@ public:
         return _adcclock_freq;
     }
 
-    double tune(const std::string &which, const double value) {
+    /* This is the internal tune function, not available outside of this class.
+     *
+     * Calculate the VCO settings for the requested frquency, and then either
+     * tune the RX or TX VCO. This function also sets the 'BANDSEL' setting,
+     * which switches in different baluns based on the frequency band in use. */
+    double tune_helper(const std::string &which, const double value) {
 
-        if(which[0] == 'R') {
-            if(freq_is_nearly_equal(value, _req_rx_freq)) {
-                return _rx_freq;
-            }
-
-        } else if(which[0] == 'T') {
-            if(freq_is_nearly_equal(value, _req_tx_freq)) {
-                return _tx_freq;
-            }
-
-        } else {
-            UHD_THROW_INVALID_CODE_PATH();
-        }
-
-        return tune_helper(which, value, true);
-    }
-
-    double tune_helper(const std::string &which, const double value, bool do_cal) {
-        //setup charge pump
-        //setup VCO/RFPLL based on rx/tx freq
-        //VCO cal
-
-        //RFPLL runs from 6GHz-12GHz
-        const double fref = 80e6; //fixed for now
+        /* The RFPLL runs from 6 GHz - 12 GHz */
+        const double fref = 80e6;
         const int modulus = 8388593;
-
         const double vcomax = 12e9;
         const double vcomin = 6e9;
         double vcorate;
         int vcodiv;
 
-        //iterate over VCO dividers until appropriate divider is found
+        /* Iterate over VCO dividers until appropriate divider is found. */
         int i;
-        for(i=0; i<=6; i++) {
-            vcodiv = 2<<i;
+        for(i = 0; i <= 6; i++) {
+            vcodiv = 2 << i;
             vcorate = value * vcodiv;
             if(vcorate >= vcomin && vcorate <= vcomax) break;
         }
@@ -1504,11 +1350,11 @@ public:
         double actual_vcorate = fref * (nint + double(nfrac)/modulus);
         double actual_lo = actual_vcorate / vcodiv;
 
-        double return_freq = 0.0;
         if(which[0] == 'R') {
 
             _req_rx_freq = value;
 
+            /* Set band-specific settings. */
             if(value < 2.2e9) {
                 fpga_bandsel = (fpga_bandsel & 0xF8) | RX_BANDSEL_B;
                 reg_inputsel = (reg_inputsel & 0xC0) | 0x30;
@@ -1524,7 +1370,7 @@ public:
             } else {
                 UHD_THROW_INVALID_CODE_PATH();
             }
-            _ctrl->poke32(TOREG(SR_MISC+1), fpga_bandsel);
+            _ctrl->poke32(TOREG(SR_MISC + 1), fpga_bandsel);
             _b200_iface->write_reg(0x004, reg_inputsel);
 
             /* Store vcodiv setting. */
@@ -1533,7 +1379,7 @@ public:
             /* Setup the synthesizer. */
             setup_synth("RX", actual_vcorate);
 
-            //tune that shit
+            /* Tune!!!! */
             _b200_iface->write_reg(0x233, nfrac & 0xFF);
             _b200_iface->write_reg(0x234, (nfrac >> 8) & 0xFF);
             _b200_iface->write_reg(0x235, (nfrac >> 16) & 0xFF);
@@ -1541,6 +1387,7 @@ public:
             _b200_iface->write_reg(0x231, nint & 0xFF);
             _b200_iface->write_reg(0x005, reg_vcodivs);
 
+            /* Lock the PLL! */
             boost::this_thread::sleep(boost::posix_time::milliseconds(2));
             if((_b200_iface->read_reg(0x247) & 0x02) == 0) {
                 std::cout << "RX PLL NOT LOCKED" << std::endl;
@@ -1548,16 +1395,13 @@ public:
 
             _rx_freq = actual_lo;
 
-            if(do_cal) {
-                program_gain_table();
-            }
-
-            return_freq = actual_lo;
+            return actual_lo;
 
         } else {
 
             _req_tx_freq = value;
 
+            /* Set band-specific settings. */
             if(value < 3e9) {
                 fpga_bandsel = (fpga_bandsel & 0xE7) | TX_BANDSEL_A;
                 reg_inputsel = reg_inputsel | 0x40;
@@ -1578,7 +1422,7 @@ public:
             /* Setup the synthesizer. */
             setup_synth("TX", actual_vcorate);
 
-            //tuning yo
+            /* Tune it, homey. */
             _b200_iface->write_reg(0x273, nfrac & 0xFF);
             _b200_iface->write_reg(0x274, (nfrac >> 8) & 0xFF);
             _b200_iface->write_reg(0x275, (nfrac >> 16) & 0xFF);
@@ -1586,6 +1430,7 @@ public:
             _b200_iface->write_reg(0x271, nint & 0xFF);
             _b200_iface->write_reg(0x005, reg_vcodivs);
 
+            /* Lock the PLL! */
             boost::this_thread::sleep(boost::posix_time::milliseconds(2));
             if((_b200_iface->read_reg(0x287) & 0x02) == 0) {
                 std::cout << "TX PLL NOT LOCKED" << std::endl;
@@ -1593,31 +1438,221 @@ public:
 
             _tx_freq = actual_lo;
 
-            return_freq = actual_lo;
+            return actual_lo;
         }
-
-        if(do_cal) {
-            /* If we aren't already in the ALERT state, we will need to return to
-             * the FDD state after calibration. */
-            bool not_in_alert = false;
-            if((_b200_iface->read_reg(0x017) & 0x0F) != 5) {
-                /* Force the device into the ALERT state. */
-                not_in_alert = true;
-                _b200_iface->write_reg(0x014, 0x01);
-            }
-
-            calibrate_tx_quadrature();
-            calibrate_rx_quadrature();
-
-            /* If we were in the FDD state, return it now. */
-            if(not_in_alert) {
-                _b200_iface->write_reg(0x014, 0x21);
-            }
-        }
-
-        return return_freq;
     }
 
+    /***********************************************************************
+     * Publicly exported functions to client code
+     **********************************************************************/
+
+    /* This function sets the RX / TX rate between Catalina and the FPGA, and
+     * thus determines the interpolation / decimation required in the FPGA to
+     * achieve the user's requested rate.
+     *
+     * This is the only clock setting function that is exposed to the outside. */
+    double set_clock_rate(const double req_rate) {
+
+        if(req_rate > 61.44e6) {
+            throw uhd::runtime_error("Requested master clock rate outside range!");
+        }
+
+        /* UHD has a habit of requesting the same rate like four times when it
+         * starts up. This prevents that, and any bugs in user code that request
+         * the same rate over and over. */
+        if(freq_is_nearly_equal(req_rate, _req_clock_rate)) {
+            return _baseband_bw;
+        }
+
+        UHD_VAR(_req_clock_rate);
+
+        /* We must be in the SLEEP / WAIT state to do this. If we aren't already
+         * there, transition the ENSM to State 0. */
+        uint8_t current_state = _b200_iface->read_reg(0x017) & 0x0F;
+        switch(current_state) {
+            case 0x05:
+                /* We are in the ALERT state. */
+                _b200_iface->write_reg(0x014, 0x21);
+                boost::this_thread::sleep(boost::posix_time::milliseconds(5));
+                _b200_iface->write_reg(0x014, 0x00);
+                break;
+
+            case 0x0A:
+                /* We are in the FDD state. */
+                _b200_iface->write_reg(0x014, 0x00);
+                break;
+
+            default:
+                throw uhd::runtime_error("AD9361 is in unknown state!");
+                break;
+        };
+
+        /* Call into the clock configuration / settings function. This is where
+         * all the hard work gets done. */
+        double rate = setup_rates(req_rate);
+
+        /* Transition to the ALERT state and calibrate everything. */
+        _b200_iface->write_reg(0x015, 0x04); //dual synth mode, synth en ctrl en
+        _b200_iface->write_reg(0x014, 0x05); //use SPI for TXNRX ctrl, to ALERT, TX on
+        _b200_iface->write_reg(0x013, 0x01); //enable ENSM
+        boost::this_thread::sleep(boost::posix_time::milliseconds(1));
+
+        calibrate_synth_charge_pumps();
+
+        tune_helper("RX", _rx_freq);
+        tune_helper("TX", _tx_freq);
+
+        program_mixer_gm_subtable();
+        program_gain_table();
+        setup_gain_control();
+
+        calibrate_baseband_rx_analog_filter();
+        calibrate_baseband_tx_analog_filter();
+        calibrate_rx_TIAs();
+        calibrate_secondary_tx_filter();
+
+        setup_adc();
+
+        calibrate_tx_quadrature();
+        calibrate_rx_quadrature();
+
+        _b200_iface->write_reg(0x012, 0x02); // cals done, set PPORT config
+        _b200_iface->write_reg(0x013, 0x01); // Set ENSM FDD bit
+        _b200_iface->write_reg(0x015, 0x04); // dual synth mode, synth en ctrl en
+
+        /* End the function in the same state as the entry state. */
+        switch(current_state) {
+            case 0x05:
+                /* We are already in ALERT. */
+                break;
+
+            case 0x0A:
+                /* Transition back to FDD. */
+                _b200_iface->write_reg(0x002, reg_txfilt);
+                _b200_iface->write_reg(0x003, reg_rxfilt);
+                _b200_iface->write_reg(0x014, 0x21);
+                break;
+
+            default:
+                throw uhd::runtime_error("AD9361 is in unknown state!");
+                break;
+        };
+
+        return rate;
+    }
+
+    /* Tune the RX or TX frequency.
+     *
+     * This is the publicly-accessible tune function. It makes sure the tune
+     * isn't a redundant request, and if not, passes it on to the class's
+     * internal tune function.
+     *
+     * After tuning, it runs any appropriate calibrations. */
+    double tune(const std::string &which, const double value) {
+
+        if(which[0] == 'R') {
+            if(freq_is_nearly_equal(value, _req_rx_freq)) {
+                return _rx_freq;
+            }
+
+        } else if(which[0] == 'T') {
+            if(freq_is_nearly_equal(value, _req_tx_freq)) {
+                return _tx_freq;
+            }
+
+        } else {
+            UHD_THROW_INVALID_CODE_PATH();
+        }
+
+        /* If we aren't already in the ALERT state, we will need to return to
+         * the FDD state after tuning. */
+        bool not_in_alert = false;
+        if((_b200_iface->read_reg(0x017) & 0x0F) != 5) {
+            /* Force the device into the ALERT state. */
+            not_in_alert = true;
+            _b200_iface->write_reg(0x014, 0x01);
+        }
+
+        /* Tune the RF VCO! */
+        double tune_freq = tune_helper(which, value);
+
+        /* Run any necessary calibrations / setups */
+        if(which[0] == 'R') {
+            program_gain_table();
+        }
+
+        calibrate_tx_quadrature();
+        calibrate_rx_quadrature();
+
+        /* If we were in the FDD state, return it now. */
+        if(not_in_alert) {
+            _b200_iface->write_reg(0x014, 0x21);
+        }
+
+        return tune_freq;
+    }
+
+    /* Set the gain of RXA, RXB, TXA, or TXB.
+     *
+     * Note that the 'value' passed to this function is the actual gain value,
+     * _not_ the gain index. This is the opposite of the eval software's GUI!
+     * Also note that the RX chains are done in terms of gain, and the TX chains
+     * are done in terms of attenuation. */
+    double set_gain(const std::string &which, const std::string &name, \
+            const double value) {
+
+        if(which[0] == 'R') {
+            /* Indexing the gain tables requires an offset from the requested
+             * amount of total gain in dB:
+             *      < 1300MHz: dB + 5
+             *      >= 1300MHz and < 4000MHz: dB + 3
+             *      >= 4000MHz and <= 6000MHz: dB + 14
+             */
+            int gain_offset = 0;
+            if(_rx_freq < 1300e6) {
+                gain_offset = 5;
+            } else if(_rx_freq < 4000e6) {
+                gain_offset = 3;
+            } else {
+                gain_offset = 14;
+            }
+
+            int gain_index = value + gain_offset;
+
+            UHD_VAR(gain_index);
+
+            /* Clip the gain values to the proper min/max gain values. */
+            if(gain_index > 76) gain_index = 76;
+            if(gain_index < 0) gain_index = 0;
+
+            if(which[3] == 'A') {
+                _b200_iface->write_reg(0x109, gain_index);
+            } else {
+                _b200_iface->write_reg(0x10c, gain_index);
+            }
+
+            return gain_index - gain_offset;
+        } else {
+            /* Setting the below bits causes a change in the TX attenuation word
+             * to immediately take effect. */
+            _b200_iface->write_reg(0x077, 0x40);
+            _b200_iface->write_reg(0x07c, 0x40);
+
+            /* Each gain step is -0.25dB. Calculate the attenuation necessary
+             * for the requested gain, convert it into gain steps, then write
+             * the attenuation word. Max gain (so zero attenuation) is 89.75. */
+            double atten = get_gain_range("TX_A", "").stop() - value;
+            int attenreg = atten * 4;
+            if(which[3] == 'A') {
+                _b200_iface->write_reg(0x073, attenreg & 0xFF);
+                _b200_iface->write_reg(0x074, (attenreg >> 8) & 0x01);
+            } else {
+                _b200_iface->write_reg(0x075, attenreg & 0xFF);
+                _b200_iface->write_reg(0x076, (attenreg >> 8) & 0x01);
+            }
+            return get_gain_range("TX_A", "").stop() - (double(attenreg)/ 4);
+        }
+    }
 
 private:
     b200_iface::sptr _b200_iface;
