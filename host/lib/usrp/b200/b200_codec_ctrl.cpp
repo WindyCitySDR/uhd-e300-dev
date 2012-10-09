@@ -1160,46 +1160,46 @@ public:
         int tfir = 0;
         if(rate <= 20e6) {
             // RX1 enabled, 2, 2, 2, 2
-            reg_rxfilt = BOOST_BINARY( 11011110 ) ;
+            reg_rxfilt = BOOST_BINARY( 01011110 ) ;
 
             // TX1 enabled, 2, 2, 2, 2
-            reg_txfilt = BOOST_BINARY( 11011110 ) ;
+            reg_txfilt = BOOST_BINARY( 01011110 ) ;
 
             divfactor = 16;
             tfir = 2;
         } else if((rate > 20e6) && (rate < 23e6)) {
            // RX1 enabled, 3, 2, 2, 2
-            reg_rxfilt = BOOST_BINARY( 11101110 ) ;
+            reg_rxfilt = BOOST_BINARY( 01101110 ) ;
 
             // TX1 enabled, 3, 1, 2, 2
-            reg_txfilt = BOOST_BINARY( 11100110 ) ;
+            reg_txfilt = BOOST_BINARY( 01100110 ) ;
 
             divfactor = 24;
             tfir = 2;
         } else if((rate >= 23e6) && (rate < 41e6)) {
             // RX1 enabled, 2, 2, 2, 2
-            reg_rxfilt = BOOST_BINARY( 11011110 ) ;
+            reg_rxfilt = BOOST_BINARY( 01011110 ) ;
 
             // TX1 enabled, 1, 2, 2, 2
-            reg_txfilt = BOOST_BINARY( 11001110 ) ;
+            reg_txfilt = BOOST_BINARY( 01001110 ) ;
 
             divfactor = 16;
             tfir = 2;
         } else if((rate >= 41e6) && (rate <= 56e6)) {
             // RX1 enabled, 3, 1, 2, 2
-            reg_rxfilt = BOOST_BINARY( 11100110 ) ;
+            reg_rxfilt = BOOST_BINARY( 01100110 ) ;
 
             // TX1 enabled, 3, 1, 1, 2
-            reg_txfilt = BOOST_BINARY( 11100010 ) ;
+            reg_txfilt = BOOST_BINARY( 01100010 ) ;
 
             divfactor = 12;
             tfir = 2;
         } else if((rate > 56e6) && (rate <= 61.44e6)) {
             // RX1 enabled, 3, 1, 1, 2
-            reg_rxfilt = BOOST_BINARY( 11100010 ) ;
+            reg_rxfilt = BOOST_BINARY( 01100010 ) ;
 
             // TX1 enabled, 3, 1, 1, 1
-            reg_txfilt = BOOST_BINARY( 11100001 ) ;
+            reg_txfilt = BOOST_BINARY( 01100001 ) ;
 
             divfactor = 6;
             tfir = 1;
@@ -1613,8 +1613,6 @@ public:
             }
 
             int gain_index = value + gain_offset;
-
-            UHD_VAR(gain_index);
 
             /* Clip the gain values to the proper min/max gain values. */
             if(gain_index > 76) gain_index = 76;
