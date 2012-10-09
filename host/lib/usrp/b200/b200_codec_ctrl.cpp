@@ -729,30 +729,12 @@ public:
         _b200_iface->write_reg(0x18b, 0xad);
     }
 
-    /* Run the TX quadrature calibration.
+    /* TX quadtrature calibration routine.
      *
-     * Note that from within this function we are also triggering the baseband
-     * and RF DC calibrations. */
-    void calibrate_tx_quadrature(void) {
-        /* Make sure we are, in fact, in the ALERT state. If not, something is
-         * terribly wrong in the driver execution flow. */
-        if((_b200_iface->read_reg(0x017) & 0x0F) != 5) {
-            throw uhd::runtime_error("TX Quad Cal started, but not in ALERT!");
-        }
-
-        /* Turn off free-running and continuous calibrations. */
-        _b200_iface->write_reg(0x169, 0xc0);
-
-        /* This calibration must be done in a certain order, and for both TX_A
-         * and TX_B, separately. Store the original setting so that we can
-         * restore it later. */
-        uint8_t orig_reg_inputsel = reg_inputsel;
-
-        /***********************************************************************
-         * TX_A Calibration
-         **********************************************************************/
-        reg_inputsel = reg_inputsel & 0xBF;
-        _b200_iface->write_reg(0x004, reg_inputsel);
+     * The TX quadrature needs to be done twice, once for each TX chain, with
+     * only one register change in between. Thus, this function enacts the
+     * calibrations, and it is called from calibrate_tx_quadrature. */
+    void tx_quadrature_cal_routine(void) {
 
         uint8_t maskbits = _b200_iface->read_reg(0x0a3) & 0x3F;
         _b200_iface->write_reg(0x0a0, 0x15); // Set NCO freq VVVV
@@ -784,6 +766,35 @@ public:
             count++;
             boost::this_thread::sleep(boost::posix_time::milliseconds(10));
         }
+    }
+
+    /* Run the TX quadrature calibration.
+     *
+     * Note that from within this function we are also triggering the baseband
+     * and RF DC calibrations. */
+    void calibrate_tx_quadrature(void) {
+        /* Make sure we are, in fact, in the ALERT state. If not, something is
+         * terribly wrong in the driver execution flow. */
+        if((_b200_iface->read_reg(0x017) & 0x0F) != 5) {
+            throw uhd::runtime_error("TX Quad Cal started, but not in ALERT!");
+        }
+
+        /* Turn off free-running and continuous calibrations. Note that this
+         * will get turned back on at the end of the RX calibratioun routine. */
+        _b200_iface->write_reg(0x169, 0xc0);
+
+        /* This calibration must be done in a certain order, and for both TX_A
+         * and TX_B, separately. Store the original setting so that we can
+         * restore it later. */
+        uint8_t orig_reg_inputsel = reg_inputsel;
+
+        /***********************************************************************
+         * TX_A Calibration
+         **********************************************************************/
+        reg_inputsel = reg_inputsel & 0xBF;
+        _b200_iface->write_reg(0x004, reg_inputsel);
+
+        tx_quadrature_cal_routine();
 
         /***********************************************************************
          * TX_B Calibration
@@ -791,38 +802,11 @@ public:
         reg_inputsel = reg_inputsel | 0x40;
         _b200_iface->write_reg(0x004, reg_inputsel);
 
-        maskbits = _b200_iface->read_reg(0x0a3) & 0x3F;
-        _b200_iface->write_reg(0x0a0, 0x15); // Set NCO freq VVVV
-        _b200_iface->write_reg(0x0a3, 0x00 | maskbits);
-        _b200_iface->write_reg(0x0a1, 0x7B); // Set tracking coefficient
-        _b200_iface->write_reg(0x0a9, 0xff); // Cal count
-        _b200_iface->write_reg(0x0a2, 0x7f); // Cal Kexp
-        _b200_iface->write_reg(0x0a5, 0x01); // Cal magnitude threshold VVVV
-        _b200_iface->write_reg(0x0a6, 0x01);
-        _b200_iface->write_reg(0x0aa, 0x25); // Cal gain table index
-        _b200_iface->write_reg(0x0a4, 0xf0); // Cal setting conut
-        _b200_iface->write_reg(0x0ae, 0x00); // Cal LPF gain index (split mode)
+        tx_quadrature_cal_routine();
 
-        /* First, calibrate the baseband DC offset. */
-        calibrate_baseband_dc_offset();
-
-        /* Second, calibrate the RF DC offset. */
-        calibrate_rf_dc_offset();
-
-        /* Now, calibrate the TX quadrature! */
-        count = 0;
-        _b200_iface->write_reg(0x016, 0x10);
-        while(_b200_iface->read_reg(0x016) & 0x10) {
-            if(count > 5) {
-                std::cout << "TX Quadrature Calibration Failure!" << std::endl;
-                break;
-            }
-
-            count++;
-            boost::this_thread::sleep(boost::posix_time::milliseconds(10));
-        }
-
-        /* Return the input select to the original setting. */
+        /***********************************************************************
+         * fin
+         **********************************************************************/
         _b200_iface->write_reg(0x004, orig_reg_inputsel);
     }
 
