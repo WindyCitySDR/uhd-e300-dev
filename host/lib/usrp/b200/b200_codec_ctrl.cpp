@@ -740,6 +740,9 @@ public:
             throw uhd::runtime_error("TX Quad Cal started, but not in ALERT!");
         }
 
+        /* Turn off free-running and continuous calibrations. */
+        _b200_iface->write_reg(0x169, 0xc0);
+
         /* This calibration must be done in a certain order, and for both TX_A
          * and TX_B, separately. Store the original setting so that we can
          * restore it later. */
