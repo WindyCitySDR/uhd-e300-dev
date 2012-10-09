@@ -578,7 +578,7 @@ _data_transport.reset();
 
     _tree->access<double>(mb_path / "tick_rate") //now subscribe the clock rate setter
         .subscribe(boost::bind(&b200_ctrl::set_tick_rate, _ctrl, _1))
-        .set(30.72e6);
+        .set(15.36e6);
 
     this->update_rates();
 

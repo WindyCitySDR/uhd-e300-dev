@@ -1448,8 +1448,6 @@ public:
      * This is the only clock setting function that is exposed to the outside. */
     double set_clock_rate(const double req_rate) {
 
-        return req_rate;
-
         if(req_rate > 61.44e6) {
             throw uhd::runtime_error("Requested master clock rate outside range!");
         }
@@ -1547,8 +1545,6 @@ public:
      * After tuning, it runs any appropriate calibrations. */
     double tune(const std::string &which, const double value) {
 
-        return value;
-
         if(which[0] == 'R') {
             if(freq_is_nearly_equal(value, _req_rx_freq)) {
                 return _rx_freq;
@@ -1599,8 +1595,6 @@ public:
      * are done in terms of attenuation. */
     double set_gain(const std::string &which, const std::string &name, \
             const double value) {
-
-        return value;
 
         if(which[0] == 'R') {
             /* Indexing the gain tables requires an offset from the requested
