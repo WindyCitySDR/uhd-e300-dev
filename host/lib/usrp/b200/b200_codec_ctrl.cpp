@@ -740,6 +740,17 @@ public:
             throw uhd::runtime_error("TX Quad Cal started, but not in ALERT!");
         }
 
+        /* This calibration must be done in a certain order, and for both TX_A
+         * and TX_B, separately. Store the original setting so that we can
+         * restore it later. */
+        uint8_t orig_reg_inputsel = reg_inputsel;
+
+        /***********************************************************************
+         * TX_A Calibration
+         **********************************************************************/
+        reg_inputsel = reg_inputsel & 0xBF;
+        _b200_iface->write_reg(0x004, reg_inputsel);
+
         uint8_t maskbits = _b200_iface->read_reg(0x0a3) & 0x3F;
         _b200_iface->write_reg(0x0a0, 0x15); // Set NCO freq VVVV
         _b200_iface->write_reg(0x0a3, 0x00 | maskbits);
@@ -770,6 +781,46 @@ public:
             count++;
             boost::this_thread::sleep(boost::posix_time::milliseconds(10));
         }
+
+        /***********************************************************************
+         * TX_B Calibration
+         **********************************************************************/
+        reg_inputsel = reg_inputsel | 0x40;
+        _b200_iface->write_reg(0x004, reg_inputsel);
+
+        maskbits = _b200_iface->read_reg(0x0a3) & 0x3F;
+        _b200_iface->write_reg(0x0a0, 0x15); // Set NCO freq VVVV
+        _b200_iface->write_reg(0x0a3, 0x00 | maskbits);
+        _b200_iface->write_reg(0x0a1, 0x7B); // Set tracking coefficient
+        _b200_iface->write_reg(0x0a9, 0xff); // Cal count
+        _b200_iface->write_reg(0x0a2, 0x7f); // Cal Kexp
+        _b200_iface->write_reg(0x0a5, 0x01); // Cal magnitude threshold VVVV
+        _b200_iface->write_reg(0x0a6, 0x01);
+        _b200_iface->write_reg(0x0aa, 0x25); // Cal gain table index
+        _b200_iface->write_reg(0x0a4, 0xf0); // Cal setting conut
+        _b200_iface->write_reg(0x0ae, 0x00); // Cal LPF gain index (split mode)
+
+        /* First, calibrate the baseband DC offset. */
+        calibrate_baseband_dc_offset();
+
+        /* Second, calibrate the RF DC offset. */
+        calibrate_rf_dc_offset();
+
+        /* Now, calibrate the TX quadrature! */
+        count = 0;
+        _b200_iface->write_reg(0x016, 0x10);
+        while(_b200_iface->read_reg(0x016) & 0x10) {
+            if(count > 5) {
+                std::cout << "TX Quadrature Calibration Failure!" << std::endl;
+                break;
+            }
+
+            count++;
+            boost::this_thread::sleep(boost::posix_time::milliseconds(10));
+        }
+
+        /* Return the input select to the original setting. */
+        _b200_iface->write_reg(0x004, orig_reg_inputsel);
     }
 
 
@@ -1112,9 +1163,9 @@ public:
         _b200_iface->write_reg(0x015, 0x04); // dual synth mode, synth en ctrl en
 
         /* Default TX attentuation to 10dB on both TX1 and TX2 */
-        _b200_iface->write_reg(0x073, 0x28);
+        _b200_iface->write_reg(0x073, 0x00);
         _b200_iface->write_reg(0x074, 0x00);
-        _b200_iface->write_reg(0x075, 0x28);
+        _b200_iface->write_reg(0x075, 0x00);
         _b200_iface->write_reg(0x076, 0x00);
 
         /* Setup RSSI Measurements */
@@ -1399,11 +1450,11 @@ public:
             /* Set band-specific settings. */
             if(value < 3e9) {
                 fpga_bandsel = (fpga_bandsel & 0xE7) | TX_BANDSEL_A;
-                reg_inputsel = reg_inputsel & 0xBF;
+                reg_inputsel = reg_inputsel | 0x40;
                 //std::cout << "FPGA BANDSEL_A; CAT BANDSEL B" << std::endl;
             } else if((value >= 3e9) && (value <= 6e9)) {
                 fpga_bandsel = (fpga_bandsel & 0xE7) | TX_BANDSEL_B;
-                reg_inputsel = reg_inputsel | 0x40;
+                reg_inputsel = reg_inputsel & 0xBF;
                 //std::cout << "FPGA BANDSEL_B; CAT BANDSEL A" << std::endl;
             } else {
                 UHD_THROW_INVALID_CODE_PATH();
