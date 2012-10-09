@@ -468,7 +468,6 @@ public:
         reg0d2 = cap;
 
         /* Program the above-calculated values. Sweet. */
-        _b200_iface->write_reg(0x0d3, 0x60);
         _b200_iface->write_reg(0x0d2, reg0d2);
         _b200_iface->write_reg(0x0d1, reg0d1);
         _b200_iface->write_reg(0x0d0, reg0d0);
@@ -771,10 +770,6 @@ public:
             count++;
             boost::this_thread::sleep(boost::posix_time::milliseconds(10));
         }
-
-        std::cout << "Y U NO TX QUAD CAL?!" << std::endl;
-        std::cout << "\t0x08E: " << (int) _b200_iface->read_reg(0x08E) << std::endl;
-        std::cout << "\t0x08F: " << (int) _b200_iface->read_reg(0x08F) << std::endl;
     }
 
 
@@ -973,7 +968,7 @@ public:
         /* Initialize shadow registers. */
         fpga_bandsel = 0x00;
         reg_vcodivs = 0x00;
-        reg_inputsel = 0x70;
+        reg_inputsel = 0x30;
         reg_rxfilt = 0x00;
         reg_txfilt = 0x00;
         //reg_bbpll = 0x02; // no clock Set by default in _impl for 40e6 reference
@@ -1014,11 +1009,11 @@ public:
         _b200_iface->write_reg(0x2ac, 0xff);
 
         /* Enable clocks. */
-        _b200_iface->write_reg(0x009, BOOST_BINARY( 00010111 ) );
+        _b200_iface->write_reg(0x009, 0x17);
         boost::this_thread::sleep(boost::posix_time::milliseconds(20));
 
         /* Tune the BBPLL, write TX and RX FIRS. */
-        setup_rates(30.72e6);
+        setup_rates(15.36e6);
 
         /* Setup data ports (FDD dual port DDR CMOS):
          *      FDD dual port DDR CMOS no swap.
@@ -1165,46 +1160,46 @@ public:
         int tfir = 0;
         if(rate <= 20e6) {
             // RX1 enabled, 2, 2, 2, 2
-            reg_rxfilt = BOOST_BINARY( 01011110 ) ;
+            reg_rxfilt = BOOST_BINARY( 11011110 ) ;
 
             // TX1 enabled, 2, 2, 2, 2
-            reg_txfilt = BOOST_BINARY( 01011110 ) ;
+            reg_txfilt = BOOST_BINARY( 11011110 ) ;
 
             divfactor = 16;
             tfir = 2;
         } else if((rate > 20e6) && (rate < 23e6)) {
            // RX1 enabled, 3, 2, 2, 2
-            reg_rxfilt = BOOST_BINARY( 01101110 ) ;
+            reg_rxfilt = BOOST_BINARY( 11101110 ) ;
 
             // TX1 enabled, 3, 1, 2, 2
-            reg_txfilt = BOOST_BINARY( 01100110 ) ;
+            reg_txfilt = BOOST_BINARY( 11100110 ) ;
 
             divfactor = 24;
             tfir = 2;
         } else if((rate >= 23e6) && (rate < 41e6)) {
             // RX1 enabled, 2, 2, 2, 2
-            reg_rxfilt = BOOST_BINARY( 01011110 ) ;
+            reg_rxfilt = BOOST_BINARY( 11011110 ) ;
 
             // TX1 enabled, 1, 2, 2, 2
-            reg_txfilt = BOOST_BINARY( 01001110 ) ;
+            reg_txfilt = BOOST_BINARY( 11001110 ) ;
 
             divfactor = 16;
             tfir = 2;
         } else if((rate >= 41e6) && (rate <= 56e6)) {
             // RX1 enabled, 3, 1, 2, 2
-            reg_rxfilt = BOOST_BINARY( 01100110 ) ;
+            reg_rxfilt = BOOST_BINARY( 11100110 ) ;
 
             // TX1 enabled, 3, 1, 1, 2
-            reg_txfilt = BOOST_BINARY( 01100010 ) ;
+            reg_txfilt = BOOST_BINARY( 11100010 ) ;
 
             divfactor = 12;
             tfir = 2;
         } else if((rate > 56e6) && (rate <= 61.44e6)) {
             // RX1 enabled, 3, 1, 1, 2
-            reg_rxfilt = BOOST_BINARY( 01100010 ) ;
+            reg_rxfilt = BOOST_BINARY( 11100010 ) ;
 
             // TX1 enabled, 3, 1, 1, 1
-            reg_txfilt = BOOST_BINARY( 01100001 ) ;
+            reg_txfilt = BOOST_BINARY( 11100001 ) ;
 
             divfactor = 6;
             tfir = 1;
@@ -1404,11 +1399,11 @@ public:
             /* Set band-specific settings. */
             if(value < 3e9) {
                 fpga_bandsel = (fpga_bandsel & 0xE7) | TX_BANDSEL_A;
-                reg_inputsel = reg_inputsel | 0x40;
+                reg_inputsel = reg_inputsel & 0xBF;
                 //std::cout << "FPGA BANDSEL_A; CAT BANDSEL B" << std::endl;
             } else if((value >= 3e9) && (value <= 6e9)) {
                 fpga_bandsel = (fpga_bandsel & 0xE7) | TX_BANDSEL_B;
-                reg_inputsel = reg_inputsel & 0xBF;
+                reg_inputsel = reg_inputsel | 0x40;
                 //std::cout << "FPGA BANDSEL_B; CAT BANDSEL A" << std::endl;
             } else {
                 UHD_THROW_INVALID_CODE_PATH();
@@ -1452,6 +1447,8 @@ public:
      *
      * This is the only clock setting function that is exposed to the outside. */
     double set_clock_rate(const double req_rate) {
+
+        return req_rate;
 
         if(req_rate > 61.44e6) {
             throw uhd::runtime_error("Requested master clock rate outside range!");
@@ -1550,6 +1547,8 @@ public:
      * After tuning, it runs any appropriate calibrations. */
     double tune(const std::string &which, const double value) {
 
+        return value;
+
         if(which[0] == 'R') {
             if(freq_is_nearly_equal(value, _req_rx_freq)) {
                 return _rx_freq;
@@ -1600,6 +1599,8 @@ public:
      * are done in terms of attenuation. */
     double set_gain(const std::string &which, const std::string &name, \
             const double value) {
+
+        return value;
 
         if(which[0] == 'R') {
             /* Indexing the gain tables requires an offset from the requested
