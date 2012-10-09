@@ -725,7 +725,7 @@ public:
         _b200_iface->write_reg(0x16e, 0x25); // RX Gain index to use for cal
         _b200_iface->write_reg(0x16a, 0x75); // Set Kexp phase
         _b200_iface->write_reg(0x16b, 0x15); // Set Kexp amplitude
-        _b200_iface->write_reg(0x169, 0xcf);
+        _b200_iface->write_reg(0x169, 0xcf); // Continuous tracking mode
         _b200_iface->write_reg(0x18b, 0xad);
     }
 
