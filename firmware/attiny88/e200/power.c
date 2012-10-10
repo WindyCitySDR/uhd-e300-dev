@@ -18,13 +18,15 @@
 #include "global.h"
 #include "error.h"
 
-#define BLINK_ERROR_DELAY   250  // ms
+#define BLINK_ERROR_DELAY		250  // ms
 
 #define POWER_DEFAULT_DELAY     50  // ms
 #define POWER_DEFAULT_RETRIES   10
 
-#define ARRAY_SIZE(a)      (sizeof(a)/sizeof(a[0]))
-#define ZERO_MEMORY(s)      memset(&s, 0x00, sizeof(s))
+#define BATT_MIN_VOLTAGE		2000	// mV
+
+#define ARRAY_SIZE(a)			(sizeof(a)/sizeof(a[0]))
+#define ZERO_MEMORY(s)			memset(&s, 0x00, sizeof(s))
 
 #ifndef I2C_REWORK
 io_pin_t PWR_SDA     = IO_PC(4);
@@ -33,18 +35,24 @@ io_pin_t PWR_SCL     = IO_PC(5);
 
 //volatile bool powered = false;
 
+#ifdef DDR3L
+#define DRAM_VOLTAGE	1350
+#else
+#define DRAM_VOLTAGE	0	// Hardware default
+#endif // DDR3
+
 struct reg_config {
     int16_t voltage;    // mV
 	uint8_t device;
     uint8_t address;    // Device specific
     bool powered;
-} default_reg_config[] = {        // Index maps to 'power_subsystem_t'
-    { 0000, REG_UNKNOWN, 0/*, true*/ },          // PS_UNKNOWN
-    { 1000, REG_TPS54478, 0/*, true*/ },          // PS_FPGA
-    { 1350, REG_LTC3675, LTC3675_REG_1 },    // PS_VDRAM
-    { 1800, REG_LTC3675, LTC3675_REG_3 },    // PS_PERIPHERALS_1_8
-    { 3300, REG_LTC3675, LTC3675_REG_6 },    // PS_PERIPHERALS_3_3
-    { 5000, REG_LTC3675, LTC3675_REG_5 }     // PS_TX
+} default_reg_config[] = {        // Index maps to 'power_subsystem_t', 0 volts means leave at hardware default
+	{ 0000, REG_UNKNOWN, 0/*, true*/ },				// PS_UNKNOWN
+	{ 1000, REG_TPS54478, 0/*, true*/ },			// PS_FPGA
+	{ DRAM_VOLTAGE, REG_LTC3675, LTC3675_REG_1 },	// PS_VDRAM
+	{ /*1800*/0, REG_LTC3675, LTC3675_REG_3 },		// PS_PERIPHERALS_1_8
+	{ /*3300*/0, REG_LTC3675, LTC3675_REG_6 },		// PS_PERIPHERALS_3_3
+	{ /*5000*/0, REG_LTC3675, LTC3675_REG_5 }		// PS_TX
 };
 /*
 int8_t power_get_regulator_index(uint8_t device, uint8_t address)
@@ -90,7 +98,7 @@ static io_pin_t AVR_IRQ     = IO_PD(5);
 
 ///////////////////////////////////////////////////////////////////////////////
 
-#define TPS54478_START_DELAY	3	// ms
+#define TPS54478_START_DELAY	10	// 50 (safety)	// 3 (per spec)	// ms (some arbitrary value so that the external power supply can settle)
 
 #ifdef ATTINY88_DIP
 static io_pin_t CORE_PWR_EN = IO_PC(1);	// IO_PC(7) not routed by card, using PWER_EN1 instead
@@ -213,7 +221,7 @@ uint16_t battery_get_voltage(void)
     // Vref = 3.3
 
     // Vbat(mV) = 1000 * (((ADC * 3.3) / 1024) * (274k + 357k)) / 357k
-    // Vbat(mV) ~= ADC * 6 (=5.70)
+    // Vbat(mV) ~= ADC * 5.70
 
     ADCSRA |= (1 << ADEN);        // FIXME: Turn on ADC (or leave on all the time?)
 
@@ -221,13 +229,15 @@ uint16_t battery_get_voltage(void)
 
     while (ADCSRA & (1 << ADSC));   // Wait for End of Conversion
 
-    uint16_t voltage = (ADCH << 8) | (ADCL << 0);
-
-    voltage *= 6;
-
+    /*uint16_t*/uint32_t voltage = (ADCH << 8) | (ADCL << 0);
+#ifdef ATTINY88_DIP
+	voltage = (voltage * 32227) / 10000;	// ~3.22265625
+#else
+    voltage = (voltage * 56961) / 10000;	// ~5.69606748
+#endif // ATTINY88_DIP
     ADCSRA &= ~(1 << ADEN);         // FIXME: Turn off ADC (or leave on all the time?)
 
-    return voltage;
+    return (uint16_t)voltage;
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -293,12 +303,14 @@ static bool _power_up_reg(power_params_t* params)
 
     struct reg_config* cfg = default_reg_config + params->subsys;
 
-    if (params->enable == false) {
+    if (params->enable == false)
         return ltc3675_enable_reg(cfg->address, false);
-    }
 
-    if (ltc3675_set_voltage(cfg->address, cfg->voltage) == false)
-        return false;
+	if (cfg->voltage > 0)
+	{
+		if (ltc3675_set_voltage(cfg->address, cfg->voltage) == false)
+			return false;
+	}	
 
     return ltc3675_enable_reg(cfg->address, true);
 }
@@ -338,11 +350,11 @@ struct boot_step {
     //uint16_t opaque;
 	//bool powered;
 } boot_steps[] = {  // MAGIC: Retries/delays
-    { PS_FPGA,              /*NULL, POWER_DEFAULT_DELAY, POWER_DEFAULT_RETRIES*/ },	// 7..8						// 3..4
-    { PS_VDRAM,             /*NULL, POWER_DEFAULT_DELAY, POWER_DEFAULT_RETRIES*/ },	// 9..10					// 5..6
-    { PS_PERIPHERALS_1_8,   /*NULL, POWER_DEFAULT_DELAY, POWER_DEFAULT_RETRIES*/ },	// 11..12					// 7..8
-    { PS_PERIPHERALS_3_3,   /*NULL, POWER_DEFAULT_DELAY, POWER_DEFAULT_RETRIES*/ },	// 13..14					// 9..10
-    //{ PS_TX,              /*NULL, POWER_DEFAULT_DELAY, POWER_DEFAULT_RETRIES*/ }  // CHECK: Leaving TX off
+	{ PS_FPGA,				/*NULL, POWER_DEFAULT_DELAY, POWER_DEFAULT_RETRIES*/ },	// 7..8						// 3..4
+	{ PS_VDRAM,				/*NULL, POWER_DEFAULT_DELAY, POWER_DEFAULT_RETRIES*/ },	// 9..10					// 5..6
+	{ PS_PERIPHERALS_1_8,	/*NULL, POWER_DEFAULT_DELAY, POWER_DEFAULT_RETRIES*/ },	// 11..12					// 7..8
+	{ PS_PERIPHERALS_3_3,	/*NULL, POWER_DEFAULT_DELAY, POWER_DEFAULT_RETRIES*/ },	// 13..14					// 9..10
+//	{ PS_TX,				/*NULL, POWER_DEFAULT_DELAY, POWER_DEFAULT_RETRIES*/ }  // CHECK: Leaving TX off
 };
 /*
 bool power_is_subsys_on(int8_t index)
@@ -360,17 +372,24 @@ void power_init(void)
     io_output_pin(CHARGE);
 	
 	charge_set_led(true);
+	
+	battery_init();
+	
+	uint16_t batt_voltage = battery_get_voltage();
+	debug_log_ex("Vb ", false);
+	debug_log_byte((uint8_t)(batt_voltage / 100));
+	//debug_log_hex_ex(batt_voltage >> 8, false);
+	//debug_log_hex(batt_voltage & 0xFF);
+	if (batt_voltage < BATT_MIN_VOLTAGE)
+		_state.battery_not_present = true;
 
     tps54478_init(true);	// Will keep EN float (keep power on)
 #ifndef I2C_REWORK
 	i2c_init(PWR_SDA, PWR_SCL);
 #endif // I2C_REWORK
-
-	ltc4155_init();
+	ltc4155_init(_state.battery_not_present);
 
     ltc3675_init(ltc3675_reg_helper);
-
-    battery_init();
 #ifdef PS_POR_AVAILABLE
 	io_output_pin(PS_POR);
 #endif // PS_POR_AVAILABLE

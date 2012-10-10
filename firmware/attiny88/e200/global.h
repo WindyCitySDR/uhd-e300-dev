@@ -17,6 +17,7 @@ typedef struct State
 	//bool timers_running;
 	uint8_t active_timers;
 	bool powered;
+	bool battery_not_present;
 	bool wake_up;
 	bool power_off;
 	bool core_power_bad;

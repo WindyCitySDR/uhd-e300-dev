@@ -144,7 +144,7 @@ bool ltc4155_clear_irq(void)
 	return result;
 }
 
-bool ltc4155_init(void)
+bool ltc4155_init(bool disable_charger)
 {
 	io_input_pin(USBPM_IRQ);
 #ifndef DEBUG
@@ -153,14 +153,17 @@ bool ltc4155_init(void)
 #ifdef I2C_REWORK
 	i2c_init_ex(CHRG_SDA, CHRG_SCL, _ltc4155_pull_up);
 #endif // I2C_REWORK
-	_ltc4155_clear_irq();	// Will set interrupt masks
+	_ltc4155_clear_irq();	// Will set interrupt masks	// FIXME: Why does this cause instability?!
 	
-	i2c_write_ex(CHRG_SDA, CHRG_SCL, LTC4155_WRITE_ADDRESS, LTC4155_REG_WALL, 0x1F, _ltc4155_pull_up);	// Without this, fails when bringing up 1.8V
-	
-	// Vbatt float = 4.05V
-	// Charge safety timer = 4hr
+	// FIXME: Vbatt float = 4.05V - 4.2V for LiPo (default 0x00)
 	// Battery charger I limit = 100%
 	// Full capacity charge threshold = 10%
+	if (disable_charger)
+		i2c_write_ex(CHRG_SDA, CHRG_SCL, LTC4155_WRITE_ADDRESS, LTC4155_REG_CHARGE, 0x00, _ltc4155_pull_up);
+	
+	i2c_write_ex(CHRG_SDA, CHRG_SCL, LTC4155_WRITE_ADDRESS, LTC4155_REG_WALL, /*0x1F*/0x0E, _ltc4155_pull_up);	// Without this, fails when bringing up 1.8V	// 0x0E - 3A, 0x1F - CLPROG1
+	
+	// Charge safety timer = 4hr
 	
 	// FIXME:
 	// Disable ID pin detection & autonomous startup
@@ -173,10 +176,11 @@ bool ltc4155_init(void)
 
 bool ltc4155_has_interrupt(void)
 {
-	bool state = io_test_pin(USBPM_IRQ);
-	debug_log_ex("4155IRQ", false);
-	debug_log_byte(state);
-	return (state != 1);
+	//bool state = io_test_pin(USBPM_IRQ);
+	//debug_log_ex("4155IRQ", false);
+	//debug_log_byte(state);
+	//return (state != 1);
+	return (io_test_pin(USBPM_IRQ) == false);
 }
 
 static uint8_t _ltc4155_last_good, _ltc4155_last_status;

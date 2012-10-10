@@ -7,10 +7,11 @@
     - Default buck/boost register values are OK
 */
 
+#include "config.h"
 #include "ltc3675.h"
 
 //#include <stdio.h>
-//#include <util/delay.h>
+#include <util/delay.h>
 #include <avr/interrupt.h>
 
 #include "io.h"
@@ -71,6 +72,8 @@ static io_pin_t PWR_RESET   = IO_PD(4);
 #define LTC3675_SCL_HIGH_PERIOD 1   // 0.6 us
 #define LTC3675_BUS_FREE_TIME   2   // 1.3 us
 #define LTC3675_STOP_TIME       1   // 0.6 us
+
+#define LTC3675_REGULATOR_ENABLE_DELAY	10	// 50	// ms (some arbitrary value so that the external power supply can settle)
 
 enum LTC3675Registers
 {
@@ -333,21 +336,29 @@ static bool _ltc3675_is_pgood(uint8_t reg)
 
 static bool _ltc3675_toggle_reg(uint8_t addr, uint8_t def_reg, bool on)
 {
-	bool result = true;
+	//bool result = true;
 	
 	//cli();
 	
-	if (i2c_write_ex(PWR_SDA, PWR_SCL, LTC3675_WRITE_ADDRESS, addr, def_reg | (on ? LTC3675_ENABLE_REGISTER_BIT : 0x00), _ltc3675_pull_up) == false)
-		result = false;
+	uint8_t val = 0x00 | def_reg;
+//	if (i2c_read2_ex(PWR_SDA, PWR_SCL, LTC3675_READ_ADDRESS, addr, &val, _ltc3675_pull_up) == false)
+//		return false;
+	
+	val &= ~LTC3675_ENABLE_REGISTER_BIT;
+	
+	if (i2c_write_ex(PWR_SDA, PWR_SCL, LTC3675_WRITE_ADDRESS, addr, /*def_reg*/val | (on ? LTC3675_ENABLE_REGISTER_BIT : 0x00), _ltc3675_pull_up) == false)
+		return true;
+		//result = false;
 	
 	if (on)
 	{
-		// FIXME: Delay?
-	}		
+		_delay_ms(LTC3675_REGULATOR_ENABLE_DELAY);
+	}
 	
 	//sei();
 
-	return result;
+	//return result;
+	return true;
 }
 
 bool ltc3675_enable_reg(ltc3675_regulator_t reg, bool on)
@@ -419,8 +430,66 @@ bool ltc3675_set_voltage(ltc3675_regulator_t reg, uint16_t voltage)
 
     // VRAM will be 1.3579 - a little high? (re-program DAC reference)
     //  No: minimum FB step will put Vout < 1.35
+	
+	uint16_t max_voltage = 0;
+	uint8_t reg_subaddr = 0;
+	
+	switch (reg)
+	{
+		case LTC3675_REG_1:	// 1A Buck
+		case LTC3675_REG_2:	// 1A Buck
+			max_voltage = 1500;
+			reg_subaddr = LTC3675_REG_BUCK1;
+			break;
+		case LTC3675_REG_3:	// 500mA Buck
+		case LTC3675_REG_4:	// 500mA Buck
+			max_voltage = 1800;
+			reg_subaddr = LTC3675_REG_BUCK3;
+			break;
+		case LTC3675_REG_5:	// 1A Boost
+			max_voltage = 5000;
+			reg_subaddr = LTC3675_REG_BOOST;
+			break;
+		case LTC3675_REG_6:	// 1A Buck-Boost
+			max_voltage = 3300;
+			reg_subaddr = LTC3675_REG_BUCK_BOOST;
+			break;
+	}
+	
+	if (voltage > max_voltage)
+		return false;
+	
+	//uint32_t rMax = ((uint32_t)voltage * 1000) / (uint32_t)max_voltage;
+	//uint32_t rFB = ((uint32_t)max_voltage * 1000) / (uint32_t)800;
+	uint32_t rFB = ((uint32_t)max_voltage * 1000) / (uint32_t)800;	// 800mV full-scale feedback voltage
+	uint32_t r = ((uint32_t)voltage * 1000) / (uint32_t)rFB;
+	if (r < 450)
+		return false;
+	
+	uint16_t rDAC = (16 * ((uint16_t)r - 450)) / (800 - 450);
+	
+	debug_log_ex("Vr ", false);
+	debug_log_byte_ex(reg, false);
+	debug_log_ex("=", false);
+	debug_log_byte_ex((uint8_t)rDAC, false);
+	
+	uint8_t val = 0x00;
+	if (i2c_read2_ex(PWR_SDA, PWR_SCL, LTC3675_READ_ADDRESS, reg_subaddr, &val, _ltc3675_pull_up) == false)
+	{
+		debug_log("-");
+		return false;
+	}		
+	
+	val = (val & 0xF0) | (uint8_t)rDAC;
+	if (i2c_write_ex(PWR_SDA, PWR_SCL, LTC3675_WRITE_ADDRESS, reg_subaddr, val, _ltc3675_pull_up) == false)
+	{
+		debug_log("-");
+		return false;
+	}
+	
+	debug_log("+");
 
-    return true;
+	return true;
 }
 
 bool ltc3675_is_power_button_depressed(void)

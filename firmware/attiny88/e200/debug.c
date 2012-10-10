@@ -1,6 +1,6 @@
 /*
  * debug.c
- */ 
+ */
 
 #include "config.h"
 #include "debug.h"
@@ -17,15 +17,27 @@
 
 #ifdef ATTINY88_DIP
 
-static io_pin_t SERIAL_DEBUG      = IO_PD(6);
+#define SERIAL_DEBUG_INDEX			6
+#define SERIAL_DEBUG_PORT			PORTD
+static io_pin_t SERIAL_DEBUG      = IO_PD(SERIAL_DEBUG_INDEX);
 
 #else
-
+/*
 #ifdef I2C_REWORK
-static io_pin_t SERIAL_DEBUG      = IO_PC(1);	// EN1
+//static io_pin_t SERIAL_DEBUG      = IO_PC(1);	// EN1
 #else
 //static io_pin_t SERIAL_DEBUG      = EN4;
 #endif // I2C_REWORK
+*/
+// No good: PWR_EN4 trace still connected to LTC3675
+//#define SERIAL_DEBUG_INDEX			1
+//#define SERIAL_DEBUG_PORT			PORTA
+//static io_pin_t SERIAL_DEBUG      = IO_PA(SERIAL_DEBUG_INDEX);
+
+// AVR_MISO
+#define SERIAL_DEBUG_INDEX			4
+#define SERIAL_DEBUG_PORT			PORTB
+static io_pin_t SERIAL_DEBUG      = IO_PB(SERIAL_DEBUG_INDEX);
 
 #endif // ATTINY88_DIP
 /*
@@ -49,9 +61,20 @@ void debug_init()
 	
 	io_enable_pin(DEBUG_1, true);
 	io_enable_pin(DEBUG_2, true);
-	
+#ifdef ENABLE_SERIAL	
 	io_set_pin(SERIAL_DEBUG);
 	io_output_pin(SERIAL_DEBUG);
+#endif // ENABLE_SERIAL
+}
+
+#else
+
+void debug_init()
+{
+#ifdef ENABLE_SERIAL
+	io_set_pin(SERIAL_DEBUG);
+	io_output_pin(SERIAL_DEBUG);
+#endif // ENABLE_SERIAL
 }
 
 #endif // DEBUG
@@ -162,6 +185,8 @@ void debug_blink_rev(uint8_t count)
 
 #endif // DEBUG
 
+#ifdef ENABLE_SERIAL
+
 void debug_log_byte_ex(uint8_t n, bool new_line)
 {
 	char ch[4];
@@ -193,15 +218,20 @@ void debug_log_hex_ex(uint8_t n, bool new_line)
 static void _serial_tx(uint8_t* buffer)
 {
 	//uint8_t time_fix = 0;
-	const uint16_t delay = 650-2;	// 3333/2 - 10
+	// 3333/2 - 10
+	// 650
+	//	[-2 for DEV] -20 works (perhaps different USB-Serial converter)
+	//	[-20 for PRD] Which board?
+	//	+20 Board #5 (-0: 3.592, -10: 3.280)
+	const uint16_t delay = 650+20;
 	uint16_t countdown;
 	
 	for (uint8_t j = 0; j < 10; ++j)
 	{
 		if (buffer[j])
-			PORTD |= _BV(6);
+			SERIAL_DEBUG_PORT |= _BV(SERIAL_DEBUG_INDEX);
 		else
-			PORTD &= ~_BV(6);
+			SERIAL_DEBUG_PORT &= ~_BV(SERIAL_DEBUG_INDEX);
 		
 		countdown = delay;
 		while (--countdown)
@@ -241,3 +271,5 @@ void debug_log_ex(const char* message, bool new_line)
 	
 	pmc_mask_irqs(false);
 }
+
+#endif // ENABLE_SERIAL

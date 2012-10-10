@@ -22,7 +22,7 @@
 #define LED_OFF		false
 #endif // DEBUG
 
-#define DEBUG_VOID
+//#define DEBUG_VOID
 #define DEBUG_SAFETY
 
 #ifdef DEBUG_VOID
@@ -37,7 +37,7 @@
 #else
 
 //DEBUG_INLINE void debug_init(void) DEBUG_NOOP
-DEBUG_INLINE void debug_set(io_pin_t pin, bool enable);
+DEBUG_INLINE void debug_set(io_pin_t pin, bool enable) DEBUG_NOOP;
 DEBUG_INLINE void debug_blink(uint8_t count) DEBUG_NOOP
 //DEBUG_INLINE void debug_blink_rev(uint8_t count) DEBUG_NOOP
 void debug_blink_rev(uint8_t count);
@@ -46,12 +46,31 @@ DEBUG_INLINE void debug_wait(void) DEBUG_NOOP
 
 #endif // DEBUG_VOID
 
-DEBUG_INLINE void debug_init(void) DEBUG_NOOP
+#if defined(DEBUG) && !defined(ENABLE_SERIAL)
+#define ENABLE_SERIAL
+#endif // DEBUG && !ENABLE_SERIAL
+
+/*DEBUG_INLINE */void debug_init(void)/* DEBUG_NOOP*/;
+
+#ifdef ENABLE_SERIAL
+
 void debug_log_ex(const char* message, bool new_line);
-inline void debug_log(const char* message) { debug_log_ex(message, true); }
 void debug_log_hex_ex(uint8_t n, bool new_line);
-inline void debug_log_hex(uint8_t n) { debug_log_hex_ex(n, true); }
 void debug_log_byte_ex(uint8_t n, bool new_line);
+
+inline void debug_log(const char* message) { debug_log_ex(message, true); }
+inline void debug_log_hex(uint8_t n) { debug_log_hex_ex(n, true); }
 inline void debug_log_byte(uint8_t n) { debug_log_byte_ex(n, true); }
+
+#else
+
+inline void debug_log_ex		(const char* message, bool new_line) {};
+inline void debug_log_hex_ex	(uint8_t n, bool new_line) {};
+inline void debug_log_byte_ex	(uint8_t n, bool new_line) {};
+
+#define debug_log			(void)
+#define debug_log_hex		(void)
+#define debug_log_byte		(void)
+#endif // ENABLE_SERIAL
 
 #endif /* DEBUG_H_ */

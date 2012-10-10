@@ -19,6 +19,8 @@
 #include "ltc3675.h"
 #include "ltc4155.h"
 
+#define INITIAL_DELAY	250	// ms
+
 FUSES = {	// FIXME: & FUSE_CKSEL1 for low power 128 kHz clock
 	.low = (FUSE_CKSEL0 & FUSE_SUT0 & FUSE_CKDIV8),	// Internal 8MHz Oscillator, Slowly rising power (start-up time), Divide Clock by 8
 	.high = (FUSE_EESAVE & FUSE_SPIEN),	// Save EEPROM between flashes	// FIXME: Leave SPIEN for programming enabled?
@@ -55,25 +57,20 @@ bool pmc_mask_irqs(bool mask)
 	
 	return true;
 }
-/*
-bool ltc4155_has_interrupt2(void)
-{
-	bool state = io_test_pin(USBPM_IRQ);
-	debug_log_ex("4155IRQ", false);
-	debug_log_byte(state);
-	return (state != 1);
-}
-*/
 
 int main(void)
 {
+	_delay_ms(INITIAL_DELAY);
+	
+	///////////////////////////////////////////////////////////////////////////
+	
 	memset((void*)&_state, 0x00, sizeof(STATE));
 	
 	debug_init();
 	debug_blink(1);
 	
-	debug_log("#");	// Will not boot if this is 21 chars long?!
-	//debug_log("Hello world\n");
+	//debug_log("#");	// Will not boot if this is 21 chars long?!
+	debug_log("Hello world");
 	
     set_sleep_mode(SLEEP_MODE_PWR_DOWN);    // SLEEP_MODE_PWR_SAVE combination is documented as Reserved
 
@@ -123,7 +120,7 @@ int main(void)
 			debug_log("ML:FPGA!");
 			
 			//power_off();
-			_state.power_off = true;
+//			_state.power_off = true;
 			
 			/*while (_state.wake_up == false)
 			{
@@ -145,7 +142,7 @@ int main(void)
 				debug_log("ML:3675!");
 				
 				//power_off();
-				_state.power_off = true;
+//				_state.power_off = true;
 			}
 			
 			_state.ltc3675_irq = false;

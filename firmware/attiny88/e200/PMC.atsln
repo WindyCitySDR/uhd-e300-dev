@@ -6,11 +6,14 @@ EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|AVR = Debug|AVR
+		Release (DDR3)|AVR = Release (DDR3)|AVR
 		Release|AVR = Release|AVR
 	EndGlobalSection
 	GlobalSection(ProjectConfigurationPlatforms) = postSolution
 		{A379D421-4236-44AF-A711-52B7BDA29919}.Debug|AVR.ActiveCfg = Debug|AVR
 		{A379D421-4236-44AF-A711-52B7BDA29919}.Debug|AVR.Build.0 = Debug|AVR
+		{A379D421-4236-44AF-A711-52B7BDA29919}.Release (DDR3)|AVR.ActiveCfg = Release (DDR3)|AVR
+		{A379D421-4236-44AF-A711-52B7BDA29919}.Release (DDR3)|AVR.Build.0 = Release (DDR3)|AVR
 		{A379D421-4236-44AF-A711-52B7BDA29919}.Release|AVR.ActiveCfg = Release|AVR
 		{A379D421-4236-44AF-A711-52B7BDA29919}.Release|AVR.Build.0 = Release|AVR
 	EndGlobalSection
