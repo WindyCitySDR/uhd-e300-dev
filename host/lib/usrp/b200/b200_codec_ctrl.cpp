@@ -7,6 +7,7 @@
 #include "b200_codec_ctrl.hpp"
 #include "ad9361_synth_lut.hpp"
 #include "ad9361_gain_tables.hpp"
+#include "ad9361_filter_taps.hpp"
 #include <uhd/exception.hpp>
 #include <uhd/utils/msg.hpp>
 #include <iostream>
@@ -172,51 +173,23 @@ public:
         _b200_iface->write_reg(base+5, 0xf8);
     }
 
-    /* Program the RX FIR Filter.
-     *
-     * TODO Right now, the taps are fixed. This function should swap the tap
-     * vectors for different BBWs. */
+    /* Program the RX FIR Filter. */
     void setup_rx_fir(int total_num_taps) {
-        uint16_t master_coeffs[] = {
-            0xffe2,0x0042,0x0024,0x0095,0x0056,0x004d,0xffcf,0xffb7,
-            0xffb1,0x0019,0x0059,0x006a,0x0004,0xff9d,0xff72,0xffd4,
-            0x0063,0x00b7,0x0062,0xffac,0xff21,0xff59,0x0032,0x0101,
-            0x00f8,0x0008,0xfeea,0xfeac,0xffa3,0x0117,0x01b5,0x00d0,
-            0xff05,0xfdea,0xfe9e,0x00ba,0x026f,0x0215,0xffb5,0xfd4a,
-            0xfd18,0xffa0,0x02de,0x03dc,0x0155,0xfd2a,0xfb0d,0xfd54,
-            0x0287,0x062f,0x048a,0xfe37,0xf862,0xf8c1,0x004d,0x0963,
-            0x0b88,0x02a4,0xf3e7,0xebdd,0xf5f8,0x1366,0x3830,0x518b
-        };
-
         int num_taps = total_num_taps / 2;
         std::vector<uint16_t> coeffs(num_taps);
         for(int i = 0; i < num_taps; i++) {
-            coeffs[num_taps - 1 - i] = master_coeffs[63 - i];
+            coeffs[num_taps - 1 - i] = default_128tap_coeffs[63 - i];
         }
 
         program_fir_filter("RX", total_num_taps, &coeffs[0]);
     }
 
-    /* Program the RX FIR Filter.
-     *
-     * TODO Right now, the taps are fixed. This function should swap the tap
-     * vectors for different BBWs. */
+    /* Program the RX FIR Filter. */
     void setup_tx_fir(int total_num_taps) {
-        uint16_t master_coeffs[] = {
-            0xfffb,0x0000,0x0004,0x0017,0x0024,0x0028,0x0013,0xfff3,
-            0xffdc,0xffe5,0x000b,0x0030,0x002e,0xfffe,0xffc4,0xffb8,
-            0xfff0,0x0045,0x0068,0x002b,0xffb6,0xff72,0xffad,0x0047,
-            0x00b8,0x0088,0xffc8,0xff1c,0xff33,0x001a,0x0110,0x0124,
-            0x0019,0xfec8,0xfe74,0xff9a,0x0156,0x0208,0x00d3,0xfe9b,
-            0xfd68,0xfe96,0x015d,0x033f,0x0236,0xfecd,0xfc00,0xfcb5,
-            0x00d7,0x04e5,0x04cc,0xffd5,0xf9fe,0xf8fb,0xfef2,0x078c,
-            0x0aae,0x036d,0xf5c0,0xed89,0xf685,0x12af,0x36a4,0x4faa
-        };
-
         int num_taps = total_num_taps / 2;
         std::vector<uint16_t> coeffs(num_taps);
         for(int i = 0; i < num_taps; i++) {
-            coeffs[num_taps - 1 - i] = master_coeffs[63 - i];
+            coeffs[num_taps - 1 - i] = default_128tap_coeffs[63 - i];
         }
 
         program_fir_filter("TX", total_num_taps, &coeffs[0]);
