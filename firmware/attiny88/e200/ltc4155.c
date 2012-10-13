@@ -80,6 +80,14 @@ enum LTC4155Options	// LTC4155_REG_USB
 	LTC4155_DISABLE_INPUT_UVCL			= 1 << 7
 };
 
+enum LTC4155Shifts
+{
+	LTC4155_SHIFTS_CHARGE_CURRENT_LIMIT	= 4,
+	LTC4155_SHIFTS_CHARGE_FLOAT_VOLTAGE	= 2,
+	LTC4155_SHIFTS_WALL_PRIORITY		= 7,
+	LTC4155_SHIFTS_WALL_SAFETY_TIMER	= 5
+};
+
 enum LTC4155Statuses	// LTC4155_REG_STATUS
 {
 	LTC4155_LOW_BATTERY		= 1 << 0,
@@ -119,7 +127,7 @@ enum LTC4155ThermistorStatuses
 	LTC4155_NTC_FAULT
 };
 
-static uint8_t _ltc4155_interrupt_mask =
+static const uint8_t _ltc4155_interrupt_mask =
 //	LTC4155_ENABLE_USB_OTG |// Enable +5V on USB connector	// Is this causing the chip to power off the output?!
 	LTC4155_INT_UVCL |
 	LTC4155_INT_ILIMIT |
@@ -144,45 +152,6 @@ bool ltc4155_clear_irq(void)
 	return result;
 }
 
-bool ltc4155_init(bool disable_charger)
-{
-	io_input_pin(USBPM_IRQ);
-#ifndef DEBUG
-	io_set_pin(USBPM_IRQ);	// Enable pull-up for Open Drain
-#endif // DEBUG
-#ifdef I2C_REWORK
-	i2c_init_ex(CHRG_SDA, CHRG_SCL, _ltc4155_pull_up);
-#endif // I2C_REWORK
-	_ltc4155_clear_irq();	// Will set interrupt masks	// FIXME: Why does this cause instability?!
-	
-	// FIXME: Vbatt float = 4.05V - 4.2V for LiPo (default 0x00)
-	// Battery charger I limit = 100%
-	// Full capacity charge threshold = 10%
-	if (disable_charger)
-		i2c_write_ex(CHRG_SDA, CHRG_SCL, LTC4155_WRITE_ADDRESS, LTC4155_REG_CHARGE, 0x00, _ltc4155_pull_up);
-	
-	i2c_write_ex(CHRG_SDA, CHRG_SCL, LTC4155_WRITE_ADDRESS, LTC4155_REG_WALL, /*0x1F*/0x0E, _ltc4155_pull_up);	// Without this, fails when bringing up 1.8V	// 0x0E - 3A, 0x1F - CLPROG1
-	
-	// Charge safety timer = 4hr
-	
-	// FIXME:
-	// Disable ID pin detection & autonomous startup
-	// Enable OTG
-	//i2c_write_ex(CHRG_SDA, CHRG_SCL, LTC4155_WRITE_ADDRESS, LTC4155_REG_USB, LTC4155_USB_OTG_LOCKOUT, _ltc4155_pull_up);	// Disable autonomous startup
-	//i2c_write_ex(CHRG_SDA, CHRG_SCL, LTC4155_WRITE_ADDRESS, LTC4155_REG_ENABLE, LTC4155_ENABLE_USB_OTG, _ltc4155_pull_up);	// Enable OTG
-	
-	return true;
-}
-
-bool ltc4155_has_interrupt(void)
-{
-	//bool state = io_test_pin(USBPM_IRQ);
-	//debug_log_ex("4155IRQ", false);
-	//debug_log_byte(state);
-	//return (state != 1);
-	return (io_test_pin(USBPM_IRQ) == false);
-}
-
 static uint8_t _ltc4155_last_good, _ltc4155_last_status;
 
 bool _ltc4155_handle_irq(void)
@@ -195,7 +164,7 @@ bool _ltc4155_handle_irq(void)
 	
 	debug_log_ex("4155GO ", false);
 	debug_log_hex(val);
-		
+	
 	_ltc4155_last_good = val;
 	
 	if (i2c_read2_ex(CHRG_SDA, CHRG_SCL, LTC4155_READ_ADDRESS, LTC4155_REG_STATUS, &val, _ltc4155_pull_up) == false)
@@ -225,7 +194,7 @@ bool _ltc4155_handle_irq(void)
 			case LTC4155_CHARGER_OFF:
 			default:
 				charge_set_led(false);
-		}				
+		}
 	}
 	
 	result = true;
@@ -233,6 +202,50 @@ handle_fail:
 	_ltc4155_clear_irq();
 	
 	return result;
+}
+
+bool ltc4155_init(bool disable_charger)
+{
+	io_input_pin(USBPM_IRQ);
+#ifndef DEBUG
+	io_set_pin(USBPM_IRQ);	// Enable pull-up for Open Drain
+#endif // DEBUG
+#ifdef I2C_REWORK
+	i2c_init_ex(CHRG_SDA, CHRG_SCL, _ltc4155_pull_up);
+#endif // I2C_REWORK
+	if (/*_ltc4155_clear_irq()*/_ltc4155_handle_irq() == false)	// Will set interrupt masks	// FIXME: Why does this cause instability?!
+		return false;
+
+	const uint8_t charge_state =
+		(disable_charger ? 0x0 : /*0xF*/0x7) << LTC4155_SHIFTS_CHARGE_CURRENT_LIMIT |	// Battery charger I limit = 100%
+		0x3 << LTC4155_SHIFTS_CHARGE_FLOAT_VOLTAGE |	// FIXME: Vbatt float = 4.05V - 4.2V for LiPo (default 0x00)
+		0x0;	// Full capacity charge threshold = 10%
+	if (i2c_write_ex(CHRG_SDA, CHRG_SCL, LTC4155_WRITE_ADDRESS, LTC4155_REG_CHARGE, charge_state, _ltc4155_pull_up) == false)
+		return false;
+
+	const uint8_t wall_state =
+		0x0 << LTC4155_SHIFTS_WALL_PRIORITY |
+		0x0 << LTC4155_SHIFTS_WALL_SAFETY_TIMER |	// Charge safety timer = 4hr
+		0xE;	// 3 amps, 0x1F - CLPROG1
+	if (i2c_write_ex(CHRG_SDA, CHRG_SCL, LTC4155_WRITE_ADDRESS, LTC4155_REG_WALL, wall_state, _ltc4155_pull_up) == false)
+		return false;
+
+	// FIXME:
+	// Disable ID pin detection & autonomous startup
+	// Enable OTG
+	//i2c_write_ex(CHRG_SDA, CHRG_SCL, LTC4155_WRITE_ADDRESS, LTC4155_REG_USB, LTC4155_USB_OTG_LOCKOUT, _ltc4155_pull_up);	// Disable autonomous startup
+	//i2c_write_ex(CHRG_SDA, CHRG_SCL, LTC4155_WRITE_ADDRESS, LTC4155_REG_ENABLE, LTC4155_ENABLE_USB_OTG, _ltc4155_pull_up);	// Enable OTG
+	
+	return true;
+}
+
+bool ltc4155_has_interrupt(void)
+{
+	//bool state = io_test_pin(USBPM_IRQ);
+	//debug_log_ex("4155IRQ", false);
+	//debug_log_byte(state);
+	//return (state != 1);
+	return (io_test_pin(USBPM_IRQ) == false);
 }
 
 bool ltc4155_handle_irq(void)

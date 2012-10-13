@@ -20,7 +20,13 @@
 #include "global.h"
 #include "error.h"
 
-const bool _ltc3675_pull_up = true;
+const bool _ltc3675_pull_up =
+#ifdef I2C_REWORK
+	true
+#else
+	false
+#endif // I2C_REWORK
+;
 
 volatile ltc3675_reg_helper_fn _ltc3675_reg_helper;
 
@@ -336,19 +342,19 @@ static bool _ltc3675_is_pgood(uint8_t reg)
 
 static bool _ltc3675_toggle_reg(uint8_t addr, uint8_t def_reg, bool on)
 {
-	//bool result = true;
+	bool result = true;
 	
 	//cli();
 	
 	uint8_t val = 0x00 | def_reg;
-//	if (i2c_read2_ex(PWR_SDA, PWR_SCL, LTC3675_READ_ADDRESS, addr, &val, _ltc3675_pull_up) == false)
-//		return false;
+	if (i2c_read2_ex(PWR_SDA, PWR_SCL, LTC3675_READ_ADDRESS, addr, &val, _ltc3675_pull_up) == false)
+		return false;
 	
 	val &= ~LTC3675_ENABLE_REGISTER_BIT;
 	
 	if (i2c_write_ex(PWR_SDA, PWR_SCL, LTC3675_WRITE_ADDRESS, addr, /*def_reg*/val | (on ? LTC3675_ENABLE_REGISTER_BIT : 0x00), _ltc3675_pull_up) == false)
-		return true;
-		//result = false;
+		//return true;
+		result = false;
 	
 	if (on)
 	{
@@ -357,8 +363,8 @@ static bool _ltc3675_toggle_reg(uint8_t addr, uint8_t def_reg, bool on)
 	
 	//sei();
 
-	//return result;
-	return true;
+	return result;
+	//return true;
 }
 
 bool ltc3675_enable_reg(ltc3675_regulator_t reg, bool on)

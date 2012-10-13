@@ -42,7 +42,9 @@ volatile STATE _state;
 	* Instruction following SEI is executed before interrupts
 	* LTC3675 real-time status doesn't contain UV/OT
 	* LTC3675 PGOOD -> power down (no point in checking blink state)
-	* On WALL, use TX, on battry use OTG switcher
+	* On WALL, use TX, on battery use OTG switcher
+	* PRR - Power Reduction Register (p40)
+	* 100% -> 50% battery charge limit
 */
 
 bool pmc_mask_irqs(bool mask)
@@ -81,8 +83,9 @@ int main(void)
 	OCR0A = 244;			// 250ms with 1024 prescale
 	TIMSK0 = _BV(OCIE0A);	// Enable CTC on Timer 0
 
-	power_init();
-	debug_log("Init");
+	bool init_result = power_init();
+	debug_log_ex("Init", false);
+	debug_log(init_result ? "+" : "-");
 	debug_blink(2);
 	//debug_blink_rev(6);
 	
@@ -100,7 +103,7 @@ int main(void)
 	
 	asm("nop");
 	
-	_state.wake_up = false;
+	_state.wake_up = false;	// This will fire the first time the regs are turned on
 	
 	bool one_more = false;
 	
@@ -117,16 +120,24 @@ int main(void)
 		
 		if (_state.core_power_bad)	// FIXME: Check whether it's supposed to be on
 		{
-			debug_log("ML:FPGA!");
-			
-			//power_off();
-//			_state.power_off = true;
-			
-			/*while (_state.wake_up == false)
+			if (power_is_subsys_on(PS_FPGA))
 			{
-				blink_error_sequence(1);
-			}*/
-//			pmc_set_blink_error(BlinkError_FPGA_Power);	// [If a blink error was set in power_off, this will supercede it]
+				_delay_ms(1);	// Seeing weird 120us drop in PGOOD during boot from flash (no apparent drop in 1.0V though)
+				
+				if (tps54478_is_power_good() == false)
+				{
+					debug_log("ML:FPGA!");
+			
+					//power_off();
+					_state.power_off = true;
+			
+					/*while (_state.wake_up == false)
+					{
+						blink_error_sequence(1);
+					}*/
+					pmc_set_blink_error(BlinkError_FPGA_Power);	// [If a blink error was set in power_off, this will supercede it]
+				}
+			}			
 			
 			_state.core_power_bad = false;
 		}
@@ -142,7 +153,7 @@ int main(void)
 				debug_log("ML:3675!");
 				
 				//power_off();
-//				_state.power_off = true;
+				_state.power_off = true;
 			}
 			
 			_state.ltc3675_irq = false;
@@ -159,7 +170,7 @@ int main(void)
 		}
 		else if (_state.wake_up)
 		{			
-			//if (_state.powered == false)	// This will fire the first time the regs are turned on (so will ignore when 'powered')
+			//if (_state.powered == false)	// Don't check in case button is held long enough to force LTC3675 shutdown (will not change 'powered' value)
 			{
 				debug_log("ML:On..");
 				
@@ -263,7 +274,7 @@ uint8_t pmc_get_blink_error(void)
 
 void pmc_set_blink_error(uint8_t count)
 {
-	if ((_state.blink_error != BlinkError_None) && (count > _state.blink_error))	// Prioritise
+	if ((_state.blink_error != BlinkError_None)/* && (count > _state.blink_error)*/)	// [Prioritise]
 		return;
 	else if (_state.blink_error == count)	// Don't restart if the same
 		return;

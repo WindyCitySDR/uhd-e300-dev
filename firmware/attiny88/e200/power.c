@@ -67,6 +67,14 @@ int8_t power_get_regulator_index(uint8_t device, uint8_t address)
 	return -1;
 }
 */
+bool power_is_subsys_on(power_subsystem_t index)
+{
+	if ((index <= PS_UNKNOWN) || (index >= PS_MAX))
+		return false;
+	
+	return default_reg_config[index].powered;
+}
+
 static bool ltc3675_reg_helper(uint8_t address)
 {
 	for (int8_t i = 0; i < ARRAY_SIZE(default_reg_config); ++i)
@@ -354,7 +362,7 @@ struct boot_step {
 	{ PS_VDRAM,				/*NULL, POWER_DEFAULT_DELAY, POWER_DEFAULT_RETRIES*/ },	// 9..10					// 5..6
 	{ PS_PERIPHERALS_1_8,	/*NULL, POWER_DEFAULT_DELAY, POWER_DEFAULT_RETRIES*/ },	// 11..12					// 7..8
 	{ PS_PERIPHERALS_3_3,	/*NULL, POWER_DEFAULT_DELAY, POWER_DEFAULT_RETRIES*/ },	// 13..14					// 9..10
-//	{ PS_TX,				/*NULL, POWER_DEFAULT_DELAY, POWER_DEFAULT_RETRIES*/ }  // CHECK: Leaving TX off
+	{ PS_TX,				/*NULL, POWER_DEFAULT_DELAY, POWER_DEFAULT_RETRIES*/ }  // CHECK: Leaving TX off
 };
 /*
 bool power_is_subsys_on(int8_t index)
@@ -367,7 +375,7 @@ bool power_is_subsys_on(int8_t index)
 	return step->powered;
 }
 */
-void power_init(void)
+bool power_init(void)
 {
     io_output_pin(CHARGE);
 	
@@ -381,15 +389,21 @@ void power_init(void)
 	//debug_log_hex_ex(batt_voltage >> 8, false);
 	//debug_log_hex(batt_voltage & 0xFF);
 	if (batt_voltage < BATT_MIN_VOLTAGE)
+	{
 		_state.battery_not_present = true;
+		
+		//debug_log("NoBatt");
+	}		
 
     tps54478_init(true);	// Will keep EN float (keep power on)
 #ifndef I2C_REWORK
 	i2c_init(PWR_SDA, PWR_SCL);
 #endif // I2C_REWORK
-	ltc4155_init(_state.battery_not_present);
+	if (ltc4155_init(_state.battery_not_present) == false)
+		return false;
 
-    ltc3675_init(ltc3675_reg_helper);
+    if (ltc3675_init(ltc3675_reg_helper) == false)
+		return false;
 #ifdef PS_POR_AVAILABLE
 	io_output_pin(PS_POR);
 #endif // PS_POR_AVAILABLE
@@ -438,6 +452,8 @@ void power_init(void)
 	TIMSK1 = _BV(OCIE1A);	// Enable CTC on Timer 1
 	
 	charge_set_led(false);
+	
+	return true;
 }
 
 bool power_on(void)
@@ -626,6 +642,8 @@ ISR(INT1_vect)	// PD(3) ONSWITCH_DB (PB_STAT): Any change
 	
 	if (ltc3675_is_power_button_depressed())
 	{
+		debug_log("PWRBTN");
+		
 		TCNT1 = 0;
 		if ((TCCR1B & 0x07) == 0x00)
 			_state.active_timers++;
@@ -655,12 +673,20 @@ ISR(INT1_vect)	// PD(3) ONSWITCH_DB (PB_STAT): Any change
 ISR(TIMER1_COMPA_vect)
 {
 	//cli();
+	
+	debug_log("TIMER1");
 
 	//TIMSK1 &= ~_BV(OCIE1A);	// Turn off timer
 	TCCR1B &= ~0x7;	// Disable timer
 	//_state.timers_running = false;
 	_state.active_timers--;
-	_state.power_off = true;
+	
+	if (_state.powered)
+	{
+		debug_log("PWROFF");
+		
+		_state.power_off = true;
+	}		
 	
 	//debug_set(DEBUG_2, true);
 	

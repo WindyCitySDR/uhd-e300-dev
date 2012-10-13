@@ -20,7 +20,8 @@ typedef enum power_subsystems {
     PS_VDRAM,
     PS_PERIPHERALS_1_8,
     PS_PERIPHERALS_3_3,
-    PS_TX
+    PS_TX,
+	PS_MAX
 } power_subsystem_t;
 
 enum Regulators
@@ -35,11 +36,12 @@ bool power_enable(power_subsystem_t subsys, bool on);
 void battery_init(void);
 uint16_t battery_get_voltage(void);  // mV
 
-void power_init(void);
+bool power_init(void);
 bool power_on(void);
 uint8_t power_off(void);
 
-bool power_is_subsys_on(int8_t index);
+//bool power_is_subsys_on(int8_t index);
+bool power_is_subsys_on(power_subsystem_t index);
 //int8_t power_get_regulator_index(uint8_t device, uint8_t address);
 //bool ltc3675_reg_helper(uint8_t address);
 
