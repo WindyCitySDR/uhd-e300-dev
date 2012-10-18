@@ -717,7 +717,15 @@ public:
         _b200_iface->write_reg(0x0a2, 0x7f); // Cal Kexp
         _b200_iface->write_reg(0x0a5, 0x01); // Cal magnitude threshold VVVV
         _b200_iface->write_reg(0x0a6, 0x01);
-        _b200_iface->write_reg(0x0aa, 0x25); // Cal gain table index
+
+        /* The gain table index used for calibration must be adjusted for the
+         * mid-table to get a TIA index = 1 and LPF index = 0. */
+        if((_rx_freq >= 1300e6) && (_rx_freq < 4000e6)) {
+            _b200_iface->write_reg(0x0aa, 0x22); // Cal gain table index
+        } else {
+            _b200_iface->write_reg(0x0aa, 0x25); // Cal gain table index
+        }
+
         _b200_iface->write_reg(0x0a4, 0xf0); // Cal setting conut
         _b200_iface->write_reg(0x0ae, 0x00); // Cal LPF gain index (split mode)
 
