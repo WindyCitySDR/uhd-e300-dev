@@ -666,11 +666,19 @@ public:
      * Note that this function is called from within the TX quadrature
      * calibration function. */
     void calibrate_rf_dc_offset() {
+        /* Some settings are frequency-dependent. */
+        if(_rx_freq < 4e9) {
+            _b200_iface->write_reg(0x186, 0x32); // RF DC Offset count
+            _b200_iface->write_reg(0x187, 0x24);
+            _b200_iface->write_reg(0x188, 0x05);
+        } else {
+            _b200_iface->write_reg(0x186, 0x28); // RF DC Offset count
+            _b200_iface->write_reg(0x187, 0x34);
+            _b200_iface->write_reg(0x188, 0x06);
+        }
+
         _b200_iface->write_reg(0x185, 0x20); // RF DC Offset wait count
-        _b200_iface->write_reg(0x186, 0x32); // RF DC Offset count
-        _b200_iface->write_reg(0x187, 0x24); // All calibration settings VVVV
         _b200_iface->write_reg(0x18b, 0x83);
-        _b200_iface->write_reg(0x188, 0x05);
         _b200_iface->write_reg(0x189, 0x30);
 
         /* Run the calibration! */
