@@ -729,6 +729,19 @@ public:
         reg0a3 = _b200_iface->read_reg(0x0a3);
         _b200_iface->write_reg(0x0a3, (reg0a3 & 0x3F) | nco_freq);
 
+        /* It is possible to reach a configuration that won't operate correctly,
+         * where the two test tones used for quadrature calibration are outside
+         * of the RX BBF, and therefore don't make it to the ADC. We will check
+         * for that scenario here. */
+        double max_cal_freq = (((_baseband_bw * _tfir_factor) * ((nco_freq >> 6) + 1)) / 32) * 2;
+        double bbbw = _baseband_bw / 2.0; // bbbw represents the one-sided BW
+        if(bbbw > 28e6) {
+            bbbw = 28e6;
+        } else if (bbbw < 0.20e6) {
+            bbbw = 0.20e6;
+        }
+        UHD_ASSERT_THROW(max_cal_freq < bbbw);
+
         _b200_iface->write_reg(0x0a1, 0x7B); // Set tracking coefficient
         _b200_iface->write_reg(0x0a9, 0xff); // Cal count
         _b200_iface->write_reg(0x0a2, 0x7f); // Cal Kexp
@@ -1193,7 +1206,7 @@ public:
         /* Set the decimation and interpolation values in the RX and TX chains.
          * This also switches filters in / out. */
         int divfactor = 0;
-        int tfir = 0;
+        _tfir_factor = 0;
         if(rate <= 20e6) {
             // RX1 enabled, 2, 2, 2, 2
             reg_rxfilt = BOOST_BINARY( 01011110 ) ;
@@ -1202,16 +1215,16 @@ public:
             reg_txfilt = BOOST_BINARY( 01011110 ) ;
 
             divfactor = 16;
-            tfir = 2;
+            _tfir_factor = 2;
         } else if((rate > 20e6) && (rate < 23e6)) {
-           // RX1 enabled, 3, 2, 2, 2
+            // RX1 enabled, 3, 2, 2, 2
             reg_rxfilt = BOOST_BINARY( 01101110 ) ;
 
             // TX1 enabled, 3, 1, 2, 2
             reg_txfilt = BOOST_BINARY( 01100110 ) ;
 
             divfactor = 24;
-            tfir = 2;
+            _tfir_factor = 2;
         } else if((rate >= 23e6) && (rate < 41e6)) {
             // RX1 enabled, 2, 2, 2, 2
             reg_rxfilt = BOOST_BINARY( 01011110 ) ;
@@ -1220,7 +1233,7 @@ public:
             reg_txfilt = BOOST_BINARY( 01001110 ) ;
 
             divfactor = 16;
-            tfir = 2;
+            _tfir_factor = 2;
         } else if((rate >= 41e6) && (rate <= 56e6)) {
             // RX1 enabled, 3, 1, 2, 2
             reg_rxfilt = BOOST_BINARY( 01100110 ) ;
@@ -1229,7 +1242,7 @@ public:
             reg_txfilt = BOOST_BINARY( 01100010 ) ;
 
             divfactor = 12;
-            tfir = 2;
+            _tfir_factor = 2;
         } else if((rate > 56e6) && (rate <= 61.44e6)) {
             // RX1 enabled, 3, 1, 1, 2
             reg_rxfilt = BOOST_BINARY( 01100010 ) ;
@@ -1238,7 +1251,7 @@ public:
             reg_txfilt = BOOST_BINARY( 01100001 ) ;
 
             divfactor = 6;
-            tfir = 1;
+            _tfir_factor = 1;
         } else {
             UHD_THROW_INVALID_CODE_PATH();
         }
@@ -1273,7 +1286,7 @@ public:
         /* Setup the RX and TX FIR filters. Scale the number of taps based on
          * the clock speed. */
         int max_tx_taps = 16 * std::min(int((dacclk / rate) + 0.5), \
-                std::min(4 * (1 << tfir), 8));
+                std::min(4 * (1 << _tfir_factor), 8));
         int max_rx_taps = std::min((16 * int(adcclk / rate)), 128);
 
         int num_tx_taps = get_num_taps(max_tx_taps);
@@ -1691,6 +1704,8 @@ private:
     double _req_clock_rate, _req_coreclk;
     uint16_t _rx_bbf_tunediv;
     uint8_t _curr_gain_table;
+
+    int _tfir_factor;
 
     /* Shadow register fields.*/
     boost::uint32_t fpga_bandsel;
