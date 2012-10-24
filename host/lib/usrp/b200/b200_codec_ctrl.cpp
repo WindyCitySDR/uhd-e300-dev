@@ -717,9 +717,18 @@ public:
      * calibrations, and it is called from calibrate_tx_quadrature. */
     void tx_quadrature_cal_routine(void) {
 
-        uint8_t maskbits = _b200_iface->read_reg(0x0a3) & 0x3F;
-        _b200_iface->write_reg(0x0a0, 0x15); // Set NCO freq VVVV
-        _b200_iface->write_reg(0x0a3, 0x00 | maskbits);
+        /* This is a weird process, but here is how it works:
+         * 1) Read the calibrated NCO frequency bits out of 0A3.
+         * 2) Write the two bits to the RX NCO freq part of 0A0.
+         * 3) Re-read 0A3 to get bits [5:0] because maybe they changed?
+         * 4) Update only the TX NCO freq bits in 0A3.
+         * 5) Profit (I hope). */
+        uint8_t reg0a3 = _b200_iface->read_reg(0x0a3);
+        uint8_t nco_freq = (reg0a3 & 0xC0);
+        _b200_iface->write_reg(0x0a0, 0x15 | (nco_freq >> 1));
+        reg0a3 = _b200_iface->read_reg(0x0a3);
+        _b200_iface->write_reg(0x0a3, (reg0a3 & 0x3F) | nco_freq);
+
         _b200_iface->write_reg(0x0a1, 0x7B); // Set tracking coefficient
         _b200_iface->write_reg(0x0a9, 0xff); // Cal count
         _b200_iface->write_reg(0x0a2, 0x7f); // Cal Kexp
