@@ -1139,7 +1139,7 @@ public:
 
         calibrate_synth_charge_pumps();
 
-        tune_helper("RX", 800e6);
+        tune_helper("RX", 1000e6);
         tune_helper("TX", 850e6);
 
         program_mixer_gm_subtable();
@@ -1178,9 +1178,8 @@ public:
         _b200_iface->write_reg(0x158, 0x0D); // RSSI Mode Select
         _b200_iface->write_reg(0x15C, 0x67); // Power Measurement Duration
 
-        /* Not sure why we do this, but it's what ADI does. */
-        _b200_iface->write_reg(0x002, reg_txfilt);
-        _b200_iface->write_reg(0x003, reg_rxfilt);
+        /* Turn on the default RX & TX chains. */
+        set_active_chains(true, false, true, false);
 
         /* Set TXers & RXers on (only works in FDD mode) */
         _b200_iface->write_reg(0x014, 0x21);
@@ -1199,56 +1198,55 @@ public:
 
         UHD_VAR(rate);
 
-        /* Turn off the receivers and transmitters. */
-        _b200_iface->write_reg(0x002, (reg_txfilt & 0x3F));
-        _b200_iface->write_reg(0x003, (reg_rxfilt & 0x3F));
-
         /* Set the decimation and interpolation values in the RX and TX chains.
-         * This also switches filters in / out. */
+         * This also switches filters in / out. Note that all transmitters and
+         * receivers have to be turned on for the calibration portion of
+         * bring-up, and then they will be switched out to reflect the actual
+         * user-requested antenna selections. */
         int divfactor = 0;
         _tfir_factor = 0;
         if(rate <= 20e6) {
-            // RX1 enabled, 2, 2, 2, 2
-            reg_rxfilt = BOOST_BINARY( 01011110 ) ;
+            // RX1 + RX2 enabled, 2, 2, 2, 2
+            reg_rxfilt = BOOST_BINARY( 11011110 ) ;
 
-            // TX1 enabled, 2, 2, 2, 2
-            reg_txfilt = BOOST_BINARY( 01011110 ) ;
+            // TX1 + TX2 enabled, 2, 2, 2, 2
+            reg_txfilt = BOOST_BINARY( 11011110 ) ;
 
             divfactor = 16;
             _tfir_factor = 2;
         } else if((rate > 20e6) && (rate < 23e6)) {
-            // RX1 enabled, 3, 2, 2, 2
-            reg_rxfilt = BOOST_BINARY( 01101110 ) ;
+            // RX1 + RX2 enabled, 3, 2, 2, 2
+            reg_rxfilt = BOOST_BINARY( 11101110 ) ;
 
-            // TX1 enabled, 3, 1, 2, 2
-            reg_txfilt = BOOST_BINARY( 01100110 ) ;
+            // TX1 + TX2 enabled, 3, 1, 2, 2
+            reg_txfilt = BOOST_BINARY( 11100110 ) ;
 
             divfactor = 24;
             _tfir_factor = 2;
         } else if((rate >= 23e6) && (rate < 41e6)) {
-            // RX1 enabled, 2, 2, 2, 2
-            reg_rxfilt = BOOST_BINARY( 01011110 ) ;
+            // RX1 + RX2 enabled, 2, 2, 2, 2
+            reg_rxfilt = BOOST_BINARY( 11011110 ) ;
 
-            // TX1 enabled, 1, 2, 2, 2
-            reg_txfilt = BOOST_BINARY( 01001110 ) ;
+            // TX1 + TX2 enabled, 1, 2, 2, 2
+            reg_txfilt = BOOST_BINARY( 11001110 ) ;
 
             divfactor = 16;
             _tfir_factor = 2;
         } else if((rate >= 41e6) && (rate <= 56e6)) {
-            // RX1 enabled, 3, 1, 2, 2
-            reg_rxfilt = BOOST_BINARY( 01100110 ) ;
+            // RX1 + RX2 enabled, 3, 1, 2, 2
+            reg_rxfilt = BOOST_BINARY( 11100110 ) ;
 
-            // TX1 enabled, 3, 1, 1, 2
-            reg_txfilt = BOOST_BINARY( 01100010 ) ;
+            // TX1 + TX2 enabled, 3, 1, 1, 2
+            reg_txfilt = BOOST_BINARY( 11100010 ) ;
 
             divfactor = 12;
             _tfir_factor = 2;
         } else if((rate > 56e6) && (rate <= 61.44e6)) {
-            // RX1 enabled, 3, 1, 1, 2
-            reg_rxfilt = BOOST_BINARY( 01100010 ) ;
+            // RX1 + RX2 enabled, 3, 1, 1, 2
+            reg_rxfilt = BOOST_BINARY( 11100010 ) ;
 
-            // TX1 enabled, 3, 1, 1, 1
-            reg_txfilt = BOOST_BINARY( 01100001 ) ;
+            // TX1 + TX2 enabled, 3, 1, 1, 1
+            reg_txfilt = BOOST_BINARY( 11100001 ) ;
 
             divfactor = 6;
             _tfir_factor = 1;
@@ -1583,6 +1581,42 @@ public:
         };
 
         return rate;
+    }
+
+
+    /* Set which of the four TX / RX chains provided by Catalina are active.
+     *
+     * Catalina provides two sets of chains, Side A and Side B. Each side
+     * provides one TX antenna, and one RX antenna. The B200 maintains the USRP
+     * standard of providing one antenna connection that is both TX & RX, and
+     * one that is RX-only - for each chain. Thus, the possible antenna and
+     * chain selections are:
+     *
+     *  B200 Antenna    Catalina Side       Catalina Chain
+     *  -------------------------------------------------------------------
+     *  TX / RX1        Side A              TX1 (when switched to TX)
+     *  TX / RX1        Side A              RX1 (when switched to RX)
+     *  RX1             Side A              RX1
+     *
+     *  TX / RX2        Side B              TX2 (when switched to TX)
+     *  TX / RX2        Side B              RX2 (when switched to RX)
+     *  RX2             Side B              RX2
+     */
+    void set_active_chains(bool tx1, bool tx2, bool rx1, bool rx2) {
+
+        /* Clear out the current active chain settings. */
+        reg_txfilt = reg_txfilt & 0x3F;
+        reg_rxfilt = reg_rxfilt & 0x3F;
+
+        /* Turn on the different chains based on the passed parameters. */
+        if(tx1) { reg_txfilt = reg_txfilt | 0x40; }
+        if(tx2) { reg_txfilt = reg_txfilt | 0x80; }
+        if(rx1) { reg_rxfilt = reg_rxfilt | 0x40; }
+        if(rx2) { reg_rxfilt = reg_rxfilt | 0x80; }
+
+        /* Turn on / off the chains. */
+        _b200_iface->write_reg(0x002, reg_txfilt);
+        _b200_iface->write_reg(0x003, reg_rxfilt);
     }
 
     /* Tune the RX or TX frequency.

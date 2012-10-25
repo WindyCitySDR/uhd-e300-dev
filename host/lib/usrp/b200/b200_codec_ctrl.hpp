@@ -57,12 +57,14 @@ public:
     //! set a new clock rate, return the exact value
     virtual double set_clock_rate(const double rate) = 0;
 
+    //! set which RX and TX chains/antennas are active
+    virtual void set_active_chains(bool tx1, bool tx2, bool rx1, bool rx2) = 0;
+
     //! tune the given frontend, return the exact value
     virtual double tune(const std::string &which, const double value) = 0;
 
     //! output a ~480 kHz test tone at 800 MHz
     virtual void output_test_tone(void) = 0;
-
 };
 
 #endif /* INCLUDED_B200_CODEC_CTRL_HPP */
