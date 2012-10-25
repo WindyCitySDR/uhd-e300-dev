@@ -1529,6 +1529,12 @@ public:
                 break;
         };
 
+        /* Store the current chain / antenna selections so that we can restore
+         * them at the end of this routine; all chains will be enabled from
+         * within setup_rates for calibration purposes. */
+        uint8_t orig_tx_chains = reg_txfilt & 0xC0;
+        uint8_t orig_rx_chains = reg_rxfilt & 0xC0;
+
         /* Call into the clock configuration / settings function. This is where
          * all the hard work gets done. */
         double rate = setup_rates(req_rate);
@@ -1569,7 +1575,11 @@ public:
                 break;
 
             case 0x0A:
-                /* Transition back to FDD. */
+                /* Transition back to FDD, and restore the original antenna
+                 * / chain selections. */
+                reg_txfilt = (reg_txfilt & 0x3F) | orig_tx_chains;
+                reg_rxfilt = (reg_rxfilt & 0x3F) | orig_rx_chains;
+
                 _b200_iface->write_reg(0x002, reg_txfilt);
                 _b200_iface->write_reg(0x003, reg_rxfilt);
                 _b200_iface->write_reg(0x014, 0x21);
