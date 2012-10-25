@@ -398,8 +398,8 @@ _data_transport.reset();
     ////////////////////////////////////////////////////////////////////
     _codec_ctrl = b200_codec_ctrl::make(_iface, _ctrl);
     static const std::vector<std::string> frontends = boost::assign::list_of
-        ("TX_A")("TX_B")("RX_A")("RX_B")
-    ;
+        ("TX_A")("TX_B")("RX_A")("RX_B");
+
     BOOST_FOREACH(const std::string &fe_name, frontends)
     {
         const std::string x = std::string(1, tolower(fe_name[0]));
@@ -652,17 +652,23 @@ void b200_impl::update_gpio_state(void)
 void b200_impl::update_antenna_sel(const std::string& which, const std::string &ant)
 {
     int val = 0;
-    if      (ant == "RX2")   val = STATE_RX_ON_RX2;
-    else if (ant == "TX/RX") val = STATE_RX_ON_TXRX;
-    else throw uhd::value_error("update_antenna_sel unknown antenna " + ant);
 
-    if (which == "RX_A")
-    {
-        _atr0->set_atr_reg(dboard_iface::ATR_REG_RX_ONLY, val | CODEC_TXRX);
+    // FIXME The current antenna selections are totally fucking broken because
+    // of the current state of the ATR switches on the B200
+    if(ant == "RX2") {
+        val = STATE_RX_ON_RX2;
+    } else if(ant == "TX/RX") {
+        val = STATE_RX_ON_TXRX;
+    } else {
+        throw uhd::value_error("update_antenna_sel unknown antenna " + ant);
     }
-    if (which == "RX_B")
-    {
+
+    if(which == "RX_A") {
+        _atr0->set_atr_reg(dboard_iface::ATR_REG_RX_ONLY, val | CODEC_TXRX);
+    } else if(which == "RX_B") {
         _atr1->set_atr_reg(dboard_iface::ATR_REG_RX_ONLY, val);
+    } else {
+        throw uhd::value_error("update_antenna_sel unknown antenna " + ant);
     }
 }
 
