@@ -187,6 +187,85 @@ void debug_blink_rev(uint8_t count)
 
 #ifdef ENABLE_SERIAL
 
+static void _serial_tx(uint8_t* buffer)
+{
+	//uint8_t time_fix = 0;
+	// 3333/2 - 10
+	// 650
+	//	[-2 for DEV] -20 works (perhaps different USB-Serial converter)
+	//	[-20 for PRD] Which board?
+	//	+20 Board #5 (-0: 3.592, -10: 3.280)
+	const uint16_t delay = 650+20;
+	uint16_t countdown;
+	
+	for (uint8_t j = 0; j < 10; ++j)
+	{
+		if (buffer[j])
+		SERIAL_DEBUG_PORT |= _BV(SERIAL_DEBUG_INDEX);
+		else
+		SERIAL_DEBUG_PORT &= ~_BV(SERIAL_DEBUG_INDEX);
+		
+		countdown = delay;
+		while (--countdown)
+		__asm("nop");
+	}
+}
+
+static void _serial_tx_char(char c)
+{
+	uint8_t buffer[10];
+	uint8_t i = 0;
+	
+	buffer[i++] = 0;	// START
+	for (int idx = 0; idx < 8; ++idx)
+	buffer[i++] = (((uint8_t)(c) & ((uint8_t)1<<((idx)))) ? 0x01 : 0x00);	// Endianness: 7-
+	buffer[i++] = 1;	// STOP
+	
+	_serial_tx(buffer);
+}
+
+void debug_log_ex_P(const char* message, bool new_line)
+{
+	char c = pgm_read_byte(message);
+	if (c == '\0')
+		return;
+	
+	pmc_mask_irqs(true);
+
+	do
+	{
+		_serial_tx_char(c);
+		c = pgm_read_byte(++message);
+	} while (c != '\0');
+	
+	if (new_line)
+		_serial_tx_char('\n');
+
+	io_set_pin(SERIAL_DEBUG);
+	
+	pmc_mask_irqs(false);
+}
+
+void _debug_log_ex(const char* message, bool new_line)
+{
+	if (message[0] == '\0')
+	return;
+	
+	pmc_mask_irqs(true);
+
+	do
+	{
+		_serial_tx_char(*message);
+	} while (*(++message) != '\0');
+	
+	if (new_line)
+	_serial_tx_char('\n');
+
+	io_set_pin(SERIAL_DEBUG);
+	
+	pmc_mask_irqs(false);
+}
+
 void debug_log_byte_ex(uint8_t n, bool new_line)
 {
 	char ch[4];
@@ -194,7 +273,7 @@ void debug_log_byte_ex(uint8_t n, bool new_line)
 	ch[1] = '0' + ((n % 100) / 10);
 	ch[2] = '0' + (n % 10);
 	ch[3] = '\0';
-	debug_log_ex(ch, new_line);
+	_debug_log_ex(ch, new_line);
 }
 
 void debug_log_hex_ex(uint8_t n, bool new_line)
@@ -212,64 +291,7 @@ void debug_log_hex_ex(uint8_t n, bool new_line)
 	else
 		ch[2] = 'A' + (n - 10);
 	ch[3] = '\0';
-	debug_log_ex(ch, new_line);
-}
-
-static void _serial_tx(uint8_t* buffer)
-{
-	//uint8_t time_fix = 0;
-	// 3333/2 - 10
-	// 650
-	//	[-2 for DEV] -20 works (perhaps different USB-Serial converter)
-	//	[-20 for PRD] Which board?
-	//	+20 Board #5 (-0: 3.592, -10: 3.280)
-	const uint16_t delay = 650+20;
-	uint16_t countdown;
-	
-	for (uint8_t j = 0; j < 10; ++j)
-	{
-		if (buffer[j])
-			SERIAL_DEBUG_PORT |= _BV(SERIAL_DEBUG_INDEX);
-		else
-			SERIAL_DEBUG_PORT &= ~_BV(SERIAL_DEBUG_INDEX);
-		
-		countdown = delay;
-		while (--countdown)
-			__asm("nop");
-	}
-}
-
-static void _serial_tx_char(char c)
-{
-	uint8_t buffer[10];
-	uint8_t i = 0;
-	
-	buffer[i++] = 0;	// START
-	for (int idx = 0; idx < 8; ++idx)
-		buffer[i++] = (((uint8_t)(c) & ((uint8_t)1<<((idx)))) ? 0x01 : 0x00);	// Endianness: 7-
-	buffer[i++] = 1;	// STOP
-	
-	_serial_tx(buffer);
-}
-
-void debug_log_ex(const char* message, bool new_line)
-{
-	if (message[0] == '\0')
-		return;
-	
-	pmc_mask_irqs(true);
-
-	do 
-	{
-		_serial_tx_char(*message);
-	} while (*(++message) != '\0');
-	
-	if (new_line)
-		_serial_tx_char('\n');
-
-	io_set_pin(SERIAL_DEBUG);
-	
-	pmc_mask_irqs(false);
+	_debug_log_ex(ch, new_line);
 }
 
 #endif // ENABLE_SERIAL

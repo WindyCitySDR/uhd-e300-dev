@@ -10,10 +10,12 @@
 
 #include <stdbool.h>
 #include <stdint.h>
+#include <avr/pgmspace.h>
 
 typedef struct State
 {
 	bool interrupts_enabled;
+	uint8_t interrupt_depth;
 	//bool timers_running;
 	uint8_t active_timers;
 	bool powered;

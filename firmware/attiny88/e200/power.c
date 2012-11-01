@@ -121,7 +121,7 @@ void tps54478_init(bool enable)
 	io_clear_pin(CORE_PWR_EN);
 	
     io_input_pin(CORE_PGOOD);
-#ifndef DEBUG	// Don't enable pull-up when connected to a pulled-up switch
+#if !defined(DEBUG) && !defined(ATTINY88_DIP)	// Don't enable pull-up when connected to a pulled-up switch
 	io_set_pin(CORE_PGOOD);	// Enable pull-up for Open Drain
 #endif // DEBUG
 //#ifdef DEBUG
@@ -165,7 +165,7 @@ static io_pin_t CHARGE      = IO_PD(1);
 
 void charge_set_led(bool on)
 {
-#ifdef DEBUG
+#ifdef ATTINY88_DIP
 	on = !on;
 #endif // DEBUG
     io_enable_pin(CHARGE, on);
@@ -180,7 +180,7 @@ void power_signal_interrupt(void)
 
 ///////////////////////////////////////////////////////////////////////////////
 
-#ifndef DEBUG
+#if !defined(DEBUG) && !(defined(ENABLE_SERIAL) && defined(ATTINY88_DIP))
 static io_pin_t PS_POR      = IO_PD(6);
 #define PS_POR_AVAILABLE
 #endif // DEBUG
@@ -383,6 +383,15 @@ bool power_init(void)
 	
 	battery_init();
 	
+    tps54478_init(true);	// Will keep EN float (keep power on)
+#ifndef I2C_REWORK
+	i2c_init(PWR_SDA, PWR_SCL);
+#endif // I2C_REWORK
+	if (ltc4155_init(/*_state.battery_not_present*/true/*false*/) == false)
+		return false;
+	
+	_delay_ms(25);	// Wait for charge current to stop (Vbatt to fall to 0V)
+	
 	uint16_t batt_voltage = battery_get_voltage();
 	debug_log_ex("Vb ", false);
 	debug_log_byte((uint8_t)(batt_voltage / 100));
@@ -393,14 +402,11 @@ bool power_init(void)
 		_state.battery_not_present = true;
 		
 		//debug_log("NoBatt");
-	}		
-
-    tps54478_init(true);	// Will keep EN float (keep power on)
-#ifndef I2C_REWORK
-	i2c_init(PWR_SDA, PWR_SCL);
-#endif // I2C_REWORK
-	if (ltc4155_init(_state.battery_not_present) == false)
-		return false;
+	}
+	else
+	{
+		ltc4155_set_charge_current_limit(50);
+	}
 
     if (ltc3675_init(ltc3675_reg_helper) == false)
 		return false;
@@ -495,6 +501,8 @@ bool power_on(void)
 //				debug_blink(3 + (step_count * 2) + 1);
 //				debug_blink_rev(7 + (step_count * 2) + 1);
 
+//ltc4155_dump();
+
                 break;
 	        }
 			
@@ -531,6 +539,8 @@ bool power_on(void)
 	fpga_reset(false);  // Power has been brought up, so let FPGA run
 	
 	///////////////////////////////////
+	
+//	ltc4155_dump();
 	
 	// Turn off WAKEUP interrupt, enable ONSWITCH_DB
 	//EIMSK = _BV(INT1);
@@ -628,25 +638,31 @@ static io_pin_t DEBUG_2	= IO_PB(7);
 ISR(INT0_vect)	// PD(2) WAKEUP: Rising edge
 {
 	//cli();
+	pmc_mask_irqs(true);
 	
 	//power_on();
 	debug_log("\nINT0\n");
 	_state.wake_up = true;
 	
 	//sei();
+	pmc_mask_irqs(false);
 }
 
 ISR(INT1_vect)	// PD(3) ONSWITCH_DB (PB_STAT): Any change
 {
 	//cli();
+	pmc_mask_irqs(true);
 	
 	if (ltc3675_is_power_button_depressed())
 	{
-		debug_log("PWRBTN");
+		debug_log("PWRBTN+");
 		
 		TCNT1 = 0;
 		if ((TCCR1B & 0x07) == 0x00)
+		{
 			_state.active_timers++;
+			debug_log("TIMER1+");
+		}
 		TCCR1B |= /*0x5*/0x3;	// [1024] 64 prescaler
 		//_state.timers_running = true;
 		
@@ -655,11 +671,16 @@ ISR(INT1_vect)	// PD(3) ONSWITCH_DB (PB_STAT): Any change
 	}
 	else
 	{
+		debug_log("PWRBTN-");
+		
 		//if (TIMSK1 & _BV(OCIE1A))	// If letting go of button and still running, stop timer
 		{
 			//TIMSK1 &= ~_BV(OCIE1A);
 			if ((TCCR1B & 0x07) != 0x00)
+			{
 				_state.active_timers--;
+				debug_log("TIMER1-");
+			}
 			TCCR1B &= ~0x7;	// Disable timer
 			//_state.timers_running = false;
 			
@@ -668,11 +689,13 @@ ISR(INT1_vect)	// PD(3) ONSWITCH_DB (PB_STAT): Any change
 	}
 	
 	//sei();
+	pmc_mask_irqs(false);
 }
 
 ISR(TIMER1_COMPA_vect)
 {
 	//cli();
+	pmc_mask_irqs(true);
 	
 	debug_log("TIMER1");
 
@@ -693,6 +716,7 @@ ISR(TIMER1_COMPA_vect)
 	//power_off();
 	
 	//sei();
+	pmc_mask_irqs(false);
 	
 	//sleep_mode();
 }
@@ -700,6 +724,9 @@ ISR(TIMER1_COMPA_vect)
 ISR(PCINT0_vect)
 {
 	//cli();
+	pmc_mask_irqs(true);
+	
+	//debug_log("PCINT0");
 	
 	// CORE_PGOOD
 	//	Assert low: power problem -> shutdown
@@ -719,11 +746,15 @@ ISR(PCINT0_vect)
 	}
 	
 	//sei();
+	pmc_mask_irqs(false);
 }
 
 ISR(PCINT2_vect)
 {
 	//cli();
+	pmc_mask_irqs(true);
+	
+	//debug_log("PCINT2");
 	
 	// PWR_IRQ
 	//	Regulator problem: shutdown
@@ -737,4 +768,5 @@ ISR(PCINT2_vect)
 	}
 	
 	//sei();
+	pmc_mask_irqs(false);
 }

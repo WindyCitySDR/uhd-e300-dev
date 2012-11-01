@@ -180,9 +180,16 @@ bool _ltc3675_handle_irq(void)
 	uint8_t val = 0x00;
 	bool result = false;
 	
-	if (i2c_read2_ex(PWR_SDA, PWR_SCL, LTC3675_READ_ADDRESS, /*LTC3675_REG_LATCHED_STATUS*/LTC3675_REG_REALTIME_STATUS, &val, _ltc3675_pull_up))
+	if (i2c_read2_ex(PWR_SDA, PWR_SCL, LTC3675_READ_ADDRESS, LTC3675_REG_LATCHED_STATUS, &val, _ltc3675_pull_up))
 	{
 		debug_log_ex("3675LTCH ", false);
+		debug_log_hex(val);
+	}
+	
+	if (i2c_read2_ex(PWR_SDA, PWR_SCL, LTC3675_READ_ADDRESS, /*LTC3675_REG_LATCHED_STATUS*/LTC3675_REG_REALTIME_STATUS, &val, _ltc3675_pull_up))	// No point acting on latched because could have been resolved
+	{
+		//debug_log_ex("3675LTCH ", false);
+		debug_log_ex("3675RT ", false);
 		debug_log_hex(val);
 		
 		_ltc3675_last_status = val;
@@ -301,7 +308,7 @@ bool ltc3675_init(ltc3675_reg_helper_fn helper)
 	i2c_init_ex(PWR_SDA, PWR_SCL, _ltc3675_pull_up);
 #endif // I2C_REWORK
     io_input_pin(PWR_IRQ);
-#ifndef DEBUG
+#if !defined(DEBUG) && !defined(ATTINY88_DIP)
 	io_set_pin(PWR_IRQ);	// Enable pull-up for Open Drain
 #endif // DEBUG
 	
@@ -330,6 +337,11 @@ bool ltc3675_init(ltc3675_reg_helper_fn helper)
 	//	Over temp warning threshold (default): 10 degrees below
 
     return true;
+}
+
+bool ltc3675_is_waking_up(void)
+{
+	return io_test_pin(WAKEUP);
 }
 
 static bool _ltc3675_is_pgood(uint8_t reg)
@@ -425,7 +437,7 @@ bool ltc3675_enable_reg(ltc3675_regulator_t reg, bool on)
 		//	return false;
     }
 	
-	debug_log((result ? "+" : "-"));
+	_debug_log((result ? "+" : "-"));
 
     return result;
 }

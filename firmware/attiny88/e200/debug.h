@@ -54,23 +54,30 @@ DEBUG_INLINE void debug_wait(void) DEBUG_NOOP
 
 #ifdef ENABLE_SERIAL
 
-void debug_log_ex(const char* message, bool new_line);
+void debug_log_ex_P(const char* message, bool new_line);
 void debug_log_hex_ex(uint8_t n, bool new_line);
 void debug_log_byte_ex(uint8_t n, bool new_line);
+void _debug_log_ex(const char* message, bool new_line);
 
-inline void debug_log(const char* message) { debug_log_ex(message, true); }
+inline void debug_log_P(const char* message) { debug_log_ex_P(message, true); }
 inline void debug_log_hex(uint8_t n) { debug_log_hex_ex(n, true); }
 inline void debug_log_byte(uint8_t n) { debug_log_byte_ex(n, true); }
+inline void _debug_log(const char* message) { _debug_log_ex(message, true); }
 
 #else
 
-inline void debug_log_ex		(const char* message, bool new_line) {};
+inline void debug_log_ex_P		(const char* message, bool new_line) {};
 inline void debug_log_hex_ex	(uint8_t n, bool new_line) {};
 inline void debug_log_byte_ex	(uint8_t n, bool new_line) {};
+inline void _debug_log_ex		(const char* message, bool new_line) {};
 
-#define debug_log			(void)
+#define debug_log_P			(void)
 #define debug_log_hex		(void)
 #define debug_log_byte		(void)
+#define _debug_log			(void)
 #endif // ENABLE_SERIAL
+
+#define debug_log(x)		debug_log_P(PSTR(x))
+#define debug_log_ex(x,nl)	debug_log_ex_P(PSTR(x), nl)
 
 #endif /* DEBUG_H_ */

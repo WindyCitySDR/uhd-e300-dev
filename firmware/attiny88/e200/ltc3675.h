@@ -32,5 +32,6 @@ int8_t ltc3675_check_status(void);
 uint8_t ltc3675_get_last_status(void);
 uint8_t ltc3675_status_to_error(uint8_t val);
 bool ltc3675_is_power_good(uint8_t val);
+bool ltc3675_is_waking_up(void);
 
 #endif /* LTC3675_H */

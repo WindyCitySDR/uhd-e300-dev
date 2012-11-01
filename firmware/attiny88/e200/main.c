@@ -19,6 +19,8 @@
 #include "ltc3675.h"
 #include "ltc4155.h"
 
+#define AUTO_POWER_ON
+
 #define INITIAL_DELAY	250	// ms
 
 FUSES = {	// FIXME: & FUSE_CKSEL1 for low power 128 kHz clock
@@ -44,7 +46,19 @@ volatile STATE _state;
 	* LTC3675 PGOOD -> power down (no point in checking blink state)
 	* On WALL, use TX, on battery use OTG switcher
 	* PRR - Power Reduction Register (p40)
-	* 100% -> 50% battery charge limit
+	- 100% -> 50% battery charge limit
+	* Check latched status for UV/OT in 3675
+	* If blink error reset, get latest charge status from 4155
+	* Fix UV status check from 3675/4155 as they currently share the same error 
+	* Use charger termination at 8hr or Vc/x
+	* Check PGood on all regs after power on before setting powered=true
+	* Re-init 4155 on soft-power on
+	- Re-set 3A limit in 4155 after external power connection
+	- Removing power when running on battery, 4155GO 0xA0 - but WALL has been removed
+	- Why is charger reporting Constant Current when power is removed
+	* ltc3675_is_power_button_depressed: check if any reg is on, otherwise value will be invalid
+	* When e.g. 3.3V doesn't come up, blink code is correctly 4 but there's a very short blink before re-starting the sequence
+	- Vprog<Vc/x
 */
 
 bool pmc_mask_irqs(bool mask)
@@ -53,9 +67,20 @@ bool pmc_mask_irqs(bool mask)
 		return false;
 	
 	if (mask)
-		cli();
+	{
+		if (_state.interrupt_depth == 0)
+			cli();
+		++_state.interrupt_depth;
+	}		
 	else
-		sei();
+	{
+		if (_state.interrupt_depth == 0)
+			return false;
+		
+		--_state.interrupt_depth;
+		if (_state.interrupt_depth == 0)
+			sei();
+	}
 	
 	return true;
 }
@@ -75,6 +100,8 @@ int main(void)
 	debug_log("Hello world");
 	
     set_sleep_mode(SLEEP_MODE_PWR_DOWN);    // SLEEP_MODE_PWR_SAVE combination is documented as Reserved
+	
+//ltc4155_dump();
 
     // FIXME: Init as SPI slave (FPGA is master)
 	
@@ -85,24 +112,26 @@ int main(void)
 
 	bool init_result = power_init();
 	debug_log_ex("Init", false);
-	debug_log(init_result ? "+" : "-");
+	_debug_log(init_result ? "+" : "-");
 	debug_blink(2);
 	//debug_blink_rev(6);
 	
 	///////////////////////////////////
-	
+#ifdef AUTO_POWER_ON
 	power_on(); // Turn on immediately. Need to de-press power button to turn off.
 	debug_log("Power");
 	debug_blink(3);
 	//debug_blink_rev(10);
-	
+
 	//debug_wait();
 	
+//ltc4155_dump();
+#endif // AUTO_POWER_ON
 	_state.interrupts_enabled = true;
 	sei();	// Enable interrupts
-	
+
 	asm("nop");
-	
+
 	_state.wake_up = false;	// This will fire the first time the regs are turned on
 	
 	bool one_more = false;
@@ -114,7 +143,7 @@ int main(void)
 		if ((_state.ltc4155_irq)/* || ltc4155_has_interrupt()*/)	// [Don't know why PCINT ISR misses LTC4155 IRQ on power up, so double-check state of line]
 		{
 			ltc4155_handle_irq();
-			
+//ltc4155_dump();
 			_state.ltc4155_irq = false;
 		}
 		
@@ -169,8 +198,11 @@ int main(void)
 			_state.wake_up = false;
 		}
 		else if (_state.wake_up)
-		{			
+		{
+			_delay_ms(1);	// Tapping 3.1 ohm load ing 4155 in dev setup causes transient on this line and causes power on sequence to begin again
+			
 			//if (_state.powered == false)	// Don't check in case button is held long enough to force LTC3675 shutdown (will not change 'powered' value)
+			if (ltc3675_is_waking_up())
 			{
 				debug_log("ML:On..");
 				
@@ -242,12 +274,15 @@ cancel_blink_error:
 				one_more = true;
 			}
 			
-			if (tps54478_is_power_good() == false)
+			if (power_is_subsys_on(PS_FPGA))
 			{
-				debug_log("BE:FPGA!");
+				if (tps54478_is_power_good() == false)
+				{
+					debug_log("BE:FPGA!");
 				
-				_state.core_power_bad = true;
-				one_more = true;
+					_state.core_power_bad = true;
+					one_more = true;
+				}
 			}
 			
 			////////////////////////////////////
@@ -274,7 +309,7 @@ uint8_t pmc_get_blink_error(void)
 
 void pmc_set_blink_error(uint8_t count)
 {
-	if ((_state.blink_error != BlinkError_None)/* && (count > _state.blink_error)*/)	// [Prioritise]
+	if ((_state.blink_error != BlinkError_None) && (count /*> _state.blink_error*/!= BlinkError_None))	// [Prioritise] Always keep first sequence running
 		return;
 	else if (_state.blink_error == count)	// Don't restart if the same
 		return;
@@ -308,6 +343,8 @@ void pmc_set_blink_error(uint8_t count)
 
 ISR(TIMER0_COMPA_vect)	// Blink the sequence, and leave one slot at the beginning and end where the LED is off so one can get a sense of how many blinks occurred
 {
+	pmc_mask_irqs(true);
+	
 	if (_state.blinker_state < (2 * _state.blink_error + 1))
 		charge_set_led((_state.blinker_state % 2) == 1);
 	
@@ -331,5 +368,7 @@ ISR(TIMER0_COMPA_vect)	// Blink the sequence, and leave one slot at the beginnin
 		{
 			_state.blink_loops++;
 		}
-	}		
+	}
+	
+	pmc_mask_irqs(false);
 }

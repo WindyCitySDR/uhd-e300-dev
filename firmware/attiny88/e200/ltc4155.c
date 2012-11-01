@@ -5,6 +5,8 @@
 #include "config.h"
 #include "ltc4155.h"
 
+#include <util/delay.h>
+
 #include "io.h"
 #include "i2c.h"
 #include "power.h"
@@ -156,19 +158,46 @@ static uint8_t _ltc4155_last_good, _ltc4155_last_status;
 
 bool _ltc4155_handle_irq(void)
 {
+	_ltc4155_clear_irq();	// Clear frozen registers to get the real-time ones
+	
+	_delay_ms(50);	// Wait for registers to clear/update
+	
+	//////////////////
+	
 	uint8_t val = 0x00;
 	bool result = false;
 	
 	if (i2c_read2_ex(CHRG_SDA, CHRG_SCL, LTC4155_READ_ADDRESS, LTC4155_REG_GOOD, &val, _ltc4155_pull_up) == false)
-		goto handle_fail;
+		goto _ltc4155_handle_fail;
+	
+	//if (i2c_read2_ex(CHRG_SDA, CHRG_SCL, LTC4155_READ_ADDRESS, LTC4155_REG_GOOD, &val, _ltc4155_pull_up) == false)
+	//	goto _ltc4155_handle_fail;
 	
 	debug_log_ex("4155GO ", false);
 	debug_log_hex(val);
 	
+	if (val & LTC4155_WALLSNS_GOOD)
+	{
+		uint8_t wall_state = 0;
+		if (i2c_read2_ex(CHRG_SDA, CHRG_SCL, LTC4155_READ_ADDRESS, LTC4155_REG_WALL, &wall_state, _ltc4155_pull_up) == false)
+			goto _ltc4155_handle_fail;
+		
+		wall_state &= ~0x1E;
+		wall_state |= 0x0E;
+		
+		if (i2c_write_ex(CHRG_SDA, CHRG_SCL, LTC4155_WRITE_ADDRESS, LTC4155_REG_WALL, wall_state, _ltc4155_pull_up) == false)
+			goto _ltc4155_handle_fail;
+		
+		debug_log("I+");
+	}
+	
 	_ltc4155_last_good = val;
 	
 	if (i2c_read2_ex(CHRG_SDA, CHRG_SCL, LTC4155_READ_ADDRESS, LTC4155_REG_STATUS, &val, _ltc4155_pull_up) == false)
-		goto handle_fail;
+		goto _ltc4155_handle_fail;
+	
+	//if (i2c_read2_ex(CHRG_SDA, CHRG_SCL, LTC4155_READ_ADDRESS, LTC4155_REG_STATUS, &val, _ltc4155_pull_up) == false)
+	//	goto _ltc4155_handle_fail;
 	
 	debug_log_ex("4155ST ", false);
 	debug_log_hex(val);
@@ -183,31 +212,71 @@ bool _ltc4155_handle_irq(void)
 		{
 			case LTC4155_CHARGER_CONSTANT_CURRENT:
 			case LTC4155_CHARGER_CONSTANT_VOLTAGE_VPROG_GT_VCX:
-			case LTC4155_CHARGER_CONSTANT_VOLTAGE_VPROG_LT_VCX:
 			case LTC4155_CHARGER_LOW_BATTERY_VOLTAGE:	// If this persists for more than 1/2hr, BAD_CELL_FAULT is enabled and FAULT interrupt is generated
-				charge_set_led(true);
-				break;
-			case LTC4155_CHARGER_NTC_TOO_WARM:
-			case LTC4155_CHARGER_NTC_TOO_COLD:
-			case LTC4155_CHARGER_NTC_HOT:
-				break;
-			case LTC4155_CHARGER_OFF:
+			{
+				if ((_state.battery_not_present == false) &&
+					(_ltc4155_last_good & (LTC4155_WALLSNS_GOOD | LTC4155_USBSNS_GOOD)))
+				{
+					charge_set_led(true);
+					break;
+				}						
+			}
+			case LTC4155_CHARGER_CONSTANT_VOLTAGE_VPROG_LT_VCX:	// Small amount of current still charging the battery but below Vc/x threshold
+			//case LTC4155_CHARGER_NTC_TOO_WARM:
+			//case LTC4155_CHARGER_NTC_TOO_COLD:
+			//case LTC4155_CHARGER_NTC_HOT:
+			//	break;
+			//case LTC4155_CHARGER_OFF:
 			default:
 				charge_set_led(false);
 		}
 	}
 	
+//	ltc4155_dump();
+	
 	result = true;
-handle_fail:
-	_ltc4155_clear_irq();
+_ltc4155_handle_fail:
+	_ltc4155_clear_irq();	// Even though it happens first above, this is necessary otherwise future IRQs won't be detected
 	
 	return result;
+}
+
+#define LTC4155_CHARGE_CURRENT_LIMIT	/*0xF*/0x7	// [100%] 50%
+
+bool ltc4155_set_charge_current_limit(uint8_t percentage)
+{
+	uint8_t val = 0;
+	uint8_t limit = 0;
+	
+	if (percentage > 100)
+		return false;
+	else if (percentage == 100)
+		percentage = 0xF;
+	else if (percentage > 12)	// 0..88 -> 0..8800
+	{
+		uint16_t l = (((uint16_t)percentage - 12) * 100) / 586;
+		limit = (uint8_t)l;
+	}
+	
+	if (i2c_read2_ex(CHRG_SDA, CHRG_SCL, LTC4155_WRITE_ADDRESS, LTC4155_REG_CHARGE, &val, _ltc4155_pull_up) == false)
+		return false;
+	
+	val &= ((0x1 << LTC4155_SHIFTS_CHARGE_CURRENT_LIMIT) - 1);
+	//val |= (LTC4155_CHARGE_CURRENT_LIMIT << LTC4155_SHIFTS_CHARGE_CURRENT_LIMIT);
+	val |= (limit << LTC4155_SHIFTS_CHARGE_CURRENT_LIMIT);
+	
+	if (i2c_write_ex(CHRG_SDA, CHRG_SCL, LTC4155_WRITE_ADDRESS, LTC4155_REG_CHARGE, val, _ltc4155_pull_up) == false)
+		return false;
+	
+//ltc4155_dump();
+	
+	return true;
 }
 
 bool ltc4155_init(bool disable_charger)
 {
 	io_input_pin(USBPM_IRQ);
-#ifndef DEBUG
+#if !defined(DEBUG) && !defined(ATTINY88_DIP)
 	io_set_pin(USBPM_IRQ);	// Enable pull-up for Open Drain
 #endif // DEBUG
 #ifdef I2C_REWORK
@@ -217,7 +286,7 @@ bool ltc4155_init(bool disable_charger)
 		return false;
 
 	const uint8_t charge_state =
-		(disable_charger ? 0x0 : /*0xF*/0x7) << LTC4155_SHIFTS_CHARGE_CURRENT_LIMIT |	// Battery charger I limit = 100%
+		(disable_charger ? 0x0 : LTC4155_CHARGE_CURRENT_LIMIT) << LTC4155_SHIFTS_CHARGE_CURRENT_LIMIT |	// Battery charger I limit = 100%
 		0x3 << LTC4155_SHIFTS_CHARGE_FLOAT_VOLTAGE |	// FIXME: Vbatt float = 4.05V - 4.2V for LiPo (default 0x00)
 		0x0;	// Full capacity charge threshold = 10%
 	if (i2c_write_ex(CHRG_SDA, CHRG_SCL, LTC4155_WRITE_ADDRESS, LTC4155_REG_CHARGE, charge_state, _ltc4155_pull_up) == false)
@@ -225,7 +294,7 @@ bool ltc4155_init(bool disable_charger)
 
 	const uint8_t wall_state =
 		0x0 << LTC4155_SHIFTS_WALL_PRIORITY |
-		0x0 << LTC4155_SHIFTS_WALL_SAFETY_TIMER |	// Charge safety timer = 4hr
+		0x0 << LTC4155_SHIFTS_WALL_SAFETY_TIMER |	// Charge safety timer = 4hr	// FIXME: 8hr or Vc/x
 		0xE;	// 3 amps, 0x1F - CLPROG1
 	if (i2c_write_ex(CHRG_SDA, CHRG_SCL, LTC4155_WRITE_ADDRESS, LTC4155_REG_WALL, wall_state, _ltc4155_pull_up) == false)
 		return false;
@@ -235,6 +304,9 @@ bool ltc4155_init(bool disable_charger)
 	// Enable OTG
 	//i2c_write_ex(CHRG_SDA, CHRG_SCL, LTC4155_WRITE_ADDRESS, LTC4155_REG_USB, LTC4155_USB_OTG_LOCKOUT, _ltc4155_pull_up);	// Disable autonomous startup
 	//i2c_write_ex(CHRG_SDA, CHRG_SCL, LTC4155_WRITE_ADDRESS, LTC4155_REG_ENABLE, LTC4155_ENABLE_USB_OTG, _ltc4155_pull_up);	// Enable OTG
+	
+	if (_ltc4155_handle_irq() == false)	// One more time (IRQ LED stays lit in dev setup)
+		return false;
 	
 	return true;
 }
@@ -266,5 +338,59 @@ bool ltc4155_arm_ship_and_store(void)
 
 bool ltc4155_get_thermistor(uint8_t* val, bool* warning)
 {
-	return true;
+	bool result = false;
+	uint8_t _val = 0;
+	
+	pmc_mask_irqs(true);
+	
+	if (i2c_read2_ex(CHRG_SDA, CHRG_SCL, LTC4155_READ_ADDRESS, LTC4155_REG_THERMISTOR, &_val, _ltc4155_pull_up) == false)
+		goto ltc4155_get_thermistor_fail;
+	
+	if (val)
+		(*val) = _val >> 1;
+	
+	if (warning)
+		(*warning) = ((_val & 0x01) != 0x00);
+	
+	result = true;
+ltc4155_get_thermistor_fail:
+	pmc_mask_irqs(false);
+	return result;
+}
+
+void ltc4155_dump(void)
+{
+	pmc_mask_irqs(true);
+	
+	uint8_t val = 0x00;
+	bool warning = false;
+	
+	if (ltc4155_get_thermistor(&val, &warning) == false)
+		goto ltc4155_dump_fail;
+	
+	debug_log_ex("\tTHRM", false);
+	if (warning)
+		debug_log_ex("!", false);
+	debug_log_byte(val);
+	
+	if (i2c_read2_ex(CHRG_SDA, CHRG_SCL, LTC4155_READ_ADDRESS, LTC4155_REG_WALL, &val, _ltc4155_pull_up) == false)
+		goto ltc4155_dump_fail;
+	
+	debug_log_ex("\tWALL", false);
+	debug_log_hex(val);
+	
+	if (i2c_read2_ex(CHRG_SDA, CHRG_SCL, LTC4155_READ_ADDRESS, LTC4155_REG_GOOD, &val, _ltc4155_pull_up) == false)
+		goto ltc4155_dump_fail;
+	
+	debug_log_ex("\t4155GO ", false);
+	debug_log_hex(val);
+	
+	if (i2c_read2_ex(CHRG_SDA, CHRG_SCL, LTC4155_READ_ADDRESS, LTC4155_REG_STATUS, &val, _ltc4155_pull_up) == false)
+		goto ltc4155_dump_fail;
+	
+	debug_log_ex("\t4155ST ", false);
+	debug_log_hex(val);
+	
+ltc4155_dump_fail:
+	pmc_mask_irqs(false);
 }

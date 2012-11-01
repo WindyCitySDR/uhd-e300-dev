@@ -15,7 +15,7 @@ enum ErrorBlinkCount	// Lower number = higher priority
 	// Low power/battery
 	BlinkError_LowVoltage,
 	BlinkError_LTC3675_UnderVoltage = BlinkError_LowVoltage,
-	BlinkError_LTC4155_UnderVoltage = BlinkError_LowVoltage,
+	BlinkError_LTC4155_UnderVoltage = BlinkError_LowVoltage,	// FIXME: This does not work when checking status
 	// Should match power boot steps
 	BlinkError_FPGA_Power,
 	BlinkError_DRAM_Power,
