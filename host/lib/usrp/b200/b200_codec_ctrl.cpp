@@ -800,7 +800,7 @@ public:
         uint8_t orig_reg_inputsel = reg_inputsel;
 
         /***********************************************************************
-         * TX_A Calibration
+         * TX1/2-A Calibration
          **********************************************************************/
         reg_inputsel = reg_inputsel & 0xBF;
         _b200_iface->write_reg(0x004, reg_inputsel);
@@ -808,7 +808,7 @@ public:
         tx_quadrature_cal_routine();
 
         /***********************************************************************
-         * TX_B Calibration
+         * TX1/2-B Calibration
          **********************************************************************/
         reg_inputsel = reg_inputsel | 0x40;
         _b200_iface->write_reg(0x004, reg_inputsel);
