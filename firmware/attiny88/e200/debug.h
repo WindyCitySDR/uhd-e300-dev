@@ -7,6 +7,7 @@
 
 #include <stdint.h>
 #include <stdbool.h>
+#include <avr/pgmspace.h>
 
 #include "io.h"
 
