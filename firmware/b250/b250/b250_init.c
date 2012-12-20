@@ -2,23 +2,27 @@
 #include "b250_defs.h"
 #include <wb_utils.h>
 #include <wb_uart.h>
+#include <wb_i2c.h>
 #include <stdint.h>
 #include <stdbool.h>
+#include <printf.h>
+
+static void b250_printf_emitter(char c, void *p)
+{
+    wb_uart_putc(UART0_BASE, c);
+}
 
 void b250_init(void)
 {
+    //first - uart
     wb_uart_init(UART0_BASE, CPU_CLOCK/UART0_BAUD);
-    wb_uart_putc(UART0_BASE, 'H');
-    wb_uart_putc(UART0_BASE, 'e');
-    wb_uart_putc(UART0_BASE, 'l');
-    wb_uart_putc(UART0_BASE, 'l');
-    wb_uart_putc(UART0_BASE, 'o');
-    wb_uart_putc(UART0_BASE, 'B');
-    wb_uart_putc(UART0_BASE, '2');
-    wb_uart_putc(UART0_BASE, '5');
-    wb_uart_putc(UART0_BASE, '0');
-    wb_uart_putc(UART0_BASE, '\r');
-    wb_uart_putc(UART0_BASE, '\n');
+    printf_register(&b250_printf_emitter);
+
+    //now we can init the rest with prints
+    printf("B250 ZPU Init Begin -- CPU CLOCK is %d MHz\n", CPU_CLOCK/1000000);
+
+    //i2c rate init
+    wb_i2c_init(I2C_BASE, CPU_CLOCK);
 }
 
 static uint32_t hex_char_to_num(const int ch)
@@ -72,8 +76,6 @@ static void handle_loader(const int ch)
         wb_uart_putc(UART0_BASE, '\n');
         if (addr >= RAM1_BASE && addr < RAM1_BASE + 0x4000)
         {
-            wb_poke32(0x9000, addr); //lets see the address on the data bus...
-            wb_poke32(0x9004, data); //lets see the address on the data bus...
             wb_poke32(addr, data);
         }
     }

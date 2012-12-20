@@ -13,11 +13,14 @@ if __name__ == '__main__':
     d = [h[i*8:(i+1)*8] for i in range(len(h)/8)]
 
     ser = serial.Serial(tty_dev, 115200, timeout=1.0)
+    ser.write('\r\n\r\n') #for into known state
+    ser.flush()
 
     for i, data in enumerate(d):
         addr = i*4 + 0x4000
         command = '%.8x%s\r\n'%(addr, data)
-        print command.strip()
+        if (addr & 0x1ff) == 0: print 'loading block -- 0x%.8x'%addr
+        #print command.strip()
         ser.write(command)
         result = ser.readline()
         assert command.strip() == result.strip()
