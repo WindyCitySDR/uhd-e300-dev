@@ -12,6 +12,38 @@ static void b250_printf_emitter(char c, void *p)
     wb_uart_putc(UART0_BASE, c);
 }
 
+/*
+ It's going to come up at 10MHz. To program it you're supposed to read out a
+calibration value and work from there, but you can get close with static
+values.
+
+Everything is vanilla I2C, address 0x55.
+
+Step 1: Freeze the DCO by setting addr 137 (0x89) bit 4. It's the only bit
+in that reg so you can probably just write it without worrying about
+masking.
+Step 2: Write:
+    0xe0 to addr 0x07
+    0xc3 to addr 0x08
+    0x02 to addr 0x09
+    0x01 to addr 0x0a
+    0x3b to addr 0x0b
+    0x64 to addr 0x0c
+Step 3: Unfreeze the DCO by clearing 0x89 bit 4.
+Step 4: Assert the new frequency by setting 0x87 bit 6. These are all
+self-clearing bits so just set bit 6 only, no masking required.
+
+--n
+*/
+
+void dco_write(const uint8_t addr, const uint8_t val)
+{
+    uint8_t buff[2];
+    buff[0] = addr;
+    buff[1] = val;
+    wb_i2c_write(I2C_BASE, 0x55, buff, 2);
+}
+
 void b250_init(void)
 {
     //first - uart
@@ -23,6 +55,17 @@ void b250_init(void)
 
     //i2c rate init
     wb_i2c_init(I2C_BASE, CPU_CLOCK);
+
+    //init clock - i2c perif
+    dco_write(0x89, 1 << 4);
+    dco_write(0x07, 0xe0);
+    dco_write(0x08, 0xc3);
+    dco_write(0x09, 0x02);
+    dco_write(0x0a, 0x01);
+    dco_write(0x0b, 0x3b);
+    dco_write(0x0c, 0x64);
+    dco_write(0x89, 0 << 4);
+    dco_write(0x87, 1 << 6);
 }
 
 static uint32_t hex_char_to_num(const int ch)

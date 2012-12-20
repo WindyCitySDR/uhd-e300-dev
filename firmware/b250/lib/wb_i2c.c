@@ -18,21 +18,23 @@
  */
 
 #include <wb_i2c.h>
-#include <wb_utils.h>
 
-#define REG_I2C_PRESCALER_LO 0
-#define REG_I2C_PRESCALER_HI 4
-#define REG_I2C_CTRL         8
-#define REG_I2C_DATA         12
-#define REG_I2C_CMD_ST       16
+typedef struct {
+  volatile uint32_t  prescaler_lo;	// r/w
+  volatile uint32_t  prescaler_hi;	// r/w
+  volatile uint32_t  ctrl;		// r/w
+  volatile uint32_t  data;		// wr = transmit reg; rd = receive reg
+  volatile uint32_t  cmd_status;	// wr = command reg;  rd = status reg
+} i2c_regs_t;
 
-//
-// STA, STO, RD, WR, and IACK bits are cleared automatically
-//
+#define i2c_regs ((i2c_regs_t *) base)
 
 #define	I2C_CTRL_EN	(1 << 7)	// core enable
 #define	I2C_CTRL_IE	(1 << 6)	// interrupt enable
 
+//
+// STA, STO, RD, WR, and IACK bits are cleared automatically
+//
 #define	I2C_CMD_START	(1 << 7)	// generate (repeated) start condition
 #define I2C_CMD_STOP	(1 << 6)	// generate stop condition
 #define	I2C_CMD_RD	(1 << 5)	// read from slave
@@ -55,15 +57,16 @@ void wb_i2c_init(const uint32_t base, const size_t clk_rate)
 {
     // prescaler divisor values for 100 kHz I2C [uses 5 * SCLK internally]
     const uint16_t prescaler = (clk_rate/(5 * 400000)) - 1;
-    wb_poke32(base + REG_I2C_PRESCALER_LO, (prescaler >> 0) & 0xff);
-    wb_poke32(base + REG_I2C_PRESCALER_HI, (prescaler >> 8) & 0xff);
-    wb_poke32(base + REG_I2C_CTRL, I2C_CTRL_EN);
+  i2c_regs->prescaler_lo = prescaler & 0xff;
+  i2c_regs->prescaler_hi = (prescaler >> 8) & 0xff;
+
+  i2c_regs->ctrl = I2C_CTRL_EN; //| I2C_CTRL_IE;	// enable core
 }
 
 static inline void
 wait_for_xfer(const uint32_t base)
 {
-  while (wb_peek32(base + REG_I2C_CMD_ST) & I2C_ST_TIP)	// wait for xfer to complete
+  while (i2c_regs->cmd_status & I2C_ST_TIP)	// wait for xfer to complete
     ;
 }
 
@@ -72,60 +75,61 @@ wait_chk_ack(const uint32_t base)
 {
   wait_for_xfer(base);
 
-  if ((wb_peek32(base + REG_I2C_CMD_ST) & I2C_ST_RXACK) != 0){	// target NAK'd
+  if ((i2c_regs->cmd_status & I2C_ST_RXACK) != 0){	// target NAK'd
     return false;
   }
   return true;
 }
 
-bool wb_i2c_read (const uint32_t base, const uint8_t i2c_addr, uint8_t *buf, size_t len)
+bool wb_i2c_read(const uint32_t base, const uint8_t i2c_addr, uint8_t *buf, size_t len)
 {
   if (len == 0)			// reading zero bytes always works
     return true;
 
-  while (wb_peek32(base + REG_I2C_CMD_ST) & I2C_ST_BUSY)
+  while (i2c_regs->cmd_status & I2C_ST_BUSY)
     ;
 
-  wb_poke32(base + REG_I2C_DATA, (i2c_addr << 1) | 1);	 // 7 bit address and read bit (1)
+  i2c_regs->data = (i2c_addr << 1) | 1;	 // 7 bit address and read bit (1)
   // generate START and write addr
-  wb_poke32(base + REG_I2C_CMD_ST, I2C_CMD_WR | I2C_CMD_START);
+  i2c_regs->cmd_status = I2C_CMD_WR | I2C_CMD_START;
   if (!wait_chk_ack(base))
     goto fail;
 
   for (; len > 0; buf++, len--){
-    wb_poke32(base + REG_I2C_CMD_ST, I2C_CMD_RD | (len == 1 ? (I2C_CMD_NACK | I2C_CMD_STOP) : 0));
+    i2c_regs->cmd_status = I2C_CMD_RD | (len == 1 ? (I2C_CMD_NACK | I2C_CMD_STOP) : 0);
     wait_for_xfer(base);
-    *buf = wb_peek32(base + REG_I2C_DATA);
+    *buf = i2c_regs->data;
   }
   return true;
 
  fail:
-  wb_poke32(base + REG_I2C_CMD_ST, I2C_CMD_STOP);  // generate STOP
+  i2c_regs->cmd_status = I2C_CMD_STOP;  // generate STOP
   return false;
 }
 
 
 bool wb_i2c_write(const uint32_t base, const uint8_t i2c_addr, const uint8_t *buf, size_t len)
 {
-  while (wb_peek32(base + REG_I2C_CMD_ST) & I2C_ST_BUSY)
+  while (i2c_regs->cmd_status & I2C_ST_BUSY)
     ;
 
-  wb_poke32(base + REG_I2C_DATA, (i2c_addr << 1) | 0);	 // 7 bit address and write bit (0)
+  i2c_regs->data = (i2c_addr << 1) | 0;	 // 7 bit address and write bit (0)
 
   // generate START and write addr (and maybe STOP)
-  wb_poke32(base + REG_I2C_CMD_ST,  I2C_CMD_WR | I2C_CMD_START | (len == 0 ? I2C_CMD_STOP : 0));
+  i2c_regs->cmd_status = I2C_CMD_WR | I2C_CMD_START | (len == 0 ? I2C_CMD_STOP : 0);
   if (!wait_chk_ack(base))
     goto fail;
 
   for (; len > 0; buf++, len--){
-    wb_poke32(base + REG_I2C_DATA, *buf);
-    wb_poke32(base + REG_I2C_CMD_ST, I2C_CMD_WR | (len == 1 ? I2C_CMD_STOP : 0));
+    i2c_regs->data = *buf;
+    i2c_regs->cmd_status = I2C_CMD_WR | (len == 1 ? I2C_CMD_STOP : 0);
     if (!wait_chk_ack(base))
       goto fail;
   }
   return true;
 
  fail:
-  wb_poke32(base + REG_I2C_CMD_ST, I2C_CMD_STOP);  // generate STOP
+  i2c_regs->cmd_status = I2C_CMD_STOP;  // generate STOP
   return false;
 }
+
