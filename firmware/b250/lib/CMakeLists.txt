@@ -17,6 +17,6 @@
 
 ########################################################################
 
-ADD_LIBRARY(usrpfw STATIC
+add_library(usrpfw STATIC
     wb_uart.c
 )

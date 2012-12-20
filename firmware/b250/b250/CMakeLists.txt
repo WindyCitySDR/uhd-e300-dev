@@ -16,9 +16,17 @@
 #
 
 ########################################################################
+include_directories(${CMAKE_CURRENT_SOURCE_DIR})
+
+add_library(b250fw STATIC
+    b250_init.c
+)
+target_link_libraries(b250fw usrpfw)
+
+########################################################################
 set(GEN_OUTPUTS_BIN_SIZE 0x3fff)
 
 add_executable(b250_main.elf b250_main.c)
-target_link_libraries(b250_main.elf usrpfw)
+target_link_libraries(b250_main.elf usrpfw b250fw)
 GEN_OUTPUTS(b250_main.elf)
 
