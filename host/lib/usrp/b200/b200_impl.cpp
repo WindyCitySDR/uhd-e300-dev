@@ -323,9 +323,9 @@ _data_transport.reset();
     // before being cleared.
     ////////////////////////////////////////////////////////////////////
     device_addr_t data_xport_args;
-    data_xport_args["recv_frame_size"] = device_addr.get("recv_frame_size", "32768");
+    data_xport_args["recv_frame_size"] = device_addr.get("recv_frame_size", "16384");
     data_xport_args["num_recv_frames"] = device_addr.get("num_recv_frames", "16");
-    data_xport_args["send_frame_size"] = device_addr.get("send_frame_size", "32768");
+    data_xport_args["send_frame_size"] = device_addr.get("send_frame_size", "16384");
     data_xport_args["num_send_frames"] = device_addr.get("num_send_frames", "16");
 
     //let packet padder know the LUT size in number of words32

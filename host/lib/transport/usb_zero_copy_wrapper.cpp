@@ -108,7 +108,7 @@ public:
         //extract VITA end of packet flag, we must force flush under eof conditions
         const bool eop = (uhd::wtohx(vita_header) & (0x1 << 24)) != 0;
         const bool full = _bytes_in_buffer >= (_last_send_buff->size() - _fragmentation_size);
-        if (eop or full){
+        if (eop or full or true){
             _last_send_buff->commit(_bytes_in_buffer);
             _last_send_buff.reset();
 
