@@ -62,6 +62,7 @@ public:
         const boost::uint32_t *mem32 = reinterpret_cast<const boost::uint32_t *>(mem);
         const size_t words32 = (uhd::wtohx(mem32[0]) & 0xffff); //length in words32 (from VRT header)
         const size_t len = words32*sizeof(boost::uint32_t); //length in bytes
+        UHD_ASSERT_THROW(len);
 
         //check if this receive buffer has been exhausted
         offset_bytes += len;

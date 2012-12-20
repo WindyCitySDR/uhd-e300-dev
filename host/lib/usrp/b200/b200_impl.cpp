@@ -209,9 +209,9 @@ b200_impl::b200_impl(const device_addr_t &device_addr)
     // Create control transport
     ////////////////////////////////////////////////////////////////////
     device_addr_t ctrl_xport_args;
-    ctrl_xport_args["recv_frame_size"] = "512";
+    ctrl_xport_args["recv_frame_size"] = "1024";
     ctrl_xport_args["num_recv_frames"] = "16";
-    ctrl_xport_args["send_frame_size"] = "512";
+    ctrl_xport_args["send_frame_size"] = "1024";
     ctrl_xport_args["num_send_frames"] = "16";
 
     _ctrl_transport = usb_zero_copy::make(
