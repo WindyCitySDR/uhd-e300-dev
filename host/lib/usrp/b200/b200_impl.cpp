@@ -188,16 +188,12 @@ b200_impl::b200_impl(const device_addr_t &device_addr)
     _iface = b200_iface::make(control);
     this->check_fw_compat(); //check after making
 
+    ////////////////////////////////////////////////////////////////////
+    // Load the FPGA image - init GPIF - hold in reset
+    ////////////////////////////////////////////////////////////////////
     _iface->reset_fpga(true);
-    //load the fpga
-    //TODO
-//    _iface->load_fpga(b200_fpga_image);
-    //_iface->load_fpga("");
-
-    _iface->reset_fpga(true);
+    //TODO load the FPGA....
     _iface->reset_fx3();
-    _iface->reset_fpga(true);
-
 
     ////////////////////////////////////////////////////////////////////
     // Get the FPGA a clock from Catalina
@@ -205,19 +201,17 @@ b200_impl::b200_impl(const device_addr_t &device_addr)
     //_iface->write_reg(0x00A, BOOST_BINARY( 00000010 ));//no clock
     _iface->write_reg(0x00A, BOOST_BINARY( 00010010 )); //yes clock
     _iface->write_reg(0x009, BOOST_BINARY( 00010111 ));
-    boost::this_thread::sleep(boost::posix_time::seconds(1));
-    _iface->reset_fpga(false); //bring it out of reset
 
-    _iface->reset_fpga(true);
     _iface->reset_fpga(false); //bring it out of reset
+    boost::this_thread::sleep(boost::posix_time::milliseconds(100));
 
     ////////////////////////////////////////////////////////////////////
     // Create control transport
     ////////////////////////////////////////////////////////////////////
     device_addr_t ctrl_xport_args;
-    ctrl_xport_args["recv_frame_size"] = "1024";
+    ctrl_xport_args["recv_frame_size"] = "512";
     ctrl_xport_args["num_recv_frames"] = "16";
-    ctrl_xport_args["send_frame_size"] = "1024";
+    ctrl_xport_args["send_frame_size"] = "512";
     ctrl_xport_args["num_send_frames"] = "16";
 
     _ctrl_transport = usb_zero_copy::make(
@@ -609,7 +603,7 @@ _data_transport.reset();
 b200_impl::~b200_impl(void)
 {
     //TODO kill any threads here
-    _iface->reset_fpga(true);
+    //_iface->reset_fpga(true);
 }
 
 void b200_impl::set_mb_eeprom(const uhd::usrp::mboard_eeprom_t &mb_eeprom)

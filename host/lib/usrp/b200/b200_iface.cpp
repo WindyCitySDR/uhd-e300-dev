@@ -221,7 +221,7 @@ public:
 
     void write_reg(uint16_t reg, uint8_t val)
     {
-        std::cout << "SPIWrite\t" << std::hex << std::setw(3) << std::setfill('0') << (int) reg << "," << std::setw(2) << (int) val << std::endl;
+        //std::cout << "SPIWrite\t" << std::hex << std::setw(3) << std::setfill('0') << (int) reg << "," << std::setw(2) << (int) val << std::endl;
         uint8_t buf[3];
         buf[0] = (0x80 | ((reg >> 8) & 0x3F));
         buf[1] = (reg & 0x00FF);
