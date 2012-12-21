@@ -27,6 +27,8 @@ PROJECT(B250_FW C)
 
 INCLUDE_DIRECTORIES(include)
 
+find_package(PythonInterp)
+
 ########################################################################
 # lwIP header include dirs
 ########################################################################
@@ -97,9 +99,14 @@ MACRO(GEN_OUTPUTS target)
         OUTPUT ${name}.rom DEPENDS ${name}.bin
         COMMAND ${HEXDUMP} -v -e'1/1 \"%.2X\\n\"' ${name}.bin > ${name}.rom
     )
+    #command to create a coe from bin
+    ADD_CUSTOM_COMMAND(
+        OUTPUT ${name}.coe DEPENDS ${name}.bin
+        COMMAND ${PYTHON_EXECUTABLE} ${CMAKE_SOURCE_DIR}/bin_to_coe.py ${name}.bin ${name}.coe
+    )
     #add a top level target for output files
     ADD_CUSTOM_TARGET(
-        ${name}_outputs ALL DEPENDS ${name}.map ${name}.bin ${name}.ihx ${name}.dump ${name}.rom
+        ${name}_outputs ALL DEPENDS ${name}.map ${name}.bin ${name}.ihx ${name}.dump ${name}.rom ${name}.coe
     )
 ENDMACRO(GEN_OUTPUTS)
 
