@@ -24,6 +24,6 @@ list(APPEND b250_sources b250_init.c b250_main.c)
 set(GEN_OUTPUTS_BIN_SIZE 0x3fff)
 
 add_executable(b250_main.elf ${b250_sources})
-target_link_libraries(b250_main.elf b250fw)
+target_link_libraries(b250_main.elf usrpfw)
 GEN_OUTPUTS(b250_main.elf)
 
