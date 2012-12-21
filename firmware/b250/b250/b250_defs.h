@@ -11,5 +11,6 @@
 #define UART0_BAUD 115200
 #define I2C_BASE 0x8800
 #define SET_BASE 0x9000
+#define RB_BASE 0x9000 //same as set
 
 #endif /* INCLUDED_B250_DEFS_H */
