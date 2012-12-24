@@ -56,6 +56,9 @@ void b250_init(void)
     //i2c rate init
     wb_i2c_init(I2C_BASE, CPU_CLOCK);
 
+    //hold phy in reset
+    wb_poke32(SR_PHY_RST, 1);
+
     //init clock - i2c perif
     dco_write(0x89, 1 << 4);
     dco_write(0x07, 0xe0);
@@ -66,6 +69,9 @@ void b250_init(void)
     dco_write(0x0c, 0x64);
     dco_write(0x89, 0 << 4);
     dco_write(0x87, 1 << 6);
+
+    //phy reset release
+    wb_poke32(SR_PHY_RST, 0);
 }
 
 static uint32_t hex_char_to_num(const int ch)

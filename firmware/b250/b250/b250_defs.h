@@ -13,4 +13,6 @@
 #define SET_BASE 0x9000
 #define RB_BASE 0x9000 //same as set
 
+#define SR_PHY_RST ((SET_BASE) + 1*4)
+
 #endif /* INCLUDED_B250_DEFS_H */
