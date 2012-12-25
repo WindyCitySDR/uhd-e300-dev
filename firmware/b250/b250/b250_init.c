@@ -123,7 +123,7 @@ static void handle_loader(const int ch)
         }
         wb_uart_putc(UART0_BASE, '\r');
         wb_uart_putc(UART0_BASE, '\n');
-        if (addr >= RAM1_BASE && addr < RAM1_BASE + 0x4000)
+        if (addr >= BOOT_RAM_BASE && addr < BOOT_RAM_BASE + 0x4000)
         {
             wb_poke32(addr, data);
         }
