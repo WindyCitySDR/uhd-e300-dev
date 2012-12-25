@@ -41,7 +41,7 @@ void dco_write(const uint8_t addr, const uint8_t val)
     uint8_t buff[2];
     buff[0] = addr;
     buff[1] = val;
-    wb_i2c_write(I2C_BASE, 0x55, buff, 2);
+    wb_i2c_write(I2C0_BASE, 0x55, buff, 2);
 }
 
 void b250_init(void)
@@ -54,7 +54,7 @@ void b250_init(void)
     printf("B250 ZPU Init Begin -- CPU CLOCK is %d MHz\n", CPU_CLOCK/1000000);
 
     //i2c rate init
-    wb_i2c_init(I2C_BASE, CPU_CLOCK);
+    wb_i2c_init(I2C0_BASE, CPU_CLOCK);
 
     //hold phy in reset
     wb_poke32(SR_PHY_RST, 1);
