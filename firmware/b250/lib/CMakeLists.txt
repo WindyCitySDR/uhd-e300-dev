@@ -21,4 +21,5 @@ add_library(usrpfw STATIC
     wb_uart.c
     wb_i2c.c
     printf.c
+    wb_pkt_iface64.c
 )

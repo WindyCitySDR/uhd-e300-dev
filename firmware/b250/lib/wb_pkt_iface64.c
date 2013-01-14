@@ -28,12 +28,12 @@ void *wb_pkt_iface64_rx_try_claim(wb_pkt_iface64_config_t *config, size_t *num_b
     const uint32_t rx_state_flag = (status >> 31) & 0x1;
     *num_bytes = (status >> 16) & 0xff;
     if (rx_state_flag == 0) return NULL;
-    return (void *)base;
+    return (void *)config->base;
 }
 
 void wb_pkt_iface64_rx_release(wb_pkt_iface64_config_t *config)
 {
-    config->ctrl |= 1 << 32; //does a release
+    config->ctrl |= 1ul << 31; //does a release
     set_control(config);
     while (true)
     {
@@ -41,7 +41,7 @@ void wb_pkt_iface64_rx_release(wb_pkt_iface64_config_t *config)
         const uint32_t rx_state_flag = (status >> 31) & 0x1;
         if (rx_state_flag == 0)
         {
-            config->ctrl &= ~(1 << 32); //allows for next claim
+            config->ctrl &= ~(1ul << 31); //allows for next claim
             set_control(config);
             return;
         }

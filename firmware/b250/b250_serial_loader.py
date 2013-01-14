@@ -4,6 +4,9 @@ import serial
 import sys
 import binascii
 
+import select
+def has_input(): return select.select([sys.stdin,],[],[],0.0)[0]
+
 if __name__ == '__main__':
     tty_dev = sys.argv[1]
     bin_file = sys.argv[2]
@@ -25,4 +28,5 @@ if __name__ == '__main__':
         result = ser.readline()
         assert command.strip() == result.strip()
 
-    print ser.readline()
+    print "Reading serial port will continue: Press ANYKEY to exit:\n"
+    while not has_input(): sys.stdout.write(ser.readline())
