@@ -29,4 +29,6 @@ if __name__ == '__main__':
         assert command.strip() == result.strip()
 
     print "Reading serial port will continue: Press ANYKEY to exit:\n"
-    while not has_input(): sys.stdout.write(ser.readline())
+    while not has_input():
+        sys.stdout.write(ser.readline())
+        sys.stdout.flush()

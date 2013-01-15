@@ -2,6 +2,7 @@
 
 #include <wb_pkt_iface64.h>
 #include <wb_utils.h>
+#include <printf.h>
 
 static uint32_t get_status(wb_pkt_iface64_config_t *config)
 {
@@ -26,7 +27,7 @@ void *wb_pkt_iface64_rx_try_claim(wb_pkt_iface64_config_t *config, size_t *num_b
 {
     const uint32_t status = get_status(config);
     const uint32_t rx_state_flag = (status >> 31) & 0x1;
-    *num_bytes = (status >> 16) & 0xff;
+    *num_bytes = (status & 0xff);
     if (rx_state_flag == 0) return NULL;
     return (void *)config->base;
 }
@@ -46,4 +47,38 @@ void wb_pkt_iface64_rx_release(wb_pkt_iface64_config_t *config)
             return;
         }
     }
+}
+
+void wb_pkt_iface64_tx_submit(wb_pkt_iface64_config_t *config, const void *buff, const size_t num_bytes)
+{
+    while (true)
+    {
+        const uint32_t status = get_status(config);
+        const uint32_t tx_state_flag = (status >> 30) & 0x1;
+        if (tx_state_flag == 1) break;
+    }
+
+    const size_t num_lines = (num_bytes + 3)/4; //round up
+    const uint32_t *buff32 = (const uint32_t *)buff;
+    for (size_t i = 0; i < num_lines; i++)
+    {
+        wb_poke32(config->base + i, buff32[i]);
+    }
+
+    config->ctrl |= (1ul << 30); //allows for next claim
+    config->ctrl &= ~(0xfff); //clear num bytes
+    config->ctrl |= num_bytes; //set num bytes
+    set_control(config);
+
+    //wait for state machine to transition
+    while (true)
+    {
+        const uint32_t status = get_status(config);
+        const uint32_t tx_state_flag = (status >> 30) & 0x1;
+        if (tx_state_flag == 0) break;
+    }
+
+    config->ctrl &= ~(1ul << 30); //release
+    set_control(config);
+
 }
