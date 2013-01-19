@@ -139,14 +139,14 @@ int main(void)
 	while (true)
 	{
 		one_more = false;
-		
+#ifndef CHARGER_TI
 		if ((_state.ltc4155_irq)/* || ltc4155_has_interrupt()*/)	// [Don't know why PCINT ISR misses LTC4155 IRQ on power up, so double-check state of line]
 		{
 			ltc4155_handle_irq();
 //ltc4155_dump();
 			_state.ltc4155_irq = false;
 		}
-		
+#endif // !CHARGER_TI
 		if (_state.core_power_bad)	// FIXME: Check whether it's supposed to be on
 		{
 			if (power_is_subsys_on(PS_FPGA))
@@ -257,7 +257,7 @@ cancel_blink_error:
 			// More periodic checks
 			// Need to do this has some interrupts are on PCINT, and while GIE is disabled, might change & change back
 			//	E.g. LTC3675 IRQ due to UV, reset IRQ, re-asserts UV
-			
+#ifndef CHARGER_TI
 			if (ltc4155_has_interrupt())
 			{
 				debug_log("BE:4155");
@@ -265,7 +265,7 @@ cancel_blink_error:
 				_state.ltc4155_irq = true;
 				one_more = true;
 			}
-			
+#endif // !CHARGER_TI
 			if (ltc3675_has_interrupt())
 			{
 				debug_log("BE:3675");

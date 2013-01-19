@@ -14,6 +14,7 @@
 #include "io.h"
 #include "ltc3675.h"
 #include "ltc4155.h"
+#include "bq24190.h"
 #include "debug.h"
 #include "global.h"
 #include "error.h"
@@ -387,9 +388,13 @@ bool power_init(void)
 #ifndef I2C_REWORK
 	i2c_init(PWR_SDA, PWR_SCL);
 #endif // I2C_REWORK
+#ifdef CHARGER_TI
+	if (bq24190_init(true) == false)
+		return false;
+#else
 	if (ltc4155_init(/*_state.battery_not_present*/true/*false*/) == false)
 		return false;
-	
+#endif // CHARGER_TI
 	_delay_ms(25);	// Wait for charge current to stop (Vbatt to fall to 0V)
 	
 	uint16_t batt_voltage = battery_get_voltage();
@@ -405,7 +410,11 @@ bool power_init(void)
 	}
 	else
 	{
+#ifdef CHARGER_TI
+		//
+#else
 		ltc4155_set_charge_current_limit(50);
+#endif // CHARGER_TI
 	}
 
     if (ltc3675_init(ltc3675_reg_helper) == false)
@@ -739,12 +748,13 @@ ISR(PCINT0_vect)
 	{
 		_state.core_power_bad = true;
 	}
-	
+#ifdef CHARGER_TI
+#else
 	if (ltc4155_has_interrupt())
 	{
 		_state.ltc4155_irq = true;
 	}
-	
+#endif // CHARGER_TI
 	//sei();
 	pmc_mask_irqs(false);
 }

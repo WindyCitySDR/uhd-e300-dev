@@ -2,6 +2,8 @@
  * ltc4155.c
  */ 
 
+#ifndef CHARGER_TI
+
 #include "config.h"
 #include "ltc4155.h"
 
@@ -42,7 +44,7 @@ const bool _ltc4155_pull_up = false;
 #define LTC4155_BASE_ADDRESS    0x12
 #define LTC4155_WRITE_ADDRESS   (LTC4155_BASE_ADDRESS + 0)
 #define LTC4155_READ_ADDRESS    (LTC4155_BASE_ADDRESS + 1)
-
+/*
 #define LTC4155_RETRY_DELAY     1   // us MAGIC
 #define LTC4155_MAX_ACK_RETRIES 10  // * LTC4155_RETRY_DELAY us
 
@@ -50,7 +52,7 @@ const bool _ltc4155_pull_up = false;
 #define LTC4155_SCL_HIGH_PERIOD 1   // 0.6 us
 #define LTC4155_BUS_FREE_TIME   2   // 1.3 us
 #define LTC4155_STOP_TIME       1   // 0.6 us
-
+*/
 enum LTC4155Registers
 {
 	LTC4155_REG_USB			= 0x00,	// W/R
@@ -394,3 +396,5 @@ void ltc4155_dump(void)
 ltc4155_dump_fail:
 	pmc_mask_irqs(false);
 }
+
+#endif // !CHARGER_TI
