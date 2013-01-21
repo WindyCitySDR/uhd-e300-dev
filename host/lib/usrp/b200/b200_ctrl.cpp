@@ -39,7 +39,7 @@ static const size_t POKE32_CMD = (1 << 8);
 static const size_t PEEK32_CMD = 0;
 static const double ACK_TIMEOUT = 0.5;
 static const double MASSIVE_TIMEOUT = 10.0; //for when we wait on a timed command
-static const boost::uint32_t MAX_SEQS_OUT = 1;
+static const boost::uint32_t MAX_SEQS_OUT = 0;
 
 #define SPI_DIV TOREG(SR_SPI + 0)
 #define SPI_CTRL TOREG(SR_SPI + 1)
@@ -95,6 +95,10 @@ public:
             UHD_MSG(status) << std::hex << pkt[1] << std::dec << std::endl;
             UHD_MSG(status) << std::hex << pkt[2] << std::dec << std::endl;
             UHD_MSG(status) << std::hex << pkt[3] << std::dec << std::endl;
+            UHD_MSG(status) << std::hex << pkt[4] << std::dec << std::endl;
+            UHD_MSG(status) << std::hex << pkt[5] << std::dec << std::endl;
+            UHD_MSG(status) << std::hex << pkt[6] << std::dec << std::endl;
+            UHD_MSG(status) << std::hex << pkt[7] << std::dec << std::endl;
         }else return;
         //*/
         vrt::if_packet_info_t packet_info;
@@ -244,7 +248,7 @@ private:
         //load packet info
         vrt::if_packet_info_t packet_info;
         packet_info.packet_type = vrt::if_packet_info_t::PACKET_TYPE_CONTEXT;
-        packet_info.num_payload_words32 = 2;
+        packet_info.num_payload_words32 = 2+4;
         packet_info.num_payload_bytes = packet_info.num_payload_words32*sizeof(boost::uint32_t);
         packet_info.packet_count = ++_seq_out;
         packet_info.tsf = _time.to_ticks(_tick_rate);
@@ -263,6 +267,10 @@ private:
         const boost::uint32_t ctrl_word = (addr/4 & 0xff) | cmd | (_seq_out << 16);
         pkt[packet_info.num_header_words32+0] = uhd::htowx(ctrl_word);
         pkt[packet_info.num_header_words32+1] = uhd::htowx(data);
+        pkt[packet_info.num_header_words32+2] = 0x1111;
+        pkt[packet_info.num_header_words32+3] = 0x2222;
+        pkt[packet_info.num_header_words32+4] = 0x3333;
+        pkt[packet_info.num_header_words32+5] = 0x4444;
 
         //send the buffer over the interface
         buff->commit(sizeof(boost::uint32_t)*(packet_info.num_packet_words32));

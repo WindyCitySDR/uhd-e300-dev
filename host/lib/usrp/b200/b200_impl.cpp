@@ -90,7 +90,7 @@ static device_addrs_t b200_find(const device_addr_t &hint)
             );
             return b200_addrs;
         }
-        UHD_LOG << "the  firmware image: " << b200_fw_image << std::endl;
+        UHD_LOG << "the firmware image: " << b200_fw_image << std::endl;
 
         usb_control::sptr control;
         try{control = usb_control::make(handle, 0);}
@@ -198,6 +198,7 @@ b200_impl::b200_impl(const device_addr_t &device_addr)
     ////////////////////////////////////////////////////////////////////
     // Get the FPGA a clock from Catalina
     ////////////////////////////////////////////////////////////////////
+    boost::this_thread::sleep(boost::posix_time::milliseconds(100));
     //_iface->write_reg(0x00A, BOOST_BINARY( 00000010 ));//no clock
     _iface->write_reg(0x00A, BOOST_BINARY( 00010010 )); //yes clock
     _iface->write_reg(0x009, BOOST_BINARY( 00010111 ));
@@ -232,7 +233,7 @@ b200_impl::b200_impl(const device_addr_t &device_addr)
 
 
 /*
-
+UHD_HERE();
 
     device_addr_t data_xport_argss;
     data_xport_argss["recv_frame_size"] = device_addr.get("recv_frame_size", "4096");
@@ -246,6 +247,24 @@ b200_impl::b200_impl(const device_addr_t &device_addr)
         1, 2,          // OUT interface, endpoint
         data_xport_argss    // param hints
     );
+
+    managed_send_buffer::sptr msb = _data_transport->get_send_buff();
+    boost::uint32_t *sbuff = msb->cast<uint32_t *>();
+    sbuff[0] = 7;
+    sbuff[1] = 0x1111;
+    sbuff[2] = 0x2222;
+    sbuff[3] = 0x3333;
+    sbuff[4] = 0x4444;
+    sbuff[5] = 0x5555;
+    sbuff[6] = 0x6666;
+    msb->commit(7*4);
+    msb.reset();
+    sleep(1);
+    managed_recv_buffer::sptr rb = _data_transport->get_recv_buff();
+    UHD_VAR(bool(rb));
+    if (rb) UHD_VAR(rb->size());
+    rb.reset();
+    _data_transport.reset();
 
 
     long count = 0;
@@ -290,7 +309,7 @@ UHD_HERE();
 _data_transport.reset();
 
 
-*/
+//*/
 
 
 
@@ -323,15 +342,16 @@ _data_transport.reset();
     // before being cleared.
     ////////////////////////////////////////////////////////////////////
     device_addr_t data_xport_args;
-    data_xport_args["recv_frame_size"] = device_addr.get("recv_frame_size", "16384");
+    data_xport_args["recv_frame_size"] = device_addr.get("recv_frame_size", "2048");
     data_xport_args["num_recv_frames"] = device_addr.get("num_recv_frames", "16");
-    data_xport_args["send_frame_size"] = device_addr.get("send_frame_size", "16384");
+    data_xport_args["send_frame_size"] = device_addr.get("send_frame_size", "2048");
     data_xport_args["num_send_frames"] = device_addr.get("num_send_frames", "16");
 
     //let packet padder know the LUT size in number of words32
     const size_t rx_lut_size = size_t(data_xport_args.cast<double>("recv_frame_size", 0.0));
     _ctrl->poke32(TOREG(SR_PADDER+0), rx_lut_size/sizeof(boost::uint32_t));
 
+/*
     _data_transport = usb_zero_copy::make_wrapper(
         usb_zero_copy::make(
             handle,        // identifier
@@ -340,6 +360,13 @@ _data_transport.reset();
             data_xport_args    // param hints
         ),
         B200_MAX_PKT_BYTE_LIMIT
+    );
+*/
+    _data_transport = usb_zero_copy::make(
+        handle,        // identifier
+        2, 6,          // IN interface, endpoint
+        1, 2,          // OUT interface, endpoint
+        data_xport_args    // param hints
     );
 
     _rx_demux = recv_packet_demuxer::make(_data_transport, B200_NUM_RX_FE, B200_RX_SID_BASE);
