@@ -22,6 +22,7 @@
 #include <boost/functional/hash.hpp>
 #include <boost/thread/thread.hpp>
 #include <boost/cstdint.hpp>
+#include <boost/lexical_cast.hpp>
 #include <fstream>
 #include <sstream>
 #include <string>
@@ -42,6 +43,7 @@ const static boost::uint8_t B200_VREQ_SPI_WRITE = 0x32;
 const static boost::uint8_t B200_VREQ_SPI_READ = 0x42;
 const static boost::uint8_t B200_VREQ_FPGA_RESET = 0x62;
 const static boost::uint8_t B200_VREQ_FX3_RESET = 0x72;
+const static boost::uint8_t B200_VREQ_GET_USB = 0x80;
 
 typedef boost::uint32_t hash_type;
 
@@ -371,6 +373,15 @@ public:
 
         fx3_control_write(B200_VREQ_FPGA_RESET, 0x00, \
                 0x00, data, 4);
+    }
+
+    boost::uint8_t get_usb_speed(void) {
+
+        unsigned char rx_data[1];
+
+        fx3_control_read(B200_VREQ_GET_USB, 0x00, 0x00, rx_data, 1);
+
+        return boost::lexical_cast<boost::uint8_t>(rx_data[0]);
     }
 
 

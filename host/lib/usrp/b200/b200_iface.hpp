@@ -37,6 +37,9 @@ public:
     //! true to hold the fpga in reset
     virtual void reset_fpga(const bool reset) = 0;
 
+    //! query the device USB speed (2, 3)
+    virtual boost::uint8_t get_usb_speed(void) = 0;
+
     //! load a firmware image
     virtual void load_firmware(const std::string filestring) = 0;
 

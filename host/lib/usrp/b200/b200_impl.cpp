@@ -209,8 +209,11 @@ b200_impl::b200_impl(const device_addr_t &device_addr)
     ////////////////////////////////////////////////////////////////////
     // Create control transport
     ////////////////////////////////////////////////////////////////////
+    boost::uint8_t usb_speed = _iface->get_usb_speed();
+    UHD_LOG << "Detected USB Speed " << usb_speed << "." << std::endl;
+
     device_addr_t ctrl_xport_args;
-    ctrl_xport_args["recv_frame_size"] = "1024";
+    ctrl_xport_args["recv_frame_size"] = (usb_speed == 3) ? "1024" : "512";
     ctrl_xport_args["num_recv_frames"] = "16";
     ctrl_xport_args["send_frame_size"] = "1024";
     ctrl_xport_args["num_send_frames"] = "16";
