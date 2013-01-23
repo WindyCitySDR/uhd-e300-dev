@@ -34,7 +34,7 @@ static void init_network(void)
     wb_poke32(SR_ADDR(SET0_BASE, SR_ETHINT1 + 8 + 2), my_ip1.addr);
 }
 
-static void b250_printf_emitter(char c, void *p)
+static void putc(void *p, char c)
 {
     wb_uart_putc(UART0_BASE, c);
 }
@@ -75,7 +75,7 @@ void b250_init(void)
 {
     //first - uart
     wb_uart_init(UART0_BASE, CPU_CLOCK/UART0_BAUD);
-    printf_register(&b250_printf_emitter);
+    init_printf(NULL,putc);
 
     //now we can init the rest with prints
     printf("B250 ZPU Init Begin -- CPU CLOCK is %d MHz\n", CPU_CLOCK/1000000);

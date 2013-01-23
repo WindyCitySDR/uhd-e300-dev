@@ -1,116 +1,233 @@
-/* -*- c -*- */
 /*
- * Copyright 2007 Free Software Foundation, Inc.
- *
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program.  If not, see <http://www.gnu.org/licenses/>.
- */
+File: printf.c
 
-/*
- * Based on code from the SDCC z80 library ;)
- */
+Copyright (C) 2004  Kustaa Nyholm
 
-#include <printf.h>
-#include <stdarg.h>
-#include <stdio.h>
+This library is free software; you can redistribute it and/or
+modify it under the terms of the GNU Lesser General Public
+License as published by the Free Software Foundation; either
+version 2.1 of the License, or (at your option) any later version.
 
-static void 
-_printn(unsigned u, unsigned base, char issigned,
-	void (*emitter)(char, void *), void *pData)
-{
-  const char *_hex = "0123456789ABCDEF";
-  if (issigned && ((int)u < 0)) {
-    (*emitter)('-', pData);
-    u = (unsigned)-((int)u);
-  }
-  if (u >= base)
-    _printn(u/base, base, 0, emitter, pData);
-  (*emitter)(_hex[u%base], pData);
-}
+This library is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+Lesser General Public License for more details.
 
-static void 
-_printf(const char *format, void (*emitter)(char, void *),
-	void *pData, va_list va)
-{
-  while (*format) {
-    if (*format != '%')
-      (*emitter)(*format, pData);
-    else {
-      switch (*++format) {
-      case 0:			/* hit end of format string */
-	return;
-      case 'c':
-	{
-	  char c = (char)va_arg(va, int);
-	  (*emitter)(c, pData);
-	  break;
-	}
-      case 'u':
-	{
-	  unsigned u = va_arg(va, unsigned);
-	  _printn(u, 10, 0, emitter, pData);
-	  break;
-	}
-      case 'd':
-	{
-	  unsigned u = va_arg(va, unsigned);
-	  _printn(u, 10, 1, emitter, pData);
-	  break;
-	}
-      case 'x':
-      case 'p':
-	{
-	  unsigned u = va_arg(va, unsigned);
-	  _printn(u, 16, 0, emitter, pData);
-	  break;
-	}
-      case 's':
-	{
-	  char *s = va_arg(va, char *);
-	  while (*s) {
-	    (*emitter)(*s, pData);
-	    s++;
-	  }
-	  break;
-	}
-      }
+You should have received a copy of the GNU Lesser General Public
+License along with this library; if not, write to the Free Software
+Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+
+*/
+
+#include "printf.h"
+
+typedef void (*putcf) (void*,char);
+static putcf stdout_putf;
+static void* stdout_putp;
+
+
+#ifdef PRINTF_LONG_SUPPORT
+
+static void uli2a(unsigned long int num, unsigned int base, int uc,char * bf)
+    {
+    int n=0;
+    unsigned int d=1;
+    while (num/d >= base)
+        d*=base;         
+    while (d!=0) {
+        int dgt = num / d;
+        num%=d;
+        d/=base;
+        if (n || dgt>0|| d==0) {
+            *bf++ = dgt+(dgt<10 ? '0' : (uc ? 'A' : 'a')-10);
+            ++n;
+            }
+        }
+    *bf=0;
     }
-    format++;
-  }
-}
 
-void default_emitter(char c, void *p)
-{
-    //NOP
-}
+static void li2a (long num, char * bf)
+    {
+    if (num<0) {
+        num=-num;
+        *bf++ = '-';
+        }
+    uli2a(num,10,0,bf);
+    }
 
-static printf_emit_t registered_emitter = &default_emitter;
+#endif
 
-void printf_register(const printf_emit_t emitter)
-{
-    registered_emitter = emitter;
-}
+static void ui2a(unsigned int num, unsigned int base, int uc,char * bf)
+    {
+    int n=0;
+    unsigned int d=1;
+    while (num/d >= base)
+        d*=base;        
+    while (d!=0) {
+        int dgt = num / d;
+        num%= d;
+        d/=base;
+        if (n || dgt>0 || d==0) {
+            *bf++ = dgt+(dgt<10 ? '0' : (uc ? 'A' : 'a')-10);
+            ++n;
+            }
+        }
+    *bf=0;
+    }
 
-int 
-printf(const char *format, ...)
-{
-  va_list va;
-  va_start(va, format);
+static void i2a (int num, char * bf)
+    {
+    if (num<0) {
+        num=-num;
+        *bf++ = '-';
+        }
+    ui2a(num,10,0,bf);
+    }
 
-  _printf(format, registered_emitter, NULL, va);
+static int a2d(char ch)
+    {
+    if (ch>='0' && ch<='9') 
+        return ch-'0';
+    else if (ch>='a' && ch<='f')
+        return ch-'a'+10;
+    else if (ch>='A' && ch<='F')
+        return ch-'A'+10;
+    else return -1;
+    }
 
-  va_end(va);
+static char a2i(char ch, char** src,int base,int* nump)
+    {
+    char* p= *src;
+    int num=0;
+    int digit;
+    while ((digit=a2d(ch))>=0) {
+        if (digit>base) break;
+        num=num*base+digit;
+        ch=*p++;
+        }
+    *src=p;
+    *nump=num;
+    return ch;
+    }
 
-  // wrong return value...
-  return 0;
-}
+static void putchw(void* putp,putcf putf,int n, char z, char* bf)
+    {
+    char fc=z? '0' : ' ';
+    char ch;
+    char* p=bf;
+    while (*p++ && n > 0)
+        n--;
+    while (n-- > 0) 
+        putf(putp,fc);
+    while ((ch= *bf++))
+        putf(putp,ch);
+    }
+
+void tfp_format(void* putp,putcf putf,char *fmt, va_list va)
+    {
+    char bf[12];
+    
+    char ch;
+
+
+    while ((ch=*(fmt++))) {
+        if (ch!='%') 
+            putf(putp,ch);
+        else {
+            char lz=0;
+#ifdef  PRINTF_LONG_SUPPORT
+            char lng=0;
+#endif
+            int w=0;
+            ch=*(fmt++);
+            if (ch=='0') {
+                ch=*(fmt++);
+                lz=1;
+                }
+            if (ch>='0' && ch<='9') {
+                ch=a2i(ch,&fmt,10,&w);
+                }
+#ifdef  PRINTF_LONG_SUPPORT
+            if (ch=='l') {
+                ch=*(fmt++);
+                lng=1;
+            }
+#endif
+            switch (ch) {
+                case 0: 
+                    goto abort;
+                case 'u' : {
+#ifdef  PRINTF_LONG_SUPPORT
+                    if (lng)
+                        uli2a(va_arg(va, unsigned long int),10,0,bf);
+                    else
+#endif
+                    ui2a(va_arg(va, unsigned int),10,0,bf);
+                    putchw(putp,putf,w,lz,bf);
+                    break;
+                    }
+                case 'd' :  {
+#ifdef  PRINTF_LONG_SUPPORT
+                    if (lng)
+                        li2a(va_arg(va, unsigned long int),bf);
+                    else
+#endif
+                    i2a(va_arg(va, int),bf);
+                    putchw(putp,putf,w,lz,bf);
+                    break;
+                    }
+                case 'x': case 'X' : 
+#ifdef  PRINTF_LONG_SUPPORT
+                    if (lng)
+                        uli2a(va_arg(va, unsigned long int),16,(ch=='X'),bf);
+                    else
+#endif
+                    ui2a(va_arg(va, unsigned int),16,(ch=='X'),bf);
+                    putchw(putp,putf,w,lz,bf);
+                    break;
+                case 'c' : 
+                    putf(putp,(char)(va_arg(va, int)));
+                    break;
+                case 's' : 
+                    putchw(putp,putf,w,0,va_arg(va, char*));
+                    break;
+                case '%' :
+                    putf(putp,ch);
+                default:
+                    break;
+                }
+            }
+        }
+    abort:;
+    }
+
+
+void init_printf(void* putp,void (*putf) (void*,char))
+    {
+    stdout_putf=putf;
+    stdout_putp=putp;
+    }
+
+void tfp_printf(char *fmt, ...)
+    {
+    va_list va;
+    va_start(va,fmt);
+    tfp_format(stdout_putp,stdout_putf,fmt,va);
+    va_end(va);
+    }
+
+static void putcp(void* p,char c)
+    {
+    *(*((char**)p))++ = c;
+    }
+
+
+
+void tfp_sprintf(char* s,char *fmt, ...)
+    {
+    va_list va;
+    va_start(va,fmt);
+    tfp_format(&s,putcp,fmt,va);
+    putcp(&s,0);
+    va_end(va);
+    }

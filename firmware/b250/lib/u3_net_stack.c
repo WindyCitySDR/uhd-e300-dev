@@ -268,6 +268,7 @@ static void handle_eth_packet(const void *buff, const size_t num_bytes)
     {
         //printf("eth_hdr->ethertype == ETHERTYPE_IPV4\n");
         const struct ip_hdr *ip = (const struct ip_hdr *)eth_body;
+        const uint8_t *ip_body = eth_body + IP_HLEN;
 
         if (IPH_V(ip) != 4 || IPH_HL(ip) != 5) return;// ignore pkts w/ bad version or options
         if (IPH_OFFSET(ip) & (IP_MF | IP_OFFMASK)) return;// ignore fragmented packets
@@ -284,11 +285,11 @@ static void handle_eth_packet(const void *buff, const size_t num_bytes)
 
         switch (protocol){
         case IP_PROTO_UDP:
-            //handle_udp_packet(ip->src, ip->dest, (struct udp_hdr *)(((char *)ip) + IP_HLEN), len);
+            //handle_udp_packet(eth_hdr->ethno, &ip->src, &ip->dest, (const struct udp_hdr *)ip_body, len);
             break;
 
         case IP_PROTO_ICMP:
-            handle_icmp_packet(eth_hdr->ethno, &ip->src, &ip->dest, (const struct icmp_echo_hdr *)(((char *)ip) + IP_HLEN), len);
+            handle_icmp_packet(eth_hdr->ethno, &ip->src, &ip->dest, (const struct icmp_echo_hdr *)ip_body, len);
             break;
 
         default:	// ignore
