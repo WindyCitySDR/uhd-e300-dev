@@ -93,8 +93,8 @@ void u3_net_stack_init_eth(
     const struct ip_addr *ip
 )
 {
-    memcpy(&net_conf_ips[ethno], mac, sizeof(eth_mac_addr_t));
-    memcpy(&net_conf_macs[ethno], ip, sizeof(struct ip_addr));
+    memcpy(&net_conf_macs[ethno], mac, sizeof(eth_mac_addr_t));
+    memcpy(&net_conf_ips[ethno], ip, sizeof(struct ip_addr));
 }
 
 const struct ip_addr *u3_net_stack_get_ip_addr(const uint8_t ethno)
@@ -105,6 +105,30 @@ const struct ip_addr *u3_net_stack_get_ip_addr(const uint8_t ethno)
 const eth_mac_addr_t *u3_net_stack_get_mac_addr(const uint8_t ethno)
 {
     return &net_conf_macs[ethno];
+}
+
+/***********************************************************************
+ * Ethernet handlers - send packet w/ payload
+ **********************************************************************/
+static void send_eth_pkt(
+    const void *header, const size_t header_size,
+    const void *payload, const size_t payload_size
+)
+{
+    void *ptr = wb_pkt_iface64_tx_claim(pkt_iface_config);
+    size_t buff_i = 0;
+
+    uint32_t *buff32 = (uint32_t *)ptr;
+    for (size_t i = 0; i < header_size/4; i++)
+    {
+        buff32[buff_i++] = ((const uint32_t *)header)[i];
+    }
+    for (size_t i = 0; i < payload_size/4; i++)
+    {
+        buff32[buff_i++] = ((const uint32_t *)payload)[i];
+    }
+
+    wb_pkt_iface64_tx_submit(pkt_iface_config, header_size + payload_size);
 }
 
 /***********************************************************************
@@ -131,12 +155,12 @@ static void send_arp_reply(
     memcpy(reply.arp.ar_tha, req->ar_sha, sizeof(eth_mac_addr_t));
     memcpy(reply.arp.ar_tip, req->ar_sip, sizeof(struct ip_addr));
 
-    wb_pkt_iface64_tx_submit(pkt_iface_config, &reply, sizeof(reply));
+    send_eth_pkt(&reply, sizeof(reply), NULL, 0);
 }
 
 static void handle_arp_packet(const uint8_t ethno, const struct arp_eth_ipv4 *p)
 {
-    printf("handle_arp_packet\n");
+    //printf("handle_arp_packet\n");
     if (p->ar_hrd != ARPHRD_ETHER
       || p->ar_pro != ETHERTYPE_IPV4
       || p->ar_hln != sizeof(eth_mac_addr_t)
@@ -145,7 +169,7 @@ static void handle_arp_packet(const uint8_t ethno, const struct arp_eth_ipv4 *p)
 
     if (p->ar_op == ARPOP_REPLY)
     {
-        printf("ARPOP_REPLY\n");
+        //printf("ARPOP_REPLY\n");
         struct ip_addr ip_addr;
         memcpy(&ip_addr, p->ar_sip, sizeof(ip_addr));
         eth_mac_addr_t mac_addr;
@@ -155,7 +179,7 @@ static void handle_arp_packet(const uint8_t ethno, const struct arp_eth_ipv4 *p)
 
     if (p->ar_op == ARPOP_REQUEST)
     {
-        printf("ARPOP_REQUEST\n");
+        //printf("ARPOP_REQUEST\n");
         if (memcmp(p->ar_tip, u3_net_stack_get_ip_addr(ethno), sizeof(struct ip_addr)) == 0)
         {
             send_arp_reply(ethno, p, u3_net_stack_get_mac_addr(ethno));
@@ -164,7 +188,7 @@ static void handle_arp_packet(const uint8_t ethno, const struct arp_eth_ipv4 *p)
 }
 
 /***********************************************************************
- * ICMP Protocol
+ * ICMP handlers
  **********************************************************************/
 static void handle_icmp_packet(
     const uint8_t ethno,
@@ -173,7 +197,7 @@ static void handle_icmp_packet(
     const struct icmp_echo_hdr *icmp,
     const size_t num_bytes
 ){
-    printf("handle_icmp_packet\n");
+    //printf("handle_icmp_packet\n");
     if (icmp->type == ICMP_ECHO)
     {
         const void *icmp_data_buff = ((uint8_t*)icmp) + sizeof(struct icmp_echo_hdr);
@@ -221,28 +245,28 @@ static void handle_icmp_packet(
             0)
         );
 
-        wb_pkt_iface64_tx_submit(pkt_iface_config, &reply, sizeof(reply) + icmp_data_len);
+        send_eth_pkt(&reply, sizeof(reply), icmp_data_buff, icmp_data_len);
     }
 }
 
 /***********************************************************************
- * Ethernet handler
+ * Ethernet handlers
  **********************************************************************/
 static void handle_eth_packet(const void *buff, const size_t num_bytes)
 {
     const padded_eth_hdr_t *eth_hdr = (padded_eth_hdr_t *)buff;
     const uint8_t *eth_body = ((const uint8_t *)buff) + sizeof(padded_eth_hdr_t);
-    printf("handle_eth_packet got ethertype 0x%x\n", (unsigned)eth_hdr->ethertype);
+    //printf("handle_eth_packet got ethertype 0x%x\n", (unsigned)eth_hdr->ethertype);
 
     if (eth_hdr->ethertype == ETHERTYPE_ARP)
     {
-        printf("eth_hdr->ethertype == ETHERTYPE_ARP\n");
+        //printf("eth_hdr->ethertype == ETHERTYPE_ARP\n");
         const struct arp_eth_ipv4 *arp = (const struct arp_eth_ipv4 *)eth_body;
         handle_arp_packet(eth_hdr->ethno, arp);
     }
     else if (eth_hdr->ethertype == ETHERTYPE_IPV4)
     {
-        printf("eth_hdr->ethertype == ETHERTYPE_IPV4\n");
+        //printf("eth_hdr->ethertype == ETHERTYPE_IPV4\n");
         const struct ip_hdr *ip = (const struct ip_hdr *)eth_body;
 
         if (IPH_V(ip) != 4 || IPH_HL(ip) != 5) return;// ignore pkts w/ bad version or options
@@ -280,7 +304,7 @@ void u3_net_stack_handle_one(void)
     const void *ptr = wb_pkt_iface64_rx_try_claim(pkt_iface_config, &num_bytes);
     if (ptr != NULL)
     {
-        printf("u3_net_stack_handle_one got %u bytes\n", (unsigned)num_bytes);
+        //printf("u3_net_stack_handle_one got %u bytes\n", (unsigned)num_bytes);
         handle_eth_packet(ptr, num_bytes);
         wb_pkt_iface64_rx_release(pkt_iface_config);
     }

@@ -16,12 +16,22 @@ static void init_network(void)
     pkt_config = wb_pkt_iface64_init(PKT_RAM0_BASE, 0x1ffc);
     printf("PKT RAM0 BASE %u\n", (&pkt_config)->base);
     u3_net_stack_init(&pkt_config);
+
     static struct ip_addr my_ip0 = {(192 << 24 | 168 << 16 | 10  << 8  | 2 << 0)};
     static eth_mac_addr_t my_mac0 = {{0x00, 0x50, 0xC2, 0x85, 0x3f, 0xff}};
     u3_net_stack_init_eth(0, &my_mac0, &my_ip0);
+
+    wb_poke32(SR_ADDR(SET0_BASE, SR_ETHINT0 + 8 + 0), (my_mac0.addr[5] << 0) | (my_mac0.addr[4] << 8) | (my_mac0.addr[3] << 16) | (my_mac0.addr[2] << 24));
+    wb_poke32(SR_ADDR(SET0_BASE, SR_ETHINT0 + 8 + 1), (my_mac0.addr[1] << 0) | (my_mac0.addr[0] << 8));
+    wb_poke32(SR_ADDR(SET0_BASE, SR_ETHINT0 + 8 + 2), my_ip0.addr);
+
     static struct ip_addr my_ip1 = {(192 << 24 | 168 << 16 | 20  << 8  | 2 << 0)};
     static eth_mac_addr_t my_mac1 = {{0x00, 0x50, 0xC2, 0x85, 0x3f, 0x33}};
     u3_net_stack_init_eth(1, &my_mac1, &my_ip1);
+
+    wb_poke32(SR_ADDR(SET0_BASE, SR_ETHINT1 + 8 + 0), (my_mac1.addr[5] << 0) | (my_mac1.addr[4] << 8) | (my_mac1.addr[3] << 16) | (my_mac1.addr[2] << 24));
+    wb_poke32(SR_ADDR(SET0_BASE, SR_ETHINT1 + 8 + 1), (my_mac1.addr[1] << 0) | (my_mac1.addr[0] << 8));
+    wb_poke32(SR_ADDR(SET0_BASE, SR_ETHINT1 + 8 + 2), my_ip1.addr);
 }
 
 static void b250_printf_emitter(char c, void *p)

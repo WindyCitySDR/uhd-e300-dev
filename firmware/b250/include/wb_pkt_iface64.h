@@ -32,8 +32,13 @@ const void *wb_pkt_iface64_rx_try_claim(wb_pkt_iface64_config_t *config, size_t 
 void wb_pkt_iface64_rx_release(wb_pkt_iface64_config_t *config);
 
 /*!
+ * Aquire the buffer for an outgoing packet.
+ */
+void *wb_pkt_iface64_tx_claim(wb_pkt_iface64_config_t *config);
+
+/*!
  * Submit an outgoing packet from a filled the buffer.
  */
-void wb_pkt_iface64_tx_submit(wb_pkt_iface64_config_t *config, const void *buff, const size_t num_bytes);
+void wb_pkt_iface64_tx_submit(wb_pkt_iface64_config_t *config, const size_t num_bytes);
 
 #endif /* INCLUDED_WB_PKT_IFACE64_H */

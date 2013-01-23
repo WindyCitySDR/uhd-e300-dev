@@ -53,7 +53,7 @@ void wb_pkt_iface64_rx_release(wb_pkt_iface64_config_t *config)
     }
 }
 
-void wb_pkt_iface64_tx_submit(wb_pkt_iface64_config_t *config, const void *buff, size_t num_bytes)
+void *wb_pkt_iface64_tx_claim(wb_pkt_iface64_config_t *config)
 {
     while (true)
     {
@@ -61,15 +61,11 @@ void wb_pkt_iface64_tx_submit(wb_pkt_iface64_config_t *config, const void *buff,
         const uint32_t tx_state_flag = (status >> 30) & 0x1;
         if (tx_state_flag == 1) break;
     }
+    return (void *)config->base;
+}
 
-    const size_t num_lines = (num_bytes + 3)/4; //round up
-    const uint32_t *buff32 = (const uint32_t *)buff;
-    for (size_t i = 0; i < num_lines; i++)
-    {
-        wb_poke32(config->base + i*sizeof(uint32_t), buff32[i]);
-        //printf("buff[%u] = 0x%x\n", (unsigned)i, buff32[i]);
-    }
-
+void wb_pkt_iface64_tx_submit(wb_pkt_iface64_config_t *config, size_t num_bytes)
+{
     config->ctrl |= (1ul << 30); //allows for next claim
     config->ctrl &= ~(NUM_BYTES_MASK); //clear num bytes
     if (num_bytes & 0x7) num_bytes += 8; //adjust for tuser
