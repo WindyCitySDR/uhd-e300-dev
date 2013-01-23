@@ -8,19 +8,20 @@
 
 static uint32_t get_status(wb_pkt_iface64_config_t *config)
 {
-    return wb_peek32(config->base + 0x1ffc);
+    return wb_peek32(config->config_addr);
 }
 
 static void set_control(wb_pkt_iface64_config_t *config)
 {
-    wb_poke32(config->base + 0x1ffc, config->ctrl);
+    wb_poke32(config->config_addr, config->ctrl);
 }
 
-wb_pkt_iface64_config_t wb_pkt_iface64_init(const uint32_t base)
+wb_pkt_iface64_config_t wb_pkt_iface64_init(const uint32_t base, const size_t ctrl_offset)
 {
     wb_pkt_iface64_config_t config;
     config.base = base;
     config.ctrl = 0;
+    config.config_addr = base + ctrl_offset;
     set_control(&config);
     return config;
 }
@@ -64,7 +65,7 @@ void wb_pkt_iface64_tx_submit(wb_pkt_iface64_config_t *config, const void *buff,
     const uint32_t *buff32 = (const uint32_t *)buff;
     for (size_t i = 0; i < num_lines; i++)
     {
-        wb_poke32(config->base + i, buff32[i]);
+        wb_poke32(config->base + i*sizeof(uint32_t), buff32[i]);
         printf("buff[%u] = 0x%x\n", (unsigned)i, buff32[i]);
     }
 

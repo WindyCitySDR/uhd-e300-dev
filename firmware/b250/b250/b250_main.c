@@ -8,7 +8,7 @@
 int main(void)
 {
     b250_init();
-    wb_pkt_iface64_config_t config = wb_pkt_iface64_init(PKT_RAM0_BASE);
+    wb_pkt_iface64_config_t config = wb_pkt_iface64_init(PKT_RAM0_BASE, 0x1ffc);
     printf("PKT RAM0 BASE %u\n", (&config)->base);
     while(1)
     {

@@ -13,10 +13,11 @@ typedef struct
 {
     uint32_t base;
     uint32_t ctrl;
+    uint32_t config_addr;
 } wb_pkt_iface64_config_t;
 
 //! Init the wb slave for packet interface
-wb_pkt_iface64_config_t wb_pkt_iface64_init(const uint32_t base);
+wb_pkt_iface64_config_t wb_pkt_iface64_init(const uint32_t base, const size_t ctrl_offset);
 
 /*!
  * Poll if an packet has been received.
