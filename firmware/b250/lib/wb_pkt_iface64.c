@@ -26,11 +26,12 @@ wb_pkt_iface64_config_t wb_pkt_iface64_init(const uint32_t base, const size_t ct
     return config;
 }
 
-void *wb_pkt_iface64_rx_try_claim(wb_pkt_iface64_config_t *config, size_t *num_bytes)
+const void *wb_pkt_iface64_rx_try_claim(wb_pkt_iface64_config_t *config, size_t *num_bytes)
 {
     const uint32_t status = get_status(config);
     const uint32_t rx_state_flag = (status >> 31) & 0x1;
     *num_bytes = (status & NUM_BYTES_MASK);
+    if (*num_bytes & 0x7) *num_bytes -= 8; //adjust for tuser
     if (rx_state_flag == 0) return NULL;
     return (void *)config->base;
 }
@@ -52,7 +53,7 @@ void wb_pkt_iface64_rx_release(wb_pkt_iface64_config_t *config)
     }
 }
 
-void wb_pkt_iface64_tx_submit(wb_pkt_iface64_config_t *config, const void *buff, const size_t num_bytes)
+void wb_pkt_iface64_tx_submit(wb_pkt_iface64_config_t *config, const void *buff, size_t num_bytes)
 {
     while (true)
     {
@@ -66,11 +67,12 @@ void wb_pkt_iface64_tx_submit(wb_pkt_iface64_config_t *config, const void *buff,
     for (size_t i = 0; i < num_lines; i++)
     {
         wb_poke32(config->base + i*sizeof(uint32_t), buff32[i]);
-        printf("buff[%u] = 0x%x\n", (unsigned)i, buff32[i]);
+        //printf("buff[%u] = 0x%x\n", (unsigned)i, buff32[i]);
     }
 
     config->ctrl |= (1ul << 30); //allows for next claim
     config->ctrl &= ~(NUM_BYTES_MASK); //clear num bytes
+    if (num_bytes & 0x7) num_bytes += 8; //adjust for tuser
     config->ctrl |= num_bytes & NUM_BYTES_MASK; //set num bytes
     set_control(config);
 

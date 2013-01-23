@@ -45,11 +45,11 @@ INCLUDE_DIRECTORIES(
 # misc flags for the gcc compiler
 ########################################################################
 SET(CMAKE_C_FLAGS -phi) #always needed compile time and link time
-ADD_DEFINITIONS(-Os)
+#ADD_DEFINITIONS(-Os) #TODO put back when we finish something :-)
 ADD_DEFINITIONS(--std=gnu99)
 ADD_DEFINITIONS(-Wall)
 ADD_DEFINITIONS(-Werror-implicit-function-declaration)
-ADD_DEFINITIONS(-ffunction-sections)
+#ADD_DEFINITIONS(-ffunction-sections) #TODO put back when we finish something :-)
 
 MACRO(ADD_LINKER_FLAGS flags)
     SET(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} ${flags}")

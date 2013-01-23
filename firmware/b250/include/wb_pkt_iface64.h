@@ -24,7 +24,7 @@ wb_pkt_iface64_config_t wb_pkt_iface64_init(const uint32_t base, const size_t ct
  * If yes, return the pointer to the pkt, num_bytes is set.
  * Otherwise, return null.
  */
-void *wb_pkt_iface64_rx_try_claim(wb_pkt_iface64_config_t *config, size_t *num_bytes);
+const void *wb_pkt_iface64_rx_try_claim(wb_pkt_iface64_config_t *config, size_t *num_bytes);
 
 /*!
  * Release the hold on a received packet.
