@@ -138,7 +138,7 @@ static void send_eth_pkt(
  * ARP handlers
  **********************************************************************/
 static void send_arp_reply(
-    const int ethno,
+    const uint8_t ethno,
     const struct arp_eth_ipv4 *req,
     const eth_mac_addr_t *our_mac
 ){
@@ -159,6 +159,27 @@ static void send_arp_reply(
     memcpy(reply.arp.ar_tip, req->ar_sip, sizeof(struct ip_addr));
 
     send_eth_pkt(&reply, sizeof(reply), NULL, 0, NULL, 0);
+}
+
+void u3_net_stack_send_arp_request(const uint8_t ethno, const struct ip_addr *addr)
+{
+    padded_arp_t req;
+    req.eth.ethno = ethno;
+    memset(&req.eth.dst, 0xff, sizeof(eth_mac_addr_t)); //bcast
+    memcpy(&req.eth.src, u3_net_stack_get_mac_addr(ethno), sizeof(eth_mac_addr_t));
+    req.eth.ethertype = ETHERTYPE_ARP;
+
+    req.arp.ar_hrd = ARPHRD_ETHER;
+    req.arp.ar_pro = ETHERTYPE_IPV4;
+    req.arp.ar_hln = sizeof(eth_mac_addr_t);
+    req.arp.ar_pln = sizeof(struct ip_addr);
+    req.arp.ar_op = ARPOP_REQUEST;
+    memcpy(req.arp.ar_sha, u3_net_stack_get_mac_addr(ethno), sizeof(eth_mac_addr_t));
+    memcpy(req.arp.ar_sip, u3_net_stack_get_ip_addr(ethno), sizeof(struct ip_addr));
+    memset(req.arp.ar_tha, 0x00, sizeof(eth_mac_addr_t));
+    memcpy(req.arp.ar_tip, addr, sizeof(struct ip_addr));
+
+    send_eth_pkt(&req, sizeof(req), NULL, 0, NULL, 0);
 }
 
 static void handle_arp_packet(const uint8_t ethno, const struct arp_eth_ipv4 *p)
@@ -339,6 +360,11 @@ static void handle_icmp_packet(
         );
 
         send_eth_pkt(&reply, sizeof(reply), icmp_data_buff, icmp_data_len, NULL, 0);
+    }
+
+    if (icmp->type == ICMP_DUR && icmp->code == ICMP_DUR_PORT)
+    {
+        //TODO call handler
     }
 }
 

@@ -70,7 +70,9 @@ void u3_net_stack_send_udp_pkt(
 
 void u3_net_stack_handle_one(void);
 
-//------------------ arp cache ------------------------------------
+//------------------ arp handling ------------------------------------
+
+void u3_net_stack_send_arp_request(const uint8_t ethno, const struct ip_addr *addr);
 
 void u3_net_stack_arp_cache_update(const struct ip_addr *ip_addr, const eth_mac_addr_t * mac_addr);
 
