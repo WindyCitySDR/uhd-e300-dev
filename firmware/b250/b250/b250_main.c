@@ -21,9 +21,9 @@ int main(void)
 
         if (ptr != NULL)
         {
-            //printf("Got %u \n", (unsigned)num_bytes);
-            wb_pkt_iface64_rx_release(&config);
+            printf("Got %u \n", (unsigned)num_bytes);
             wb_pkt_iface64_tx_submit(&config, ptr, num_bytes);
+            wb_pkt_iface64_rx_release(&config);
             //printf("ok - done\n");
             //while(1){}
         }
