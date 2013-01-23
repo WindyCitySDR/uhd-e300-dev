@@ -15,6 +15,13 @@
 #define SET0_BASE 0xa000
 #define RB0_BASE 0xa000 //same as set
 
-#define SR_PHY_RST ((SET0_BASE) + 1*4)
+#define SR_ADDR(base, offset) ((base) + (offset)*4)
+
+static const int SR_LEDS       = 0;
+static const int SR_PHY_RST    = 1;
+static const int SR_CLOCK_CTRL = 2;
+static const int SR_SPI        = 32;
+static const int SR_ETHINT0    = 40;
+static const int SR_ETHINT1    = 56;
 
 #endif /* INCLUDED_B250_DEFS_H */

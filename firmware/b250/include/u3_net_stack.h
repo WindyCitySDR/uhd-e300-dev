@@ -36,11 +36,13 @@ typedef struct
 
 void u3_net_stack_init(wb_pkt_iface64_config_t *config);
 
-void u3_net_stack_handle_one(void);
+void u3_net_stack_init_eth(const uint8_t ethno, const eth_mac_addr_t *mac, const struct ip_addr *ip);
 
 const struct ip_addr *u3_net_stack_get_ip_addr(const uint8_t ethno);
 
 const eth_mac_addr_t *u3_net_stack_get_mac_addr(const uint8_t ethno);
+
+void u3_net_stack_handle_one(void);
 
 void u3_net_stack_arp_cache_update(const struct ip_addr *ip_addr, const eth_mac_addr_t * mac_addr);
 

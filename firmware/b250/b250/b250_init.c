@@ -6,6 +6,23 @@
 #include <stdint.h>
 #include <stdbool.h>
 #include <printf.h>
+#include <wb_pkt_iface64.h>
+#include <u3_net_stack.h>
+
+static wb_pkt_iface64_config_t pkt_config;
+
+static void init_network(void)
+{
+    pkt_config = wb_pkt_iface64_init(PKT_RAM0_BASE, 0x1ffc);
+    printf("PKT RAM0 BASE %u\n", (&pkt_config)->base);
+    u3_net_stack_init(&pkt_config);
+    static struct ip_addr my_ip0 = {(192 << 24 | 168 << 16 | 10  << 8  | 2 << 0)};
+    static eth_mac_addr_t my_mac0 = {{0x00, 0x50, 0xC2, 0x85, 0x3f, 0xff}};
+    u3_net_stack_init_eth(0, &my_mac0, &my_ip0);
+    static struct ip_addr my_ip1 = {(192 << 24 | 168 << 16 | 20  << 8  | 2 << 0)};
+    static eth_mac_addr_t my_mac1 = {{0x00, 0x50, 0xC2, 0x85, 0x3f, 0x33}};
+    u3_net_stack_init_eth(1, &my_mac1, &my_ip1);
+}
 
 static void b250_printf_emitter(char c, void *p)
 {
@@ -57,7 +74,7 @@ void b250_init(void)
     wb_i2c_init(I2C0_BASE, CPU_CLOCK);
 
     //hold phy in reset
-    wb_poke32(SR_PHY_RST, 1);
+    wb_poke32(SR_ADDR(SET0_BASE, SR_PHY_RST), 1);
 
     //init clock - i2c perif
     dco_write(0x89, 1 << 4);
@@ -70,8 +87,11 @@ void b250_init(void)
     dco_write(0x89, 0 << 4);
     dco_write(0x87, 1 << 6);
 
+    //setup net stack and eth state machines
+    init_network();
+
     //phy reset release
-    wb_poke32(SR_PHY_RST, 0);
+    wb_poke32(SR_ADDR(SET0_BASE, SR_PHY_RST), 0);
 }
 
 static uint32_t hex_char_to_num(const int ch)

@@ -43,21 +43,6 @@ static uint32_t chksum_buffer(
 }
 
 /***********************************************************************
- * dummy settings
- **********************************************************************/
-const struct ip_addr *u3_net_stack_get_ip_addr(const uint8_t ethno)
-{
-    static struct ip_addr my_ip = {(192 << 24 | 168 << 16 | 10  << 8  | 2 << 0)};
-    return &my_ip;
-}
-
-const eth_mac_addr_t *u3_net_stack_get_mac_addr(const uint8_t ethno)
-{
-    static eth_mac_addr_t my_mac = {{0x00, 0x50, 0xC2, 0x85, 0x3f, 0xff}};
-    return &my_mac;
-}
-
-/***********************************************************************
  * ARP Cache implementation
  **********************************************************************/
 #define ARP_CACHE_NENTRIES 32
@@ -88,11 +73,38 @@ const eth_mac_addr_t *u3_net_stack_arp_cache_lookup(const struct ip_addr *ip_add
 }
 
 
+/***********************************************************************
+ * Net stack config
+ **********************************************************************/
 static wb_pkt_iface64_config_t *pkt_iface_config = NULL;
 
 void u3_net_stack_init(wb_pkt_iface64_config_t *config)
 {
     pkt_iface_config = config;
+}
+
+#define MAX_NETHS 4
+static struct ip_addr net_conf_ips[MAX_NETHS];
+static eth_mac_addr_t net_conf_macs[MAX_NETHS];
+
+void u3_net_stack_init_eth(
+    const uint8_t ethno,
+    const eth_mac_addr_t *mac,
+    const struct ip_addr *ip
+)
+{
+    memcpy(&net_conf_ips[ethno], mac, sizeof(eth_mac_addr_t));
+    memcpy(&net_conf_macs[ethno], ip, sizeof(struct ip_addr));
+}
+
+const struct ip_addr *u3_net_stack_get_ip_addr(const uint8_t ethno)
+{
+    return &net_conf_ips[ethno];
+}
+
+const eth_mac_addr_t *u3_net_stack_get_mac_addr(const uint8_t ethno)
+{
+    return &net_conf_macs[ethno];
 }
 
 /***********************************************************************
@@ -128,7 +140,7 @@ static void handle_arp_packet(const uint8_t ethno, const struct arp_eth_ipv4 *p)
     if (p->ar_hrd != ARPHRD_ETHER
       || p->ar_pro != ETHERTYPE_IPV4
       || p->ar_hln != sizeof(eth_mac_addr_t)
-      || p->ar_pln != sizeof(ip_addr))
+      || p->ar_pln != sizeof(struct ip_addr))
     return;
 
     if (p->ar_op == ARPOP_REPLY)
