@@ -32,7 +32,7 @@ typedef struct
     uint16_t ethertype;
 } padded_eth_hdr_t;
 
-//----------------------------------------------------------------------
+//------------------ init stuff ------------------------------------
 
 void u3_net_stack_init(wb_pkt_iface64_config_t *config);
 
@@ -42,7 +42,35 @@ const struct ip_addr *u3_net_stack_get_ip_addr(const uint8_t ethno);
 
 const eth_mac_addr_t *u3_net_stack_get_mac_addr(const uint8_t ethno);
 
+//------------------ udp handling ------------------------------------
+
+typedef void (*u3_net_stack_udp_handler_t)(
+    const uint8_t,
+    const struct ip_addr *, const struct ip_addr *,
+    const uint16_t, const uint16_t,
+    const void *, const size_t
+);
+
+void u3_net_stack_register_udp_handler(
+    const uint16_t port,
+    const u3_net_stack_udp_handler_t *handler
+);
+
+void u3_net_stack_send_udp_pkt(
+    const uint8_t ethno,
+    const struct ip_addr *src,
+    const struct ip_addr *dst,
+    const uint16_t src_port,
+    const uint16_t dst_port,
+    const void *buff,
+    const size_t num_bytes
+);
+
+//------------------ entry point ------------------------------------
+
 void u3_net_stack_handle_one(void);
+
+//------------------ arp cache ------------------------------------
 
 void u3_net_stack_arp_cache_update(const struct ip_addr *ip_addr, const eth_mac_addr_t * mac_addr);
 

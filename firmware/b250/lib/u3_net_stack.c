@@ -5,8 +5,6 @@
 #include <string.h> //memcmp
 #include <printf.h>
 
-static const eth_mac_addr_t BCAST_MAC_ADDR = {{0xff, 0xff, 0xff, 0xff, 0xff, 0xff}};
-
 typedef struct
 {
     padded_eth_hdr_t eth;
@@ -111,24 +109,29 @@ const eth_mac_addr_t *u3_net_stack_get_mac_addr(const uint8_t ethno)
  * Ethernet handlers - send packet w/ payload
  **********************************************************************/
 static void send_eth_pkt(
-    const void *header, const size_t header_size,
-    const void *payload, const size_t payload_size
+    const void *p0, const size_t l0,
+    const void *p1, const size_t l1,
+    const void *p2, const size_t l2
 )
 {
     void *ptr = wb_pkt_iface64_tx_claim(pkt_iface_config);
     size_t buff_i = 0;
 
     uint32_t *buff32 = (uint32_t *)ptr;
-    for (size_t i = 0; i < header_size/4; i++)
+    for (size_t i = 0; i < l0/4; i++)
     {
-        buff32[buff_i++] = ((const uint32_t *)header)[i];
+        buff32[buff_i++] = ((const uint32_t *)p0)[i];
     }
-    for (size_t i = 0; i < payload_size/4; i++)
+    for (size_t i = 0; i < l1/4; i++)
     {
-        buff32[buff_i++] = ((const uint32_t *)payload)[i];
+        buff32[buff_i++] = ((const uint32_t *)p1)[i];
+    }
+    for (size_t i = 0; i < l2/4; i++)
+    {
+        buff32[buff_i++] = ((const uint32_t *)p2)[i];
     }
 
-    wb_pkt_iface64_tx_submit(pkt_iface_config, header_size + payload_size);
+    wb_pkt_iface64_tx_submit(pkt_iface_config, l0 + l1 + l2);
 }
 
 /***********************************************************************
@@ -155,7 +158,7 @@ static void send_arp_reply(
     memcpy(reply.arp.ar_tha, req->ar_sha, sizeof(eth_mac_addr_t));
     memcpy(reply.arp.ar_tip, req->ar_sip, sizeof(struct ip_addr));
 
-    send_eth_pkt(&reply, sizeof(reply), NULL, 0);
+    send_eth_pkt(&reply, sizeof(reply), NULL, 0, NULL, 0);
 }
 
 static void handle_arp_packet(const uint8_t ethno, const struct arp_eth_ipv4 *p)
@@ -185,6 +188,96 @@ static void handle_arp_packet(const uint8_t ethno, const struct arp_eth_ipv4 *p)
             send_arp_reply(ethno, p, u3_net_stack_get_mac_addr(ethno));
         }
     }
+}
+
+/***********************************************************************
+ * UDP handlers
+ **********************************************************************/
+#define UDP_NHANDLERS 16
+
+static uint16_t udp_handler_ports[UDP_NHANDLERS];
+static u3_net_stack_udp_handler_t udp_handlers[UDP_NHANDLERS];
+static size_t udp_handlers_index = 0;
+
+void u3_net_stack_register_udp_handler(
+    const uint16_t port,
+    const u3_net_stack_udp_handler_t *handler
+)
+{
+    if (udp_handlers_index < UDP_NHANDLERS)
+    {
+        udp_handler_ports[udp_handlers_index] = port;
+        udp_handlers[udp_handlers_index] = *handler;
+        udp_handlers_index++;
+    }
+}
+
+void u3_net_stack_send_udp_pkt(
+    const uint8_t ethno,
+    const struct ip_addr *src,
+    const struct ip_addr *dst,
+    const uint16_t src_port,
+    const uint16_t dst_port,
+    const void *buff,
+    const size_t num_bytes
+)
+{
+    const eth_mac_addr_t *dst_mac_addr = u3_net_stack_arp_cache_lookup(src);
+    if (dst_mac_addr == NULL)
+    {
+        printf("u3_net_stack_send_udp_pkt arp_cache_lookup fail\n");
+        return;
+    }
+
+    padded_udp_t reply;
+
+    reply.eth.ethno = ethno;
+    memcpy(&reply.eth.dst, dst_mac_addr,                     sizeof(eth_mac_addr_t));
+    memcpy(&reply.eth.src, u3_net_stack_get_mac_addr(ethno), sizeof(eth_mac_addr_t));
+    reply.eth.ethertype = ETHERTYPE_IPV4;
+
+    IPH_VHLTOS_SET(&reply.ip, 4, 5, 0);
+    IPH_LEN_SET(&reply.ip, IP_HLEN + UDP_HLEN + num_bytes);
+    IPH_ID_SET(&reply.ip, 0);
+    IPH_OFFSET_SET(&reply.ip, IP_DF);	/* don't fragment */
+    IPH_TTL_SET(&reply.ip, 32);
+    IPH_PROTO_SET(&reply.ip, IP_PROTO_UDP);
+    IPH_CHKSUM_SET(&reply.ip, 0);
+    memcpy(&reply.ip.src, src, sizeof(struct ip_addr));
+    memcpy(&reply.ip.dest, dst, sizeof(struct ip_addr));
+
+    IPH_CHKSUM_SET(&reply.ip, ~chksum_buffer(
+        (unsigned short *) &reply.ip, sizeof(reply.ip)/sizeof(short), 0
+    ));
+
+    reply.udp.src = src_port;
+    reply.udp.dest = dst_port;
+    reply.udp.len = UDP_HLEN + num_bytes;
+    reply.udp.chksum = 0;
+
+    send_eth_pkt(&reply, sizeof(reply), buff, num_bytes, NULL, 0);
+}
+
+static void handle_udp_packet(
+    const uint8_t ethno,
+    const struct ip_addr *src,
+    const struct ip_addr *dst,
+    const struct udp_hdr *udp,
+    const size_t num_bytes
+){
+    for (size_t i = 0; i < udp_handlers_index; i++)
+    {
+        if (udp_handler_ports[i] == udp->dest)
+        {
+            udp_handlers[i](
+                ethno, src, dst, udp->src, udp->dest,
+                ((const uint8_t *)udp) - sizeof(struct udp_hdr),
+                num_bytes - UDP_HLEN
+            );
+            return;
+        }
+    }
+    //TODO send destination unreachable
 }
 
 /***********************************************************************
@@ -245,7 +338,7 @@ static void handle_icmp_packet(
             0)
         );
 
-        send_eth_pkt(&reply, sizeof(reply), icmp_data_buff, icmp_data_len);
+        send_eth_pkt(&reply, sizeof(reply), icmp_data_buff, icmp_data_len, NULL, 0);
     }
 }
 
@@ -273,27 +366,24 @@ static void handle_eth_packet(const void *buff, const size_t num_bytes)
         if (IPH_V(ip) != 4 || IPH_HL(ip) != 5) return;// ignore pkts w/ bad version or options
         if (IPH_OFFSET(ip) & (IP_MF | IP_OFFMASK)) return;// ignore fragmented packets
 
-        // filter on dest ip addr (should be broadcast or for us)
-        bool is_bcast = memcmp(&eth_hdr->dst, &BCAST_MAC_ADDR, sizeof(BCAST_MAC_ADDR)) == 0;
-        bool is_my_ip = memcmp(&ip->dest, u3_net_stack_get_ip_addr(eth_hdr->ethno), sizeof(struct ip_addr)) == 0;
-        if (!is_bcast && !is_my_ip) return;
-
         u3_net_stack_arp_cache_update(&ip->src, &eth_hdr->src);
 
-        int protocol = IPH_PROTO(ip);
-        int len = IPH_LEN(ip) - IP_HLEN;
+        if (IPH_PROTO(ip) == IP_PROTO_UDP)
+        {
+            handle_udp_packet(
+                eth_hdr->ethno, &ip->src, &ip->dest,
+                (const struct udp_hdr *)ip_body,
+                IPH_LEN(ip) - IP_HLEN
+            );
+        }
 
-        switch (protocol){
-        case IP_PROTO_UDP:
-            //handle_udp_packet(eth_hdr->ethno, &ip->src, &ip->dest, (const struct udp_hdr *)ip_body, len);
-            break;
-
-        case IP_PROTO_ICMP:
-            handle_icmp_packet(eth_hdr->ethno, &ip->src, &ip->dest, (const struct icmp_echo_hdr *)ip_body, len);
-            break;
-
-        default:	// ignore
-            break;
+        if (IPH_PROTO(ip) == IP_PROTO_ICMP)
+        {
+            handle_icmp_packet(
+                eth_hdr->ethno, &ip->src, &ip->dest,
+                (const struct icmp_echo_hdr *)ip_body,
+                IPH_LEN(ip) - IP_HLEN
+            );
         }
     }
     else return;	// Not ARP or IPV4, ignore
