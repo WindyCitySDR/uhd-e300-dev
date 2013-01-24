@@ -222,13 +222,13 @@ static size_t udp_handlers_index = 0;
 
 void u3_net_stack_register_udp_handler(
     const uint16_t port,
-    const u3_net_stack_udp_handler_t *handler
+    const u3_net_stack_udp_handler_t handler
 )
 {
     if (udp_handlers_index < UDP_NHANDLERS)
     {
         udp_handler_ports[udp_handlers_index] = port;
-        udp_handlers[udp_handlers_index] = *handler;
+        udp_handlers[udp_handlers_index] = handler;
         udp_handlers_index++;
     }
 }

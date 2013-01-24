@@ -53,7 +53,7 @@ typedef void (*u3_net_stack_udp_handler_t)(
 
 void u3_net_stack_register_udp_handler(
     const uint16_t port,
-    const u3_net_stack_udp_handler_t *handler
+    const u3_net_stack_udp_handler_t handler
 );
 
 void u3_net_stack_send_udp_pkt(
