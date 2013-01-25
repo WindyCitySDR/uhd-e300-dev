@@ -52,6 +52,14 @@ static eth_mac_addr_t arp_cache_macs[ARP_CACHE_NENTRIES];
 
 void u3_net_stack_arp_cache_update(const struct ip_addr *ip_addr, const eth_mac_addr_t *mac_addr)
 {
+    for (size_t i = 0; i < ARP_CACHE_NENTRIES; i++)
+    {
+        if (memcmp(ip_addr, arp_cache_ips+i, sizeof(struct ip_addr)) == 0)
+        {
+            memcpy(arp_cache_macs+i, mac_addr, sizeof(eth_mac_addr_t));
+            return;
+        }
+    }
     if (arp_cache_wr_index >= ARP_CACHE_NENTRIES) arp_cache_wr_index = 0;
     memcpy(arp_cache_ips+arp_cache_wr_index, ip_addr, sizeof(struct ip_addr));
     memcpy(arp_cache_macs+arp_cache_wr_index, mac_addr, sizeof(eth_mac_addr_t));
@@ -243,7 +251,7 @@ void u3_net_stack_send_udp_pkt(
     const size_t num_bytes
 )
 {
-    const eth_mac_addr_t *dst_mac_addr = u3_net_stack_arp_cache_lookup(src);
+    const eth_mac_addr_t *dst_mac_addr = u3_net_stack_arp_cache_lookup(dst);
     if (dst_mac_addr == NULL)
     {
         printf("u3_net_stack_send_udp_pkt arp_cache_lookup fail\n");
@@ -292,7 +300,7 @@ static void handle_udp_packet(
         {
             udp_handlers[i](
                 ethno, src, dst, udp->src, udp->dest,
-                ((const uint8_t *)udp) - sizeof(struct udp_hdr),
+                ((const uint8_t *)udp) + sizeof(struct udp_hdr),
                 num_bytes - UDP_HLEN
             );
             return;

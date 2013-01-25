@@ -15,11 +15,56 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 //
 
-#ifndef INCLUDED_USRP2_IMPL_HPP
-#define INCLUDED_USRP2_IMPL_HPP
+#ifndef INCLUDED_B250_IMPL_HPP
+#define INCLUDED_B250_IMPL_HPP
 
 #include <uhd/property_tree.hpp>
 #include <uhd/device.hpp>
+#include "wb_iface.hpp"
+#include <uhd/transport/udp_simple.hpp>
+#include <uhd/utils/byteswap.hpp>
+
+struct b250_ctrl_iface : wb_iface
+{
+    b250_ctrl_iface(uhd::transport::udp_simple::sptr udp):
+        udp(udp){}
+
+    uhd::transport::udp_simple::sptr udp;
+
+    void poke32(wb_addr_type addr, boost::uint32_t data)
+    {
+        boost::uint32_t request[2] = {};
+        request[0] = uhd::htonx(addr);
+        request[1] = uhd::htonx(data);
+        boost::uint32_t reply[2] = {};
+        udp->send(boost::asio::buffer(request));
+        const size_t nbytes = udp->recv(boost::asio::buffer(reply));
+        UHD_ASSERT_THROW(nbytes == 8);
+        UHD_ASSERT_THROW(uhd::ntohx(reply[0]) == addr);
+    }
+
+    boost::uint32_t peek32(wb_addr_type addr)
+    {
+        boost::uint32_t request[1] = {};
+        request[0] = uhd::htonx(addr);
+        boost::uint32_t reply[2] = {};
+        udp->send(boost::asio::buffer(request));
+        const size_t nbytes = udp->recv(boost::asio::buffer(reply));
+        UHD_ASSERT_THROW(nbytes == 8);
+        UHD_ASSERT_THROW(uhd::ntohx(reply[0]) == addr);
+        return uhd::ntohx(reply[1]);
+    }
+
+    void poke16(wb_addr_type, boost::uint16_t)
+    {
+        throw uhd::not_implemented_error("b250_ctrl_iface::poke16");
+    }
+
+    boost::uint16_t peek16(wb_addr_type)
+    {
+        throw uhd::not_implemented_error("b250_ctrl_iface::peek16");
+    }
+};
 
 class b250_impl : public uhd::device
 {
@@ -28,9 +73,9 @@ public:
     ~b250_impl(void);
 
     //the io interface
-    uhd::rx_streamer::sptr get_rx_stream(const uhd::stream_args_t &args);
-    uhd::tx_streamer::sptr get_tx_stream(const uhd::stream_args_t &args);
-    bool recv_async_msg(uhd::async_metadata_t &, double);
+    uhd::rx_streamer::sptr get_rx_stream(const uhd::stream_args_t &args){}
+    uhd::tx_streamer::sptr get_tx_stream(const uhd::stream_args_t &args){}
+    bool recv_async_msg(uhd::async_metadata_t &, double){}
 
 private:
     uhd::property_tree::sptr _tree;
@@ -39,6 +84,9 @@ private:
     {
         return _tree;
     }
+
+    wb_iface::sptr ctrl;
+
 };
 
-#endif /* INCLUDED_USRP2_IMPL_HPP */
+#endif /* INCLUDED_B250_IMPL_HPP */
