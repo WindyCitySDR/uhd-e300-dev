@@ -12,25 +12,26 @@ void handle_udp_ctrl(
     const void *buff, const size_t num_bytes
 )
 {
-    printf("handle_udp_ctrl %u bytes\n", num_bytes);
+    //printf("handle_udp_ctrl %u bytes\n", num_bytes);
     const uint32_t *cmd = (const uint32_t *)buff;
     const uint32_t addr = cmd[0];
     const uint32_t data = cmd[1];
     uint32_t reply[2];
     reply[0] = addr;
     reply[1] = 0;
-    if (num_bytes > 4)
-    {
-        printf("udp poke 0x%x = 0x%x\n", addr, data);
-        wb_poke32(addr, data);
-    }
-    else
+
+    if (num_bytes == 4)
     {
         reply[1] = wb_peek32(addr);
-        printf("udp peek 0x%x = 0x%x\n", addr, reply[1]);
+        //printf("udp peek 0x%x = 0x%x\n", addr, reply[1]);
+        u3_net_stack_send_udp_pkt(ethno, dst, src, dst_port, src_port, &reply, sizeof(reply));
     }
 
-    u3_net_stack_send_udp_pkt(ethno, dst, src, dst_port, src_port, &reply, sizeof(reply));
+    if (num_bytes == 8)
+    {
+        //printf("udp poke 0x%x = 0x%x\n", addr, data);
+        wb_poke32(addr, data);
+    }
 }
 
 int main(void)

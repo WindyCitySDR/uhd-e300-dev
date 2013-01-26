@@ -24,12 +24,16 @@
 #include <uhd/transport/udp_simple.hpp>
 #include <uhd/utils/byteswap.hpp>
 
+static const std::string B250_FW_FILE_NAME = "b250_fw.bin";
+static const size_t B250_FW_NUM_BYTES = (1 << 14);
+
 struct b250_ctrl_iface : wb_iface
 {
     b250_ctrl_iface(uhd::transport::udp_simple::sptr udp):
-        udp(udp){}
+        udp(udp), poke_count(0){}
 
     uhd::transport::udp_simple::sptr udp;
+    size_t poke_count;
 
     void poke32(wb_addr_type addr, boost::uint32_t data)
     {
@@ -37,10 +41,12 @@ struct b250_ctrl_iface : wb_iface
         request[0] = uhd::htonx(addr);
         request[1] = uhd::htonx(data);
         boost::uint32_t reply[2] = {};
+        while (udp->recv(boost::asio::buffer(reply), 0.0)){} //flush
         udp->send(boost::asio::buffer(request));
-        const size_t nbytes = udp->recv(boost::asio::buffer(reply));
-        UHD_ASSERT_THROW(nbytes == 8);
-        UHD_ASSERT_THROW(uhd::ntohx(reply[0]) == addr);
+        //const size_t nbytes = udp->recv(boost::asio::buffer(reply));
+        //UHD_ASSERT_THROW(nbytes == 8);
+        //UHD_ASSERT_THROW(uhd::ntohx(reply[0]) == addr);
+        if ((poke_count++ & 0xf) == 0) this->peek32(0); //stop poke from overflowing
     }
 
     boost::uint32_t peek32(wb_addr_type addr)
@@ -48,6 +54,7 @@ struct b250_ctrl_iface : wb_iface
         boost::uint32_t request[1] = {};
         request[0] = uhd::htonx(addr);
         boost::uint32_t reply[2] = {};
+        while (udp->recv(boost::asio::buffer(reply), 0.0)){} //flush
         udp->send(boost::asio::buffer(request));
         const size_t nbytes = udp->recv(boost::asio::buffer(reply));
         UHD_ASSERT_THROW(nbytes == 8);
@@ -84,6 +91,8 @@ private:
     {
         return _tree;
     }
+
+    void load_fw(const std::string &file_name);
 
     wb_iface::sptr ctrl;
 

@@ -23,6 +23,7 @@ wb_pkt_iface64_config_t wb_pkt_iface64_init(const uint32_t base, const size_t ct
     config.ctrl = 0;
     config.config_addr = base + ctrl_offset;
     set_control(&config);
+    wb_pkt_iface64_rx_release(&config); //always release, in case left in a filled state
     return config;
 }
 
