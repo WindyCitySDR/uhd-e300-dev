@@ -21,45 +21,80 @@
 #include <uhd/property_tree.hpp>
 #include <uhd/device.hpp>
 #include "wb_iface.hpp"
+#include "b250_fw_common.h"
 #include <uhd/transport/udp_simple.hpp>
 #include <uhd/utils/byteswap.hpp>
 
 static const std::string B250_FW_FILE_NAME = "b250_fw.bin";
-static const size_t B250_FW_NUM_BYTES = (1 << 14);
 
 struct b250_ctrl_iface : wb_iface
 {
     b250_ctrl_iface(uhd::transport::udp_simple::sptr udp):
-        udp(udp), poke_count(0){}
+        udp(udp), seq(0){}
 
     uhd::transport::udp_simple::sptr udp;
-    size_t poke_count;
+    size_t seq;
+
+    void flush(void)
+    {
+        char buff[B250_FW_COMMS_MTU] = {};
+        while (udp->recv(boost::asio::buffer(buff), 0.0)){} //flush
+    }
 
     void poke32(wb_addr_type addr, boost::uint32_t data)
     {
-        boost::uint32_t request[2] = {};
-        request[0] = uhd::htonx(addr);
-        request[1] = uhd::htonx(data);
-        boost::uint32_t reply[2] = {};
-        while (udp->recv(boost::asio::buffer(reply), 0.0)){} //flush
-        udp->send(boost::asio::buffer(request));
-        //const size_t nbytes = udp->recv(boost::asio::buffer(reply));
-        //UHD_ASSERT_THROW(nbytes == 8);
-        //UHD_ASSERT_THROW(uhd::ntohx(reply[0]) == addr);
-        if ((poke_count++ & 0xf) == 0) this->peek32(0); //stop poke from overflowing
+        //load request struct
+        b250_fw_comms_t request = b250_fw_comms_t();
+        request.flags = uhd::htonx<boost::uint32_t>(B250_FW_COMMS_FLAGS_ACK | B250_FW_COMMS_FLAGS_POKE32);
+        request.sequence = uhd::htonx<boost::uint32_t>(seq++);
+        request.addr = uhd::htonx(addr);
+        request.data = uhd::htonx(data);
+
+        //send request
+        udp->send(boost::asio::buffer(&request, sizeof(request)));
+
+        //recv reply
+        this->flush();
+        b250_fw_comms_t reply = b250_fw_comms_t();
+        const size_t nbytes = udp->recv(boost::asio::buffer(&reply, sizeof(reply)));
+
+        //sanity checks
+        UHD_ASSERT_THROW(nbytes == sizeof(reply));
+        UHD_ASSERT_THROW(not (uhd::ntohx(reply.flags) & B250_FW_COMMS_FLAGS_ERROR));
+        UHD_ASSERT_THROW(uhd::ntohx(reply.flags) & B250_FW_COMMS_FLAGS_POKE32);
+        UHD_ASSERT_THROW(uhd::ntohx(reply.flags) & B250_FW_COMMS_FLAGS_ACK);
+        UHD_ASSERT_THROW(reply.sequence == request.sequence);
+        UHD_ASSERT_THROW(reply.addr == request.addr);
+        UHD_ASSERT_THROW(reply.data == request.data);
     }
 
     boost::uint32_t peek32(wb_addr_type addr)
     {
-        boost::uint32_t request[1] = {};
-        request[0] = uhd::htonx(addr);
-        boost::uint32_t reply[2] = {};
-        while (udp->recv(boost::asio::buffer(reply), 0.0)){} //flush
-        udp->send(boost::asio::buffer(request));
-        const size_t nbytes = udp->recv(boost::asio::buffer(reply));
-        UHD_ASSERT_THROW(nbytes == 8);
-        UHD_ASSERT_THROW(uhd::ntohx(reply[0]) == addr);
-        return uhd::ntohx(reply[1]);
+        //load request struct
+        b250_fw_comms_t request = b250_fw_comms_t();
+        request.flags = uhd::htonx<boost::uint32_t>(B250_FW_COMMS_FLAGS_ACK | B250_FW_COMMS_FLAGS_PEEK32);
+        request.sequence = uhd::htonx<boost::uint32_t>(seq++);
+        request.addr = uhd::htonx(addr);
+        request.data = 0;
+
+        //send request
+        udp->send(boost::asio::buffer(&request, sizeof(request)));
+
+        //recv reply
+        this->flush();
+        b250_fw_comms_t reply = b250_fw_comms_t();
+        const size_t nbytes = udp->recv(boost::asio::buffer(&reply, sizeof(reply)));
+
+        //sanity checks
+        UHD_ASSERT_THROW(nbytes == sizeof(reply));
+        UHD_ASSERT_THROW(not (uhd::ntohx(reply.flags) & B250_FW_COMMS_FLAGS_ERROR));
+        UHD_ASSERT_THROW(uhd::ntohx(reply.flags) & B250_FW_COMMS_FLAGS_PEEK32);
+        UHD_ASSERT_THROW(uhd::ntohx(reply.flags) & B250_FW_COMMS_FLAGS_ACK);
+        UHD_ASSERT_THROW(reply.sequence == request.sequence);
+        UHD_ASSERT_THROW(reply.addr == request.addr);
+
+        //return result!
+        return uhd::ntohx(reply.data);
     }
 
     void poke16(wb_addr_type, boost::uint16_t)
@@ -91,8 +126,6 @@ private:
     {
         return _tree;
     }
-
-    void load_fw(const std::string &file_name);
 
     wb_iface::sptr ctrl;
 

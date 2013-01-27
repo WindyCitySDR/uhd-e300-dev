@@ -19,20 +19,79 @@
 #include <uhd/utils/static.hpp>
 #include <uhd/utils/msg.hpp>
 #include <uhd/utils/images.hpp>
+#include <uhd/transport/if_addrs.hpp>
+#include <boost/foreach.hpp>
+#include <boost/asio.hpp>
 #include <fstream>
 
 using namespace uhd;
 using namespace uhd::transport;
+namespace asio = boost::asio;
 
 /***********************************************************************
  * Discovery over the udp transport
  **********************************************************************/
-static device_addrs_t b250_find(const device_addr_t &)
+static device_addrs_t b250_find_with_addr(const device_addr_t &dev_addr)
 {
-    device_addr_t dummy_addr;
-    dummy_addr["addr"] = "192.168.10.2";
+    udp_simple::sptr comm = udp_simple::make_broadcast(
+        dev_addr["addr"], BOOST_STRINGIZE(B250_FW_COMMS_UDP_PORT));
+
+    //load request struct
+    b250_fw_comms_t request = b250_fw_comms_t();
+    request.flags = uhd::htonx<boost::uint32_t>(B250_FW_COMMS_FLAGS_ACK);
+    request.sequence = 0;
+
+    //send request
+    comm->send(asio::buffer(&request, sizeof(request)));
+
+    //loop for replies until timeout
     device_addrs_t addrs;
-    addrs.push_back(dummy_addr);
+    while (true)
+    {
+        char buff[B250_FW_COMMS_MTU] = {};
+        const size_t nbytes = comm->recv(asio::buffer(buff));
+        if (nbytes == 0) break;
+        device_addr_t new_addr;
+        new_addr["type"] = "b250";
+        new_addr["addr"] = comm->get_recv_addr();
+        addrs.push_back(new_addr);
+    }
+
+    return addrs;
+}
+
+static device_addrs_t b250_find(const device_addr_t &hint)
+{
+    device_addrs_t addrs;
+    if (hint.has_key("type") and hint["type"] != "b250") return addrs;
+
+    //use the address given
+    if (hint.has_key("addr"))
+    {
+        device_addrs_t reply_addrs = b250_find_with_addr(hint);
+        BOOST_FOREACH(const device_addr_t &reply_addr, reply_addrs)
+        {
+            if (b250_find_with_addr(reply_addr).empty()) continue;
+            addrs.push_back(reply_addr);
+        }
+        return addrs;
+    }
+
+    //otherwise, no address was specified, send a broadcast on each interface
+    BOOST_FOREACH(const if_addrs_t &if_addrs, get_if_addrs())
+    {
+        //avoid the loopback device
+        if (if_addrs.inet == asio::ip::address_v4::loopback().to_string()) continue;
+
+        //create a new hint with this broadcast address
+        device_addr_t new_hint = hint;
+        new_hint["addr"] = if_addrs.bcast;
+
+        //call discover with the new hint and append results
+        device_addrs_t new_addrs = b250_find(new_hint);
+        addrs.insert(addrs.begin(), new_addrs.begin(), new_addrs.end());
+    }
+
     return addrs;
 }
 
@@ -49,38 +108,62 @@ UHD_STATIC_BLOCK(register_b250_device)
     device::register_device(&b250_find, &b250_make);
 }
 
+static void b250_load_fw(const std::string &addr, const std::string &file_name)
+{
+    udp_simple::sptr comm = udp_simple::make_connected(
+        addr, BOOST_STRINGIZE(B250_FW_COMMS_UDP_PORT));
+
+    UHD_MSG(status) << "Loading firmware " << file_name << std::flush;
+
+    //load file into memory
+    std::ifstream fw_file(file_name.c_str());
+    boost::uint32_t fw_file_buff[B250_FW_NUM_BYTES/sizeof(boost::uint32_t)];
+    fw_file.read((char *)fw_file_buff, sizeof(fw_file_buff));
+    fw_file.close();
+
+    //poke the fw words into the upper bootram half
+    size_t seq = 0;
+    for (size_t i = 0; i < B250_FW_NUM_BYTES; i+=sizeof(boost::uint32_t))
+    {
+        //do ack for occasional backpressure
+        const bool ack = (i & 0xf) == 0;
+
+        //load request struct
+        b250_fw_comms_t request = b250_fw_comms_t();
+        request.flags = uhd::htonx<boost::uint32_t>(B250_FW_COMMS_FLAGS_POKE32 | (ack?B250_FW_COMMS_FLAGS_ACK : 0));
+        request.sequence = uhd::htonx<boost::uint32_t>(seq++);
+        request.addr = uhd::htonx<boost::uint32_t>(B250_FW_NUM_BYTES+i);
+        request.data = uhd::htonx(uhd::byteswap(fw_file_buff[i/sizeof(boost::uint32_t)]));
+
+        //send request
+        comm->send(asio::buffer(&request, sizeof(request)));
+
+        //do ack for occasional backpressure
+        char buff[B250_FW_COMMS_MTU] = {};
+        if (ack) comm->recv(asio::buffer(buff));
+
+        if ((i & 0xfff) == 0) UHD_MSG(status) << "." << std::flush;
+    }
+
+    UHD_MSG(status) << " done!" << std::endl;
+}
+
 b250_impl::b250_impl(const uhd::device_addr_t &dev_addr)
 {
     _tree = uhd::property_tree::make();
-
-    //create basic communication
-    ctrl.reset(new b250_ctrl_iface(udp_simple::make_connected(dev_addr["addr"], "12345")));
 
     //extract the FW path for the B250
     //and live load fw over ethernet link
     const std::string b250_fw_image = find_image_path(
         dev_addr.has_key("fw")? dev_addr["fw"] : B250_FW_FILE_NAME
     );
-    this->load_fw(b250_fw_image);
+    b250_load_fw(dev_addr["addr"], b250_fw_image);
+
+    //create basic communication
+    ctrl.reset(new b250_ctrl_iface(udp_simple::make_connected(dev_addr["addr"], BOOST_STRINGIZE(B250_FW_COMMS_UDP_PORT))));
 }
 
 b250_impl::~b250_impl(void)
 {
     //NOP
-}
-
-void b250_impl::load_fw(const std::string &file_name)
-{
-    UHD_MSG(status) << "Loading firmware " << file_name << std::flush;
-    std::ifstream fw_file(file_name.c_str());
-    boost::uint32_t fw_file_buff[B250_FW_NUM_BYTES/sizeof(boost::uint32_t)];
-    fw_file.read((char *)fw_file_buff, sizeof(fw_file_buff));
-    fw_file.close();
-    for (size_t i = 0; i < B250_FW_NUM_BYTES; i+=sizeof(boost::uint32_t))
-    {
-        const boost::uint32_t data = uhd::byteswap(fw_file_buff[i/sizeof(boost::uint32_t)]);
-        ctrl->poke32(B250_FW_NUM_BYTES+i, data);
-        if ((i & 0xfff) == 0) UHD_MSG(status) << "." << std::flush;
-    }
-    UHD_MSG(status) << " done!" << std::endl;
 }

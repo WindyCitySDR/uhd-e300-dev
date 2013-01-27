@@ -299,7 +299,7 @@ static void handle_udp_packet(
         if (udp_handler_ports[i] == udp->dest)
         {
             udp_handlers[i](
-                ethno, src, dst, udp->src, udp->dest,
+                ethno, src, u3_net_stack_get_ip_addr(ethno), udp->src, udp->dest,
                 ((const uint8_t *)udp) + sizeof(struct udp_hdr),
                 num_bytes - UDP_HLEN
             );

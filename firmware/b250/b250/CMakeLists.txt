@@ -17,6 +17,7 @@
 
 ########################################################################
 include_directories(${CMAKE_CURRENT_SOURCE_DIR})
+include_directories(${CMAKE_SOURCE_DIR}/../../host/lib/usrp/b250)
 
 list(APPEND b250_sources b250_init.c b250_main.c)
 
