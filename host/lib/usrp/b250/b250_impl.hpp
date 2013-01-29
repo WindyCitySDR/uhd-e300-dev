@@ -30,7 +30,7 @@ static const std::string B250_FW_FILE_NAME = "b250_fw.bin";
 struct b250_ctrl_iface : wb_iface
 {
     b250_ctrl_iface(uhd::transport::udp_simple::sptr udp):
-        udp(udp), seq(0){}
+        udp(udp), seq(0){this->flush();}
 
     uhd::transport::udp_simple::sptr udp;
     size_t seq;
