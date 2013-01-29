@@ -24,7 +24,6 @@
 #include <boost/make_shared.hpp>
 #include <boost/thread/thread.hpp>
 #include <list>
-#include <iostream>
 
 using namespace uhd;
 using namespace uhd::transport;
@@ -99,11 +98,7 @@ public:
     void release(void){
         completed = false;
         _lut->length = _frame_size; //always reset length
-        int retvalue = libusb_submit_transfer(_lut);
-        if(retvalue != 0) {
-            std::cout << libusb_error_name(retvalue) << std::endl;
-            UHD_ASSERT_THROW(retvalue == 0);
-        }
+        UHD_ASSERT_THROW(libusb_submit_transfer(_lut) == 0);
     }
 
     sptr get_new(const double timeout, size_t &index){

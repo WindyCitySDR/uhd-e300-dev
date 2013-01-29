@@ -62,7 +62,6 @@ public:
         const boost::uint32_t *mem32 = reinterpret_cast<const boost::uint32_t *>(mem);
         const size_t words32 = (uhd::wtohx(mem32[0]) & 0xffff); //length in words32 (from VRT header)
         const size_t len = words32*sizeof(boost::uint32_t); //length in bytes
-        UHD_ASSERT_THROW(len);
 
         //check if this receive buffer has been exhausted
         offset_bytes += len;
@@ -108,7 +107,7 @@ public:
         //extract VITA end of packet flag, we must force flush under eof conditions
         const bool eop = (uhd::wtohx(vita_header) & (0x1 << 24)) != 0;
         const bool full = _bytes_in_buffer >= (_last_send_buff->size() - _fragmentation_size);
-        if (eop or full or true){
+        if (eop or full){
             _last_send_buff->commit(_bytes_in_buffer);
             _last_send_buff.reset();
 

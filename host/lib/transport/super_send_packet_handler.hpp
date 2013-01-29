@@ -220,10 +220,7 @@ private:
         get_buff_type get_buff;
         bool has_sid;
         boost::uint32_t sid;
-<<<<<<< HEAD
         managed_send_buffer::sptr buff;
-=======
->>>>>>> sph: added set SID per channel
     };
     std::vector<xport_chan_props_type> _props;
     size_t _num_inputs;

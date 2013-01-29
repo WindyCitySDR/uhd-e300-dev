@@ -32,7 +32,7 @@ int UHD_SAFE_MAIN(int argc, char *argv[]){
     std::string args;
     double seconds_in_future;
     size_t total_num_samps;
-    double rate, codec_rate;
+    double rate;
 
     //setup the program options
     po::options_description desc("Allowed options");
@@ -42,7 +42,6 @@ int UHD_SAFE_MAIN(int argc, char *argv[]){
         ("secs", po::value<double>(&seconds_in_future)->default_value(1.5), "number of seconds in the future to receive")
         ("nsamps", po::value<size_t>(&total_num_samps)->default_value(10000), "total number of samples to receive")
         ("rate", po::value<double>(&rate)->default_value(100e6/16), "rate of incoming samples")
-        ("codec_rate", po::value<double>(&codec_rate), "codec rate")
         ("dilv", "specify to disable inner-loop verbose")
     ;
     po::variables_map vm;
@@ -62,10 +61,6 @@ int UHD_SAFE_MAIN(int argc, char *argv[]){
     std::cout << boost::format("Creating the usrp device with: %s...") % args << std::endl;
     uhd::usrp::multi_usrp::sptr usrp = uhd::usrp::multi_usrp::make(args);
     std::cout << boost::format("Using Device: %s") % usrp->get_pp_string() << std::endl;
-
-    if(vm.count("codec_rate")) {
-        usrp->set_master_clock_rate(codec_rate);
-    }
 
     //set the rx sample rate
     std::cout << boost::format("Setting RX Rate: %f Msps...") % (rate/1e6) << std::endl;
