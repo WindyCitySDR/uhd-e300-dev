@@ -1412,7 +1412,11 @@ public:
             } else {
                 UHD_THROW_INVALID_CODE_PATH();
             }
-            _ctrl->poke32(TOREG(SR_MISC + 1), fpga_bandsel);
+            UHD_HERE();
+            UHD_THROW_INVALID_CODE_PATH();
+            //FIX this ctrl poke, its not the same on R2
+            //register a second set freq so this is not in codec ctrl
+            _ctrl->poke32(TOREG(SR_MISC_OUTS), fpga_bandsel);
             _b200_iface->write_reg(0x004, reg_inputsel);
 
             /* Store vcodiv setting. */
@@ -1455,7 +1459,11 @@ public:
             } else {
                 UHD_THROW_INVALID_CODE_PATH();
             }
-            _ctrl->poke32(TOREG(SR_MISC+1), fpga_bandsel);
+            UHD_HERE();
+            UHD_THROW_INVALID_CODE_PATH();
+            //FIX this ctrl poke, its not the same on R2
+            //register a second set freq so this is not in codec ctrl
+            _ctrl->poke32(TOREG(SR_MISC_OUTS), fpga_bandsel);
             _b200_iface->write_reg(0x004, reg_inputsel);
 
             /* Store vcodiv setting. */

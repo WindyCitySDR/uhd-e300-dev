@@ -32,10 +32,12 @@ void b200_impl::update_rates(void)
     _tree->access<double>(mb_path / "tick_rate").update();
 
     //and now that the tick rate is set, init the host rates to something
-    BOOST_FOREACH(const std::string &name, _tree->list(mb_path / "rx_dsps")){
+    BOOST_FOREACH(const std::string &name, _tree->list(mb_path / "rx_dsps"))
+    {
         _tree->access<double>(mb_path / "rx_dsps" / name / "rate" / "value").update();
     }
-    BOOST_FOREACH(const std::string &name, _tree->list(mb_path / "tx_dsps")){
+    BOOST_FOREACH(const std::string &name, _tree->list(mb_path / "tx_dsps"))
+    {
         _tree->access<double>(mb_path / "tx_dsps" / name / "rate" / "value").update();
     }
 }
@@ -43,13 +45,15 @@ void b200_impl::update_rates(void)
 void b200_impl::update_tick_rate(const double rate)
 {
     //update the tick rate on all existing streamers -> thread safe
-    for (size_t i = 0; i < _rx_streamers.size(); i++){
+    for (size_t i = 0; i < _rx_streamers.size(); i++)
+    {
         boost::shared_ptr<sph::recv_packet_streamer> my_streamer =
             boost::dynamic_pointer_cast<sph::recv_packet_streamer>(_rx_streamers[i].lock());
         if (my_streamer.get() == NULL) continue;
         my_streamer->set_tick_rate(rate);
     }
-    for (size_t i = 0; i < _tx_streamers.size(); i++){
+    for (size_t i = 0; i < _tx_streamers.size(); i++)
+    {
         boost::shared_ptr<sph::send_packet_streamer> my_streamer =
             boost::dynamic_pointer_cast<sph::send_packet_streamer>(_tx_streamers[i].lock());
         if (my_streamer.get() == NULL) continue;
@@ -81,8 +85,8 @@ void b200_impl::update_rx_samp_rate(const size_t dspno, const double rate)
     if (my_streamer.get() == NULL) return;
 
     my_streamer->set_samp_rate(rate);
-    const double adj = _rx_dsps[dspno]->get_scaling_adjustment();
-    my_streamer->set_scale_factor(adj);
+    //const double adj = _rx_dsps[dspno]->get_scaling_adjustment();
+    //my_streamer->set_scale_factor(adj);
 }
 
 void b200_impl::update_tx_samp_rate(const size_t dspno, const double rate)
@@ -92,8 +96,8 @@ void b200_impl::update_tx_samp_rate(const size_t dspno, const double rate)
     if (my_streamer.get() == NULL) return;
 
     my_streamer->set_samp_rate(rate);
-    const double adj = _tx_dsps[dspno]->get_scaling_adjustment();
-    my_streamer->set_scale_factor(adj);
+    //const double adj = _tx_dsps[dspno]->get_scaling_adjustment();
+    //my_streamer->set_scale_factor(adj);
 }
 
 /***********************************************************************
@@ -145,16 +149,17 @@ rx_streamer::sptr b200_impl::get_rx_stream(const uhd::stream_args_t &args_)
     my_streamer->set_converter(id);
 
     //bind callbacks for the handler
-    for (size_t chan_i = 0; chan_i < args.channels.size(); chan_i++){
+    for (size_t chan_i = 0; chan_i < args.channels.size(); chan_i++)
+    {
         const size_t dsp = args.channels[chan_i];
-        _rx_dsps[dsp]->set_nsamps_per_packet(spp); //seems to be a good place to set this
-        _rx_dsps[dsp]->setup(args);
+        //_rx_dsps[dsp]->set_nsamps_per_packet(spp); //seems to be a good place to set this
+        //_rx_dsps[dsp]->setup(args);
         my_streamer->set_xport_chan_get_buff(chan_i, boost::bind(
-            &recv_packet_demuxer::get_recv_buff, _rx_demux, dsp, _1
+            &zero_copy_if::get_recv_buff, _data_transport, _1
         ), true /*flush*/);
-        my_streamer->set_overflow_handler(chan_i, boost::bind(
-            &rx_dsp_core_200::handle_overflow, _rx_dsps[dsp]
-        ));
+        //my_streamer->set_overflow_handler(chan_i, boost::bind(
+        //    &rx_dsp_core_200::handle_overflow, _rx_dsps[dsp]
+        //));
         _rx_streamers[dsp] = my_streamer; //store weak pointer
     }
 
@@ -201,9 +206,10 @@ tx_streamer::sptr b200_impl::get_tx_stream(const uhd::stream_args_t &args_)
     my_streamer->set_converter(id);
 
     //bind callbacks for the handler
-    for (size_t chan_i = 0; chan_i < args.channels.size(); chan_i++){
+    for (size_t chan_i = 0; chan_i < args.channels.size(); chan_i++)
+    {
         const size_t dsp = args.channels[chan_i];
-        _tx_dsps[dsp]->setup(args);
+        //_tx_dsps[dsp]->setup(args);
         my_streamer->set_xport_chan_get_buff(chan_i, boost::bind(
             &zero_copy_if::get_send_buff, _data_transport, _1
         ));

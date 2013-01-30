@@ -244,7 +244,7 @@ b200_impl::b200_impl(const device_addr_t &device_addr)
     this->check_fpga_compat(); //check after making
     */
 
-
+/*
     UHD_HERE();
     _ctrl->peek32(12);
     sleep(1);
@@ -261,6 +261,7 @@ b200_impl::b200_impl(const device_addr_t &device_addr)
         if (test_fail) break; //exit loop on any failure
     }
     UHD_MSG(status) << ((test_fail)? " fail" : "pass") << std::endl;
+*/
 
     ////////////////////////////////////////////////////////////////////
     // Create data transport
@@ -274,29 +275,12 @@ b200_impl::b200_impl(const device_addr_t &device_addr)
     data_xport_args["send_frame_size"] = device_addr.get("send_frame_size", "2048");
     data_xport_args["num_send_frames"] = device_addr.get("num_send_frames", "16");
 
-    //let packet padder know the LUT size in number of words32
-    const size_t rx_lut_size = size_t(data_xport_args.cast<double>("recv_frame_size", 0.0));
-    _ctrl->poke32(TOREG(SR_PADDER+0), rx_lut_size/sizeof(boost::uint32_t));
-
-/*
-    _data_transport = usb_zero_copy::make_wrapper(
-        usb_zero_copy::make(
-            handle,        // identifier
-            2, 6,          // IN interface, endpoint
-            1, 2,          // OUT interface, endpoint
-            data_xport_args    // param hints
-        ),
-        B200_MAX_PKT_BYTE_LIMIT
-    );
-*/
     _data_transport = usb_zero_copy::make(
         handle,        // identifier
         2, 6,          // IN interface, endpoint
         1, 2,          // OUT interface, endpoint
         data_xport_args    // param hints
     );
-
-    _rx_demux = recv_packet_demuxer::make(_data_transport, B200_NUM_RX_FE, B200_RX_SID_BASE);
 
     ////////////////////////////////////////////////////////////////////
     // setup the mboard eeprom
@@ -311,8 +295,8 @@ b200_impl::b200_impl(const device_addr_t &device_addr)
     ////////////////////////////////////////////////////////////////////
     // create gpio and misc controls
     ////////////////////////////////////////////////////////////////////
-    _atr0 = gpio_core_200_32wo::make(_ctrl, TOREG(SR_GPIO0));
-    _atr1 = gpio_core_200_32wo::make(_ctrl, TOREG(SR_GPIO1));
+    _atr0 = gpio_core_200_32wo::make(_ctrl, TOREG(SR_GPIO));
+    //_atr1 = gpio_core_200_32wo::make(_ctrl, TOREG(SR_GPIO1));
     _gpio_state = gpio_state(); //clear all to zero
 
     //set bandsel switches to A band fixed for now
@@ -337,9 +321,9 @@ b200_impl::b200_impl(const device_addr_t &device_addr)
     _atr0->set_atr_reg(dboard_iface::ATR_REG_TX_ONLY, STATE_TX | CODEC_TXRX);
     _atr0->set_atr_reg(dboard_iface::ATR_REG_FULL_DUPLEX, STATE_FDX | CODEC_TXRX);
 
-    _atr1->set_atr_reg(dboard_iface::ATR_REG_IDLE, STATE_OFF);
-    _atr1->set_atr_reg(dboard_iface::ATR_REG_TX_ONLY, STATE_TX);
-    _atr1->set_atr_reg(dboard_iface::ATR_REG_FULL_DUPLEX, STATE_FDX);
+    //_atr1->set_atr_reg(dboard_iface::ATR_REG_IDLE, STATE_OFF);
+    //_atr1->set_atr_reg(dboard_iface::ATR_REG_TX_ONLY, STATE_TX);
+    //_atr1->set_atr_reg(dboard_iface::ATR_REG_FULL_DUPLEX, STATE_FDX);
 
     ////////////////////////////////////////////////////////////////////
     // create codec control objects
@@ -381,60 +365,69 @@ b200_impl::b200_impl(const device_addr_t &device_addr)
     ////////////////////////////////////////////////////////////////////
     // create rx dsp control objects
     ////////////////////////////////////////////////////////////////////
-    _rx_dsps.resize(B200_NUM_RX_FE);
-    for (size_t dspno = 0; dspno < _rx_dsps.size(); dspno++)
+    //_rx_dsps.resize(B200_NUM_RX_FE);
+    for (size_t dspno = 0; dspno < B200_NUM_RX_FE; dspno++)
     {
         const fs_path rx_dsp_path = mb_path / str(boost::format("rx_dsps/%u") % dspno);
-        _rx_dsps[dspno] = rx_dsp_core_200::make(_ctrl, TOREG(SR_RX_DSP(dspno)), TOREG(SR_RX_CTRL(dspno)), B200_RX_SID_BASE + dspno);
-        _rx_dsps[dspno]->set_link_rate(B200_LINK_RATE_BPS);
-        _tree->access<double>(mb_path / "tick_rate")
-            .subscribe(boost::bind(&rx_dsp_core_200::set_tick_rate, _rx_dsps[dspno], _1));
-        _tree->create<meta_range_t>(rx_dsp_path / "rate/range")
-            .publish(boost::bind(&rx_dsp_core_200::get_host_rates, _rx_dsps[dspno]));
+        //_rx_dsps[dspno] = rx_dsp_core_200::make(_ctrl, TOREG(SR_RX_DSP(dspno)), TOREG(SR_RX_CTRL(dspno)), B200_RX_SID_BASE + dspno);
+        //_rx_dsps[dspno]->set_link_rate(B200_LINK_RATE_BPS);
+        //_tree->access<double>(mb_path / "tick_rate")
+        //    .subscribe(boost::bind(&rx_dsp_core_200::set_tick_rate, _rx_dsps[dspno], _1));
+        _tree->create<meta_range_t>(rx_dsp_path / "rate/range");
+        //TODO get rates from CAT
+        //    .publish(boost::bind(&rx_dsp_core_200::get_host_rates, _rx_dsps[dspno]));
         _tree->create<double>(rx_dsp_path / "rate/value")
             .set(1e6) //some default
-            .coerce(boost::bind(&rx_dsp_core_200::set_host_rate, _rx_dsps[dspno], _1))
+            //TODO get from CAT or CACHE
+            //.coerce(boost::bind(&rx_dsp_core_200::set_host_rate, _rx_dsps[dspno], _1))
             .subscribe(boost::bind(&b200_impl::update_rx_samp_rate, this, dspno, _1));
-        _tree->create<double>(rx_dsp_path / "freq/value")
-            .coerce(boost::bind(&rx_dsp_core_200::set_freq, _rx_dsps[dspno], _1));
-        _tree->create<meta_range_t>(rx_dsp_path / "freq/range")
-            .publish(boost::bind(&rx_dsp_core_200::get_freq_range, _rx_dsps[dspno]));
-        _tree->create<stream_cmd_t>(rx_dsp_path / "stream_cmd")
-            .subscribe(boost::bind(&rx_dsp_core_200::issue_stream_command, _rx_dsps[dspno], _1));
+        _tree->create<double>(rx_dsp_path / "freq/value");
+            //TODO always readback 0
+            //.coerce(boost::bind(&rx_dsp_core_200::set_freq, _rx_dsps[dspno], _1));
+        _tree->create<meta_range_t>(rx_dsp_path / "freq/range");
+            //TODO always readback 0, 0
+            //.publish(boost::bind(&rx_dsp_core_200::get_freq_range, _rx_dsps[dspno]));
+        _tree->create<stream_cmd_t>(rx_dsp_path / "stream_cmd");
+            //TODO new stream command module...
+            //.subscribe(boost::bind(&rx_dsp_core_200::issue_stream_command, _rx_dsps[dspno], _1));
     }
 
     ////////////////////////////////////////////////////////////////////
     // create tx dsp control objects
     ////////////////////////////////////////////////////////////////////
-    _tx_dsps.resize(B200_NUM_TX_FE);
-    for (size_t dspno = 0; dspno < _tx_dsps.size(); dspno++)
+    //_tx_dsps.resize(B200_NUM_TX_FE);
+    for (size_t dspno = 0; dspno < B200_NUM_TX_FE; dspno++)
     {
         const fs_path tx_dsp_path = mb_path / str(boost::format("tx_dsps/%u") % dspno);
-        _tx_dsps[dspno] = tx_dsp_core_200::make(_ctrl, TOREG(SR_TX_DSP(dspno)), TOREG(SR_TX_CTRL(dspno)), B200_ASYNC_SID_BASE + dspno);
-        _tx_dsps[dspno]->set_link_rate(B200_LINK_RATE_BPS);
-        _tree->access<double>(mb_path / "tick_rate")
-            .subscribe(boost::bind(&tx_dsp_core_200::set_tick_rate, _tx_dsps[dspno], _1));
-        _tree->create<meta_range_t>(tx_dsp_path / "rate/range")
-            .publish(boost::bind(&tx_dsp_core_200::get_host_rates, _tx_dsps[dspno]));
+        //_tx_dsps[dspno] = tx_dsp_core_200::make(_ctrl, TOREG(SR_TX_DSP(dspno)), TOREG(SR_TX_CTRL(dspno)), B200_ASYNC_SID_BASE + dspno);
+        //_tx_dsps[dspno]->set_link_rate(B200_LINK_RATE_BPS);
+        //_tree->access<double>(mb_path / "tick_rate")
+        //    .subscribe(boost::bind(&tx_dsp_core_200::set_tick_rate, _tx_dsps[dspno], _1));
+        _tree->create<meta_range_t>(tx_dsp_path / "rate/range");
+        //TODO get rates from CAT
+        //    .publish(boost::bind(&tx_dsp_core_200::get_host_rates, _tx_dsps[dspno]));
         _tree->create<double>(tx_dsp_path / "rate/value")
             .set(1e6) //some default
-            .coerce(boost::bind(&tx_dsp_core_200::set_host_rate, _tx_dsps[dspno], _1))
+            //TODO get from CAT or CACHE
+            //.coerce(boost::bind(&tx_dsp_core_200::set_host_rate, _tx_dsps[dspno], _1))
             .subscribe(boost::bind(&b200_impl::update_tx_samp_rate, this, 0, _1));
-        _tree->create<double>(tx_dsp_path / "freq/value")
-            .coerce(boost::bind(&tx_dsp_core_200::set_freq, _tx_dsps[dspno], _1));
-        _tree->create<meta_range_t>(tx_dsp_path / "freq/range")
-            .publish(boost::bind(&tx_dsp_core_200::get_freq_range, _tx_dsps[dspno]));
+        _tree->create<double>(tx_dsp_path / "freq/value");
+            //TODO always readback 0
+            //.coerce(boost::bind(&tx_dsp_core_200::set_freq, _tx_dsps[dspno], _1));
+        _tree->create<meta_range_t>(tx_dsp_path / "freq/range");
+            //TODO always readback 0, 0
+            //.publish(boost::bind(&tx_dsp_core_200::get_freq_range, _tx_dsps[dspno]));
     }
 
     ////////////////////////////////////////////////////////////////////
     // create time control objects
     ////////////////////////////////////////////////////////////////////
     time64_core_200::readback_bases_type time64_rb_bases;
-    time64_rb_bases.rb_hi_now = REG_RB_TIME_NOW_HI;
-    time64_rb_bases.rb_lo_now = REG_RB_TIME_NOW_LO;
-    time64_rb_bases.rb_hi_pps = REG_RB_TIME_PPS_HI;
-    time64_rb_bases.rb_lo_pps = REG_RB_TIME_PPS_LO;
-    _time64 = time64_core_200::make(_ctrl, TOREG(SR_TIME64), time64_rb_bases);
+    time64_rb_bases.rb_hi_now = 0;
+    time64_rb_bases.rb_lo_now = 0;
+    time64_rb_bases.rb_hi_pps = 0;
+    time64_rb_bases.rb_lo_pps = 0;
+    _time64 = time64_core_200::make(_ctrl, TOREG(0/*TODO*/), time64_rb_bases);
     _tree->access<double>(mb_path / "tick_rate")
         .subscribe(boost::bind(&time64_core_200::set_tick_rate, _time64, _1));
     _tree->create<time_spec_t>(mb_path / "time/now")
@@ -453,13 +446,6 @@ b200_impl::b200_impl(const device_addr_t &device_addr)
         .subscribe(boost::bind(&b200_impl::update_clock_source, this, _1));
     static const std::vector<std::string> clock_sources = boost::assign::list_of("internal")("external");
     _tree->create<std::vector<std::string> >(mb_path / "clock_source/options").set(clock_sources);
-
-    ////////////////////////////////////////////////////////////////////
-    // create user-defined control objects
-    ////////////////////////////////////////////////////////////////////
-    _user = user_settings_core_200::make(_ctrl, TOREG(SR_USER_REGS));
-    _tree->create<user_settings_core_200::user_reg_t>(mb_path / "user/regs")
-        .subscribe(boost::bind(&user_settings_core_200::set_reg, _user, _1));
 
     ////////////////////////////////////////////////////////////////////
     // create RF frontend interfacing
@@ -516,13 +502,9 @@ b200_impl::b200_impl(const device_addr_t &device_addr)
     // do some post-init tasks
     ////////////////////////////////////////////////////////////////////
 
-    //TODO global clears, maybe useful to move to streamer creation
-    _ctrl->poke32(TOREG(REG_RX_CLEAR), 1);
-    _ctrl->poke32(TOREG(REG_TX_CLEAR), 1);
-
     //allocate streamer weak ptrs containers
-    _rx_streamers.resize(_rx_dsps.size());
-    _tx_streamers.resize(_tx_dsps.size());
+    _rx_streamers.resize(B200_NUM_RX_FE);
+    _tx_streamers.resize(B200_NUM_TX_FE);
 
     _tree->access<double>(mb_path / "tick_rate") //now subscribe the clock rate setter
         .subscribe(boost::bind(&b200_ctrl::set_tick_rate, _ctrl, _1))
@@ -531,10 +513,12 @@ b200_impl::b200_impl(const device_addr_t &device_addr)
     this->update_rates();
 
     //reset cordic rates and their properties to zero
-    BOOST_FOREACH(const std::string &name, _tree->list(mb_path / "rx_dsps")){
+    BOOST_FOREACH(const std::string &name, _tree->list(mb_path / "rx_dsps"))
+    {
         _tree->access<double>(mb_path / "rx_dsps" / name / "freq" / "value").set(0.0);
     }
-    BOOST_FOREACH(const std::string &name, _tree->list(mb_path / "tx_dsps")){
+    BOOST_FOREACH(const std::string &name, _tree->list(mb_path / "tx_dsps"))
+    {
         _tree->access<double>(mb_path / "tx_dsps" / name / "freq" / "value").set(0.0);
     }
 
@@ -584,6 +568,9 @@ void b200_impl::update_clock_source(const std::string &)
 
 void b200_impl::update_gpio_state(void)
 {
+    UHD_HERE();
+            UHD_THROW_INVALID_CODE_PATH();
+            //FIX this ctrl poke, its not the same on R2
     const boost::uint32_t misc_word = 0
         | (_gpio_state.mimo_tx << 7)
         | (_gpio_state.mimo_rx << 6)
@@ -594,7 +581,7 @@ void b200_impl::update_gpio_state(void)
         | (_gpio_state.gps_out_enable << 1)
         | (_gpio_state.gps_ref_enable << 0)
     ;
-    _ctrl->poke32(TOREG(REG_MISC_GPIO), misc_word);
+    _ctrl->poke32(TOREG(SR_MISC_OUTS), misc_word);
 }
 
 void b200_impl::update_antenna_sel(const std::string& which, const std::string &ant)

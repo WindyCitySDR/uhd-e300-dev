@@ -24,44 +24,13 @@
 
 #define localparam static const int
 
-localparam SR_MISC         = 0;      // 5
-localparam SR_USER_REGS    = 5;      // 2
-localparam SR_PADDER       = 10;     // 2
-
-localparam SR_TX_CTRL0     = 32;     // 6
-localparam SR_TX_DSP0      = 40;     // 5
-
-localparam SR_TX_CTRL1     = 64;      // 6
-localparam SR_TX_DSP1      = 72;      // 5
-
-localparam SR_RX_CTRL0     = 96;      // 9
-localparam SR_RX_DSP0      = 106;     // 7
-
-localparam SR_RX_CTRL1     = 128;     // 9
-localparam SR_RX_DSP1      = 138;     // 7
-
-localparam SR_TIME64       = 192;     // 6
-localparam SR_SPI          = 208;     // 3
-localparam SR_GPIO0        = 224;     // 5
-localparam SR_GPIO1        = 232;     // 5
-
-#define SR_RX_DSP(which) (SR_RX_DSP0 + which*32)
-#define SR_TX_DSP(which) (SR_TX_DSP0 + which*32)
-
-#define SR_RX_CTRL(which) (SR_RX_CTRL0 + which*32)
-#define SR_TX_CTRL(which) (SR_TX_CTRL0 + which*32)
-
-#define REG_RB_TIME_NOW_HI TOREG(10)
-#define REG_RB_TIME_NOW_LO TOREG(11)
-#define REG_RB_TIME_PPS_HI TOREG(14)
-#define REG_RB_TIME_PPS_LO TOREG(15)
-#define REG_RB_SPI         TOREG(0)
-#define REG_RB_COMPAT      TOREG(1)
-
-#define REG_MISC_GPIO SR_MISC + 0
-#define REG_BANDSEL   SR_MISC + 1
-#define REG_RX_CLEAR  SR_MISC + 2
-#define REG_TX_CLEAR  SR_MISC + 3
+localparam SR_SPI       = 8;
+localparam SR_GPIO      = 16;
+localparam SR_LEDS      = 20;
+localparam SR_MISC_OUTS = 24;
+localparam SR_READBACK  = 32;
+localparam SR_TX_CTRL   = 64;
+localparam SR_RX_CTRL   = 96;
 
 /* ATR GPIO TX Output Settings 
  * N.B. The LED_RX and LED_TXRX_RX names are switched in the schematic and the
