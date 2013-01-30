@@ -235,7 +235,7 @@ b200_impl::b200_impl(const device_addr_t &device_addr)
     _tree->create<std::string>(mb_path / "codename").set("Sasquatch");
 
 
-/*
+
 UHD_HERE();
 
     device_addr_t data_xport_argss;
@@ -250,26 +250,44 @@ UHD_HERE();
         1, 2,          // OUT interface, endpoint
         data_xport_argss    // param hints
     );
+    _data_transport = _ctrl_transport;
 
     managed_send_buffer::sptr msb = _data_transport->get_send_buff();
     boost::uint32_t *sbuff = msb->cast<uint32_t *>();
-    sbuff[0] = 7;
+    sbuff[0] = 8;
     sbuff[1] = 0x1111;
     sbuff[2] = 0x2222;
     sbuff[3] = 0x3333;
     sbuff[4] = 0x4444;
     sbuff[5] = 0x5555;
     sbuff[6] = 0x6666;
-    msb->commit(7*4);
+    msb->commit(8*4);
     msb.reset();
     sleep(1);
     managed_recv_buffer::sptr rb = _data_transport->get_recv_buff();
     UHD_VAR(bool(rb));
     if (rb) UHD_VAR(rb->size());
+    
+    if (rb->size())
+        {
+            UHD_VAR(rb->size());
+            const boost::uint32_t *pkt = rb->cast<const boost::uint32_t *>();
+            UHD_MSG(status) << std::hex << pkt[0] << std::dec << std::endl;
+            UHD_MSG(status) << std::hex << pkt[1] << std::dec << std::endl;
+            UHD_MSG(status) << std::hex << pkt[2] << std::dec << std::endl;
+            UHD_MSG(status) << std::hex << pkt[3] << std::dec << std::endl;
+            UHD_MSG(status) << std::hex << pkt[4] << std::dec << std::endl;
+            UHD_MSG(status) << std::hex << pkt[5] << std::dec << std::endl;
+            UHD_MSG(status) << std::hex << pkt[6] << std::dec << std::endl;
+            UHD_MSG(status) << std::hex << pkt[7] << std::dec << std::endl;
+        }
+    
+    
     rb.reset();
     _data_transport.reset();
+    exit(-1);
 
-
+/*
     long count = 0;
 
 UHD_HERE();

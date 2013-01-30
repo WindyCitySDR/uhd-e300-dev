@@ -87,7 +87,7 @@ public:
         if (not buff->size()) return;
         
         const boost::uint32_t *pkt = buff->cast<const boost::uint32_t *>();
-        /*
+        //*
         if (buff->size())
         {
             UHD_VAR(buff->size());
