@@ -76,7 +76,7 @@ public:
     {
         boost::mutex::scoped_lock lock(_mutex);
 
-        this->send_pkt(32, addr/8);
+        this->send_pkt(SR_READBACK, addr/8);
         this->wait_for_ack(_seq_out);
 
         this->send_pkt(addr);
@@ -90,7 +90,7 @@ public:
     {
         boost::mutex::scoped_lock lock(_mutex);
 
-        this->send_pkt(32, addr/8);
+        this->send_pkt(SR_READBACK, addr/8);
         this->wait_for_ack(_seq_out);
 
         this->send_pkt(addr);
@@ -130,14 +130,14 @@ private:
         //load packet info
         vrt::if_packet_info_t packet_info;
         packet_info.link_type = vrt::if_packet_info_t::LINK_TYPE_CHDR;
-        packet_info.packet_type = vrt::if_packet_info_t::PACKET_TYPE_CONTEXT;
+        packet_info.packet_type = vrt::if_packet_info_t::PACKET_TYPE_EXTENSION;
         packet_info.num_payload_words32 = 2;
         packet_info.num_payload_bytes = packet_info.num_payload_words32*sizeof(boost::uint32_t);
         packet_info.packet_count = ++_seq_out;
         packet_info.tsf = _time.to_ticks(_tick_rate);
         packet_info.sob = false;
         packet_info.eob = false;
-        packet_info.has_sid = false;
+        packet_info.has_sid = true;
         packet_info.has_cid = false;
         packet_info.has_tsi = false;
         packet_info.has_tsf = _use_time;
@@ -161,7 +161,7 @@ private:
         UHD_ASSERT_THROW(bool(buff->size()));
         
         const boost::uint32_t *pkt = buff->cast<const boost::uint32_t *>();
-        //*
+        /*
         if (buff->size())
         {
             UHD_VAR(buff->size());
@@ -191,6 +191,7 @@ private:
             UHD_MSG(status) << std::hex << pkt[3] << std::dec << std::endl;
         }
         UHD_ASSERT_THROW(packet_info.packet_count == seq_to_ack);
+        UHD_ASSERT_THROW(packet_info.num_payload_words32 == 2);
         const boost::uint64_t hi = pkt[packet_info.num_header_words32+0];
         const boost::uint64_t lo = pkt[packet_info.num_header_words32+1];
         return ((hi << 32) | lo);

@@ -244,24 +244,18 @@ b200_impl::b200_impl(const device_addr_t &device_addr)
     this->check_fpga_compat(); //check after making
     */
 
-/*
-    UHD_HERE();
-    _ctrl->peek32(12);
-    sleep(1);
-    exit(0);
-
-    //Perform wishbone readback tests, these tests also write the hash
+    //Perform readback tests, these tests also write the hash
     bool test_fail = false;
     UHD_MSG(status) << "Performing control readback test... " << std::flush;
     size_t hash = time(NULL);
-    for (size_t i = 0; i < 100; i++){
+    for (size_t i = 0; i < 100; i++)
+    {
         boost::hash_combine(hash, i);
-        _ctrl->poke32(TOREG(SR_MISC+4), boost::uint32_t(hash));
-        test_fail = _ctrl->peek32(TOREG(4)) != boost::uint32_t(hash);
+        _ctrl->poke32(TOREG(SR_TEST), boost::uint32_t(hash));
+        test_fail = _ctrl->peek32(TOREG(3*2)) != boost::uint32_t(hash);
         if (test_fail) break; //exit loop on any failure
     }
     UHD_MSG(status) << ((test_fail)? " fail" : "pass") << std::endl;
-*/
 
     ////////////////////////////////////////////////////////////////////
     // Create data transport
@@ -296,6 +290,7 @@ b200_impl::b200_impl(const device_addr_t &device_addr)
     // create gpio and misc controls
     ////////////////////////////////////////////////////////////////////
     _atr0 = gpio_core_200_32wo::make(_ctrl, TOREG(SR_GPIO));
+
     //_atr1 = gpio_core_200_32wo::make(_ctrl, TOREG(SR_GPIO1));
     _gpio_state = gpio_state(); //clear all to zero
 

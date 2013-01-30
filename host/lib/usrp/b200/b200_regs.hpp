@@ -27,6 +27,7 @@
 localparam SR_SPI       = 8;
 localparam SR_GPIO      = 16;
 localparam SR_LEDS      = 20;
+localparam SR_TEST      = 21;
 localparam SR_MISC_OUTS = 24;
 localparam SR_READBACK  = 32;
 localparam SR_TX_CTRL   = 64;
