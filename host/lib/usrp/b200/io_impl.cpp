@@ -102,7 +102,9 @@ void b200_impl::update_tx_samp_rate(const size_t dspno, const double rate)
 bool b200_impl::recv_async_msg(
     async_metadata_t &async_metadata, double timeout
 ){
-    return _ctrl->pop_async_msg(async_metadata, timeout);
+    return false;
+    //TODO!!
+    //return _ctrl->pop_async_msg(async_metadata, timeout);
 }
 
 /***********************************************************************

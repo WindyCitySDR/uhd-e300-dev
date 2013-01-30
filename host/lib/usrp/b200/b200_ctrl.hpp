@@ -1,5 +1,5 @@
 //
-// Copyright 2012 Ettus Research LLC
+// Copyright 2012-2013 Ettus Research LLC
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -19,7 +19,7 @@
 #define INCLUDED_B200_CTRL_HPP
 
 #include <uhd/types/time_spec.hpp>
-#include <uhd/types/metadata.hpp>
+//#include <uhd/types/metadata.hpp>
 #include <uhd/types/serial.hpp>
 #include <uhd/transport/zero_copy.hpp>
 #include <boost/shared_ptr.hpp>
@@ -30,7 +30,8 @@
 /*!
  * Provide access to peek, poke, spi, and async messages.
  */
-class b200_ctrl : public wb_iface, public uhd::spi_iface{
+class b200_ctrl : public wb_iface//, public uhd::spi_iface
+{
 public:
     typedef boost::shared_ptr<b200_ctrl> sptr;
 
@@ -44,7 +45,7 @@ public:
     virtual void set_tick_rate(const double rate) = 0;
 
     //! Pop an async message from the queue or timeout
-    virtual bool pop_async_msg(uhd::async_metadata_t &async_metadata, double timeout) = 0;
+    //virtual bool pop_async_msg(uhd::async_metadata_t &async_metadata, double timeout) = 0;
 };
 
 #endif /* INCLUDED_B200_CTRL_HPP */

@@ -215,7 +215,7 @@ b200_impl::b200_impl(const device_addr_t &device_addr)
     device_addr_t ctrl_xport_args;
     ctrl_xport_args["recv_frame_size"] = (usb_speed == 3) ? "1024" : "512";
     ctrl_xport_args["num_recv_frames"] = "16";
-    ctrl_xport_args["send_frame_size"] = "1024";
+    ctrl_xport_args["send_frame_size"] = (usb_speed == 3) ? "1024" : "512";
     ctrl_xport_args["num_send_frames"] = "16";
 
     _ctrl_transport = usb_zero_copy::make(
@@ -234,106 +234,6 @@ b200_impl::b200_impl(const device_addr_t &device_addr)
     _tree->create<std::string>(mb_path / "name").set("B200");
     _tree->create<std::string>(mb_path / "codename").set("Sasquatch");
 
-
-
-UHD_HERE();
-
-    device_addr_t data_xport_argss;
-    data_xport_argss["recv_frame_size"] = device_addr.get("recv_frame_size", "4096");
-    data_xport_argss["num_recv_frames"] = device_addr.get("num_recv_frames", "16");
-    data_xport_argss["send_frame_size"] = device_addr.get("send_frame_size", "4096");
-    data_xport_argss["num_send_frames"] = device_addr.get("num_send_frames", "16");
-
-    _data_transport = usb_zero_copy::make(
-        handle,        // identifier
-        2, 6,          // IN interface, endpoint
-        1, 2,          // OUT interface, endpoint
-        data_xport_argss    // param hints
-    );
-    _data_transport = _ctrl_transport;
-
-    managed_send_buffer::sptr msb = _data_transport->get_send_buff();
-    boost::uint32_t *sbuff = msb->cast<uint32_t *>();
-    sbuff[0] = 8;
-    sbuff[1] = 0x1111;
-    sbuff[2] = 0x2222;
-    sbuff[3] = 0x3333;
-    sbuff[4] = 0x4444;
-    sbuff[5] = 0x5555;
-    sbuff[6] = 0x6666;
-    msb->commit(8*4);
-    msb.reset();
-    sleep(1);
-    managed_recv_buffer::sptr rb = _data_transport->get_recv_buff();
-    UHD_VAR(bool(rb));
-    if (rb) UHD_VAR(rb->size());
-    
-    if (rb->size())
-        {
-            UHD_VAR(rb->size());
-            const boost::uint32_t *pkt = rb->cast<const boost::uint32_t *>();
-            UHD_MSG(status) << std::hex << pkt[0] << std::dec << std::endl;
-            UHD_MSG(status) << std::hex << pkt[1] << std::dec << std::endl;
-            UHD_MSG(status) << std::hex << pkt[2] << std::dec << std::endl;
-            UHD_MSG(status) << std::hex << pkt[3] << std::dec << std::endl;
-            UHD_MSG(status) << std::hex << pkt[4] << std::dec << std::endl;
-            UHD_MSG(status) << std::hex << pkt[5] << std::dec << std::endl;
-            UHD_MSG(status) << std::hex << pkt[6] << std::dec << std::endl;
-            UHD_MSG(status) << std::hex << pkt[7] << std::dec << std::endl;
-        }
-    
-    
-    rb.reset();
-    _data_transport.reset();
-    exit(-1);
-
-/*
-    long count = 0;
-
-UHD_HERE();
-bool fail = false;
-    for (size_t i = 0; i < 10; i++)
-    {
-        for (size_t j = 0; j < 4; j++)
-        {
-            managed_send_buffer::sptr rb = _data_transport->get_send_buff();
-            for (size_t k = 0; k < rb->size()/4; k++)
-            {
-                rb->cast<uint32_t *>()[k] = count++;
-            }
-            rb->commit(rb->size());
-            rb.reset();
-        }
-        for (size_t j = 0; j < 4; j++)
-        {
-            managed_recv_buffer::sptr rb = _data_transport->get_recv_buff();
-            char src_buff[rb->size()];
-            std::memset(src_buff, (i << 4) + j, rb->size());
-            for (size_t k = 0; k < rb->size()/4; k++)
-            {
-                long num = (i*4 + j)*rb->size()/4 + k;
-                if (rb->cast<uint32_t *>()[k] != num)
-                {
-                    UHD_MSG(status) << boost::format("fail i=%d, j=%d, k=%d -> supposed to be %d but was %d\n") % i % j % k % num % rb->cast<uint32_t *>()[k];
-                    fail = true;
-                    break;
-                }
-            }
-            rb.reset();
-        }
-        UHD_ASSERT_THROW(not fail);
-    }
-
-UHD_HERE();
-
-
-_data_transport.reset();
-
-
-//*/
-
-
-
     ////////////////////////////////////////////////////////////////////
     // Initialize control (settings regs and async messages)
     ////////////////////////////////////////////////////////////////////
@@ -343,6 +243,12 @@ _data_transport.reset();
     /*
     this->check_fpga_compat(); //check after making
     */
+
+
+    UHD_HERE();
+    _ctrl->peek32(12);
+    sleep(1);
+    exit(0);
 
     //Perform wishbone readback tests, these tests also write the hash
     bool test_fail = false;
