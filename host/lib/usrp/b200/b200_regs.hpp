@@ -25,7 +25,8 @@
 #define localparam static const int
 
 localparam SR_SPI       = 8;
-localparam SR_GPIO      = 16;
+localparam SR_ATR0      = 12;
+localparam SR_ATR1      = 16;
 localparam SR_LEDS      = 20;
 localparam SR_TEST      = 21;
 localparam SR_MISC_OUTS = 24;

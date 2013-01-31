@@ -192,6 +192,7 @@ private:
         }
         UHD_ASSERT_THROW(packet_info.packet_count == seq_to_ack);
         UHD_ASSERT_THROW(packet_info.num_payload_words32 == 2);
+        UHD_ASSERT_THROW(packet_info.packet_type == vrt::if_packet_info_t::PACKET_TYPE_EXTENSION);
         const boost::uint64_t hi = pkt[packet_info.num_header_words32+0];
         const boost::uint64_t lo = pkt[packet_info.num_header_words32+1];
         return ((hi << 32) | lo);

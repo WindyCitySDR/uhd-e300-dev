@@ -252,7 +252,7 @@ b200_impl::b200_impl(const device_addr_t &device_addr)
     {
         boost::hash_combine(hash, i);
         _ctrl->poke32(TOREG(SR_TEST), boost::uint32_t(hash));
-        test_fail = _ctrl->peek32(TOREG(3*2)) != boost::uint32_t(hash);
+        test_fail = _ctrl->peek32(TOREG(0*2)) != boost::uint32_t(hash);
         if (test_fail) break; //exit loop on any failure
     }
     UHD_MSG(status) << ((test_fail)? " fail" : "pass") << std::endl;
@@ -289,9 +289,9 @@ b200_impl::b200_impl(const device_addr_t &device_addr)
     ////////////////////////////////////////////////////////////////////
     // create gpio and misc controls
     ////////////////////////////////////////////////////////////////////
-    _atr0 = gpio_core_200_32wo::make(_ctrl, TOREG(SR_GPIO));
+    _atr0 = gpio_core_200_32wo::make(_ctrl, TOREG(SR_ATR0));
+    _atr1 = gpio_core_200_32wo::make(_ctrl, TOREG(SR_ATR1));
 
-    //_atr1 = gpio_core_200_32wo::make(_ctrl, TOREG(SR_GPIO1));
     _gpio_state = gpio_state(); //clear all to zero
 
     //set bandsel switches to A band fixed for now
