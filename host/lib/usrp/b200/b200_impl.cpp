@@ -280,30 +280,17 @@ b200_impl::b200_impl(const device_addr_t &device_addr)
     _atr0 = gpio_core_200_32wo::make(_ctrl, TOREG(SR_ATR0));
     _atr1 = gpio_core_200_32wo::make(_ctrl, TOREG(SR_ATR1));
 
-    _gpio_state = gpio_state(); //clear all to zero
-
-    //set bandsel switches to A band fixed for now
-    //assign { /* 2'bX, */ ext_ref_enable, dac_shdn, pps_fpga_out_enable, pps_gps_out_enable, gps_out_enable, gps_ref_enable } = misc_outs[23:16];
-    //assign { /* 3'bX, */ tx_bandsel_a, tx_bandsel_b, rx_bandsel_a, rx_bandsel_b, rx_bandsel_c } = misc_outs[15:8];
-    //assign { /* 7'bX, */ mimo } = misc_outs[7:0];
+    /* Initialize the GPIOs, set the default bandsels to the lower range. Note
+     * that calling update_bandsel calls update_gpio_state(). */
+    _gpio_state = gpio_state();
+    update_bandsel("RX", 800e6);
+    update_bandsel("TX", 850e6);
 
     /* TODO lock to ext ref
     _gpio_state.gps_ref_enable = 1;
     _gpio_state.gps_out_enable = 1;
     _gpio_state.ext_ref_enable = 0;
     */
-    update_gpio_state(); //first time init
-
-    //set ATR for FDX operation fixed GPIO, amps enabled, LEDs all on
-    //set all ATR to GPIO not ATR
-    //assign {tx_enable1, SFDX1_RX, SFDX1_TX, SRX1_RX, SRX1_TX, LED_RX1, LED_TXRX1_RX, LED_TXRX1_TX} = atr0[23:16];
-    //assign {tx_enable2, SFDX2_RX, SFDX2_TX, SRX2_RX, SRX2_TX, LED_RX2, LED_TXRX2_RX, LED_TXRX2_TX} = atr1[23:16];
-    //assign {codec_txrx, codec_en_agc, codec_ctrl_in[3:0] } = atr0[5:0];
-
-
-    //_atr1->set_atr_reg(dboard_iface::ATR_REG_IDLE, STATE_OFF);
-    //_atr1->set_atr_reg(dboard_iface::ATR_REG_TX_ONLY, STATE_TX);
-    //_atr1->set_atr_reg(dboard_iface::ATR_REG_FULL_DUPLEX, STATE_FDX);
 
     ////////////////////////////////////////////////////////////////////
     // create codec control objects
