@@ -566,7 +566,6 @@ void b200_impl::update_bandsel(const std::string& which, double freq)
 
 void b200_impl::update_gpio_state(void)
 {
-    UHD_HERE();
     const boost::uint32_t misc_word = 0
         | (_gpio_state.tx_bandsel_a << 10)
         | (_gpio_state.tx_bandsel_b << 9)
