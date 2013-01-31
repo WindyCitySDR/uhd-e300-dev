@@ -598,12 +598,6 @@ void b200_impl::update_gpio_state(void)
 {
     UHD_HERE();
     const boost::uint32_t misc_word = 0
-        | (_gpio_state.codec_txrx << 16)
-        | (_gpio_state.codec_en_agc << 15)
-        | (_gpio_state.codec_ctrl_in0 << 14)
-        | (_gpio_state.codec_ctrl_in0 << 13)
-        | (_gpio_state.codec_ctrl_in0 << 12)
-        | (_gpio_state.codec_ctrl_in0 << 11)
         | (_gpio_state.tx_bandsel_a << 10)
         | (_gpio_state.tx_bandsel_b << 9)
         | (_gpio_state.rx_bandsel_a << 8)
@@ -631,15 +625,15 @@ void b200_impl::update_antenna_sel(const std::string& which, const std::string &
     }
 
     if(which[3] == 'A') {
-        _atr0->set_atr_reg(dboard_iface::ATR_REG_IDLE, STATE_FDX_TXRX1 | CODEC_TXRX);
-        _atr0->set_atr_reg(dboard_iface::ATR_REG_RX_ONLY, STATE_FDX_TXRX1 | CODEC_TXRX);
-        _atr0->set_atr_reg(dboard_iface::ATR_REG_TX_ONLY, STATE_FDX_TXRX1 | CODEC_TXRX);
-        _atr0->set_atr_reg(dboard_iface::ATR_REG_FULL_DUPLEX, STATE_FDX_TXRX1 | CODEC_TXRX);
+        _atr0->set_atr_reg(dboard_iface::ATR_REG_IDLE, STATE_FDX_TXRX1);
+        _atr0->set_atr_reg(dboard_iface::ATR_REG_RX_ONLY, STATE_FDX_TXRX1);
+        _atr0->set_atr_reg(dboard_iface::ATR_REG_TX_ONLY, STATE_FDX_TXRX1);
+        _atr0->set_atr_reg(dboard_iface::ATR_REG_FULL_DUPLEX, STATE_FDX_TXRX1);
     } else if(which[3] == 'B') {
-        _atr0->set_atr_reg(dboard_iface::ATR_REG_IDLE, STATE_FDX_TXRX2 | CODEC_TXRX);
-        _atr0->set_atr_reg(dboard_iface::ATR_REG_RX_ONLY, STATE_FDX_TXRX2 | CODEC_TXRX);
-        _atr0->set_atr_reg(dboard_iface::ATR_REG_TX_ONLY, STATE_FDX_TXRX2 | CODEC_TXRX);
-        _atr0->set_atr_reg(dboard_iface::ATR_REG_FULL_DUPLEX, STATE_FDX_TXRX2 | CODEC_TXRX);
+        _atr0->set_atr_reg(dboard_iface::ATR_REG_IDLE, STATE_FDX_TXRX2);
+        _atr0->set_atr_reg(dboard_iface::ATR_REG_RX_ONLY, STATE_FDX_TXRX2);
+        _atr0->set_atr_reg(dboard_iface::ATR_REG_TX_ONLY, STATE_FDX_TXRX2);
+        _atr0->set_atr_reg(dboard_iface::ATR_REG_FULL_DUPLEX, STATE_FDX_TXRX2);
     } else {
         throw uhd::value_error("update_antenna_sel unknown side " + which);
     }

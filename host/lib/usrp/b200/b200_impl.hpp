@@ -109,7 +109,6 @@ private:
     void update_antenna_sel(const std::string& which, const std::string &ant);
 
     struct gpio_state{
-        boost::uint32_t  codec_txrx, codec_en_agc, codec_ctrl_in0, codec_ctrl_in1, codec_ctrl_in2, codec_ctrl_in3;
         boost::uint32_t  tx_bandsel_a, tx_bandsel_b, rx_bandsel_a, rx_bandsel_b, rx_bandsel_c;
         boost::uint32_t  mimo_tx, mimo_rx, ext_ref_enable, pps_fpga_out_enable, gps_out_enable, gps_ref_enable;
     } _gpio_state;

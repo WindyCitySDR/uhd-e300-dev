@@ -67,10 +67,4 @@ static const boost::uint32_t STATE_FDX_TXRX2 = (SFDX2_RX
                                                 | LED_TXRX_TX2
                                                 | LED_RX2);
 
-/* ATR GPIO RX Output Settings */
-//FIXME -- What do these do?
-static const boost::uint32_t CODEC_CTRL_IN = 0x0F;
-static const boost::uint32_t CODEC_EN_AGC = (1 << 4);
-static const boost::uint32_t CODEC_TXRX = (1 << 5);
-
 #endif /* INCLUDED_B200_REGS_HPP */
