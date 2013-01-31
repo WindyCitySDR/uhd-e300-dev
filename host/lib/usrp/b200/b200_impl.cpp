@@ -312,9 +312,6 @@ b200_impl::b200_impl(const device_addr_t &device_addr)
     //assign {tx_enable2, SFDX2_RX, SFDX2_TX, SRX2_RX, SRX2_TX, LED_RX2, LED_TXRX2_RX, LED_TXRX2_TX} = atr1[23:16];
     //assign {codec_txrx, codec_en_agc, codec_ctrl_in[3:0] } = atr0[5:0];
 
-    _atr0->set_atr_reg(dboard_iface::ATR_REG_IDLE, STATE_OFF | CODEC_TXRX);
-    _atr0->set_atr_reg(dboard_iface::ATR_REG_TX_ONLY, STATE_TX | CODEC_TXRX);
-    _atr0->set_atr_reg(dboard_iface::ATR_REG_FULL_DUPLEX, STATE_FDX | CODEC_TXRX);
 
     //_atr1->set_atr_reg(dboard_iface::ATR_REG_IDLE, STATE_OFF);
     //_atr1->set_atr_reg(dboard_iface::ATR_REG_TX_ONLY, STATE_TX);
@@ -323,7 +320,7 @@ b200_impl::b200_impl(const device_addr_t &device_addr)
     ////////////////////////////////////////////////////////////////////
     // create codec control objects
     ////////////////////////////////////////////////////////////////////
-    _codec_ctrl = b200_codec_ctrl::make(_iface, _ctrl);
+    _codec_ctrl = b200_codec_ctrl::make(_iface);
     static const std::vector<std::string> frontends = boost::assign::list_of
         ("TX_A")("TX_B")("RX_A")("RX_B");
 
@@ -471,7 +468,8 @@ b200_impl::b200_impl(const device_addr_t &device_addr)
         _tree->create<meta_range_t>(rf_fe_path / "bandwidth" / "range")
             .publish(boost::bind(&b200_codec_ctrl::get_bw_filter_range, _codec_ctrl, fe_name));
         _tree->create<double>(rf_fe_path / "freq" / "value")
-            .coerce(boost::bind(&b200_codec_ctrl::tune, _codec_ctrl, fe_name, _1));
+            .coerce(boost::bind(&b200_codec_ctrl::tune, _codec_ctrl, fe_name, _1))
+            .subscribe(boost::bind(&b200_impl::update_bandsel, this, fe_name, _1));
         _tree->create<meta_range_t>(rf_fe_path / "freq" / "range")
             .publish(boost::bind(&b200_codec_ctrl::get_rf_freq_range, _codec_ctrl, fe_name));
 
@@ -561,44 +559,89 @@ void b200_impl::update_clock_source(const std::string &)
     //TODO
 }
 
+void b200_impl::update_bandsel(const std::string& which, double freq)
+{
+    if(which == "RX") {
+        if(freq < 2.0e9) {
+            _gpio_state.rx_bandsel_a = 0;
+            _gpio_state.rx_bandsel_b = 0;
+            _gpio_state.rx_bandsel_c = 1;
+        } else if((freq >= 2.0e9) && (freq < 4e9)) {
+            _gpio_state.rx_bandsel_a = 0;
+            _gpio_state.rx_bandsel_b = 1;
+            _gpio_state.rx_bandsel_c = 0;
+        } else if((freq >= 4e9) && (freq <= 6e9)) {
+            _gpio_state.rx_bandsel_a = 1;
+            _gpio_state.rx_bandsel_b = 0;
+            _gpio_state.rx_bandsel_c = 0;
+        } else {
+            UHD_THROW_INVALID_CODE_PATH();
+        }
+    } else if(which == "TX") {
+        if(freq < 3e9) {
+            _gpio_state.tx_bandsel_a = 0;
+            _gpio_state.tx_bandsel_b = 1;
+        } else if((freq >= 3e9) && (freq <= 6e9)) {
+            _gpio_state.tx_bandsel_a = 1;
+            _gpio_state.tx_bandsel_b = 0;
+        } else {
+            UHD_THROW_INVALID_CODE_PATH();
+        }
+    } else {
+        UHD_THROW_INVALID_CODE_PATH();
+    }
+
+    update_gpio_state();
+}
+
 void b200_impl::update_gpio_state(void)
 {
     UHD_HERE();
-            UHD_THROW_INVALID_CODE_PATH();
-            //FIX this ctrl poke, its not the same on R2
     const boost::uint32_t misc_word = 0
-        | (_gpio_state.mimo_tx << 7)
-        | (_gpio_state.mimo_rx << 6)
-        | (_gpio_state.ext_ref_enable << 5)
-        | (_gpio_state.dac_shdn << 4)
-        | (_gpio_state.pps_fpga_out_enable << 3)
-        | (_gpio_state.pps_gps_out_enable << 2)
+        | (_gpio_state.codec_txrx << 16)
+        | (_gpio_state.codec_en_agc << 15)
+        | (_gpio_state.codec_ctrl_in0 << 14)
+        | (_gpio_state.codec_ctrl_in0 << 13)
+        | (_gpio_state.codec_ctrl_in0 << 12)
+        | (_gpio_state.codec_ctrl_in0 << 11)
+        | (_gpio_state.tx_bandsel_a << 10)
+        | (_gpio_state.tx_bandsel_b << 9)
+        | (_gpio_state.rx_bandsel_a << 8)
+        | (_gpio_state.rx_bandsel_b << 7)
+        | (_gpio_state.rx_bandsel_c << 6)
+        | (_gpio_state.mimo_tx << 5)
+        | (_gpio_state.mimo_rx << 4)
+        | (_gpio_state.ext_ref_enable << 3)
+        | (_gpio_state.pps_fpga_out_enable << 2)
         | (_gpio_state.gps_out_enable << 1)
         | (_gpio_state.gps_ref_enable << 0)
     ;
+
     _ctrl->poke32(TOREG(SR_MISC_OUTS), misc_word);
 }
 
 void b200_impl::update_antenna_sel(const std::string& which, const std::string &ant)
 {
-    int val = 0;
-
-    // FIXME The current antenna selections are totally fucking broken because
-    // of the current state of the ATR switches on the B200
-    if(ant == "RX2") {
-        val = STATE_RX_ON_RX2;
-    } else if(ant == "TX/RX") {
-        val = STATE_RX_ON_TXRX;
+    if(ant == "TX/RX") {
+        //TODO
+    } else if(ant == "RX2") {
+        //TODO
     } else {
         throw uhd::value_error("update_antenna_sel unknown antenna " + ant);
     }
 
-    if(which == "RX_A") {
-        _atr0->set_atr_reg(dboard_iface::ATR_REG_RX_ONLY, val | CODEC_TXRX);
-    } else if(which == "RX_B") {
-        _atr1->set_atr_reg(dboard_iface::ATR_REG_RX_ONLY, val);
+    if(which[3] == 'A') {
+        _atr0->set_atr_reg(dboard_iface::ATR_REG_IDLE, STATE_FDX_TXRX1 | CODEC_TXRX);
+        _atr0->set_atr_reg(dboard_iface::ATR_REG_RX_ONLY, STATE_FDX_TXRX1 | CODEC_TXRX);
+        _atr0->set_atr_reg(dboard_iface::ATR_REG_TX_ONLY, STATE_FDX_TXRX1 | CODEC_TXRX);
+        _atr0->set_atr_reg(dboard_iface::ATR_REG_FULL_DUPLEX, STATE_FDX_TXRX1 | CODEC_TXRX);
+    } else if(which[3] == 'B') {
+        _atr0->set_atr_reg(dboard_iface::ATR_REG_IDLE, STATE_FDX_TXRX2 | CODEC_TXRX);
+        _atr0->set_atr_reg(dboard_iface::ATR_REG_RX_ONLY, STATE_FDX_TXRX2 | CODEC_TXRX);
+        _atr0->set_atr_reg(dboard_iface::ATR_REG_TX_ONLY, STATE_FDX_TXRX2 | CODEC_TXRX);
+        _atr0->set_atr_reg(dboard_iface::ATR_REG_FULL_DUPLEX, STATE_FDX_TXRX2 | CODEC_TXRX);
     } else {
-        throw uhd::value_error("update_antenna_sel unknown antenna " + ant);
+        throw uhd::value_error("update_antenna_sel unknown side " + which);
     }
 }
 

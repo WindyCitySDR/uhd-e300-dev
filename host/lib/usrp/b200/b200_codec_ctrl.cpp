@@ -19,14 +19,7 @@
 #include <vector>
 
 using namespace uhd;
-using namespace uhd::transport;
-
-static const int RX_BANDSEL_C = (1 << 0);
-static const int RX_BANDSEL_B = (1 << 1);
-static const int RX_BANDSEL_A = (1 << 2);
-static const int TX_BANDSEL_B = (1 << 3);
-static const int TX_BANDSEL_A = (1 << 4);
-
+using namespace uhd::transport; 
 
 class b200_codec_ctrl_impl : public b200_codec_ctrl {
 public:
@@ -1013,9 +1006,8 @@ public:
      ***********************************************************************/
 
     /* Catalina initialization routine. */
-    b200_codec_ctrl_impl(b200_iface::sptr iface, wb_iface::sptr ctrl) {
+    b200_codec_ctrl_impl(b200_iface::sptr iface) {
         /* Initialize shadow registers. */
-        fpga_bandsel = 0x00;
         reg_vcodivs = 0x00;
         reg_inputsel = 0x30;
         reg_rxfilt = 0x00;
@@ -1040,7 +1032,6 @@ public:
 
         /* Initialize control interfaces. */
         _b200_iface = iface;
-        _ctrl = ctrl;
 
         /* Reset the device. */
         _b200_iface->write_reg(0x000,0x01);
@@ -1365,8 +1356,7 @@ public:
     /* This is the internal tune function, not available outside of this class.
      *
      * Calculate the VCO settings for the requested frquency, and then either
-     * tune the RX or TX VCO. This function also sets the 'BANDSEL' setting,
-     * which switches in different baluns based on the frequency band in use. */
+     * tune the RX or TX VCO. */
     double tune_helper(const std::string &which, const double value) {
 
         /* The RFPLL runs from 6 GHz - 12 GHz */
@@ -1398,25 +1388,15 @@ public:
 
             /* Set band-specific settings. */
             if(value < 2.2e9) {
-                fpga_bandsel = (fpga_bandsel & 0xF8) | RX_BANDSEL_B;
                 reg_inputsel = (reg_inputsel & 0xC0) | 0x30;
-                //std::cout << "FPGA BANDSEL_B; CAT BANDSEL C" << std::endl;
             } else if((value >= 2.2e9) && (value < 4e9)) {
-                fpga_bandsel = (fpga_bandsel & 0xF8) | RX_BANDSEL_A;
                 reg_inputsel = (reg_inputsel & 0xC0) | 0x0C;
-                //std::cout << "FPGA BANDSEL_A; CAT BANDSEL B" << std::endl;
             } else if((value >= 4e9) && (value <= 6e9)) {
-                fpga_bandsel = (fpga_bandsel & 0xF8) | RX_BANDSEL_C;
                 reg_inputsel = (reg_inputsel & 0xC0) | 0x03;
-                //std::cout << "FPGA BANDSEL_C; CAT BANDSEL A" << std::endl;
             } else {
                 UHD_THROW_INVALID_CODE_PATH();
             }
-            UHD_HERE();
-            UHD_THROW_INVALID_CODE_PATH();
-            //FIX this ctrl poke, its not the same on R2
-            //register a second set freq so this is not in codec ctrl
-            _ctrl->poke32(TOREG(SR_MISC_OUTS), fpga_bandsel);
+
             _b200_iface->write_reg(0x004, reg_inputsel);
 
             /* Store vcodiv setting. */
@@ -1449,21 +1429,13 @@ public:
 
             /* Set band-specific settings. */
             if(value < 3e9) {
-                fpga_bandsel = (fpga_bandsel & 0xE7) | TX_BANDSEL_A;
                 reg_inputsel = reg_inputsel | 0x40;
-                //std::cout << "FPGA BANDSEL_A; CAT BANDSEL B" << std::endl;
             } else if((value >= 3e9) && (value <= 6e9)) {
-                fpga_bandsel = (fpga_bandsel & 0xE7) | TX_BANDSEL_B;
                 reg_inputsel = reg_inputsel & 0xBF;
-                //std::cout << "FPGA BANDSEL_B; CAT BANDSEL A" << std::endl;
             } else {
                 UHD_THROW_INVALID_CODE_PATH();
             }
-            UHD_HERE();
-            UHD_THROW_INVALID_CODE_PATH();
-            //FIX this ctrl poke, its not the same on R2
-            //register a second set freq so this is not in codec ctrl
-            _ctrl->poke32(TOREG(SR_MISC_OUTS), fpga_bandsel);
+
             _b200_iface->write_reg(0x004, reg_inputsel);
 
             /* Store vcodiv setting. */
@@ -1750,7 +1722,6 @@ public:
 
 private:
     b200_iface::sptr _b200_iface;
-    wb_iface::sptr _ctrl;
     double _rx_freq, _tx_freq, _req_rx_freq, _req_tx_freq;
     double _baseband_bw, _bbpll_freq, _adcclock_freq;
     double _req_clock_rate, _req_coreclk;
@@ -1760,7 +1731,6 @@ private:
     int _tfir_factor;
 
     /* Shadow register fields.*/
-    boost::uint32_t fpga_bandsel;
     boost::uint8_t reg_vcodivs;
     boost::uint8_t reg_inputsel;
     boost::uint8_t reg_rxfilt;
@@ -1774,7 +1744,7 @@ private:
 /***********************************************************************
  * Make an instance of the implementation
  **********************************************************************/
-b200_codec_ctrl::sptr b200_codec_ctrl::make(b200_iface::sptr iface, wb_iface::sptr ctrl)
+b200_codec_ctrl::sptr b200_codec_ctrl::make(b200_iface::sptr iface)
 {
-    return sptr(new b200_codec_ctrl_impl(iface, ctrl));
+    return sptr(new b200_codec_ctrl_impl(iface));
 }

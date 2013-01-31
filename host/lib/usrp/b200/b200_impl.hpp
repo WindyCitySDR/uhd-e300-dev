@@ -105,14 +105,13 @@ private:
     void update_tx_samp_rate(const size_t, const double rate);
     void update_clock_source(const std::string &);
     void update_tick_rate(const double rate);
+    void update_bandsel(const std::string& which, double freq);
     void update_antenna_sel(const std::string& which, const std::string &ant);
 
     struct gpio_state{
-        boost::uint32_t mimo_tx, mimo_rx, ext_ref_enable, dac_shdn, pps_fpga_out_enable, pps_gps_out_enable, gps_out_enable, gps_ref_enable;
-        boost::uint32_t LED_RX1, LED_RX2, LED_TXRX1_RX, LED_TXRX1_TX, LED_TXRX2_RX, LED_TXRX2_TX;
-        boost::uint32_t tx_enable1, tx_enable2;
-        boost::uint32_t SFDX2_RX, SFDX2_TX, SRX2_RX, SRX2_TX, SFDX1_RX, SFDX1_TX, SRX1_RX, SRX1_TX;
-        boost::uint32_t codec_txrx, codec_en_agc, codec_ctrl_in;
+        boost::uint32_t  codec_txrx, codec_en_agc, codec_ctrl_in0, codec_ctrl_in1, codec_ctrl_in2, codec_ctrl_in3;
+        boost::uint32_t  tx_bandsel_a, tx_bandsel_b, rx_bandsel_a, rx_bandsel_b, rx_bandsel_c;
+        boost::uint32_t  mimo_tx, mimo_rx, ext_ref_enable, pps_fpga_out_enable, gps_out_enable, gps_ref_enable;
     } _gpio_state;
 
     void update_gpio_state(void);
