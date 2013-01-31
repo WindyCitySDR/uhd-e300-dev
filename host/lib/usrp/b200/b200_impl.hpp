@@ -117,6 +117,11 @@ private:
     double get_dsp_freq(void){return 0.0;}
     uhd::meta_range_t get_dsp_freq_range(void){return uhd::meta_range_t(0.0, 0.0);}
 
+    //TODO implement me
+    uhd::meta_range_t get_possible_rates(void){return uhd::meta_range_t(0.0, 0.0);}
+
+    double set_sample_rate(const double rate);
+
     uhd::task::sptr _server;
     void run_server(void);
 };

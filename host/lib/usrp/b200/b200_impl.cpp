@@ -313,8 +313,7 @@ b200_impl::b200_impl(const device_addr_t &device_addr)
     ////////////////////////////////////////////////////////////////////
     //^^^ clock created up top, just reg props here... ^^^
     _tree->create<double>(mb_path / "tick_rate")
-        .coerce(boost::bind(&b200_codec_ctrl::set_clock_rate, _codec_ctrl, _1))
-        .subscribe(boost::bind(&b200_impl::update_tick_rate, this, _1));
+        .coerce(boost::bind(&b200_impl::set_sample_rate, this, _1));
 
     ////////////////////////////////////////////////////////////////////
     // and do the misc mboard sensors
@@ -340,14 +339,10 @@ b200_impl::b200_impl(const device_addr_t &device_addr)
         _rx_framers[dspno] = rx_vita_core_3000::make(_ctrl, TOREG(SR_RX_CTRL), TOREG(SR_RX_CTRL+4));
         _tree->access<double>(mb_path / "tick_rate")
             .subscribe(boost::bind(&rx_vita_core_3000::set_tick_rate, _rx_framers[dspno], _1));
-        _tree->create<meta_range_t>(rx_dsp_path / "rate/range");
-        //TODO get rates from CAT
-        //    .publish(boost::bind(&rx_dsp_core_200::get_host_rates, _rx_dsps[dspno]));
+        _tree->create<meta_range_t>(rx_dsp_path / "rate/range")
+            .publish(boost::bind(&b200_impl::get_possible_rates, this));
         _tree->create<double>(rx_dsp_path / "rate/value")
-            .set(1e6) //some default
-            //TODO get from CAT or CACHE
-            //.coerce(boost::bind(&rx_dsp_core_200::set_host_rate, _rx_dsps[dspno], _1))
-            .subscribe(boost::bind(&b200_impl::update_rx_samp_rate, this, dspno, _1));
+            .coerce(boost::bind(&b200_impl::set_sample_rate, this, _1));
         _tree->create<double>(rx_dsp_path / "freq/value")
             .publish(boost::bind(&b200_impl::get_dsp_freq, this));
         _tree->create<meta_range_t>(rx_dsp_path / "freq/range")
@@ -367,14 +362,10 @@ b200_impl::b200_impl(const device_addr_t &device_addr)
         _tx_deframers[dspno] = tx_vita_core_3000::make(_ctrl, TOREG(SR_TX_CTRL), TOREG(SR_TX_CTRL+4));
         _tree->access<double>(mb_path / "tick_rate")
             .subscribe(boost::bind(&tx_vita_core_3000::set_tick_rate, _tx_deframers[dspno], _1));
-        _tree->create<meta_range_t>(tx_dsp_path / "rate/range");
-        //TODO get rates from CAT
-        //    .publish(boost::bind(&tx_dsp_core_200::get_host_rates, _tx_dsps[dspno]));
+        _tree->create<meta_range_t>(tx_dsp_path / "rate/range")
+            .publish(boost::bind(&b200_impl::get_possible_rates, this));
         _tree->create<double>(tx_dsp_path / "rate/value")
-            .set(1e6) //some default
-            //TODO get from CAT or CACHE
-            //.coerce(boost::bind(&tx_dsp_core_200::set_host_rate, _tx_dsps[dspno], _1))
-            .subscribe(boost::bind(&b200_impl::update_tx_samp_rate, this, 0, _1));
+            .coerce(boost::bind(&b200_impl::set_sample_rate, this, _1));
         _tree->create<double>(tx_dsp_path / "freq/value")
             .publish(boost::bind(&b200_impl::get_dsp_freq, this));
         _tree->create<meta_range_t>(tx_dsp_path / "freq/range")
@@ -473,18 +464,6 @@ b200_impl::b200_impl(const device_addr_t &device_addr)
         .subscribe(boost::bind(&b200_ctrl::set_tick_rate, _ctrl, _1))
         .set(15.36e6);
 
-    this->update_rates();
-
-    //reset cordic rates and their properties to zero
-    BOOST_FOREACH(const std::string &name, _tree->list(mb_path / "rx_dsps"))
-    {
-        _tree->access<double>(mb_path / "rx_dsps" / name / "freq" / "value").set(0.0);
-    }
-    BOOST_FOREACH(const std::string &name, _tree->list(mb_path / "tx_dsps"))
-    {
-        _tree->access<double>(mb_path / "tx_dsps" / name / "freq" / "value").set(0.0);
-    }
-
     _tree->access<subdev_spec_t>(mb_path / "rx_subdev_spec").set(subdev_spec_t("A:" + _tree->list(mb_path / "dboards/A/rx_frontends").at(0)));
     _tree->access<subdev_spec_t>(mb_path / "tx_subdev_spec").set(subdev_spec_t("A:" + _tree->list(mb_path / "dboards/A/tx_frontends").at(0)));
     _tree->access<std::string>(mb_path / "clock_source/value").set("internal");
@@ -505,6 +484,15 @@ b200_impl::~b200_impl(void)
 {
     //TODO kill any threads here
     //_iface->set_fpga_reset_pin(true);
+}
+
+double b200_impl::set_sample_rate(const double rate)
+{
+    const double actual_rate = _codec_ctrl->set_clock_rate(rate);
+    this->update_tick_rate(actual_rate);
+    for (size_t i = 0; i < B200_NUM_RX_FE; i++) this->update_rx_samp_rate(i, rate);
+    for (size_t i = 0; i < B200_NUM_TX_FE; i++) this->update_tx_samp_rate(i, rate);
+    return actual_rate;
 }
 
 void b200_impl::set_mb_eeprom(const uhd::usrp::mboard_eeprom_t &mb_eeprom)
