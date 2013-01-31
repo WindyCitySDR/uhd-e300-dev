@@ -48,15 +48,17 @@ static const boost::uint16_t B200_FW_COMPAT_NUM = 0x03;
 static const boost::uint16_t B200_FPGA_COMPAT_NUM = 0x09;
 static const size_t          B200_MAX_PKT_BYTE_LIMIT = 2048*4;
 static const double          B200_LINK_RATE_BPS = (5e9)/8; //practical link rate (5 Gbps)
-static const boost::uint32_t B200_ASYNC_SID_BASE = 10;
-static const boost::uint32_t B200_CTRL_MSG_SID = 20;
-static const boost::uint32_t B200_RX_SID_BASE = 30;
-static const boost::uint32_t B200_TX_SID_BASE = 40;
+static const boost::uint32_t B200_CTRL_MSG_SID = 0x00010000;
+static const boost::uint32_t B200_RESP_MSG_SID = 0x00000001;
+static const boost::uint32_t B200_TX_DATA_SID_BASE = 0x00020000;
+static const boost::uint32_t B200_TX_MSG_SID_BASE = 0x00000002;
+static const boost::uint32_t B200_RX_DATA_SID_BASE = 0x00040000;
 static const size_t          B200_NUM_RX_FE = 2;
 static const size_t          B200_NUM_TX_FE = 2;
 
 //! Implementation guts
-class b200_impl : public uhd::device {
+class b200_impl : public uhd::device
+{
 public:
     //structors
     b200_impl(const uhd::device_addr_t &);

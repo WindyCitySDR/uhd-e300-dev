@@ -108,6 +108,11 @@ struct rx_vita_core_3000_impl : rx_vita_core_3000
         _iface->poke32(REG_FRAMER_SID, sid);
     }
 
+    void handle_overflow(void)
+    {
+        if (_continuous_streaming) this->issue_stream_command(stream_cmd_t::STREAM_MODE_START_CONTINUOUS);
+    }
+
     void setup(const uhd::stream_args_t &)
     {
     }

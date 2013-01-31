@@ -228,6 +228,7 @@ b200_impl::b200_impl(const device_addr_t &device_addr)
         ctrl_xport_args
     );
     while (_ctrl_transport->get_recv_buff(0.0)){} //flush ctrl xport
+    _ctrl_demux = recv_packet_demuxer::make(_ctrl_transport, 1+B200_NUM_TX_FE, B200_RESP_MSG_SID);
 
     ////////////////////////////////////////////////////////////////////
     // Initialize the properties tree
@@ -240,7 +241,7 @@ b200_impl::b200_impl(const device_addr_t &device_addr)
     ////////////////////////////////////////////////////////////////////
     // Initialize control (settings regs and async messages)
     ////////////////////////////////////////////////////////////////////
-    _ctrl = b200_ctrl::make(_ctrl_transport);
+    _ctrl = b200_ctrl::make(_ctrl_transport, boost::bind(&recv_packet_demuxer::get_recv_buff, _ctrl_demux, 0, _1));
     _tree->create<time_spec_t>(mb_path / "time/cmd")
         .subscribe(boost::bind(&b200_ctrl::set_time, _ctrl, _1));
     /*
@@ -278,6 +279,8 @@ b200_impl::b200_impl(const device_addr_t &device_addr)
         1, 2,          // OUT interface, endpoint
         data_xport_args    // param hints
     );
+    while (_data_transport->get_recv_buff(0.0)){} //flush ctrl xport
+    _data_demux = recv_packet_demuxer::make(_data_transport, B200_NUM_RX_FE, B200_RX_DATA_SID_BASE);
 
     ////////////////////////////////////////////////////////////////////
     // setup the mboard eeprom

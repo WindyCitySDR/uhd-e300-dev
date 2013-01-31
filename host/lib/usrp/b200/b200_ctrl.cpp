@@ -41,8 +41,12 @@ static const double MASSIVE_TIMEOUT = 10.0; //for when we wait on a timed comman
 class b200_ctrl_impl : public b200_ctrl{
 public:
 
-    b200_ctrl_impl(zero_copy_if::sptr xport):
+    b200_ctrl_impl(
+        zero_copy_if::sptr xport,
+        boost::function<managed_recv_buffer::sptr(const double)> get_buff
+    ):
         _xport(xport),
+        _get_buff(get_buff),
         _seq_out(0),
         _seq_ack(0),
         _timeout(ACK_TIMEOUT)
@@ -137,6 +141,7 @@ private:
         packet_info.tsf = _time.to_ticks(_tick_rate);
         packet_info.sob = false;
         packet_info.eob = false;
+        packet_info.sid = B200_CTRL_MSG_SID;
         packet_info.has_sid = true;
         packet_info.has_cid = false;
         packet_info.has_tsi = false;
@@ -156,7 +161,7 @@ private:
 
     UHD_INLINE boost::uint64_t wait_for_ack(const size_t seq_to_ack)
     {
-        managed_recv_buffer::sptr buff = _xport->get_recv_buff();
+        managed_recv_buffer::sptr buff = _get_buff(_timeout);
         UHD_ASSERT_THROW(bool(buff));
         UHD_ASSERT_THROW(bool(buff->size()));
         
@@ -190,6 +195,9 @@ private:
             UHD_MSG(status) << std::hex << pkt[2] << std::dec << std::endl;
             UHD_MSG(status) << std::hex << pkt[3] << std::dec << std::endl;
         }
+        //B200_CTRL_MSG_SID
+        UHD_ASSERT_THROW(packet_info.has_sid);
+        UHD_ASSERT_THROW(packet_info.sid == B200_RESP_MSG_SID);
         UHD_ASSERT_THROW(packet_info.packet_count == seq_to_ack);
         UHD_ASSERT_THROW(packet_info.num_payload_words32 == 2);
         UHD_ASSERT_THROW(packet_info.packet_type == vrt::if_packet_info_t::PACKET_TYPE_EXTENSION);
@@ -199,6 +207,7 @@ private:
     }
 
     zero_copy_if::sptr _xport;
+    boost::function<managed_recv_buffer::sptr(const double)> _get_buff;
     boost::mutex _mutex;
     size_t _seq_out;
     size_t _seq_ack;
@@ -209,7 +218,10 @@ private:
 };
 
 
-b200_ctrl::sptr b200_ctrl::make(zero_copy_if::sptr xport)
+b200_ctrl::sptr b200_ctrl::make(
+    zero_copy_if::sptr xport,
+    boost::function<managed_recv_buffer::sptr(const double)> get_buff
+)
 {
-    return sptr(new b200_ctrl_impl(xport));
+    return sptr(new b200_ctrl_impl(xport, get_buff));
 }

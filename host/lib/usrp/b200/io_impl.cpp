@@ -118,15 +118,16 @@ rx_streamer::sptr b200_impl::get_rx_stream(const uhd::stream_args_t &args_)
     {
         const size_t dsp = args.channels[chan_i];
         _rx_framers[dsp]->set_nsamps_per_packet(spp); //seems to be a good place to set this
+        _rx_framers[dsp]->set_sid(B200_RX_DATA_SID_BASE+chan_i);
         _rx_framers[dsp]->setup(args);
         my_streamer->set_xport_chan_get_buff(chan_i, boost::bind(
-            &zero_copy_if::get_recv_buff, _data_transport, _1
+            &recv_packet_demuxer::get_recv_buff, _data_demux, chan_i, _1
         ), true /*flush*/);
-        //my_streamer->set_overflow_handler(chan_i, boost::bind(
-        //    &rx_dsp_core_200::handle_overflow, _rx_dsps[dsp]
-        //));
-        _rx_streamer = my_streamer; //store weak pointer
+        my_streamer->set_overflow_handler(chan_i, boost::bind(
+            &rx_vita_core_3000::handle_overflow, _rx_framers[dsp]
+        ));
     }
+    _rx_streamer = my_streamer; //store weak pointer
 
     //sets all tick and samp rates on this streamer
     this->update_rates();
@@ -178,9 +179,9 @@ tx_streamer::sptr b200_impl::get_tx_stream(const uhd::stream_args_t &args_)
         my_streamer->set_xport_chan_get_buff(chan_i, boost::bind(
             &zero_copy_if::get_send_buff, _data_transport, _1
         ));
-        my_streamer->set_xport_chan_sid(chan_i, true, B200_TX_SID_BASE+chan_i);
-        _tx_streamer = my_streamer; //store weak pointer
+        my_streamer->set_xport_chan_sid(chan_i, true, B200_TX_DATA_SID_BASE+chan_i);
     }
+    _tx_streamer = my_streamer; //store weak pointer
 
     //sets all tick and samp rates on this streamer
     this->update_rates();

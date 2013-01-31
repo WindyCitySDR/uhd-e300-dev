@@ -48,6 +48,8 @@ public:
 
     virtual void set_sid(const boost::uint32_t sid) = 0;
 
+    virtual void handle_overflow(void) = 0;
+
     virtual void setup(const uhd::stream_args_t &stream_args) = 0;
 };
 
