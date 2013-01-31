@@ -629,11 +629,21 @@ void b200_impl::update_antenna_sel(const std::string& which, const std::string &
         _atr0->set_atr_reg(dboard_iface::ATR_REG_RX_ONLY, STATE_FDX_TXRX1);
         _atr0->set_atr_reg(dboard_iface::ATR_REG_TX_ONLY, STATE_FDX_TXRX1);
         _atr0->set_atr_reg(dboard_iface::ATR_REG_FULL_DUPLEX, STATE_FDX_TXRX1);
+
+        _atr1->set_atr_reg(dboard_iface::ATR_REG_IDLE, STATE_FDX_TXRX1);
+        _atr1->set_atr_reg(dboard_iface::ATR_REG_RX_ONLY, STATE_FDX_TXRX1);
+        _atr1->set_atr_reg(dboard_iface::ATR_REG_TX_ONLY, STATE_FDX_TXRX1);
+        _atr1->set_atr_reg(dboard_iface::ATR_REG_FULL_DUPLEX, STATE_FDX_TXRX1);
     } else if(which[3] == 'B') {
         _atr0->set_atr_reg(dboard_iface::ATR_REG_IDLE, STATE_FDX_TXRX2);
         _atr0->set_atr_reg(dboard_iface::ATR_REG_RX_ONLY, STATE_FDX_TXRX2);
         _atr0->set_atr_reg(dboard_iface::ATR_REG_TX_ONLY, STATE_FDX_TXRX2);
         _atr0->set_atr_reg(dboard_iface::ATR_REG_FULL_DUPLEX, STATE_FDX_TXRX2);
+
+        _atr1->set_atr_reg(dboard_iface::ATR_REG_IDLE, STATE_FDX_TXRX1);
+        _atr1->set_atr_reg(dboard_iface::ATR_REG_RX_ONLY, STATE_FDX_TXRX1);
+        _atr1->set_atr_reg(dboard_iface::ATR_REG_TX_ONLY, STATE_FDX_TXRX1);
+        _atr1->set_atr_reg(dboard_iface::ATR_REG_FULL_DUPLEX, STATE_FDX_TXRX1);
     } else {
         throw uhd::value_error("update_antenna_sel unknown side " + which);
     }
