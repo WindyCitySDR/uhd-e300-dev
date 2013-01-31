@@ -678,7 +678,7 @@ public:
         int count = 0;
         _b200_iface->write_reg(0x016, 0x02);
         while(_b200_iface->read_reg(0x016) & 0x02) {
-            if(count > 5) {
+            if(count > 20) {
                 std::cout << "RF DC Offset Calibration Failure!" << std::endl;
                 break;
             }
