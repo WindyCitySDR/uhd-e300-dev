@@ -345,14 +345,14 @@ b200_impl::b200_impl(const device_addr_t &device_addr)
     ////////////////////////////////////////////////////////////////////
     // create rx dsp control objects
     ////////////////////////////////////////////////////////////////////
-    //_rx_dsps.resize(B200_NUM_RX_FE);
+    _rx_framers.resize(B200_NUM_RX_FE);
     for (size_t dspno = 0; dspno < B200_NUM_RX_FE; dspno++)
     {
         const fs_path rx_dsp_path = mb_path / str(boost::format("rx_dsps/%u") % dspno);
-        //_rx_dsps[dspno] = rx_dsp_core_200::make(_ctrl, TOREG(SR_RX_DSP(dspno)), TOREG(SR_RX_CTRL(dspno)), B200_RX_SID_BASE + dspno);
-        //_rx_dsps[dspno]->set_link_rate(B200_LINK_RATE_BPS);
-        //_tree->access<double>(mb_path / "tick_rate")
-        //    .subscribe(boost::bind(&rx_dsp_core_200::set_tick_rate, _rx_dsps[dspno], _1));
+        //FIXME this is not valid for dspno 1
+        _rx_framers[dspno] = rx_vita_core_3000::make(_ctrl, TOREG(SR_RX_CTRL), TOREG(SR_RX_CTRL+4));
+        _tree->access<double>(mb_path / "tick_rate")
+            .subscribe(boost::bind(&rx_vita_core_3000::set_tick_rate, _rx_framers[dspno], _1));
         _tree->create<meta_range_t>(rx_dsp_path / "rate/range");
         //TODO get rates from CAT
         //    .publish(boost::bind(&rx_dsp_core_200::get_host_rates, _rx_dsps[dspno]));
@@ -361,28 +361,25 @@ b200_impl::b200_impl(const device_addr_t &device_addr)
             //TODO get from CAT or CACHE
             //.coerce(boost::bind(&rx_dsp_core_200::set_host_rate, _rx_dsps[dspno], _1))
             .subscribe(boost::bind(&b200_impl::update_rx_samp_rate, this, dspno, _1));
-        _tree->create<double>(rx_dsp_path / "freq/value");
-            //TODO always readback 0
-            //.coerce(boost::bind(&rx_dsp_core_200::set_freq, _rx_dsps[dspno], _1));
-        _tree->create<meta_range_t>(rx_dsp_path / "freq/range");
-            //TODO always readback 0, 0
-            //.publish(boost::bind(&rx_dsp_core_200::get_freq_range, _rx_dsps[dspno]));
-        _tree->create<stream_cmd_t>(rx_dsp_path / "stream_cmd");
-            //TODO new stream command module...
-            //.subscribe(boost::bind(&rx_dsp_core_200::issue_stream_command, _rx_dsps[dspno], _1));
+        _tree->create<double>(rx_dsp_path / "freq/value")
+            .publish(boost::bind(&b200_impl::get_dsp_freq, this));
+        _tree->create<meta_range_t>(rx_dsp_path / "freq/range")
+            .publish(boost::bind(&b200_impl::get_dsp_freq_range, this));
+        _tree->create<stream_cmd_t>(rx_dsp_path / "stream_cmd")
+            .subscribe(boost::bind(&rx_vita_core_3000::issue_stream_command, _rx_framers[dspno], _1));
     }
 
     ////////////////////////////////////////////////////////////////////
     // create tx dsp control objects
     ////////////////////////////////////////////////////////////////////
-    //_tx_dsps.resize(B200_NUM_TX_FE);
+    _tx_deframers.resize(B200_NUM_TX_FE);
     for (size_t dspno = 0; dspno < B200_NUM_TX_FE; dspno++)
     {
         const fs_path tx_dsp_path = mb_path / str(boost::format("tx_dsps/%u") % dspno);
-        //_tx_dsps[dspno] = tx_dsp_core_200::make(_ctrl, TOREG(SR_TX_DSP(dspno)), TOREG(SR_TX_CTRL(dspno)), B200_ASYNC_SID_BASE + dspno);
-        //_tx_dsps[dspno]->set_link_rate(B200_LINK_RATE_BPS);
-        //_tree->access<double>(mb_path / "tick_rate")
-        //    .subscribe(boost::bind(&tx_dsp_core_200::set_tick_rate, _tx_dsps[dspno], _1));
+        //FIXME this is not valid for dspno 1
+        _tx_deframers[dspno] = tx_vita_core_3000::make(_ctrl, TOREG(SR_TX_CTRL), TOREG(SR_TX_CTRL+4));
+        _tree->access<double>(mb_path / "tick_rate")
+            .subscribe(boost::bind(&tx_vita_core_3000::set_tick_rate, _tx_deframers[dspno], _1));
         _tree->create<meta_range_t>(tx_dsp_path / "rate/range");
         //TODO get rates from CAT
         //    .publish(boost::bind(&tx_dsp_core_200::get_host_rates, _tx_dsps[dspno]));
@@ -391,12 +388,10 @@ b200_impl::b200_impl(const device_addr_t &device_addr)
             //TODO get from CAT or CACHE
             //.coerce(boost::bind(&tx_dsp_core_200::set_host_rate, _tx_dsps[dspno], _1))
             .subscribe(boost::bind(&b200_impl::update_tx_samp_rate, this, 0, _1));
-        _tree->create<double>(tx_dsp_path / "freq/value");
-            //TODO always readback 0
-            //.coerce(boost::bind(&tx_dsp_core_200::set_freq, _tx_dsps[dspno], _1));
-        _tree->create<meta_range_t>(tx_dsp_path / "freq/range");
-            //TODO always readback 0, 0
-            //.publish(boost::bind(&tx_dsp_core_200::get_freq_range, _tx_dsps[dspno]));
+        _tree->create<double>(tx_dsp_path / "freq/value")
+            .publish(boost::bind(&b200_impl::get_dsp_freq, this));
+        _tree->create<meta_range_t>(tx_dsp_path / "freq/range")
+            .publish(boost::bind(&b200_impl::get_dsp_freq_range, this));
     }
 
     ////////////////////////////////////////////////////////////////////

@@ -20,11 +20,10 @@
 #include "b200_iface.hpp"
 #include "b200_ctrl.hpp"
 #include "b200_codec_ctrl.hpp"
-//#include "rx_dsp_core_200.hpp"
-//#include "tx_dsp_core_200.hpp"
+#include "rx_vita_core_3000.hpp"
+#include "tx_vita_core_3000.hpp"
 #include "time64_core_200.hpp"
 #include "gpio_core_200.hpp"
-//#include "user_settings_core_200.hpp"
 #include "recv_packet_demuxer.hpp"
 #include <uhd/device.hpp>
 #include <uhd/property_tree.hpp>
@@ -74,10 +73,9 @@ private:
     b200_iface::sptr _iface;
     b200_ctrl::sptr _ctrl;
     b200_codec_ctrl::sptr _codec_ctrl;
-    //std::vector<rx_dsp_core_200::sptr> _rx_dsps;
-    //std::vector<tx_dsp_core_200::sptr> _tx_dsps;
+    std::vector<rx_vita_core_3000::sptr> _rx_framers;
+    std::vector<tx_vita_core_3000::sptr> _tx_deframers;
     time64_core_200::sptr _time64;
-    //user_settings_core_200::sptr _user;
     gpio_core_200_32wo::sptr _atr0;
     gpio_core_200_32wo::sptr _atr1;
 
@@ -114,6 +112,10 @@ private:
     } _gpio_state;
 
     void update_gpio_state(void);
+
+    //no dsp in fpga
+    double get_dsp_freq(void){return 0.0;}
+    uhd::meta_range_t get_dsp_freq_range(void){return uhd::meta_range_t(0.0, 0.0);}
 
     uhd::task::sptr _server;
     void run_server(void);
