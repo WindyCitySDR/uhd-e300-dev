@@ -65,6 +65,22 @@ void b200_impl::update_tx_subdev_spec(const uhd::usrp::subdev_spec_t &spec)
     update_gpio_state();
 }
 
+static void b200_if_hdr_unpack_le(
+    const boost::uint32_t *packet_buff,
+    vrt::if_packet_info_t &if_packet_info
+){
+    if_packet_info.link_type = vrt::if_packet_info_t::LINK_TYPE_CHDR;
+    return vrt::if_hdr_unpack_le(packet_buff, if_packet_info);
+}
+
+static void b200_if_hdr_pack_le(
+    boost::uint32_t *packet_buff,
+    vrt::if_packet_info_t &if_packet_info
+){
+    if_packet_info.link_type = vrt::if_packet_info_t::LINK_TYPE_CHDR;
+    return vrt::if_hdr_pack_le(packet_buff, if_packet_info);
+}
+
 /***********************************************************************
  * Async Data
  **********************************************************************/
@@ -103,7 +119,7 @@ rx_streamer::sptr b200_impl::get_rx_stream(const uhd::stream_args_t &args_)
 
     //init some streamer stuff
     my_streamer->resize(args.channels.size());
-    my_streamer->set_vrt_unpacker(&vrt::if_hdr_unpack_le);
+    my_streamer->set_vrt_unpacker(&b200_if_hdr_unpack_le);
 
     //set the converter
     uhd::convert::id_type id;
@@ -161,7 +177,7 @@ tx_streamer::sptr b200_impl::get_tx_stream(const uhd::stream_args_t &args_)
 
     //init some streamer stuff
     my_streamer->resize(args.channels.size());
-    my_streamer->set_vrt_packer(&vrt::if_hdr_pack_le);
+    my_streamer->set_vrt_packer(&b200_if_hdr_pack_le);
 
     //set the converter
     uhd::convert::id_type id;

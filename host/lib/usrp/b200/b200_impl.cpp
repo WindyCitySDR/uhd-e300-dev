@@ -354,7 +354,7 @@ b200_impl::b200_impl(const device_addr_t &device_addr)
     {
         const fs_path rx_dsp_path = mb_path / str(boost::format("rx_dsps/%u") % dspno);
         //FIXME this is not valid for dspno 1
-        _rx_framers[dspno] = rx_vita_core_3000::make(_ctrl, TOREG(SR_RX_CTRL), TOREG(SR_RX_CTRL+4));
+        _rx_framers[dspno] = rx_vita_core_3000::make(_ctrl, TOREG(SR_RX_CTRL+4), TOREG(SR_RX_CTRL));
         _tree->access<double>(mb_path / "tick_rate")
             .subscribe(boost::bind(&rx_vita_core_3000::set_tick_rate, _rx_framers[dspno], _1));
         _tree->create<meta_range_t>(rx_dsp_path / "rate/range")
@@ -377,7 +377,7 @@ b200_impl::b200_impl(const device_addr_t &device_addr)
     {
         const fs_path tx_dsp_path = mb_path / str(boost::format("tx_dsps/%u") % dspno);
         //FIXME this is not valid for dspno 1
-        _tx_deframers[dspno] = tx_vita_core_3000::make(_ctrl, TOREG(SR_TX_CTRL), TOREG(SR_TX_CTRL+4));
+        _tx_deframers[dspno] = tx_vita_core_3000::make(_ctrl, TOREG(SR_TX_CTRL+4), TOREG(SR_TX_CTRL));
         _tree->access<double>(mb_path / "tick_rate")
             .subscribe(boost::bind(&tx_vita_core_3000::set_tick_rate, _tx_deframers[dspno], _1));
         _tree->create<meta_range_t>(tx_dsp_path / "rate/range")
