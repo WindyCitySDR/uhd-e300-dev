@@ -30,16 +30,6 @@ void b200_impl::update_rates(void)
 {
     const fs_path mb_path = "/mboards/0";
     _tree->access<double>(mb_path / "tick_rate").update();
-
-    //and now that the tick rate is set, init the host rates to something
-    BOOST_FOREACH(const std::string &name, _tree->list(mb_path / "rx_dsps"))
-    {
-        _tree->access<double>(mb_path / "rx_dsps" / name / "rate" / "value").update();
-    }
-    BOOST_FOREACH(const std::string &name, _tree->list(mb_path / "tx_dsps"))
-    {
-        _tree->access<double>(mb_path / "tx_dsps" / name / "rate" / "value").update();
-    }
 }
 
 void b200_impl::update_tick_rate(const double rate)
