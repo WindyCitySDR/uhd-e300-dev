@@ -213,11 +213,12 @@ b200_impl::b200_impl(const device_addr_t &device_addr)
     ////////////////////////////////////////////////////////////////////
     boost::uint8_t usb_speed = _iface->get_usb_speed();
     UHD_MSG(status) << "Operating over USB " << (int) usb_speed << "." << std::endl;
+    const std::string min_frame_size = (usb_speed == 3) ? "1024" : "512";
 
     device_addr_t ctrl_xport_args;
-    ctrl_xport_args["recv_frame_size"] = (usb_speed == 3) ? "1024" : "512";
+    ctrl_xport_args["recv_frame_size"] = min_frame_size;
     ctrl_xport_args["num_recv_frames"] = "16";
-    ctrl_xport_args["send_frame_size"] = (usb_speed == 3) ? "1024" : "512";
+    ctrl_xport_args["send_frame_size"] = min_frame_size;
     ctrl_xport_args["num_send_frames"] = "16";
 
     _ctrl_transport = usb_zero_copy::make(
@@ -470,10 +471,6 @@ b200_impl::b200_impl(const device_addr_t &device_addr)
     // do some post-init tasks
     ////////////////////////////////////////////////////////////////////
 
-    //allocate streamer weak ptrs containers
-    _rx_streamers.resize(B200_NUM_RX_FE);
-    _tx_streamers.resize(B200_NUM_TX_FE);
-
     _tree->access<double>(mb_path / "tick_rate") //now subscribe the clock rate setter
         .subscribe(boost::bind(&b200_ctrl::set_tick_rate, _ctrl, _1))
         .set(15.36e6);
@@ -504,8 +501,6 @@ double b200_impl::set_sample_rate(const double rate)
 {
     const double actual_rate = _codec_ctrl->set_clock_rate(rate);
     this->update_tick_rate(actual_rate);
-    for (size_t i = 0; i < B200_NUM_RX_FE; i++) this->update_rx_samp_rate(i, rate);
-    for (size_t i = 0; i < B200_NUM_TX_FE; i++) this->update_tx_samp_rate(i, rate);
     return actual_rate;
 }
 

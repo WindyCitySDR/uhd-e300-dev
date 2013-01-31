@@ -1,4 +1,5 @@
-// // Copyright 2012 Ettus Research LLC
+//
+// Copyright 2012 Ettus Research LLC
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -82,7 +83,8 @@ private:
     //transports
     uhd::transport::zero_copy_if::sptr _data_transport;
     uhd::transport::zero_copy_if::sptr _ctrl_transport;
-    //uhd::usrp::recv_packet_demuxer::sptr _rx_demux;
+    uhd::usrp::recv_packet_demuxer::sptr _data_demux;
+    uhd::usrp::recv_packet_demuxer::sptr _ctrl_demux;
 
     //device properties interface
     uhd::property_tree::sptr get_tree(void) const
@@ -90,8 +92,8 @@ private:
         return _tree;
     }
 
-    std::vector<boost::weak_ptr<uhd::rx_streamer> > _rx_streamers;
-    std::vector<boost::weak_ptr<uhd::tx_streamer> > _tx_streamers;
+    boost::weak_ptr<uhd::rx_streamer> _rx_streamer;
+    boost::weak_ptr<uhd::tx_streamer> _tx_streamer;
 
     void set_mb_eeprom(const uhd::usrp::mboard_eeprom_t &);
     void check_fw_compat(void);
@@ -99,8 +101,6 @@ private:
     void update_rates(void);
     void update_rx_subdev_spec(const uhd::usrp::subdev_spec_t &);
     void update_tx_subdev_spec(const uhd::usrp::subdev_spec_t &);
-    void update_rx_samp_rate(const size_t, const double rate);
-    void update_tx_samp_rate(const size_t, const double rate);
     void update_clock_source(const std::string &);
     void update_tick_rate(const double rate);
     void update_bandsel(const std::string& which, double freq);

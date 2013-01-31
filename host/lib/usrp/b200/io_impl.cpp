@@ -35,19 +35,17 @@ void b200_impl::update_rates(void)
 void b200_impl::update_tick_rate(const double rate)
 {
     //update the tick rate on all existing streamers -> thread safe
-    for (size_t i = 0; i < _rx_streamers.size(); i++)
     {
         boost::shared_ptr<sph::recv_packet_streamer> my_streamer =
-            boost::dynamic_pointer_cast<sph::recv_packet_streamer>(_rx_streamers[i].lock());
-        if (my_streamer.get() == NULL) continue;
-        my_streamer->set_tick_rate(rate);
+            boost::dynamic_pointer_cast<sph::recv_packet_streamer>(_rx_streamer.lock());
+        if (my_streamer) my_streamer->set_tick_rate(rate);
+        if (my_streamer) my_streamer->set_samp_rate(rate);
     }
-    for (size_t i = 0; i < _tx_streamers.size(); i++)
     {
         boost::shared_ptr<sph::send_packet_streamer> my_streamer =
-            boost::dynamic_pointer_cast<sph::send_packet_streamer>(_tx_streamers[i].lock());
-        if (my_streamer.get() == NULL) continue;
-        my_streamer->set_tick_rate(rate);
+            boost::dynamic_pointer_cast<sph::send_packet_streamer>(_tx_streamer.lock());
+        if (my_streamer) my_streamer->set_tick_rate(rate);
+        if (my_streamer) my_streamer->set_samp_rate(rate);
     }
 }
 
@@ -65,29 +63,6 @@ void b200_impl::update_tx_subdev_spec(const uhd::usrp::subdev_spec_t &spec)
     //set muxing and other codec settings
     _gpio_state.mimo_tx = (spec.size() == 2)? 1 : 0;
     update_gpio_state();
-}
-
-
-void b200_impl::update_rx_samp_rate(const size_t dspno, const double rate)
-{
-    boost::shared_ptr<sph::recv_packet_streamer> my_streamer =
-        boost::dynamic_pointer_cast<sph::recv_packet_streamer>(_rx_streamers[dspno].lock());
-    if (my_streamer.get() == NULL) return;
-
-    my_streamer->set_samp_rate(rate);
-    //const double adj = _rx_dsps[dspno]->get_scaling_adjustment();
-    //my_streamer->set_scale_factor(adj);
-}
-
-void b200_impl::update_tx_samp_rate(const size_t dspno, const double rate)
-{
-    boost::shared_ptr<sph::send_packet_streamer> my_streamer =
-        boost::dynamic_pointer_cast<sph::send_packet_streamer>(_tx_streamers[dspno].lock());
-    if (my_streamer.get() == NULL) return;
-
-    my_streamer->set_samp_rate(rate);
-    //const double adj = _tx_dsps[dspno]->get_scaling_adjustment();
-    //my_streamer->set_scale_factor(adj);
 }
 
 /***********************************************************************
@@ -150,7 +125,7 @@ rx_streamer::sptr b200_impl::get_rx_stream(const uhd::stream_args_t &args_)
         //my_streamer->set_overflow_handler(chan_i, boost::bind(
         //    &rx_dsp_core_200::handle_overflow, _rx_dsps[dsp]
         //));
-        _rx_streamers[dsp] = my_streamer; //store weak pointer
+        _rx_streamer = my_streamer; //store weak pointer
     }
 
     //sets all tick and samp rates on this streamer
@@ -204,7 +179,7 @@ tx_streamer::sptr b200_impl::get_tx_stream(const uhd::stream_args_t &args_)
             &zero_copy_if::get_send_buff, _data_transport, _1
         ));
         my_streamer->set_xport_chan_sid(chan_i, true, B200_TX_SID_BASE+chan_i);
-        _tx_streamers[dsp] = my_streamer; //store weak pointer
+        _tx_streamer = my_streamer; //store weak pointer
     }
 
     //sets all tick and samp rates on this streamer
