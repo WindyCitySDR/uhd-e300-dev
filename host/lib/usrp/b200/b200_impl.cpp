@@ -191,20 +191,8 @@ b200_impl::b200_impl(const device_addr_t &device_addr)
     ////////////////////////////////////////////////////////////////////
     // Load the FPGA image - init GPIF - hold in reset
     ////////////////////////////////////////////////////////////////////
-    _iface->reset_fpga(true);
+    _iface->reset_gpif();
     //TODO load the FPGA....
-    _iface->reset_fx3();
-
-    ////////////////////////////////////////////////////////////////////
-    // Get the FPGA a clock from Catalina
-    ////////////////////////////////////////////////////////////////////
-    boost::this_thread::sleep(boost::posix_time::milliseconds(100));
-    //_iface->write_reg(0x00A, BOOST_BINARY( 00000010 ));//no clock
-    _iface->write_reg(0x00A, BOOST_BINARY( 00010010 )); //yes clock
-    _iface->write_reg(0x009, BOOST_BINARY( 00010111 ));
-
-    _iface->reset_fpga(false); //bring it out of reset
-    boost::this_thread::sleep(boost::posix_time::milliseconds(100));
 
     ////////////////////////////////////////////////////////////////////
     // Create control transport
@@ -534,7 +522,7 @@ b200_impl::b200_impl(const device_addr_t &device_addr)
 b200_impl::~b200_impl(void)
 {
     //TODO kill any threads here
-    //_iface->reset_fpga(true);
+    //_iface->set_fpga_reset_pin(true);
 }
 
 void b200_impl::set_mb_eeprom(const uhd::usrp::mboard_eeprom_t &mb_eeprom)

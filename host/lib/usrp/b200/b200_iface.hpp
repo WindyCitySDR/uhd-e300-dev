@@ -34,9 +34,6 @@ public:
      */
     static sptr make(uhd::transport::usb_control::sptr usb_ctrl);
 
-    //! true to hold the fpga in reset
-    virtual void reset_fpga(const bool reset) = 0;
-
     //! query the device USB speed (2, 3)
     virtual boost::uint8_t get_usb_speed(void) = 0;
 
@@ -45,6 +42,12 @@ public:
 
     //! reset the FX3
     virtual void reset_fx3(void) = 0;
+
+    //! reset the GPIF state machine
+    virtual void reset_gpif(void) = 0;
+
+    //! set the FPGA_RESET line
+    virtual void set_fpga_reset_pin(const bool reset) = 0;
 
     //! load an FPGA image
     virtual void load_fpga(const std::string filestring) = 0;

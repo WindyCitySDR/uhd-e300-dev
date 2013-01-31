@@ -42,8 +42,9 @@ const static boost::uint8_t B200_VREQ_LOOP = 0x22;
 const static boost::uint8_t B200_VREQ_SPI_WRITE = 0x32;
 const static boost::uint8_t B200_VREQ_SPI_READ = 0x42;
 const static boost::uint8_t B200_VREQ_FPGA_RESET = 0x62;
-const static boost::uint8_t B200_VREQ_FX3_RESET = 0x72;
+const static boost::uint8_t B200_VREQ_GPIF_RESET = 0x72;
 const static boost::uint8_t B200_VREQ_GET_USB = 0x80;
+const static boost::uint8_t B200_VREQ_FX3_RESET = 0x99;
 
 typedef boost::uint32_t hash_type;
 
@@ -366,7 +367,15 @@ public:
                     0x00, data, 4);
     }
 
-    void reset_fpga(const bool reset)
+    void reset_gpif(void) {
+        unsigned char data[4];
+        memset(data, 0x00, sizeof(data));
+
+        fx3_control_write(B200_VREQ_GPIF_RESET, 0x00, \
+                    0x00, data, 4);
+    }
+
+    void set_fpga_reset_pin(const bool reset)
     {
         unsigned char data[4];
         memset(data, (reset)? 0xFF : 0x00, sizeof(data));
