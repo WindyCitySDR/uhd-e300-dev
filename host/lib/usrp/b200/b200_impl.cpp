@@ -538,7 +538,7 @@ void b200_impl::update_clock_source(const std::string &)
 
 void b200_impl::update_bandsel(const std::string& which, double freq)
 {
-    if(which == "RX") {
+    if(which[0] == 'R') {
         if(freq < 2.0e9) {
             _gpio_state.rx_bandsel_a = 0;
             _gpio_state.rx_bandsel_b = 0;
@@ -554,7 +554,7 @@ void b200_impl::update_bandsel(const std::string& which, double freq)
         } else {
             UHD_THROW_INVALID_CODE_PATH();
         }
-    } else if(which == "TX") {
+    } else if(which[0] == 'T') {
         if(freq < 3e9) {
             _gpio_state.tx_bandsel_a = 0;
             _gpio_state.tx_bandsel_b = 1;
