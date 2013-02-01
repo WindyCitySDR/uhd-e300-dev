@@ -1186,7 +1186,7 @@ public:
          * Store the new rate. */
         _req_clock_rate = rate;
 
-        UHD_VAR(rate);
+        UHD_VAR(_req_clock_rate);
 
         /* Set the decimation and interpolation values in the RX and TX chains.
          * This also switches filters in / out. Note that all transmitters and
@@ -1484,8 +1484,6 @@ public:
         if(freq_is_nearly_equal(req_rate, _req_clock_rate)) {
             return _baseband_bw;
         }
-
-        UHD_VAR(_req_clock_rate);
 
         /* We must be in the SLEEP / WAIT state to do this. If we aren't already
          * there, transition the ENSM to State 0. */
