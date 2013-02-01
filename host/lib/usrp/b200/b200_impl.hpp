@@ -23,7 +23,7 @@
 #include "b200_codec_ctrl.hpp"
 #include "rx_vita_core_3000.hpp"
 #include "tx_vita_core_3000.hpp"
-#include "time64_core_200.hpp"
+#include "time_core_3000.hpp"
 #include "gpio_core_200.hpp"
 #include "recv_packet_demuxer.hpp"
 #include <uhd/device.hpp>
@@ -78,7 +78,7 @@ private:
     b200_codec_ctrl::sptr _codec_ctrl;
     std::vector<rx_vita_core_3000::sptr> _rx_framers;
     std::vector<tx_vita_core_3000::sptr> _tx_deframers;
-    time64_core_200::sptr _time64;
+    time_core_3000::sptr _time64;
     gpio_core_200_32wo::sptr _atr0;
     gpio_core_200_32wo::sptr _atr1;
 

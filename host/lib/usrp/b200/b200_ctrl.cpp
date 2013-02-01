@@ -195,7 +195,6 @@ private:
             UHD_MSG(status) << std::hex << pkt[2] << std::dec << std::endl;
             UHD_MSG(status) << std::hex << pkt[3] << std::dec << std::endl;
         }
-        //B200_CTRL_MSG_SID
         UHD_ASSERT_THROW(packet_info.has_sid);
         UHD_ASSERT_THROW(packet_info.sid == B200_RESP_MSG_SID);
         UHD_ASSERT_THROW(packet_info.packet_count == seq_to_ack);

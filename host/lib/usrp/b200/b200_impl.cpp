@@ -255,7 +255,7 @@ b200_impl::b200_impl(const device_addr_t &device_addr)
     {
         boost::hash_combine(hash, i);
         _ctrl->poke32(TOREG(SR_TEST), boost::uint32_t(hash));
-        test_fail = _ctrl->peek32(TOREG(0*2)) != boost::uint32_t(hash);
+        test_fail = _ctrl->peek32(RB32_TEST) != boost::uint32_t(hash);
         if (test_fail) break; //exit loop on any failure
     }
     UHD_MSG(status) << ((test_fail)? " fail" : "pass") << std::endl;
@@ -351,16 +351,16 @@ b200_impl::b200_impl(const device_addr_t &device_addr)
     _rx_framers.resize(B200_NUM_RX_FE);
     for (size_t dspno = 0; dspno < B200_NUM_RX_FE; dspno++)
     {
-        const fs_path rx_dsp_path = mb_path / str(boost::format("rx_dsps/%u") % dspno);
+        const fs_path rx_dsp_path = mb_path / "rx_dsps" / str(boost::format("%u") % dspno);
         //FIXME this is not valid for dspno 1
         _rx_framers[dspno] = rx_vita_core_3000::make(_ctrl, TOREG(SR_RX_CTRL+4), TOREG(SR_RX_CTRL));
         _tree->access<double>(mb_path / "tick_rate")
             .subscribe(boost::bind(&rx_vita_core_3000::set_tick_rate, _rx_framers[dspno], _1));
-        _tree->create<meta_range_t>(rx_dsp_path / "rate/range")
+        _tree->create<meta_range_t>(rx_dsp_path / "rate" / "range")
             .publish(boost::bind(&b200_impl::get_possible_rates, this));
-        _tree->create<double>(rx_dsp_path / "rate/value")
+        _tree->create<double>(rx_dsp_path / "rate" / "value")
             .coerce(boost::bind(&b200_impl::set_sample_rate, this, _1));
-        _tree->create<double>(rx_dsp_path / "freq/value")
+        _tree->create<double>(rx_dsp_path / "freq" / "value")
             .publish(boost::bind(&b200_impl::get_dsp_freq, this));
         _tree->create<meta_range_t>(rx_dsp_path / "freq/range")
             .publish(boost::bind(&b200_impl::get_dsp_freq_range, this));
@@ -374,48 +374,46 @@ b200_impl::b200_impl(const device_addr_t &device_addr)
     _tx_deframers.resize(B200_NUM_TX_FE);
     for (size_t dspno = 0; dspno < B200_NUM_TX_FE; dspno++)
     {
-        const fs_path tx_dsp_path = mb_path / str(boost::format("tx_dsps/%u") % dspno);
+        const fs_path tx_dsp_path = mb_path / "tx_dsps" / str(boost::format("%u") % dspno);
         //FIXME this is not valid for dspno 1
         _tx_deframers[dspno] = tx_vita_core_3000::make(_ctrl, TOREG(SR_TX_CTRL+4), TOREG(SR_TX_CTRL));
         _tree->access<double>(mb_path / "tick_rate")
             .subscribe(boost::bind(&tx_vita_core_3000::set_tick_rate, _tx_deframers[dspno], _1));
-        _tree->create<meta_range_t>(tx_dsp_path / "rate/range")
+        _tree->create<meta_range_t>(tx_dsp_path / "rate" / "range")
             .publish(boost::bind(&b200_impl::get_possible_rates, this));
-        _tree->create<double>(tx_dsp_path / "rate/value")
+        _tree->create<double>(tx_dsp_path / "rate" / "value")
             .coerce(boost::bind(&b200_impl::set_sample_rate, this, _1));
-        _tree->create<double>(tx_dsp_path / "freq/value")
+        _tree->create<double>(tx_dsp_path / "freq" / "value")
             .publish(boost::bind(&b200_impl::get_dsp_freq, this));
-        _tree->create<meta_range_t>(tx_dsp_path / "freq/range")
+        _tree->create<meta_range_t>(tx_dsp_path / "freq" / "range")
             .publish(boost::bind(&b200_impl::get_dsp_freq_range, this));
     }
 
     ////////////////////////////////////////////////////////////////////
     // create time control objects
     ////////////////////////////////////////////////////////////////////
-    time64_core_200::readback_bases_type time64_rb_bases;
-    time64_rb_bases.rb_hi_now = 0;
-    time64_rb_bases.rb_lo_now = 0;
-    time64_rb_bases.rb_hi_pps = 0;
-    time64_rb_bases.rb_lo_pps = 0;
-    _time64 = time64_core_200::make(_ctrl, TOREG(0/*TODO*/), time64_rb_bases);
+    time_core_3000::readback_bases_type time64_rb_bases;
+    time64_rb_bases.rb_now = RB64_TIME_NOW;
+    time64_rb_bases.rb_pps = RB64_TIME_PPS;
+    _time64 = time_core_3000::make(_ctrl, TOREG(SR_TIME), time64_rb_bases);
     _tree->access<double>(mb_path / "tick_rate")
-        .subscribe(boost::bind(&time64_core_200::set_tick_rate, _time64, _1));
-    _tree->create<time_spec_t>(mb_path / "time/now")
-        .publish(boost::bind(&time64_core_200::get_time_now, _time64))
-        .subscribe(boost::bind(&time64_core_200::set_time_now, _time64, _1));
-    _tree->create<time_spec_t>(mb_path / "time/pps")
-        .publish(boost::bind(&time64_core_200::get_time_last_pps, _time64))
-        .subscribe(boost::bind(&time64_core_200::set_time_next_pps, _time64, _1));
+        .subscribe(boost::bind(&time_core_3000::set_tick_rate, _time64, _1));
+    _tree->create<time_spec_t>(mb_path / "time" / "now")
+        .publish(boost::bind(&time_core_3000::get_time_now, _time64))
+        .subscribe(boost::bind(&time_core_3000::set_time_now, _time64, _1));
+    _tree->create<time_spec_t>(mb_path / "time" / "pps")
+        .publish(boost::bind(&time_core_3000::get_time_last_pps, _time64))
+        .subscribe(boost::bind(&time_core_3000::set_time_next_pps, _time64, _1));
     //setup time source props
-    _tree->create<std::string>(mb_path / "time_source/value")
-        .subscribe(boost::bind(&time64_core_200::set_time_source, _time64, _1));
-    _tree->create<std::vector<std::string> >(mb_path / "time_source/options")
-        .publish(boost::bind(&time64_core_200::get_time_sources, _time64));
+    _tree->create<std::string>(mb_path / "time_source" / "value")
+        .subscribe(boost::bind(&time_core_3000::set_time_source, _time64, _1));
+    _tree->create<std::vector<std::string> >(mb_path / "time_source" / "options")
+        .publish(boost::bind(&time_core_3000::get_time_sources, _time64));
     //setup reference source props
-    _tree->create<std::string>(mb_path / "clock_source/value")
+    _tree->create<std::string>(mb_path / "clock_source" / "value")
         .subscribe(boost::bind(&b200_impl::update_clock_source, this, _1));
     static const std::vector<std::string> clock_sources = boost::assign::list_of("internal")("external");
-    _tree->create<std::vector<std::string> >(mb_path / "clock_source/options").set(clock_sources);
+    _tree->create<std::vector<std::string> >(mb_path / "clock_source" / "options").set(clock_sources);
 
     ////////////////////////////////////////////////////////////////////
     // create RF frontend interfacing
@@ -481,6 +479,13 @@ b200_impl::b200_impl(const device_addr_t &device_addr)
     _tree->access<subdev_spec_t>(mb_path / "tx_subdev_spec").set(subdev_spec_t("A:" + _tree->list(mb_path / "dboards/A/tx_frontends").at(0)));
     _tree->access<std::string>(mb_path / "clock_source/value").set("internal");
     _tree->access<std::string>(mb_path / "time_source/value").set("none");
+
+    //time register readback self test
+    {
+        const time_spec_t time0 = _tree->access<time_spec_t>(mb_path / "time" / "now").get();
+        const time_spec_t time1 = _tree->access<time_spec_t>(mb_path / "time" / "now").get();
+        UHD_ASSERT_THROW(time0 < time1);
+    }
 
     _server = task::make(boost::bind(&b200_impl::run_server, this));
 
