@@ -330,6 +330,7 @@ b200_impl::b200_impl(const device_addr_t &device_addr)
     ////////////////////////////////////////////////////////////////////
     //^^^ clock created up top, just reg props here... ^^^
     _tree->create<double>(mb_path / "tick_rate")
+        .publish(boost::bind(&b200_impl::get_clock_rate, this))
         .coerce(boost::bind(&b200_impl::set_sample_rate, this, _1));
 
     ////////////////////////////////////////////////////////////////////
@@ -359,6 +360,7 @@ b200_impl::b200_impl(const device_addr_t &device_addr)
         _tree->create<meta_range_t>(rx_dsp_path / "rate" / "range")
             .publish(boost::bind(&b200_impl::get_possible_rates, this));
         _tree->create<double>(rx_dsp_path / "rate" / "value")
+            .publish(boost::bind(&b200_impl::get_clock_rate, this))
             .coerce(boost::bind(&b200_impl::set_sample_rate, this, _1));
         _tree->create<double>(rx_dsp_path / "freq" / "value")
             .publish(boost::bind(&b200_impl::get_dsp_freq, this));
@@ -382,6 +384,7 @@ b200_impl::b200_impl(const device_addr_t &device_addr)
         _tree->create<meta_range_t>(tx_dsp_path / "rate" / "range")
             .publish(boost::bind(&b200_impl::get_possible_rates, this));
         _tree->create<double>(tx_dsp_path / "rate" / "value")
+            .publish(boost::bind(&b200_impl::get_clock_rate, this))
             .coerce(boost::bind(&b200_impl::set_sample_rate, this, _1));
         _tree->create<double>(tx_dsp_path / "freq" / "value")
             .publish(boost::bind(&b200_impl::get_dsp_freq, this));
@@ -506,9 +509,9 @@ b200_impl::~b200_impl(void)
 
 double b200_impl::set_sample_rate(const double rate)
 {
-    const double actual_rate = _codec_ctrl->set_clock_rate(rate);
-    this->update_tick_rate(actual_rate);
-    return actual_rate;
+    _tick_rate = _codec_ctrl->set_clock_rate(rate);
+    this->update_tick_rate(_tick_rate);
+    return _tick_rate;
 }
 
 void b200_impl::set_mb_eeprom(const uhd::usrp::mboard_eeprom_t &mb_eeprom)

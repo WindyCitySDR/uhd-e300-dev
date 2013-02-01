@@ -81,6 +81,8 @@ private:
     time_core_3000::sptr _time64;
     gpio_core_200_32wo::sptr _atr0;
     gpio_core_200_32wo::sptr _atr1;
+    double _tick_rate;
+    double get_clock_rate(void){return _tick_rate;}
 
     //transports
     uhd::transport::zero_copy_if::sptr _data_transport;
