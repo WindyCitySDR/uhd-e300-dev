@@ -1012,7 +1012,7 @@ public:
         reg_inputsel = 0x30;
         reg_rxfilt = 0x00;
         reg_txfilt = 0x00;
-        reg_bbpll = 0x02; // no clock Set by default in _impl for 40e6 reference
+        reg_bbpll = 0x02;
         reg_bbftune_config = 0x1e;
         reg_bbftune_mode = 0x1e;
 

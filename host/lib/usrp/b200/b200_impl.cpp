@@ -200,7 +200,7 @@ b200_impl::b200_impl(const device_addr_t &device_addr)
     _iface->set_fpga_reset_pin(true);
     boost::this_thread::sleep(boost::posix_time::milliseconds(100));
 
-    _iface->write_reg(0x00A, BOOST_BINARY( 00000010 ));//no clock
+    _iface->write_reg(0x00A, BOOST_BINARY( 00000010 ));
     _iface->write_reg(0x009, BOOST_BINARY( 00010111 ));
 
     _iface->set_fpga_reset_pin(false); //bring it out of reset
