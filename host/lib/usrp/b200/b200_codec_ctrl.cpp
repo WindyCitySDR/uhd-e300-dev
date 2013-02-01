@@ -644,7 +644,7 @@ public:
         int count = 0;
         _b200_iface->write_reg(0x016, 0x01);
         while(_b200_iface->read_reg(0x016) & 0x01) {
-            if(count > 5) {
+            if(count > 100) {
                 std::cout << "Baseband DC Offset Calibration Failure!" << std::endl;
                 break;
             }
@@ -678,7 +678,7 @@ public:
         int count = 0;
         _b200_iface->write_reg(0x016, 0x02);
         while(_b200_iface->read_reg(0x016) & 0x02) {
-            if(count > 20) {
+            if(count > 100) {
                 std::cout << "RF DC Offset Calibration Failure!" << std::endl;
                 break;
             }
@@ -762,7 +762,7 @@ public:
         int count = 0;
         _b200_iface->write_reg(0x016, 0x10);
         while(_b200_iface->read_reg(0x016) & 0x10) {
-            if(count > 5) {
+            if(count > 100) {
                 std::cout << "TX Quadrature Calibration Failure!" << std::endl;
                 break;
             }
