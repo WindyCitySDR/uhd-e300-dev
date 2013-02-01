@@ -108,9 +108,23 @@ private:
     void update_bandsel(const std::string& which, double freq);
     void update_antenna_sel(const std::string& which, const std::string &ant);
 
-    struct gpio_state{
+    struct gpio_state {
         boost::uint32_t  tx_bandsel_a, tx_bandsel_b, rx_bandsel_a, rx_bandsel_b, rx_bandsel_c;
         boost::uint32_t  mimo_tx, mimo_rx, ext_ref_enable, pps_fpga_out_enable, gps_out_enable, gps_ref_enable;
+
+        gpio_state() {
+            tx_bandsel_a = 0;
+            tx_bandsel_b = 0;
+            rx_bandsel_a = 0;
+            rx_bandsel_b = 0;
+            rx_bandsel_c = 0;
+            mimo_tx = 0;
+            mimo_rx = 0;
+            ext_ref_enable = 0;
+            pps_fpga_out_enable = 0;
+            gps_out_enable = 0;
+            gps_ref_enable = 0;
+        }
     } _gpio_state;
 
     void update_gpio_state(void);
