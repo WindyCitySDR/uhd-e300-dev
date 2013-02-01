@@ -22,7 +22,6 @@
 #include <uhd/exception.hpp>
 #include <uhd/utils/msg.hpp>
 #include <uhd/utils/byteswap.hpp>
-#include <uhd/utils/tasks.hpp>
 #include <uhd/utils/safe_call.hpp>
 #include <uhd/transport/vrt_if_packet.hpp>
 #include <uhd/transport/bounded_buffer.hpp>
@@ -30,6 +29,7 @@
 #include <boost/thread/thread.hpp>
 #include <boost/format.hpp>
 #include <boost/bind.hpp>
+#include <queue>
 
 using namespace uhd;
 using namespace uhd::usrp;
@@ -37,19 +37,16 @@ using namespace uhd::transport;
 
 static const double ACK_TIMEOUT = 0.5;
 static const double MASSIVE_TIMEOUT = 10.0; //for when we wait on a timed command
+static const size_t RESP_QUEUE_SIZE = 16;
 
 class b200_ctrl_impl : public b200_ctrl{
 public:
 
-    b200_ctrl_impl(
-        zero_copy_if::sptr xport,
-        boost::function<managed_recv_buffer::sptr(const double)> get_buff
-    ):
+    b200_ctrl_impl(zero_copy_if::sptr xport):
         _xport(xport),
-        _get_buff(get_buff),
         _seq_out(0),
-        _seq_ack(0),
-        _timeout(ACK_TIMEOUT)
+        _timeout(ACK_TIMEOUT),
+        _resp_queue(RESP_QUEUE_SIZE)
     {
         while (_xport->get_recv_buff(0.0)){} //flush
         this->set_time(uhd::time_spec_t(0.0));
@@ -72,8 +69,7 @@ public:
         boost::mutex::scoped_lock lock(_mutex);
 
         this->send_pkt(addr/4, data);
-
-        this->wait_for_ack(_seq_out);
+        this->wait_for_ack(false);
     }
 
     boost::uint32_t peek32(wb_addr_type addr)
@@ -81,10 +77,10 @@ public:
         boost::mutex::scoped_lock lock(_mutex);
 
         this->send_pkt(SR_READBACK, addr/8);
-        this->wait_for_ack(_seq_out);
+        this->wait_for_ack(false);
 
         this->send_pkt(addr);
-        const boost::uint64_t res = this->wait_for_ack(_seq_out);
+        const boost::uint64_t res = this->wait_for_ack(true);
         const boost::uint32_t lo = boost::uint32_t(res & 0xffffffff);
         const boost::uint32_t hi = boost::uint32_t(res >> 32);
         return ((addr/4) & 0x1)? hi : lo;
@@ -95,10 +91,10 @@ public:
         boost::mutex::scoped_lock lock(_mutex);
 
         this->send_pkt(SR_READBACK, addr/8);
-        this->wait_for_ack(_seq_out);
+        this->wait_for_ack(false);
 
         this->send_pkt(addr);
-        return this->wait_for_ack(_seq_out);
+        return this->wait_for_ack(true);
     }
 
     /*******************************************************************
@@ -156,71 +152,80 @@ private:
         pkt[packet_info.num_header_words32+1] = uhd::htowx(data);
 
         //send the buffer over the interface
+        _outstanding_seqs.push(_seq_out);
         buff->commit(sizeof(boost::uint32_t)*(packet_info.num_packet_words32));
     }
 
-    UHD_INLINE boost::uint64_t wait_for_ack(const size_t seq_to_ack)
+    UHD_INLINE boost::uint64_t wait_for_ack(const bool readback)
     {
-        managed_recv_buffer::sptr buff = _get_buff(_timeout);
-        UHD_ASSERT_THROW(bool(buff));
-        UHD_ASSERT_THROW(bool(buff->size()));
-        
-        const boost::uint32_t *pkt = buff->cast<const boost::uint32_t *>();
-        /*
-        if (buff->size())
+        while (readback or (_outstanding_seqs.size() >= RESP_QUEUE_SIZE))
         {
-            UHD_VAR(buff->size());
-            UHD_MSG(status) << std::hex << pkt[0] << std::dec << std::endl;
-            UHD_MSG(status) << std::hex << pkt[1] << std::dec << std::endl;
-            UHD_MSG(status) << std::hex << pkt[2] << std::dec << std::endl;
-            UHD_MSG(status) << std::hex << pkt[3] << std::dec << std::endl;
-            UHD_MSG(status) << std::hex << pkt[4] << std::dec << std::endl;
-            UHD_MSG(status) << std::hex << pkt[5] << std::dec << std::endl;
-            UHD_MSG(status) << std::hex << pkt[6] << std::dec << std::endl;
-            UHD_MSG(status) << std::hex << pkt[7] << std::dec << std::endl;
+            //get seq to ack from outstanding packets list
+            UHD_ASSERT_THROW(not _outstanding_seqs.empty());
+            const size_t seq_to_ack = _outstanding_seqs.front();
+            _outstanding_seqs.pop();
+
+            //get buffer from response endpoing - or die in timeout
+            managed_recv_buffer::sptr buff;
+            UHD_ASSERT_THROW(_resp_queue.pop_with_timed_wait(buff, _timeout));
+            UHD_ASSERT_THROW(bool(buff));
+            UHD_ASSERT_THROW(bool(buff->size()));
+
+            //parse the buffer
+            const boost::uint32_t *pkt = buff->cast<const boost::uint32_t *>();
+            vrt::if_packet_info_t packet_info;
+            packet_info.link_type = vrt::if_packet_info_t::LINK_TYPE_CHDR;
+            packet_info.num_packet_words32 = buff->size()/sizeof(boost::uint32_t);
+            try
+            {
+                vrt::if_hdr_unpack_le(pkt, packet_info);
+            }
+            catch(const std::exception &ex)
+            {
+                UHD_MSG(error) << "B200 ctrl bad VITA packet: " << ex.what() << std::endl;
+                UHD_VAR(buff->size());
+                UHD_MSG(status) << std::hex << pkt[0] << std::dec << std::endl;
+                UHD_MSG(status) << std::hex << pkt[1] << std::dec << std::endl;
+                UHD_MSG(status) << std::hex << pkt[2] << std::dec << std::endl;
+                UHD_MSG(status) << std::hex << pkt[3] << std::dec << std::endl;
+            }
+
+            //check the buffer
+            UHD_ASSERT_THROW(packet_info.has_sid);
+            UHD_ASSERT_THROW(packet_info.sid == B200_RESP_MSG_SID);
+            UHD_ASSERT_THROW(packet_info.packet_count == (seq_to_ack & 0xfff));
+            UHD_ASSERT_THROW(packet_info.num_payload_words32 == 2);
+            UHD_ASSERT_THROW(packet_info.packet_type == vrt::if_packet_info_t::PACKET_TYPE_EXTENSION);
+
+            //return the readback value
+            if (readback and _outstanding_seqs.empty())
+            {
+                const boost::uint64_t hi = pkt[packet_info.num_header_words32+0];
+                const boost::uint64_t lo = pkt[packet_info.num_header_words32+1];
+                return ((hi << 32) | lo);
+            }
         }
-        //*/
-        vrt::if_packet_info_t packet_info;
-        packet_info.link_type = vrt::if_packet_info_t::LINK_TYPE_CHDR;
-        packet_info.num_packet_words32 = buff->size()/sizeof(boost::uint32_t);
-        try{
-            vrt::if_hdr_unpack_le(pkt, packet_info);
-        }
-        catch(const std::exception &ex)
-        {
-            UHD_MSG(error) << "B200 ctrl bad VITA packet: " << ex.what() << std::endl;
-            UHD_VAR(buff->size());
-            UHD_MSG(status) << std::hex << pkt[0] << std::dec << std::endl;
-            UHD_MSG(status) << std::hex << pkt[1] << std::dec << std::endl;
-            UHD_MSG(status) << std::hex << pkt[2] << std::dec << std::endl;
-            UHD_MSG(status) << std::hex << pkt[3] << std::dec << std::endl;
-        }
-        UHD_ASSERT_THROW(packet_info.has_sid);
-        UHD_ASSERT_THROW(packet_info.sid == B200_RESP_MSG_SID);
-        UHD_ASSERT_THROW(packet_info.packet_count == seq_to_ack);
-        UHD_ASSERT_THROW(packet_info.num_payload_words32 == 2);
-        UHD_ASSERT_THROW(packet_info.packet_type == vrt::if_packet_info_t::PACKET_TYPE_EXTENSION);
-        const boost::uint64_t hi = pkt[packet_info.num_header_words32+0];
-        const boost::uint64_t lo = pkt[packet_info.num_header_words32+1];
-        return ((hi << 32) | lo);
+        return 0;
+    }
+
+    void push_resp(uhd::transport::managed_recv_buffer::sptr resp)
+    {
+        _resp_queue.push_with_haste(resp);
     }
 
     zero_copy_if::sptr _xport;
-    boost::function<managed_recv_buffer::sptr(const double)> _get_buff;
     boost::mutex _mutex;
     size_t _seq_out;
-    size_t _seq_ack;
     uhd::time_spec_t _time;
     bool _use_time;
     double _tick_rate;
     double _timeout;
+    std::queue<size_t> _outstanding_seqs;
+    bounded_buffer<managed_recv_buffer::sptr> _resp_queue;
 };
 
 
-b200_ctrl::sptr b200_ctrl::make(
-    zero_copy_if::sptr xport,
-    boost::function<managed_recv_buffer::sptr(const double)> get_buff
-)
+b200_ctrl::sptr b200_ctrl::make(zero_copy_if::sptr xport)
 {
-    return sptr(new b200_ctrl_impl(xport, get_buff));
+    return sptr(new b200_ctrl_impl(xport));
 }

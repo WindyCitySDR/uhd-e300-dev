@@ -227,7 +227,7 @@ b200_impl::b200_impl(const device_addr_t &device_addr)
         ctrl_xport_args
     );
     while (_ctrl_transport->get_recv_buff(0.0)){} //flush ctrl xport
-    _ctrl_demux = recv_packet_demuxer::make(_ctrl_transport, 1+B200_NUM_TX_FE, B200_RESP_MSG_SID);
+    _async_task = uhd::task::make(boost::bind(&b200_impl::handle_async_task, this));
 
     ////////////////////////////////////////////////////////////////////
     // Initialize the properties tree
@@ -240,7 +240,7 @@ b200_impl::b200_impl(const device_addr_t &device_addr)
     ////////////////////////////////////////////////////////////////////
     // Initialize control (settings regs and async messages)
     ////////////////////////////////////////////////////////////////////
-    _ctrl = b200_ctrl::make(_ctrl_transport, boost::bind(&recv_packet_demuxer::get_recv_buff, _ctrl_demux, 0, _1));
+    _ctrl = b200_ctrl::make(_ctrl_transport);
     _tree->create<time_spec_t>(mb_path / "time/cmd")
         .subscribe(boost::bind(&b200_ctrl::set_time, _ctrl, _1));
     /*
@@ -505,6 +505,7 @@ b200_impl::~b200_impl(void)
 {
     //TODO kill any threads here
     //_iface->set_fpga_reset_pin(true);
+    _async_task.reset();
 }
 
 double b200_impl::set_sample_rate(const double rate)

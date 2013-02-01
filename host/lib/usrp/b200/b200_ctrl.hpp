@@ -22,7 +22,6 @@
 #include <uhd/transport/zero_copy.hpp>
 #include <boost/shared_ptr.hpp>
 #include <boost/utility.hpp>
-#include <boost/function.hpp>
 #include "wb_iface.hpp"
 #include <string>
 
@@ -36,8 +35,7 @@ public:
 
     //! Make a new control object
     static sptr make(
-        uhd::transport::zero_copy_if::sptr xport,
-        boost::function<uhd::transport::managed_recv_buffer::sptr(const double)>
+        uhd::transport::zero_copy_if::sptr xport
     );
 
     //! Set the command time that will activate
@@ -45,6 +43,8 @@ public:
 
     //! Set the tick rate (converting time into ticks)
     virtual void set_tick_rate(const double rate) = 0;
+
+    virtual void push_resp(uhd::transport::managed_recv_buffer::sptr) = 0;
 };
 
 #endif /* INCLUDED_B200_CTRL_HPP */

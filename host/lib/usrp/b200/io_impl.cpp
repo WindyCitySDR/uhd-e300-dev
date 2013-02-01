@@ -92,6 +92,15 @@ bool b200_impl::recv_async_msg(
     //return _ctrl->pop_async_msg(async_metadata, timeout);
 }
 
+void b200_impl::handle_async_task(void)
+{
+    managed_recv_buffer::sptr buff = _ctrl_transport->get_recv_buff();
+    if (not buff or buff->size() < 8) return;
+    const boost::uint32_t sid = uhd::wtohx(buff->cast<const boost::uint32_t *>()[1]);
+    if (sid == B200_RESP_MSG_SID) _ctrl->push_resp(buff);
+    else UHD_MSG(error) << "Got a data packet with unknown SID " << sid << std::endl;
+}
+
 /***********************************************************************
  * Receive streamer
  **********************************************************************/

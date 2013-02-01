@@ -39,6 +39,7 @@
 #include <uhd/transport/usb_zero_copy.hpp>
 #include <boost/weak_ptr.hpp>
 #include <boost/asio.hpp>
+#include <uhd/utils/tasks.hpp>
 
 namespace asio = boost::asio;
 
@@ -88,7 +89,8 @@ private:
     uhd::transport::zero_copy_if::sptr _data_transport;
     uhd::transport::zero_copy_if::sptr _ctrl_transport;
     uhd::usrp::recv_packet_demuxer::sptr _data_demux;
-    uhd::usrp::recv_packet_demuxer::sptr _ctrl_demux;
+    uhd::task::sptr _async_task;
+    void handle_async_task(void);
 
     //device properties interface
     uhd::property_tree::sptr get_tree(void) const
