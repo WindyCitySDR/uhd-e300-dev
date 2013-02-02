@@ -19,6 +19,7 @@
 #include "b200_impl.hpp"
 #include "../../transport/super_recv_packet_handler.hpp"
 #include "../../transport/super_send_packet_handler.hpp"
+#include "async_packet_handler.hpp"
 #include <boost/bind.hpp>
 #include <boost/make_shared.hpp>
 
@@ -79,9 +80,7 @@ static void b200_if_hdr_pack_le(
 bool b200_impl::recv_async_msg(
     async_metadata_t &async_metadata, double timeout
 ){
-    return false;
-    //TODO!!
-    //return _ctrl->pop_async_msg(async_metadata, timeout);
+    return _async_md.pop_with_timed_wait(async_metadata, timeout);
 }
 
 void b200_impl::handle_async_task(void)
@@ -89,19 +88,44 @@ void b200_impl::handle_async_task(void)
     managed_recv_buffer::sptr buff = _ctrl_transport->get_recv_buff();
     if (not buff or buff->size() < 8) return;
     const boost::uint32_t sid = uhd::wtohx(buff->cast<const boost::uint32_t *>()[1]);
-    if (sid == B200_RESP_MSG_SID) _ctrl->push_resp(buff);
-    else
+
+    //if the packet is a control response
+    if (sid == B200_RESP_MSG_SID)
     {
-        UHD_MSG(error) << "Got a data packet with unknown SID " << sid << std::endl;
-        const boost::uint32_t *pkt = buff->cast<const boost::uint32_t *>();
-        UHD_VAR(buff->size());
-        UHD_MSG(status) << std::hex << pkt[0] << std::dec << std::endl;
-        UHD_MSG(status) << std::hex << pkt[1] << std::dec << std::endl;
-        UHD_MSG(status) << std::hex << pkt[2] << std::dec << std::endl;
-        UHD_MSG(status) << std::hex << pkt[3] << std::dec << std::endl;
-        UHD_MSG(status) << std::hex << pkt[4] << std::dec << std::endl;
-        UHD_MSG(status) << std::hex << pkt[5] << std::dec << std::endl;
+        _ctrl->push_resp(buff);
+        return;
     }
+
+    //or maybe the packet is a TX async message
+    if (sid >= B200_TX_MSG_SID_BASE and sid <= B200_TX_MSG_SID_BASE+_tx_deframers.size())
+    {
+        //extract packet info
+        vrt::if_packet_info_t if_packet_info;
+        if_packet_info.num_packet_words32 = buff->size()/sizeof(boost::uint32_t);
+        const boost::uint32_t *packet_buff = buff->cast<const boost::uint32_t *>();
+        if_packet_info.link_type = vrt::if_packet_info_t::LINK_TYPE_CHDR;
+
+        //unpacking can fail
+        try
+        {
+            vrt::if_hdr_unpack_le(packet_buff, if_packet_info);
+        }
+        catch(const std::exception &ex)
+        {
+            UHD_MSG(error) << "Error parsing ctrl packet: " << ex.what() << std::endl;
+            return;
+        }
+
+        //fill in the async metadata
+        async_metadata_t metadata;
+        load_metadata_from_buff(uhd::wtohx<boost::uint32_t>, metadata, if_packet_info, packet_buff, _tick_rate, sid-B200_TX_MSG_SID_BASE);
+        _async_md.push_with_pop_on_full(metadata);
+        standard_async_msg_prints(metadata);
+        return;
+    }
+
+    //doh!
+    UHD_MSG(error) << "Got a ctrl packet with unknown SID " << sid << std::endl;
 }
 
 /***********************************************************************

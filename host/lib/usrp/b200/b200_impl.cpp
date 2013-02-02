@@ -156,7 +156,8 @@ UHD_STATIC_BLOCK(register_b200_device)
 /***********************************************************************
  * Structors
  **********************************************************************/
-b200_impl::b200_impl(const device_addr_t &device_addr)
+b200_impl::b200_impl(const device_addr_t &device_addr):
+    _async_md(1000/*messages deep*/)
 {
     //extract the FPGA path for the B200
     //TODO

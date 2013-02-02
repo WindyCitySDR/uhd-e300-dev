@@ -37,6 +37,7 @@
 #include <uhd/usrp/mboard_eeprom.hpp>
 #include <uhd/usrp/subdev_spec.hpp>
 #include <uhd/transport/usb_zero_copy.hpp>
+#include <uhd/transport/bounded_buffer.hpp>
 #include <boost/weak_ptr.hpp>
 #include <boost/asio.hpp>
 #include <uhd/utils/tasks.hpp>
@@ -100,6 +101,7 @@ private:
 
     boost::weak_ptr<uhd::rx_streamer> _rx_streamer;
     boost::weak_ptr<uhd::tx_streamer> _tx_streamer;
+    uhd::transport::bounded_buffer<uhd::async_metadata_t> _async_md;
 
     void set_mb_eeprom(const uhd::usrp::mboard_eeprom_t &);
     void check_fw_compat(void);
