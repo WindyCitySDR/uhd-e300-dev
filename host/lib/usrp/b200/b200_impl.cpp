@@ -1,5 +1,5 @@
 //
-// Copyright 2012 Ettus Research LLC
+// Copyright 2012-2013 Ettus Research LLC
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -267,9 +267,9 @@ b200_impl::b200_impl(const device_addr_t &device_addr)
     // before being cleared.
     ////////////////////////////////////////////////////////////////////
     device_addr_t data_xport_args;
-    data_xport_args["recv_frame_size"] = device_addr.get("recv_frame_size", "2048");
+    data_xport_args["recv_frame_size"] = device_addr.get("recv_frame_size", "4096");
     data_xport_args["num_recv_frames"] = device_addr.get("num_recv_frames", "16");
-    data_xport_args["send_frame_size"] = device_addr.get("send_frame_size", "2048");
+    data_xport_args["send_frame_size"] = device_addr.get("send_frame_size", "4096");
     data_xport_args["num_send_frames"] = device_addr.get("num_send_frames", "16");
 
     _data_transport = usb_zero_copy::make(
@@ -378,7 +378,7 @@ b200_impl::b200_impl(const device_addr_t &device_addr)
     {
         const fs_path tx_dsp_path = mb_path / "tx_dsps" / str(boost::format("%u") % dspno);
         //FIXME this is not valid for dspno 1
-        _tx_deframers[dspno] = tx_vita_core_3000::make(_ctrl, TOREG(SR_TX_CTRL+4), TOREG(SR_TX_CTRL));
+        _tx_deframers[dspno] = tx_vita_core_3000::make(_ctrl, TOREG(SR_TX_CTRL+2), TOREG(SR_TX_CTRL));
         _tree->access<double>(mb_path / "tick_rate")
             .subscribe(boost::bind(&tx_vita_core_3000::set_tick_rate, _tx_deframers[dspno], _1));
         _tree->create<meta_range_t>(tx_dsp_path / "rate" / "range")
@@ -511,7 +511,7 @@ b200_impl::~b200_impl(void)
 double b200_impl::set_sample_rate(const double rate)
 {
     _tick_rate = _codec_ctrl->set_clock_rate(rate);
-    this->update_tick_rate(_tick_rate);
+    this->update_streamer_rates(_tick_rate);
     return _tick_rate;
 }
 

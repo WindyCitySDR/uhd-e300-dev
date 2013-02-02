@@ -104,11 +104,10 @@ private:
     void set_mb_eeprom(const uhd::usrp::mboard_eeprom_t &);
     void check_fw_compat(void);
     void check_fpga_compat(void);
-    void update_rates(void);
     void update_rx_subdev_spec(const uhd::usrp::subdev_spec_t &);
     void update_tx_subdev_spec(const uhd::usrp::subdev_spec_t &);
     void update_clock_source(const std::string &);
-    void update_tick_rate(const double rate);
+    void update_streamer_rates(const double rate);
     void update_bandsel(const std::string& which, double freq);
     void update_antenna_sel(const std::string& which, const std::string &ant);
 

@@ -1,5 +1,5 @@
 //
-// Copyright 2012 Ettus Research LLC
+// Copyright 2012-2013 Ettus Research LLC
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -26,13 +26,7 @@ using namespace uhd;
 using namespace uhd::usrp;
 using namespace uhd::transport;
 
-void b200_impl::update_rates(void)
-{
-    const fs_path mb_path = "/mboards/0";
-    _tree->access<double>(mb_path / "tick_rate").update();
-}
-
-void b200_impl::update_tick_rate(const double rate)
+void b200_impl::update_streamer_rates(const double rate)
 {
     //update the tick rate on all existing streamers -> thread safe
     {
@@ -49,20 +43,18 @@ void b200_impl::update_tick_rate(const double rate)
     }
 }
 
-void b200_impl::update_rx_subdev_spec(const uhd::usrp::subdev_spec_t &spec)
+void b200_impl::update_rx_subdev_spec(const uhd::usrp::subdev_spec_t &)
 {
     //TODO
+    //validate the spec
     //set muxing and other codec settings
-    _gpio_state.mimo_rx = (spec.size() == 2)? 1 : 0;
-    update_gpio_state();
 }
 
-void b200_impl::update_tx_subdev_spec(const uhd::usrp::subdev_spec_t &spec)
+void b200_impl::update_tx_subdev_spec(const uhd::usrp::subdev_spec_t &)
 {
     //TODO
+    //validate the spec
     //set muxing and other codec settings
-    _gpio_state.mimo_tx = (spec.size() == 2)? 1 : 0;
-    update_gpio_state();
 }
 
 static void b200_if_hdr_unpack_le(
@@ -98,7 +90,18 @@ void b200_impl::handle_async_task(void)
     if (not buff or buff->size() < 8) return;
     const boost::uint32_t sid = uhd::wtohx(buff->cast<const boost::uint32_t *>()[1]);
     if (sid == B200_RESP_MSG_SID) _ctrl->push_resp(buff);
-    else UHD_MSG(error) << "Got a data packet with unknown SID " << sid << std::endl;
+    else
+    {
+        UHD_MSG(error) << "Got a data packet with unknown SID " << sid << std::endl;
+        const boost::uint32_t *pkt = buff->cast<const boost::uint32_t *>();
+        UHD_VAR(buff->size());
+        UHD_MSG(status) << std::hex << pkt[0] << std::dec << std::endl;
+        UHD_MSG(status) << std::hex << pkt[1] << std::dec << std::endl;
+        UHD_MSG(status) << std::hex << pkt[2] << std::dec << std::endl;
+        UHD_MSG(status) << std::hex << pkt[3] << std::dec << std::endl;
+        UHD_MSG(status) << std::hex << pkt[4] << std::dec << std::endl;
+        UHD_MSG(status) << std::hex << pkt[5] << std::dec << std::endl;
+    }
 }
 
 /***********************************************************************
@@ -155,7 +158,11 @@ rx_streamer::sptr b200_impl::get_rx_stream(const uhd::stream_args_t &args_)
     _rx_streamer = my_streamer; //store weak pointer
 
     //sets all tick and samp rates on this streamer
-    this->update_rates();
+    this->update_streamer_rates(_tick_rate);
+
+    //set the mimo bit as per number of channels
+    _gpio_state.mimo_rx = (args.channels.size() == 2)? 1 : 0;
+    update_gpio_state();
 
     return my_streamer;
 }
@@ -209,7 +216,11 @@ tx_streamer::sptr b200_impl::get_tx_stream(const uhd::stream_args_t &args_)
     _tx_streamer = my_streamer; //store weak pointer
 
     //sets all tick and samp rates on this streamer
-    this->update_rates();
+    this->update_streamer_rates(_tick_rate);
+
+    //set the mimo bit as per number of channels
+    _gpio_state.mimo_tx = (args.channels.size() == 2)? 1 : 0;
+    update_gpio_state();
 
     return my_streamer;
 }
