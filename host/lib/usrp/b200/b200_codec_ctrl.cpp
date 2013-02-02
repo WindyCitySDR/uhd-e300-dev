@@ -1052,7 +1052,7 @@ public:
         boost::this_thread::sleep(boost::posix_time::milliseconds(20));
 
         /* Tune the BBPLL, write TX and RX FIRS. */
-        setup_rates(15.36e6);
+        setup_rates(3.84e6);
 
         /* Setup data ports (FDD dual port DDR CMOS):
          *      FDD dual port DDR CMOS no swap.
@@ -1129,7 +1129,7 @@ public:
 
         calibrate_synth_charge_pumps();
 
-        tune_helper("RX", 1000e6);
+        tune_helper("RX", 800e6);
         tune_helper("TX", 850e6);
 
         program_mixer_gm_subtable();
@@ -1388,10 +1388,13 @@ public:
             /* Set band-specific settings. */
             if(value < 2.2e9) {
                 reg_inputsel = (reg_inputsel & 0xC0) | 0x30;
+                UHD_MSG(status) << "Selected RX C" << std::endl;
             } else if((value >= 2.2e9) && (value < 4e9)) {
                 reg_inputsel = (reg_inputsel & 0xC0) | 0x0C;
+                UHD_MSG(status) << "Selected RX B" << std::endl;
             } else if((value >= 4e9) && (value <= 6e9)) {
                 reg_inputsel = (reg_inputsel & 0xC0) | 0x03;
+                UHD_MSG(status) << "Selected RX A" << std::endl;
             } else {
                 UHD_THROW_INVALID_CODE_PATH();
             }
@@ -1419,6 +1422,8 @@ public:
             }
 
             _rx_freq = actual_lo;
+
+            UHD_VAR(_rx_freq);
 
             return actual_lo;
 
@@ -1458,6 +1463,8 @@ public:
             }
 
             _tx_freq = actual_lo;
+
+            UHD_VAR(_tx_freq);
 
             return actual_lo;
         }

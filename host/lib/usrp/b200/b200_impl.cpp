@@ -315,6 +315,7 @@ b200_impl::b200_impl(const device_addr_t &device_addr)
     _codec_ctrl = b200_codec_ctrl::make(_iface);
     static const std::vector<std::string> frontends = boost::assign::list_of
         ("TX_A")("TX_B")("RX_A")("RX_B");
+    //FIXME This names aren't accurate. Should be 1/2, not A/B.
 
     BOOST_FOREACH(const std::string &fe_name, frontends)
     {
@@ -476,7 +477,7 @@ b200_impl::b200_impl(const device_addr_t &device_addr)
 
     _tree->access<double>(mb_path / "tick_rate") //now subscribe the clock rate setter
         .subscribe(boost::bind(&b200_ctrl::set_tick_rate, _ctrl, _1))
-        .set(15.36e6);
+        .set(3.84e6);
 
     _tree->access<subdev_spec_t>(mb_path / "rx_subdev_spec").set(subdev_spec_t("A:" + _tree->list(mb_path / "dboards/A/rx_frontends").at(0)));
     _tree->access<subdev_spec_t>(mb_path / "tx_subdev_spec").set(subdev_spec_t("A:" + _tree->list(mb_path / "dboards/A/tx_frontends").at(0)));
@@ -491,7 +492,6 @@ b200_impl::b200_impl(const device_addr_t &device_addr)
     }
 
     _server = task::make(boost::bind(&b200_impl::run_server, this));
-
 
     /* Attempting to lock to external reference. */
     /* TODO lock to ext ref
@@ -601,6 +601,7 @@ void b200_impl::update_antenna_sel(const std::string& which, const std::string &
         throw uhd::value_error("update_antenna_sel unknown antenna " + ant);
     }
 
+    //FIXME This really shouldn't be "_A" and "_B", but chains 1 & 2.
     if(which[3] == 'A') {
         _atr0->set_atr_reg(dboard_iface::ATR_REG_IDLE, STATE_FDX_TXRX1);
         _atr0->set_atr_reg(dboard_iface::ATR_REG_RX_ONLY, STATE_FDX_TXRX1);
