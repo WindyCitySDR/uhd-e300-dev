@@ -1059,7 +1059,7 @@ public:
          *      Force TX on one port, RX on the other. */
         _b200_iface->write_reg(0x010, 0xc8);
         _b200_iface->write_reg(0x011, 0x00);
-        _b200_iface->write_reg(0x012, 0x02);
+        _b200_iface->write_reg(0x012, 0x42);
 
         /* Data delay for TX and RX data clocks */
         _b200_iface->write_reg(0x006, 0x0F);
@@ -1146,7 +1146,7 @@ public:
         calibrate_tx_quadrature();
         calibrate_rx_quadrature();
 
-        _b200_iface->write_reg(0x012, 0x02); // cals done, set PPORT config
+        _b200_iface->write_reg(0x012, 0x42); // cals done, set PPORT config
         _b200_iface->write_reg(0x013, 0x01); // Set ENSM FDD bit
         _b200_iface->write_reg(0x015, 0x04); // dual synth mode, synth en ctrl en
 
@@ -1548,7 +1548,7 @@ public:
         calibrate_tx_quadrature();
         calibrate_rx_quadrature();
 
-        _b200_iface->write_reg(0x012, 0x02); // cals done, set PPORT config
+        _b200_iface->write_reg(0x012, 0x42); // cals done, set PPORT config
         _b200_iface->write_reg(0x013, 0x01); // Set ENSM FDD bit
         _b200_iface->write_reg(0x015, 0x04); // dual synth mode, synth en ctrl en
 
