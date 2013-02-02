@@ -356,8 +356,6 @@ b200_impl::b200_impl(const device_addr_t &device_addr)
         const fs_path rx_dsp_path = mb_path / "rx_dsps" / str(boost::format("%u") % dspno);
         //FIXME this is not valid for dspno 1
         _rx_framers[dspno] = rx_vita_core_3000::make(_ctrl, TOREG(SR_RX_CTRL+4), TOREG(SR_RX_CTRL));
-        _tree->access<double>(mb_path / "tick_rate")
-            .subscribe(boost::bind(&rx_vita_core_3000::set_tick_rate, _rx_framers[dspno], _1));
         _tree->create<meta_range_t>(rx_dsp_path / "rate" / "range")
             .publish(boost::bind(&b200_impl::get_possible_rates, this));
         _tree->create<double>(rx_dsp_path / "rate" / "value")
@@ -380,8 +378,6 @@ b200_impl::b200_impl(const device_addr_t &device_addr)
         const fs_path tx_dsp_path = mb_path / "tx_dsps" / str(boost::format("%u") % dspno);
         //FIXME this is not valid for dspno 1
         _tx_deframers[dspno] = tx_vita_core_3000::make(_ctrl, TOREG(SR_TX_CTRL+2), TOREG(SR_TX_CTRL));
-        _tree->access<double>(mb_path / "tick_rate")
-            .subscribe(boost::bind(&tx_vita_core_3000::set_tick_rate, _tx_deframers[dspno], _1));
         _tree->create<meta_range_t>(tx_dsp_path / "rate" / "range")
             .publish(boost::bind(&b200_impl::get_possible_rates, this));
         _tree->create<double>(tx_dsp_path / "rate" / "value")
@@ -400,8 +396,6 @@ b200_impl::b200_impl(const device_addr_t &device_addr)
     time64_rb_bases.rb_now = RB64_TIME_NOW;
     time64_rb_bases.rb_pps = RB64_TIME_PPS;
     _time64 = time_core_3000::make(_ctrl, TOREG(SR_TIME), time64_rb_bases);
-    _tree->access<double>(mb_path / "tick_rate")
-        .subscribe(boost::bind(&time_core_3000::set_tick_rate, _time64, _1));
     _tree->create<time_spec_t>(mb_path / "time" / "now")
         .publish(boost::bind(&time_core_3000::get_time_now, _time64))
         .subscribe(boost::bind(&time_core_3000::set_time_now, _time64, _1));
@@ -512,6 +506,15 @@ double b200_impl::set_sample_rate(const double rate)
 {
     _tick_rate = _codec_ctrl->set_clock_rate(rate);
     this->update_streamer_rates(_tick_rate);
+    _time64->set_tick_rate(_tick_rate);
+    for (size_t i = 0; i < _rx_framers.size(); i++)
+    {
+        _rx_framers[i]->set_tick_rate(_tick_rate);
+    }
+    for (size_t i = 0; i < _tx_deframers.size(); i++)
+    {
+        _tx_deframers[i]->set_tick_rate(_tick_rate);
+    }
     return _tick_rate;
 }
 

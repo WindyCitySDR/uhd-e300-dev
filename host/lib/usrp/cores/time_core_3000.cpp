@@ -18,6 +18,10 @@
 #include "time_core_3000.hpp"
 #include <uhd/utils/safe_call.hpp>
 
+#define REG_TIME_HI       _base + 0
+#define REG_TIME_LO       _base + 4
+#define REG_TIME_CTRL     _base + 8
+
 using namespace uhd;
 
 struct time_core_3000_impl : time_core_3000
@@ -58,9 +62,12 @@ struct time_core_3000_impl : time_core_3000
         return time_spec_t::from_ticks(ticks, _tick_rate);
     }
 
-    void set_time_now(const uhd::time_spec_t &)
+    void set_time_now(const uhd::time_spec_t &time)
     {
-        //TODO
+        const boost::uint64_t ticks = time.to_ticks(_tick_rate);
+        _iface->poke32(REG_TIME_HI, boost::uint32_t(ticks >> 32));
+        _iface->poke32(REG_TIME_LO, boost::uint32_t(ticks >> 0));
+        _iface->poke32(REG_TIME_CTRL, 0/*no options yet, but this latches time now*/);
     }
 
     void set_time_next_pps(const uhd::time_spec_t &)

@@ -81,7 +81,7 @@ int UHD_SAFE_MAIN(int argc, char *argv[]){
     ) % total_num_samps % seconds_in_future << std::endl;
     uhd::stream_cmd_t stream_cmd(uhd::stream_cmd_t::STREAM_MODE_NUM_SAMPS_AND_DONE);
     stream_cmd.num_samps = total_num_samps;
-    stream_cmd.stream_now = true;
+    stream_cmd.stream_now = false;
     stream_cmd.time_spec = uhd::time_spec_t(seconds_in_future);
     usrp->issue_stream_cmd(stream_cmd);
 
