@@ -37,7 +37,7 @@ public:
     }
 
     uhd::meta_range_t get_rf_freq_range(const std::string &which) {
-        return uhd::meta_range_t(100.0e6, 6.0e9);
+        return uhd::meta_range_t(30e6, 6e9);
     }
 
     uhd::meta_range_t get_bw_filter_range(const std::string &which) {
@@ -1059,7 +1059,7 @@ public:
          *      Force TX on one port, RX on the other. */
         _b200_iface->write_reg(0x010, 0xc8);
         _b200_iface->write_reg(0x011, 0x00);
-        _b200_iface->write_reg(0x012, 0x42);
+        _b200_iface->write_reg(0x012, 0x02);
 
         /* Data delay for TX and RX data clocks */
         _b200_iface->write_reg(0x006, 0x0F);
@@ -1146,7 +1146,7 @@ public:
         calibrate_tx_quadrature();
         calibrate_rx_quadrature();
 
-        _b200_iface->write_reg(0x012, 0x42); // cals done, set PPORT config
+        _b200_iface->write_reg(0x012, 0x02); // cals done, set PPORT config
         _b200_iface->write_reg(0x013, 0x01); // Set ENSM FDD bit
         _b200_iface->write_reg(0x015, 0x04); // dual synth mode, synth en ctrl en
 
@@ -1381,6 +1381,8 @@ public:
         double actual_vcorate = fref * (nint + double(nfrac)/modulus);
         double actual_lo = actual_vcorate / vcodiv;
 
+        UHD_VAR(actual_lo);
+
         if(which[0] == 'R') {
 
             _req_rx_freq = value;
@@ -1388,13 +1390,10 @@ public:
             /* Set band-specific settings. */
             if(value < 2.2e9) {
                 reg_inputsel = (reg_inputsel & 0xC0) | 0x30;
-                UHD_MSG(status) << "Selected RX C" << std::endl;
             } else if((value >= 2.2e9) && (value < 4e9)) {
                 reg_inputsel = (reg_inputsel & 0xC0) | 0x0C;
-                UHD_MSG(status) << "Selected RX B" << std::endl;
             } else if((value >= 4e9) && (value <= 6e9)) {
                 reg_inputsel = (reg_inputsel & 0xC0) | 0x03;
-                UHD_MSG(status) << "Selected RX A" << std::endl;
             } else {
                 UHD_THROW_INVALID_CODE_PATH();
             }
@@ -1422,8 +1421,6 @@ public:
             }
 
             _rx_freq = actual_lo;
-
-            UHD_VAR(_rx_freq);
 
             return actual_lo;
 
@@ -1463,8 +1460,6 @@ public:
             }
 
             _tx_freq = actual_lo;
-
-            UHD_VAR(_tx_freq);
 
             return actual_lo;
         }
@@ -1548,7 +1543,7 @@ public:
         calibrate_tx_quadrature();
         calibrate_rx_quadrature();
 
-        _b200_iface->write_reg(0x012, 0x42); // cals done, set PPORT config
+        _b200_iface->write_reg(0x012, 0x02); // cals done, set PPORT config
         _b200_iface->write_reg(0x013, 0x01); // Set ENSM FDD bit
         _b200_iface->write_reg(0x015, 0x04); // dual synth mode, synth en ctrl en
 

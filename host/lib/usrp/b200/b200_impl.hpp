@@ -58,6 +58,13 @@ static const boost::uint32_t B200_RX_DATA_SID_BASE = 0x00040000;
 static const size_t          B200_NUM_RX_FE = 2;
 static const size_t          B200_NUM_TX_FE = 2;
 
+
+/***********************************************************************
+ * The B200 Capability Constants
+ **********************************************************************/
+static const uhd::meta_range_t b200_samp_range(200e3, 56e6);
+
+
 //! Implementation guts
 class b200_impl : public uhd::device
 {
@@ -136,10 +143,9 @@ private:
 
     //no dsp in fpga
     double get_dsp_freq(void){return 0.0;}
-    uhd::meta_range_t get_dsp_freq_range(void){return uhd::meta_range_t(0.0, 0.0);}
 
-    //TODO implement me
-    uhd::meta_range_t get_possible_rates(void){return uhd::meta_range_t(0.0, 0.0);}
+    uhd::meta_range_t get_dsp_freq_range(void){return uhd::meta_range_t(0.0, 0.0);};
+    uhd::meta_range_t get_possible_rates(void){return b200_samp_range;};
 
     double set_sample_rate(const double rate);
 
