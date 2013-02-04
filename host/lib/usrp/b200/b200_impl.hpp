@@ -1,5 +1,5 @@
 //
-// Copyright 2012 Ettus Research LLC
+// Copyright 2012-2013 Ettus Research LLC
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -110,6 +110,8 @@ private:
     boost::weak_ptr<uhd::tx_streamer> _tx_streamer;
     uhd::transport::bounded_buffer<uhd::async_metadata_t> _async_md;
 
+	void register_loopback_self_test(void);
+	void codec_loopback_self_test(void);
     void set_mb_eeprom(const uhd::usrp::mboard_eeprom_t &);
     void check_fw_compat(void);
     void check_fpga_compat(void);

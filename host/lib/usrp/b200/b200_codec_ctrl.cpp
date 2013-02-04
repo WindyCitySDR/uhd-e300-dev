@@ -66,6 +66,16 @@ public:
         _b200_iface->write_reg(0x3FE, 0x3F);
     }
 
+    /* Turn on Catalina's TX port --> RX port loopback. */
+    void data_port_loopback_on(void) {
+        _b200_iface->write_reg(0x3F5, 0x01);
+    }
+
+    /* Turn off Catalina's TX port --> RX port loopback. */
+    void data_port_loopback_off(void) {
+        _b200_iface->write_reg(0x3F5, 0x00);
+    }
+
     /* Read and print the currently-programed gain table. */
     void read_gain_table(void) {
         uint8_t index, word1, word2, word3;

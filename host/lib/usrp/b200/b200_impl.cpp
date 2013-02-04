@@ -32,6 +32,7 @@
 #include <cstdio>
 #include <iomanip>
 #include <ctime>
+#include <iostream>
 
 using namespace uhd;
 using namespace uhd::usrp;
@@ -248,18 +249,7 @@ b200_impl::b200_impl(const device_addr_t &device_addr):
     this->check_fpga_compat(); //check after making
     */
 
-    //Perform readback tests, these tests also write the hash
-    bool test_fail = false;
-    UHD_MSG(status) << "Performing control readback test... " << std::flush;
-    size_t hash = time(NULL);
-    for (size_t i = 0; i < 100; i++)
-    {
-        boost::hash_combine(hash, i);
-        _ctrl->poke32(TOREG(SR_TEST), boost::uint32_t(hash));
-        test_fail = _ctrl->peek32(RB32_TEST) != boost::uint32_t(hash);
-        if (test_fail) break; //exit loop on any failure
-    }
-    UHD_MSG(status) << ((test_fail)? " fail" : "pass") << std::endl;
+    this->register_loopback_self_test();
 
     ////////////////////////////////////////////////////////////////////
     // Create data transport
@@ -317,6 +307,11 @@ b200_impl::b200_impl(const device_addr_t &device_addr):
     static const std::vector<std::string> frontends = boost::assign::list_of
         ("TX_A")("TX_B")("RX_A")("RX_B");
     //FIXME This names aren't accurate. Should be 1/2, not A/B.
+
+    _codec_ctrl->data_port_loopback_on();
+    this->codec_loopback_self_test();
+    _codec_ctrl->data_port_loopback_off();
+
 
     BOOST_FOREACH(const std::string &fe_name, frontends)
     {
@@ -501,6 +496,41 @@ b200_impl::~b200_impl(void)
     //TODO kill any threads here
     //_iface->set_fpga_reset_pin(true);
     _async_task.reset();
+}
+
+void b200_impl::register_loopback_self_test(void)
+{
+	bool test_fail = false;
+    UHD_MSG(status) << "Performing register readback test... " << std::flush;
+    size_t hash = time(NULL);
+    for (size_t i = 0; i < 100; i++)
+    {
+        boost::hash_combine(hash, i);
+        _ctrl->poke32(TOREG(SR_TEST), boost::uint32_t(hash));
+        test_fail = _ctrl->peek32(RB32_TEST) != boost::uint32_t(hash);
+        if (test_fail) break; //exit loop on any failure
+    }
+    UHD_MSG(status) << ((test_fail)? " fail" : "pass") << std::endl;
+}
+
+void b200_impl::codec_loopback_self_test(void)
+{
+	bool test_fail = false;
+    UHD_MSG(status) << "Performing CODEC readback test... " << std::flush;
+    size_t hash = time(NULL);
+    for (size_t i = 0; i < 100; i++)
+    {
+        boost::hash_combine(hash, i);
+        const boost::uint32_t word32 = boost::uint32_t(hash) & 0xfff0fff0;
+        _ctrl->poke32(TOREG(SR_CODEC_IDLE), word32);
+        _ctrl->peek64(RB64_CODEC_READBACK); //enough idleness for loopback to propagate
+        const boost::uint64_t rb_word64 = _ctrl->peek64(RB64_CODEC_READBACK);
+        const boost::uint32_t rb_tx = boost::uint32_t(rb_word64 >> 32);
+        const boost::uint32_t rb_rx = boost::uint32_t(rb_word64 & 0xffffffff);
+        test_fail = word32 != rb_tx or word32 != rb_rx;
+        if (test_fail) break; //exit loop on any failure
+    }
+    UHD_MSG(status) << ((test_fail)? " fail" : "pass") << std::endl;
 }
 
 double b200_impl::set_sample_rate(const double rate)

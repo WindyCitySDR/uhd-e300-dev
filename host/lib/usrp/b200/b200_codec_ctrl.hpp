@@ -65,6 +65,10 @@ public:
 
     //! output a ~480 kHz test tone at 800 MHz
     virtual void output_test_tone(void) = 0;
+
+    //! turn on/off Catalina's data port loopback
+    virtual void data_port_loopback_on(void) = 0;
+    virtual void data_port_loopback_off(void) = 0;
 };
 
 #endif /* INCLUDED_B200_CODEC_CTRL_HPP */
