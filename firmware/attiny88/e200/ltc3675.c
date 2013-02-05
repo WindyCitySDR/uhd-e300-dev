@@ -304,7 +304,7 @@ bool ltc3675_init(ltc3675_reg_helper_fn helper)
     io_set_pin(PWR_SDA);
     io_set_pin(PWR_SCL);
 */
- #ifdef I2C_REWORK
+#ifdef I2C_REWORK
 	i2c_init_ex(PWR_SDA, PWR_SCL, _ltc3675_pull_up);
 #endif // I2C_REWORK
     io_input_pin(PWR_IRQ);

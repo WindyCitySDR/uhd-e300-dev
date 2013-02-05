@@ -38,7 +38,10 @@ static bool _i2c_start_ex(io_pin_t sda, io_pin_t scl, bool pull_up)
 	{
 		I2C_DELAY(I2C_DEFAULT_BUS_WAIT);
 		if (retries-- == 0)
+		{
+debug_log("I2C:S1");
 			return false;
+		}			
 	}
 	
 	// START condition
@@ -56,6 +59,8 @@ static bool _i2c_start_ex(io_pin_t sda, io_pin_t scl, bool pull_up)
 		if (retries-- == 0)
 		{
 			io_input_pin(sda);
+debug_log_ex("I2C:S2", false);
+debug_log_hex(scl);
 			return false;
 		}			
 	}

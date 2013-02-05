@@ -17,7 +17,11 @@
 #include "debug.h"
 #include "error.h"
 #include "ltc3675.h"
+#ifdef CHARGER_TI
+#include "bq24190.h"
+#else
 #include "ltc4155.h"
+#endif // CHARGER_TI
 
 #define AUTO_POWER_ON
 
@@ -139,7 +143,14 @@ int main(void)
 	while (true)
 	{
 		one_more = false;
-#ifndef CHARGER_TI
+#ifdef CHARGER_TI
+		if (_state.bq24190_irq)
+		{
+			bq24190_handle_irq();
+			
+			_state.bq24190_irq = false;
+		}
+#else
 		if ((_state.ltc4155_irq)/* || ltc4155_has_interrupt()*/)	// [Don't know why PCINT ISR misses LTC4155 IRQ on power up, so double-check state of line]
 		{
 			ltc4155_handle_irq();

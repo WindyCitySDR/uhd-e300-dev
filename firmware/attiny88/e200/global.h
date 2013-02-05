@@ -24,7 +24,11 @@ typedef struct State
 	bool power_off;
 	bool core_power_bad;
 	bool ltc3675_irq;
+#ifdef CHARGER_TI
+	bool bq24190_irq;
+#else
 	bool ltc4155_irq;
+#endif // CHARGER_TI
 	//bool low_battery;
 	uint8_t blink_error;
 	uint8_t blinker_state;

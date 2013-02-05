@@ -395,8 +395,11 @@ bool power_init(void)
 	if (ltc4155_init(/*_state.battery_not_present*/true/*false*/) == false)
 		return false;
 #endif // CHARGER_TI
+#ifdef CHARGER_TI
+	_delay_ms(1000);	// Still at 1.4V on dev board
+#else
 	_delay_ms(25);	// Wait for charge current to stop (Vbatt to fall to 0V)
-	
+#endif // CHARGER_TI
 	uint16_t batt_voltage = battery_get_voltage();
 	debug_log_ex("Vb ", false);
 	debug_log_byte((uint8_t)(batt_voltage / 100));
@@ -411,7 +414,7 @@ bool power_init(void)
 	else
 	{
 #ifdef CHARGER_TI
-		//
+		bq24190_toggle_charger(true);
 #else
 		ltc4155_set_charge_current_limit(50);
 #endif // CHARGER_TI
@@ -749,6 +752,10 @@ ISR(PCINT0_vect)
 		_state.core_power_bad = true;
 	}
 #ifdef CHARGER_TI
+	if (bq24190_has_interrupt())
+	{
+		_state.bq24190_irq = true;
+	}
 #else
 	if (ltc4155_has_interrupt())
 	{
