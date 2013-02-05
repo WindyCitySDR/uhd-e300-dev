@@ -472,14 +472,10 @@ b200_impl::b200_impl(const device_addr_t &device_addr):
     _tree->access<subdev_spec_t>(mb_path / "rx_subdev_spec").set(subdev_spec_t("A:" + _tree->list(mb_path / "dboards/A/rx_frontends").at(0)));
     _tree->access<subdev_spec_t>(mb_path / "tx_subdev_spec").set(subdev_spec_t("A:" + _tree->list(mb_path / "dboards/A/tx_frontends").at(0)));
     _tree->access<std::string>(mb_path / "clock_source/value").set("internal");
-    _tree->access<std::string>(mb_path / "time_source/value").set("none");
+    _tree->access<std::string>(mb_path / "time_source/value").set("internal");
 
-    //time register readback self test
-    {
-        const time_spec_t time0 = _tree->access<time_spec_t>(mb_path / "time" / "now").get();
-        const time_spec_t time1 = _tree->access<time_spec_t>(mb_path / "time" / "now").get();
-        UHD_ASSERT_THROW(time0 < time1);
-    }
+    //radio clock init'd -> time register readback self test
+    this->time_loopback_self_test();
 
     _server = task::make(boost::bind(&b200_impl::run_server, this));
 
@@ -500,8 +496,8 @@ b200_impl::~b200_impl(void)
 
 void b200_impl::register_loopback_self_test(void)
 {
-	bool test_fail = false;
-    UHD_MSG(status) << "Performing register readback test... " << std::flush;
+    bool test_fail = false;
+    UHD_MSG(status) << "Performing register loopback test... " << std::flush;
     size_t hash = time(NULL);
     for (size_t i = 0; i < 100; i++)
     {
@@ -515,8 +511,8 @@ void b200_impl::register_loopback_self_test(void)
 
 void b200_impl::codec_loopback_self_test(void)
 {
-	bool test_fail = false;
-    UHD_MSG(status) << "Performing CODEC readback test... " << std::flush;
+    bool test_fail = false;
+    UHD_MSG(status) << "Performing CODEC loopback test... " << std::flush;
     size_t hash = time(NULL);
     for (size_t i = 0; i < 100; i++)
     {
@@ -530,6 +526,18 @@ void b200_impl::codec_loopback_self_test(void)
         test_fail = word32 != rb_tx or word32 != rb_rx;
         if (test_fail) break; //exit loop on any failure
     }
+    UHD_MSG(status) << ((test_fail)? " fail" : "pass") << std::endl;
+}
+
+void b200_impl::time_loopback_self_test(void)
+{
+    const fs_path mb_path = "/mboards/0";
+    UHD_MSG(status) << "Performing timer loopback test... " << std::flush;
+    const time_spec_t time0 = _tree->access<time_spec_t>(mb_path / "time" / "now").get();
+    boost::this_thread::sleep(boost::posix_time::milliseconds(100));
+    const time_spec_t time1 = _tree->access<time_spec_t>(mb_path / "time" / "now").get();
+    const double approx_secs = (time1 - time0).get_real_secs();
+    const bool test_fail = (approx_secs > 0.15) or (approx_secs < 0.05);
     UHD_MSG(status) << ((test_fail)? " fail" : "pass") << std::endl;
 }
 

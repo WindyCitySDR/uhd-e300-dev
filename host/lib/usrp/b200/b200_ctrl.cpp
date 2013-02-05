@@ -37,9 +37,10 @@ using namespace uhd::transport;
 
 static const double ACK_TIMEOUT = 0.5;
 static const double MASSIVE_TIMEOUT = 10.0; //for when we wait on a timed command
-static const size_t RESP_QUEUE_SIZE = 16;
+static const size_t RESP_QUEUE_SIZE = 2;
 
-class b200_ctrl_impl : public b200_ctrl{
+class b200_ctrl_impl : public b200_ctrl
+{
 public:
 
     b200_ctrl_impl(zero_copy_if::sptr xport):
