@@ -574,11 +574,11 @@ void b200_impl::update_clock_source(const std::string &)
 void b200_impl::update_bandsel(const std::string& which, double freq)
 {
     if(which[0] == 'R') {
-        if(freq < 2.0e9) {
+        if(freq < 2.2e9) {
             _gpio_state.rx_bandsel_a = 0;
             _gpio_state.rx_bandsel_b = 0;
             _gpio_state.rx_bandsel_c = 1;
-        } else if((freq >= 2.0e9) && (freq < 4e9)) {
+        } else if((freq >= 2.2e9) && (freq < 4e9)) {
             _gpio_state.rx_bandsel_a = 0;
             _gpio_state.rx_bandsel_b = 1;
             _gpio_state.rx_bandsel_c = 0;
