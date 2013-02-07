@@ -84,8 +84,8 @@ private:
     b200_iface::sptr _iface;
     b200_ctrl::sptr _ctrl;
     b200_codec_ctrl::sptr _codec_ctrl;
-    std::vector<rx_vita_core_3000::sptr> _rx_framers;
-    std::vector<tx_vita_core_3000::sptr> _tx_deframers;
+    rx_vita_core_3000::sptr _rx_framer;
+    tx_vita_core_3000::sptr _tx_deframer;
     time_core_3000::sptr _time64;
     gpio_core_200_32wo::sptr _atr0;
     gpio_core_200_32wo::sptr _atr1;
@@ -107,6 +107,8 @@ private:
     boost::weak_ptr<uhd::rx_streamer> _rx_streamer;
     boost::weak_ptr<uhd::tx_streamer> _tx_streamer;
     uhd::transport::bounded_buffer<uhd::async_metadata_t> _async_md;
+
+    void issue_stream_cmd(const size_t dspno, const uhd::stream_cmd_t &);
 
     void register_loopback_self_test(void);
     void codec_loopback_self_test(void);

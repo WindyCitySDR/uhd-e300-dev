@@ -345,12 +345,10 @@ b200_impl::b200_impl(const device_addr_t &device_addr):
     ////////////////////////////////////////////////////////////////////
     // create rx dsp control objects
     ////////////////////////////////////////////////////////////////////
-    _rx_framers.resize(B200_NUM_RX_FE);
+    _rx_framer = rx_vita_core_3000::make(_ctrl, TOREG(SR_RX_CTRL+4), TOREG(SR_RX_CTRL));
     for (size_t dspno = 0; dspno < B200_NUM_RX_FE; dspno++)
     {
         const fs_path rx_dsp_path = mb_path / "rx_dsps" / str(boost::format("%u") % dspno);
-        //FIXME this is not valid for dspno 1
-        _rx_framers[dspno] = rx_vita_core_3000::make(_ctrl, TOREG(SR_RX_CTRL+4), TOREG(SR_RX_CTRL));
         _tree->create<meta_range_t>(rx_dsp_path / "rate" / "range")
             .publish(boost::bind(&b200_impl::get_possible_rates, this));
         _tree->create<double>(rx_dsp_path / "rate" / "value")
@@ -361,18 +359,16 @@ b200_impl::b200_impl(const device_addr_t &device_addr):
         _tree->create<meta_range_t>(rx_dsp_path / "freq/range")
             .publish(boost::bind(&b200_impl::get_dsp_freq_range, this));
         _tree->create<stream_cmd_t>(rx_dsp_path / "stream_cmd")
-            .subscribe(boost::bind(&rx_vita_core_3000::issue_stream_command, _rx_framers[dspno], _1));
+            .subscribe(boost::bind(&b200_impl::issue_stream_cmd, this, dspno, _1));
     }
 
     ////////////////////////////////////////////////////////////////////
     // create tx dsp control objects
     ////////////////////////////////////////////////////////////////////
-    _tx_deframers.resize(B200_NUM_TX_FE);
+    _tx_deframer = tx_vita_core_3000::make(_ctrl, TOREG(SR_TX_CTRL+2), TOREG(SR_TX_CTRL));
     for (size_t dspno = 0; dspno < B200_NUM_TX_FE; dspno++)
     {
         const fs_path tx_dsp_path = mb_path / "tx_dsps" / str(boost::format("%u") % dspno);
-        //FIXME this is not valid for dspno 1
-        _tx_deframers[dspno] = tx_vita_core_3000::make(_ctrl, TOREG(SR_TX_CTRL+2), TOREG(SR_TX_CTRL));
         _tree->create<meta_range_t>(tx_dsp_path / "rate" / "range")
             .publish(boost::bind(&b200_impl::get_possible_rates, this));
         _tree->create<double>(tx_dsp_path / "rate" / "value")
@@ -545,14 +541,8 @@ double b200_impl::set_sample_rate(const double rate)
     _tick_rate = _codec_ctrl->set_clock_rate(rate);
     this->update_streamer_rates(_tick_rate);
     _time64->set_tick_rate(_tick_rate);
-    for (size_t i = 0; i < _rx_framers.size(); i++)
-    {
-        _rx_framers[i]->set_tick_rate(_tick_rate);
-    }
-    for (size_t i = 0; i < _tx_deframers.size(); i++)
-    {
-        _tx_deframers[i]->set_tick_rate(_tick_rate);
-    }
+    _rx_framer->set_tick_rate(_tick_rate);
+    _tx_deframer->set_tick_rate(_tick_rate);
     return _tick_rate;
 }
 

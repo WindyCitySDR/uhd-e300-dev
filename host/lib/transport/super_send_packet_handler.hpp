@@ -57,6 +57,7 @@ public:
     send_packet_handler(const size_t size = 1):
         _next_packet_seq(0)
     {
+        this->set_enable_trailer(true);
         this->resize(size);
     }
 
@@ -96,6 +97,11 @@ public:
     void set_xport_chan_sid(const size_t xport_chan, const bool has_sid, const boost::uint32_t sid = 0){
         _props.at(xport_chan).has_sid = has_sid;
         _props.at(xport_chan).sid = sid;
+    }
+
+    void set_enable_trailer(const bool enable)
+    {
+        _has_tlr = enable;
     }
 
     //! Set the rate of ticks per second
@@ -156,7 +162,7 @@ public:
         if_packet_info.packet_type = vrt::if_packet_info_t::PACKET_TYPE_DATA;
         //if_packet_info.has_sid = false; //set per channel
         if_packet_info.has_cid = false;
-        if_packet_info.has_tlr = true;
+        if_packet_info.has_tlr = _has_tlr;
         if_packet_info.has_tsi = false;
         if_packet_info.has_tsf = metadata.has_time_spec;
         if_packet_info.tsf     = metadata.time_spec.to_ticks(_tick_rate);
@@ -230,6 +236,7 @@ private:
     size_t _max_samples_per_packet;
     std::vector<const void *> _zero_buffs;
     size_t _next_packet_seq;
+    bool _has_tlr;
 
     /*******************************************************************
      * Send a single packet:

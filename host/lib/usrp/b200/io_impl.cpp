@@ -58,6 +58,16 @@ void b200_impl::update_tx_subdev_spec(const uhd::usrp::subdev_spec_t &)
     //set muxing and other codec settings
 }
 
+void b200_impl::issue_stream_cmd(const size_t dspno, const uhd::stream_cmd_t &cmd)
+{
+    if (dspno == 0)
+    {
+        uhd::stream_cmd_t new_cmd = cmd;
+        if (_gpio_state.mimo_rx) new_cmd.num_samps *= 2;
+        _rx_framer->issue_stream_command(new_cmd);
+    }
+}
+
 static void b200_if_hdr_unpack_le(
     const boost::uint32_t *packet_buff,
     vrt::if_packet_info_t &if_packet_info
@@ -97,7 +107,7 @@ void b200_impl::handle_async_task(void)
     }
 
     //or maybe the packet is a TX async message
-    if (sid >= B200_TX_MSG_SID_BASE and sid <= B200_TX_MSG_SID_BASE+_tx_deframers.size())
+    if (sid == B200_TX_MSG_SID_BASE)
     {
         //extract packet info
         vrt::if_packet_info_t if_packet_info;
@@ -118,7 +128,7 @@ void b200_impl::handle_async_task(void)
 
         //fill in the async metadata
         async_metadata_t metadata;
-        load_metadata_from_buff(uhd::wtohx<boost::uint32_t>, metadata, if_packet_info, packet_buff, _tick_rate, sid-B200_TX_MSG_SID_BASE);
+        load_metadata_from_buff(uhd::wtohx<boost::uint32_t>, metadata, if_packet_info, packet_buff, _tick_rate);
         _async_md.push_with_pop_on_full(metadata);
         standard_async_msg_prints(metadata);
         return;
@@ -142,6 +152,8 @@ rx_streamer::sptr b200_impl::get_rx_stream(const uhd::stream_args_t &args_)
     }
     args.otw_format = "sc16";
     args.channels = args.channels.empty()? std::vector<size_t>(1, 0) : args.channels;
+    const size_t nchans = args.channels.size();
+    UHD_ASSERT_THROW(nchans == 1 or nchans == 2);
 
     //calculate packet size
     static const size_t hdr_size = 0
@@ -150,7 +162,7 @@ rx_streamer::sptr b200_impl::get_rx_stream(const uhd::stream_args_t &args_)
         - sizeof(vrt::if_packet_info_t().cid) //no class id ever used
         - sizeof(vrt::if_packet_info_t().tsi) //no int time ever used
     ;
-    const size_t bpp = _data_transport->get_recv_frame_size() - hdr_size;
+    const size_t bpp = _data_transport->get_recv_frame_size()/nchans - hdr_size;
     const size_t bpi = convert::get_bytes_per_item(args.otw_format);
     const size_t spp = unsigned(args.args.cast<double>("spp", bpp/bpi));
 
@@ -158,7 +170,7 @@ rx_streamer::sptr b200_impl::get_rx_stream(const uhd::stream_args_t &args_)
     boost::shared_ptr<sph::recv_packet_streamer> my_streamer = boost::make_shared<sph::recv_packet_streamer>(spp);
 
     //init some streamer stuff
-    my_streamer->resize(args.channels.size());
+    my_streamer->resize(nchans);
     my_streamer->set_vrt_unpacker(&b200_if_hdr_unpack_le);
 
     //set the converter
@@ -166,30 +178,25 @@ rx_streamer::sptr b200_impl::get_rx_stream(const uhd::stream_args_t &args_)
     id.input_format = args.otw_format + "_item32_le";
     id.num_inputs = 1;
     id.output_format = args.cpu_format;
-    id.num_outputs = args.channels.size();
+    id.num_outputs = nchans;
     my_streamer->set_converter(id);
 
-    //bind callbacks for the handler
-    for (size_t chan_i = 0; chan_i < args.channels.size(); chan_i++)
-    {
-        const size_t dsp = args.channels[chan_i];
-        _rx_framers[dsp]->set_nsamps_per_packet(spp); //seems to be a good place to set this
-        _rx_framers[dsp]->set_sid(B200_RX_DATA_SID_BASE+chan_i);
-        _rx_framers[dsp]->setup(args);
-        my_streamer->set_xport_chan_get_buff(chan_i, boost::bind(
-            &zero_copy_if::get_recv_buff, _data_transport, _1
-        ), true /*flush*/);
-        my_streamer->set_overflow_handler(chan_i, boost::bind(
-            &rx_vita_core_3000::handle_overflow, _rx_framers[dsp]
-        ));
-    }
+    _rx_framer->set_nsamps_per_packet(spp); //seems to be a good place to set this
+    _rx_framer->set_sid(B200_RX_DATA_SID_BASE);
+    _rx_framer->setup(args);
+    my_streamer->set_xport_chan_get_buff(0, boost::bind(
+        &zero_copy_if::get_recv_buff, _data_transport, _1
+    ), true /*flush*/);
+    my_streamer->set_overflow_handler(0, boost::bind(
+        &rx_vita_core_3000::handle_overflow, _rx_framer
+    ));
     _rx_streamer = my_streamer; //store weak pointer
 
     //sets all tick and samp rates on this streamer
     this->update_streamer_rates(_tick_rate);
 
     //set the mimo bit as per number of channels
-    _gpio_state.mimo_rx = (args.channels.size() == 2)? 1 : 0;
+    _gpio_state.mimo_rx = (nchans == 2)? 1 : 0;
     update_gpio_state();
 
     return my_streamer;
@@ -209,49 +216,47 @@ tx_streamer::sptr b200_impl::get_tx_stream(const uhd::stream_args_t &args_)
     }
     args.otw_format = "sc16";
     args.channels = args.channels.empty()? std::vector<size_t>(1, 0) : args.channels;
+    const size_t nchans = args.channels.size();
+    UHD_ASSERT_THROW(nchans == 1 or nchans == 2);
 
     //calculate packet size
     static const size_t hdr_size = 0
         + vrt::max_if_hdr_words32*sizeof(boost::uint32_t)
-        + sizeof(vrt::if_packet_info_t().tlr) //forced to have trailer
+        //+ sizeof(vrt::if_packet_info_t().tlr) //forced to have trailer
         - sizeof(vrt::if_packet_info_t().cid) //no class id ever used
         - sizeof(vrt::if_packet_info_t().tsi) //no int time ever used
     ;
-    static const size_t bpp = _data_transport->get_send_frame_size() - hdr_size;
+    static const size_t bpp = _data_transport->get_send_frame_size()/nchans - hdr_size;
     const size_t spp = bpp/convert::get_bytes_per_item(args.otw_format);
 
     //make the new streamer given the samples per packet
     boost::shared_ptr<sph::send_packet_streamer> my_streamer = boost::make_shared<sph::send_packet_streamer>(spp);
 
     //init some streamer stuff
-    my_streamer->resize(args.channels.size());
+    my_streamer->resize(nchans);
     my_streamer->set_vrt_packer(&b200_if_hdr_pack_le);
 
     //set the converter
     uhd::convert::id_type id;
     id.input_format = args.cpu_format;
-    id.num_inputs = args.channels.size();
+    id.num_inputs = nchans;
     id.output_format = args.otw_format + "_item32_le";
     id.num_outputs = 1;
     my_streamer->set_converter(id);
 
-    //bind callbacks for the handler
-    for (size_t chan_i = 0; chan_i < args.channels.size(); chan_i++)
-    {
-        const size_t dsp = args.channels[chan_i];
-        _tx_deframers[dsp]->setup(args);
-        my_streamer->set_xport_chan_get_buff(chan_i, boost::bind(
-            &zero_copy_if::get_send_buff, _data_transport, _1
-        ));
-        my_streamer->set_xport_chan_sid(chan_i, true, B200_TX_DATA_SID_BASE+chan_i);
-    }
+    _tx_deframer->setup(args);
+    my_streamer->set_xport_chan_get_buff(0, boost::bind(
+        &zero_copy_if::get_send_buff, _data_transport, _1
+    ));
+    my_streamer->set_xport_chan_sid(0, true, B200_TX_DATA_SID_BASE);
+    my_streamer->set_enable_trailer(false); //TODO not implemented trailer support yet
     _tx_streamer = my_streamer; //store weak pointer
 
     //sets all tick and samp rates on this streamer
     this->update_streamer_rates(_tick_rate);
 
     //set the mimo bit as per number of channels
-    _gpio_state.mimo_tx = (args.channels.size() == 2)? 1 : 0;
+    _gpio_state.mimo_tx = (nchans == 2)? 1 : 0;
     update_gpio_state();
 
     return my_streamer;
