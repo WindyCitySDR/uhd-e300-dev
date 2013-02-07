@@ -166,7 +166,7 @@ rx_streamer::sptr b200_impl::get_rx_stream(const uhd::stream_args_t &args_)
     id.input_format = args.otw_format + "_item32_le";
     id.num_inputs = 1;
     id.output_format = args.cpu_format;
-    id.num_outputs = 1;
+    id.num_outputs = args.channels.size();
     my_streamer->set_converter(id);
 
     //bind callbacks for the handler
@@ -230,7 +230,7 @@ tx_streamer::sptr b200_impl::get_tx_stream(const uhd::stream_args_t &args_)
     //set the converter
     uhd::convert::id_type id;
     id.input_format = args.cpu_format;
-    id.num_inputs = 1;
+    id.num_inputs = args.channels.size();
     id.output_format = args.otw_format + "_item32_le";
     id.num_outputs = 1;
     my_streamer->set_converter(id);
