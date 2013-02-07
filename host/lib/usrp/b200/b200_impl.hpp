@@ -144,6 +144,9 @@ private:
 
     void update_gpio_state(void);
 
+    bool _enable_tx1, _enable_tx2, _enable_rx1, _enable_rx2;
+    void update_enables(void);
+
     //no dsp in fpga
     double get_dsp_freq(void){return 0.0;}
 

@@ -658,6 +658,12 @@ void b200_impl::update_antenna_sel(const std::string& which, const std::string &
     }
 }
 
+void b200_impl::update_enables(void)
+{
+    //TODO setup ATR here
+    _codec_ctrl->set_active_chains(_enable_tx1, _enable_tx2, _enable_rx1, _enable_rx2);
+}
+
 static inline bool wait_for_recv_ready(int sock_fd, const size_t timeout_ms)
 {
     //setup timeval for timeout

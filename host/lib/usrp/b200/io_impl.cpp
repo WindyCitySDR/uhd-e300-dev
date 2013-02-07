@@ -17,6 +17,7 @@
 
 #include "b200_regs.hpp"
 #include "b200_impl.hpp"
+#include "validate_subdev_spec.hpp"
 #include "../../transport/super_recv_packet_handler.hpp"
 #include "../../transport/super_send_packet_handler.hpp"
 #include "async_packet_handler.hpp"
@@ -44,18 +45,56 @@ void b200_impl::update_streamer_rates(const double rate)
     }
 }
 
-void b200_impl::update_rx_subdev_spec(const uhd::usrp::subdev_spec_t &)
+void b200_impl::update_rx_subdev_spec(const uhd::usrp::subdev_spec_t &spec)
 {
-    //TODO
-    //validate the spec
-    //set muxing and other codec settings
+    //sanity checking
+    validate_subdev_spec(_tree, spec, "rx");
+    UHD_ASSERT_THROW(spec.size() == 1 or spec.size() == 2);
+
+    if (spec.size() == 1)
+    {
+        UHD_ASSERT_THROW(spec[0].db_name == "A");
+        _enable_rx1 = spec[0].sd_name == "A";
+        _enable_rx2 = spec[0].sd_name == "B";
+    }
+    if (spec.size() == 2)
+    {
+        //TODO we can support swapping at a later date, only this combo is supported
+        UHD_ASSERT_THROW(spec[0].db_name == "A");
+        UHD_ASSERT_THROW(spec[0].sd_name == "A");
+        UHD_ASSERT_THROW(spec[1].db_name == "A");
+        UHD_ASSERT_THROW(spec[1].sd_name == "B");
+        _enable_rx1 = true;
+        _enable_rx2 = true;
+    }
+
+    this->update_enables();
 }
 
-void b200_impl::update_tx_subdev_spec(const uhd::usrp::subdev_spec_t &)
+void b200_impl::update_tx_subdev_spec(const uhd::usrp::subdev_spec_t &spec)
 {
-    //TODO
-    //validate the spec
-    //set muxing and other codec settings
+    //sanity checking
+    validate_subdev_spec(_tree, spec, "tx");
+    UHD_ASSERT_THROW(spec.size() == 1 or spec.size() == 2);
+
+    if (spec.size() == 1)
+    {
+        UHD_ASSERT_THROW(spec[0].db_name == "A");
+        _enable_tx1 = spec[0].sd_name == "A";
+        _enable_tx2 = spec[0].sd_name == "B";
+    }
+    if (spec.size() == 2)
+    {
+        //TODO we can support swapping at a later date, only this combo is supported
+        UHD_ASSERT_THROW(spec[0].db_name == "A");
+        UHD_ASSERT_THROW(spec[0].sd_name == "A");
+        UHD_ASSERT_THROW(spec[1].db_name == "A");
+        UHD_ASSERT_THROW(spec[1].sd_name == "B");
+        _enable_tx1 = true;
+        _enable_tx2 = true;
+    }
+
+    this->update_enables();
 }
 
 void b200_impl::issue_stream_cmd(const size_t dspno, const uhd::stream_cmd_t &cmd)
