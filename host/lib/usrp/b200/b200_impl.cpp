@@ -304,20 +304,21 @@ b200_impl::b200_impl(const device_addr_t &device_addr):
     ////////////////////////////////////////////////////////////////////
     _codec_ctrl = b200_codec_ctrl::make(_iface);
     static const std::vector<std::string> frontends = boost::assign::list_of
-        ("TX_A")("TX_B")("RX_A")("RX_B");
+        ("TX1")("TX2")("RX1")("RX2");
     //FIXME This names aren't accurate. Should be 1/2, not A/B.
 
     _codec_ctrl->data_port_loopback_on();
     this->codec_loopback_self_test();
     _codec_ctrl->data_port_loopback_off();
 
-
-    BOOST_FOREACH(const std::string &fe_name, frontends)
     {
-        const std::string x = std::string(1, tolower(fe_name[0]));
-        const std::string y = std::string(1, fe_name[3]);
-        const fs_path codec_path = mb_path / (x+"x_codecs") / y;
-        _tree->create<std::string>(codec_path / "name").set("B200 " + fe_name + " CODEC");
+        const fs_path codec_path = mb_path / ("rx_codecs") / "A";
+        _tree->create<std::string>(codec_path / "name").set("B200 RX dual ADC");
+        _tree->create<int>(codec_path / "gains"); //empty cuz gains are in frontend
+    }
+    {
+        const fs_path codec_path = mb_path / ("tx_codecs") / "A";
+        _tree->create<std::string>(codec_path / "name").set("B200 TX dual DAC");
         _tree->create<int>(codec_path / "gains"); //empty cuz gains are in frontend
     }
 
@@ -410,8 +411,7 @@ b200_impl::b200_impl(const device_addr_t &device_addr):
     BOOST_FOREACH(const std::string &fe_name, frontends)
     {
         const std::string x = std::string(1, tolower(fe_name[0]));
-        const std::string y = std::string(1, fe_name[3]);
-        const fs_path rf_fe_path = mb_path / "dboards" / "A" / (x+"x_frontends") / y;
+        const fs_path rf_fe_path = mb_path / "dboards" / "A" / (x+"x_frontends") / fe_name;
 
         _tree->create<std::string>(rf_fe_path / "name").set(fe_name);
         _tree->create<int>(rf_fe_path / "sensors"); //empty TODO
@@ -632,8 +632,8 @@ void b200_impl::update_antenna_sel(const std::string& which, const std::string &
         throw uhd::value_error("update_antenna_sel unknown antenna " + ant);
     }
 
-    //FIXME This really shouldn't be "_A" and "_B", but chains 1 & 2.
-    if(which[3] == 'A') {
+    if(which[2] == '1')
+    {
         _atr0->set_atr_reg(dboard_iface::ATR_REG_IDLE, STATE_FDX_TXRX1);
         _atr0->set_atr_reg(dboard_iface::ATR_REG_RX_ONLY, STATE_FDX_TXRX1);
         _atr0->set_atr_reg(dboard_iface::ATR_REG_TX_ONLY, STATE_FDX_TXRX1);
@@ -643,7 +643,9 @@ void b200_impl::update_antenna_sel(const std::string& which, const std::string &
         _atr1->set_atr_reg(dboard_iface::ATR_REG_RX_ONLY, STATE_FDX_TXRX2);
         _atr1->set_atr_reg(dboard_iface::ATR_REG_TX_ONLY, STATE_FDX_TXRX2);
         _atr1->set_atr_reg(dboard_iface::ATR_REG_FULL_DUPLEX, STATE_FDX_TXRX2);
-    } else if(which[3] == 'B') {
+    }
+    else if(which[2] == '2')
+    {
         _atr0->set_atr_reg(dboard_iface::ATR_REG_IDLE, STATE_FDX_TXRX1);
         _atr0->set_atr_reg(dboard_iface::ATR_REG_RX_ONLY, STATE_FDX_TXRX1);
         _atr0->set_atr_reg(dboard_iface::ATR_REG_TX_ONLY, STATE_FDX_TXRX1);

@@ -54,16 +54,16 @@ void b200_impl::update_rx_subdev_spec(const uhd::usrp::subdev_spec_t &spec)
     if (spec.size() == 1)
     {
         UHD_ASSERT_THROW(spec[0].db_name == "A");
-        _enable_rx1 = spec[0].sd_name == "A";
-        _enable_rx2 = spec[0].sd_name == "B";
+        _enable_rx1 = spec[0].sd_name == "RX1";
+        _enable_rx2 = spec[0].sd_name == "RX2";
     }
     if (spec.size() == 2)
     {
         //TODO we can support swapping at a later date, only this combo is supported
         UHD_ASSERT_THROW(spec[0].db_name == "A");
-        UHD_ASSERT_THROW(spec[0].sd_name == "A");
+        UHD_ASSERT_THROW(spec[0].sd_name == "RX1");
         UHD_ASSERT_THROW(spec[1].db_name == "A");
-        UHD_ASSERT_THROW(spec[1].sd_name == "B");
+        UHD_ASSERT_THROW(spec[1].sd_name == "RX2");
         _enable_rx1 = true;
         _enable_rx2 = true;
     }
@@ -80,16 +80,16 @@ void b200_impl::update_tx_subdev_spec(const uhd::usrp::subdev_spec_t &spec)
     if (spec.size() == 1)
     {
         UHD_ASSERT_THROW(spec[0].db_name == "A");
-        _enable_tx1 = spec[0].sd_name == "A";
-        _enable_tx2 = spec[0].sd_name == "B";
+        _enable_tx1 = spec[0].sd_name == "TX1";
+        _enable_tx2 = spec[0].sd_name == "TX2";
     }
     if (spec.size() == 2)
     {
         //TODO we can support swapping at a later date, only this combo is supported
         UHD_ASSERT_THROW(spec[0].db_name == "A");
-        UHD_ASSERT_THROW(spec[0].sd_name == "A");
+        UHD_ASSERT_THROW(spec[0].sd_name == "TX1");
         UHD_ASSERT_THROW(spec[1].db_name == "A");
-        UHD_ASSERT_THROW(spec[1].sd_name == "B");
+        UHD_ASSERT_THROW(spec[1].sd_name == "TX2");
         _enable_tx1 = true;
         _enable_tx2 = true;
     }
