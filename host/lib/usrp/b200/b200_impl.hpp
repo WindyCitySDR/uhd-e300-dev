@@ -25,7 +25,6 @@
 #include "tx_vita_core_3000.hpp"
 #include "time_core_3000.hpp"
 #include "gpio_core_200.hpp"
-#include "recv_packet_demuxer.hpp"
 #include <uhd/device.hpp>
 #include <uhd/property_tree.hpp>
 #include <uhd/utils/pimpl.hpp>
@@ -96,7 +95,6 @@ private:
     //transports
     uhd::transport::zero_copy_if::sptr _data_transport;
     uhd::transport::zero_copy_if::sptr _ctrl_transport;
-    uhd::usrp::recv_packet_demuxer::sptr _data_demux;
     uhd::task::sptr _async_task;
     void handle_async_task(void);
 

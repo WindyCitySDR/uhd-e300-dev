@@ -136,7 +136,11 @@ rx_streamer::sptr b200_impl::get_rx_stream(const uhd::stream_args_t &args_)
     stream_args_t args = args_;
 
     //setup defaults for unspecified values
-    args.otw_format = args.otw_format.empty()? "sc16" : args.otw_format;
+    if (not args.otw_format.empty() and args.otw_format != "sc16")
+    {
+        throw uhd::value_error("b200_impl::get_rx_stream only supports otw_format sc16");
+    }
+    args.otw_format = "sc16";
     args.channels = args.channels.empty()? std::vector<size_t>(1, 0) : args.channels;
 
     //calculate packet size
@@ -173,7 +177,7 @@ rx_streamer::sptr b200_impl::get_rx_stream(const uhd::stream_args_t &args_)
         _rx_framers[dsp]->set_sid(B200_RX_DATA_SID_BASE+chan_i);
         _rx_framers[dsp]->setup(args);
         my_streamer->set_xport_chan_get_buff(chan_i, boost::bind(
-            &recv_packet_demuxer::get_recv_buff, _data_demux, chan_i, _1
+            &zero_copy_if::get_recv_buff, _data_transport, _1
         ), true /*flush*/);
         my_streamer->set_overflow_handler(chan_i, boost::bind(
             &rx_vita_core_3000::handle_overflow, _rx_framers[dsp]
@@ -199,7 +203,11 @@ tx_streamer::sptr b200_impl::get_tx_stream(const uhd::stream_args_t &args_)
     stream_args_t args = args_;
 
     //setup defaults for unspecified values
-    args.otw_format = args.otw_format.empty()? "sc16" : args.otw_format;
+    if (not args.otw_format.empty() and args.otw_format != "sc16")
+    {
+        throw uhd::value_error("b200_impl::get_rx_stream only supports otw_format sc16");
+    }
+    args.otw_format = "sc16";
     args.channels = args.channels.empty()? std::vector<size_t>(1, 0) : args.channels;
 
     //calculate packet size

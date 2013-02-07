@@ -270,7 +270,6 @@ b200_impl::b200_impl(const device_addr_t &device_addr):
         data_xport_args    // param hints
     );
     while (_data_transport->get_recv_buff(0.0)){} //flush ctrl xport
-    _data_demux = recv_packet_demuxer::make(_data_transport, B200_NUM_RX_FE, B200_RX_DATA_SID_BASE);
 
     ////////////////////////////////////////////////////////////////////
     // setup the mboard eeprom
