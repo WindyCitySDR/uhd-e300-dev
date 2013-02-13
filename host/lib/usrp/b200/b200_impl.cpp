@@ -191,23 +191,27 @@ b200_impl::b200_impl(const device_addr_t &device_addr):
     this->check_fw_compat(); //check after making
 
     ////////////////////////////////////////////////////////////////////
-    // Load the FPGA image - init GPIF - hold in reset
+    // Load the FPGA image - init GPIF - hold FPGA in reset
     ////////////////////////////////////////////////////////////////////
     _iface->reset_gpif();
-    //TODO load the FPGA....
+
+    ////////////////////////////////////////////////////////////////////
+    // Reset Catalina
+    ////////////////////////////////////////////////////////////////////
+    _iface->write_reg(0x000, 0x01);
+    boost::this_thread::sleep(boost::posix_time::milliseconds(5));
+    _iface->write_reg(0x000, 0x00);
+    boost::this_thread::sleep(boost::posix_time::milliseconds(20));
 
     ////////////////////////////////////////////////////////////////////
     // Get the FPGA a clock from Catalina
     ////////////////////////////////////////////////////////////////////
-    _iface->set_fpga_reset_pin(true);
     boost::this_thread::sleep(boost::posix_time::milliseconds(100));
 
     _iface->write_reg(0x00A, BOOST_BINARY( 00000010 ));
     _iface->write_reg(0x009, BOOST_BINARY( 00010111 ));
 
-    _iface->set_fpga_reset_pin(false); //bring it out of reset
     boost::this_thread::sleep(boost::posix_time::milliseconds(100));
-
 
     ////////////////////////////////////////////////////////////////////
     // Create control transport
