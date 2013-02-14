@@ -23,4 +23,6 @@ add_library(usrpfw STATIC
     printf.c
     wb_pkt_iface64.c
     u3_net_stack.c
+    ethernet.c
+    mdelay.c
 )

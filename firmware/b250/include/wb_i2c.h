@@ -14,4 +14,5 @@ bool wb_i2c_read(const uint32_t base, const uint8_t i2c_addr, uint8_t *buf, size
 
 bool wb_i2c_write(const uint32_t base, const uint8_t i2c_addr, const uint8_t *buf, size_t len);
 
+
 #endif /* INCLUDED_WB_I2C_H */

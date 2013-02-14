@@ -17,6 +17,9 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+// NOTE: this driver left shifts a "7bit" I2C address by one bit and puts a R/W bit as bit 0.
+// Some devices may specify there I2C address assuming this R/W bit is already in place.
+
 #include <wb_i2c.h>
 
 typedef struct {
@@ -106,7 +109,6 @@ bool wb_i2c_read(const uint32_t base, const uint8_t i2c_addr, uint8_t *buf, size
   i2c_regs->cmd_status = I2C_CMD_STOP;  // generate STOP
   return false;
 }
-
 
 bool wb_i2c_write(const uint32_t base, const uint8_t i2c_addr, const uint8_t *buf, size_t len)
 {
