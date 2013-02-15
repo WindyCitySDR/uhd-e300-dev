@@ -1,5 +1,5 @@
 #
-# Copyright 2010-2013 Ettus Research LLC
+# Copyright 2013 Ettus Research LLC
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -18,23 +18,19 @@
 ########################################################################
 # This file included, use CMake directory variables
 ########################################################################
-LIBUHD_APPEND_SOURCES(
-    ${CMAKE_CURRENT_SOURCE_DIR}/dboard_base.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/dboard_eeprom.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/dboard_id.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/dboard_iface.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/dboard_manager.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/gps_ctrl.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/mboard_eeprom.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/multi_usrp.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/subdev_spec.cpp
-)
 
-INCLUDE_SUBDIRECTORY(cores)
-INCLUDE_SUBDIRECTORY(dboard)
-INCLUDE_SUBDIRECTORY(common)
-INCLUDE_SUBDIRECTORY(usrp1)
-INCLUDE_SUBDIRECTORY(usrp2)
-INCLUDE_SUBDIRECTORY(b100)
-INCLUDE_SUBDIRECTORY(e100)
-INCLUDE_SUBDIRECTORY(e200)
+########################################################################
+# Conditionally configure the USRP-E200 support
+########################################################################
+find_package(UDev)
+
+LIBUHD_REGISTER_COMPONENT("E200" ENABLE_E200 OFF "ENABLE_LIBUHD;LINUX;UDEV_FOUND" OFF)
+
+IF(ENABLE_E200)
+    INCLUDE_DIRECTORIES(${UDEV_INCLUDE_DIR})
+    LIBUHD_APPEND_SOURCES(
+        ${CMAKE_CURRENT_SOURCE_DIR}/e200_impl.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/e200_sysfs_hooks.cpp
+    )
+    LIBUHD_APPEND_LIBS(${UDEV_LIBS})
+ENDIF(ENABLE_E200)
