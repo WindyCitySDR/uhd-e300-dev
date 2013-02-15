@@ -19,13 +19,11 @@ static void init_network(void)
     pkt_config = wb_pkt_iface64_init(PKT_RAM0_BASE, 0x1ffc);
     printf("PKT RAM0 BASE %u\n", (&pkt_config)->base);
     u3_net_stack_init(&pkt_config);
-    printf("DEBUG: Returned from u3_net_stack_init\n");
 
-    //IJB    static struct ip_addr my_ip0 = {(192 << 24 | 168 << 16 | 10  << 8  | 2 << 0)};
     static struct ip_addr my_ip0 = {(192 << 24 | 168 << 16 | 50  << 8  | 2 << 0)};
+    //IJB static struct ip_addr my_ip0 = {(192 << 24 | 168 << 16 | 10  << 8  | 2 << 0)};
     static eth_mac_addr_t my_mac0 = {{0x00, 0x50, 0xC2, 0x85, 0x3f, 0xff}};
     u3_net_stack_init_eth(0, &my_mac0, &my_ip0);
-    printf("DEBUG: Returned from u3_net_stack_init_eth(0)\n");
 
     wb_poke32(SR_ADDR(SET0_BASE, SR_ETHINT0 + 8 + 0), (my_mac0.addr[5] << 0) | (my_mac0.addr[4] << 8) | (my_mac0.addr[3] << 16) | (my_mac0.addr[2] << 24));
     wb_poke32(SR_ADDR(SET0_BASE, SR_ETHINT0 + 8 + 1), (my_mac0.addr[1] << 0) | (my_mac0.addr[0] << 8));
@@ -34,7 +32,6 @@ static void init_network(void)
     static struct ip_addr my_ip1 = {(192 << 24 | 168 << 16 | 20  << 8  | 2 << 0)};
     static eth_mac_addr_t my_mac1 = {{0x00, 0x50, 0xC2, 0x85, 0x3f, 0x33}};
     u3_net_stack_init_eth(1, &my_mac1, &my_ip1);
-    printf("DEBUG: Returned from u3_net_stack_init_eth(1)\n");
 
     wb_poke32(SR_ADDR(SET0_BASE, SR_ETHINT1 + 8 + 0), (my_mac1.addr[5] << 0) | (my_mac1.addr[4] << 8) | (my_mac1.addr[3] << 16) | (my_mac1.addr[2] << 24));
     wb_poke32(SR_ADDR(SET0_BASE, SR_ETHINT1 + 8 + 1), (my_mac1.addr[1] << 0) | (my_mac1.addr[0] << 8));
@@ -91,7 +88,6 @@ uint8_t dco_read(const uint8_t addr)
 
 void b250_init(void)
 {
-  uint8_t x;
     //first - uart
     wb_uart_init(UART0_BASE, CPU_CLOCK/UART0_BAUD);
     init_printf(NULL,putc);
@@ -109,22 +105,18 @@ void b250_init(void)
     // to determine Fxtal and hence derive and exact value for RFREQ. Currently we are just hard coding it.
 
     //init clock - i2c perif
-
+    // Show power-on or after reset value of DCO.
     printf("DEBUG: DCO after power up reads:\n");
-    x = dco_read(0x07);
-    printf("0x7=%x\n",x);
-    x = dco_read(0x08);
-    printf("0x8=%x\n",x);
-    x = dco_read(0x09);
-    printf("0x9=%x\n",x);
-    x = dco_read(0x0A);
-    printf("0xA=%x\n",x);
-    x = dco_read(0x0B);
-    printf("0xB=%x\n",x);
-    x = dco_read(0x0C);
-    printf("0xC=%x\n",x);
+    printf("0x7=%x\n",dco_read(0x07));
+    printf("0x8=%x\n",dco_read(0x08));
+    printf("0x9=%x\n",dco_read(0x09));
+    printf("0xA=%x\n",dco_read(0x0A));
+    printf("0xB=%x\n",dco_read(0x0B));
+    printf("0xC=%x\n",dco_read(0x0C));
 
-#ifdef ETH1G
+    printf("DEBUG: Version reports %8x\n",wb_peek32(SR_ADDR(RB0_BASE, RB_VERSION)));
+
+    if (wb_peek32(SR_ADDR(RB0_BASE, RB_VERSION)) == 0) {
     // 125MHZ
     dco_write(0x89, 1 << 4);
     dco_write(0x07, 0xe0);
@@ -135,17 +127,9 @@ void b250_init(void)
     dco_write(0x0c, 0x64);
     dco_write(0x89, 0 << 4);
     dco_write(0x87, 1 << 6);
-#elif defined ETH10G
-    // 156.25MHz
-     /* dco_write(0x89, 1 << 4);  */
-     /* dco_write(0x07, 0xA0);  */
-     /* dco_write(0x08, 0xC3);  */
-     /* dco_write(0x09, 0x13);  */
-     /* dco_write(0x0a, 0x81);  */
-     /* dco_write(0x0b, 0x42);  */
-     /* dco_write(0x0c, 0x8F);  */
-     /* dco_write(0x89, 0 << 4);  */
-     /* dco_write(0x87, 1 << 6);  */
+    //    } else if (wb_peek32(SR_ADDR(RB0_BASE, RB_VERSION)) == 1) {
+
+    } else {    // 156.25MHz
     dco_write(0x89, 1 << 4);
     dco_write(0x07, 0xA0);
     dco_write(0x08, 0xC3); 
@@ -155,36 +139,29 @@ void b250_init(void)
     dco_write(0x0c, 0x66);  
     dco_write(0x89, 0 << 4);  
     dco_write(0x87, 1 << 6);  
-
-#endif
-   /* printf("DEBUG: DCO after config reads:\n"); */
-   /*  dco_read(0x07,x); */
-   /*  printf("0x7=%x\n",x); */
-   /*  dco_read(0x08,x); */
-   /*  printf("0x8=%x\n",x); */
-   /*  dco_read(0x09,x); */
-   /*  printf("0x9=%x\n",x); */
-   /*  dco_read(0x0A,x); */
-   /*  printf("0xA=%x\n",x); */
-   /*  dco_read(0x0B,x); */
-   /*  printf("0xB=%x\n",x); */
-   /*  dco_read(0x0C,x); */
-   /*  printf("0xC=%x\n",x); */
-
+    //    } else printf("ERROR: Version %8x is unrecognized.\n",wb_peek32(SR_ADDR(RB0_BASE, RB_VERSION)));
+    }    
     //setup net stack and eth state machines
     init_network();
     printf("DEBUG: Returned from init_network\n");
     //phy reset release
     wb_poke32(SR_ADDR(SET0_BASE, SR_PHY_RST), 0);
+    // Run only for 10GE
+    if (wb_peek32(SR_ADDR(RB0_BASE, RB_VERSION)) != 0) {
+	 mdelay(100);
+	 xge_ethernet_init(0);
+    }
 
-#ifdef ETH10G
-    // Initialise XGE PHY and MAC for port0.
-    ethernet_init(0);
-    mdelay(100);
-    dump_mdio_regs(XGE0_BASE,MDIO_PORT);
-    mdelay(100);
-    dump_mdio_regs(XGE0_BASE,MDIO_PORT);
-#endif
+
+/* #ifdef ETH10G */
+/*     // Initialise XGE PHY and MAC for port0. */
+    
+/*     xge_ethernet_init(0); */
+/*     mdelay(100); */
+/*     dump_mdio_regs(XGE0_BASE,MDIO_PORT); */
+/*     mdelay(100); */
+/*     dump_mdio_regs(XGE0_BASE,MDIO_PORT); */
+/* #endif */
     
     
 }

@@ -95,7 +95,6 @@ int main(void)
 {
   uint32_t last_counter = 0;
   uint32_t xge_sfpp_hotplug_count = 0;
-  // uint32_t im_alive_led = 2;
   static struct ip_addr test_ip = {(192 << 24 | 168 << 16 | 50  << 8  | 3 << 0)};
   
     b250_init();
@@ -121,16 +120,8 @@ int main(void)
 	if ((xge_sfpp_hotplug_count++) == 1000) {
           // Every so often poll XGE Phy to look for SFP+ hotplug events.
           xge_sfpp_hotplug_count = 0;
-          xge_sfpp_hotplug_test(0);
+	  xge_poll_sfpp_status(0);
 	  
-	  // Blink 1 LED
-      	  //im_alive_led = im_alive_led ^ 1<<10; // Bottom of center LED's flashes green.
-	  // Could blink led[11] here instead of [10] for a Red warning light.
-	  //hal_set_leds(im_alive_led, ~0);  // Leave the first one on
-	  
-	  // Blink LED DS7 to show we are alive in main loop. IJB.
-	  //wb_poke32(SR_ADDR(SET0_BASE, SR_LEDS), im_alive_led);
-	  //im_alive_led = im_alive_led ^ 2;
 	}
     }
     return 0;

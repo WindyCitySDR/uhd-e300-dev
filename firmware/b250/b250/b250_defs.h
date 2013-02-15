@@ -17,8 +17,8 @@
 #define SET0_BASE 0xa000
 #define RB0_BASE 0xa000 //same as set
 
-//#define ETH1G
-#define ETH10G 
+#define ETH1G
+//#define ETH10G 
 
 // Setting Regs Memeory Map
 static const int SR_LEDS       = 0;
@@ -35,6 +35,7 @@ static const int RB_COUNTER     = 0;
 static const int RB_SPI_RDY     = 1;
 static const int RB_SPI_DATA    = 2;
 static const int RB_SFPP_STATUS = 3;
+static const int RB_VERSION     = 4;
 
 
 #endif /* INCLUDED_B250_DEFS_H */

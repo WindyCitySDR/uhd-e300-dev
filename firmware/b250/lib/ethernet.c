@@ -255,7 +255,7 @@ xge_phy_init(const uint32_t base, const uint32_t mdio_port)
     x = xge_read_mdio(base, 0x0,XGE_MDIO_DEVICE_PMA,mdio_port);
 }
 
-static int
+void
 xge_poll_sfpp_status(const uint32_t eth)
 {   
   uint32_t x;
@@ -263,53 +263,39 @@ xge_poll_sfpp_status(const uint32_t eth)
   x = wb_peek32(SR_ADDR(RB0_BASE, RB_SFPP_STATUS));
 
   if (x & SFPP_STATUS_RXLOS_CHG)
-    printf("RXLOS changed state: %d\n",x & SFPP_STATUS_RXLOS);
+    printf("DEBUG: RXLOS changed state: %d\n",x & SFPP_STATUS_RXLOS);
   if (x & SFPP_STATUS_TXFAULT_CHG)
-    printf("TXFAULT changed state: %d\n", (x & SFPP_STATUS_TXFAULT) >> 1 );
+    printf("DEBUG: TXFAULT changed state: %d\n", (x & SFPP_STATUS_TXFAULT) >> 1 );
   if (x & SFPP_STATUS_MODABS_CHG)
-    printf("MODABS changed state: %d\n", (x & SFPP_STATUS_MODABS) >> 2);
+    printf("DEBUG: MODABS changed state: %d\n", (x & SFPP_STATUS_MODABS) >> 2);
 
+  if (x & (SFPP_STATUS_RXLOS_CHG|SFPP_STATUS_TXFAULT_CHG|SFPP_STATUS_MODABS_CHG))
+    if (( x & (SFPP_STATUS_RXLOS|SFPP_STATUS_TXFAULT|SFPP_STATUS_MODABS)) == 0) {
+      xge_ethernet_init(0);
+      dump_mdio_regs(XGE0_BASE,MDIO_PORT);
+      mdelay(100);
+      dump_mdio_regs(XGE0_BASE,MDIO_PORT);
+      mdelay(100);
+      dump_mdio_regs(XGE0_BASE,MDIO_PORT);
+    }
 
   if (x & SFPP_STATUS_MODABS_CHG) {
     // MODDET has changed state since last checked
     if (x & SFPP_STATUS_MODABS) {
       // MODDET is high, module currently removed.
-      return(SFFP_REMOVED);
+      printf("INFO: An SFP+ module has been removed from eth port %d.\n", eth);
     } else {
       // MODDET is low, module currently inserted.
       // Return status.
-      return(SFFP_INSERTED);
+      printf("INFO: A new SFP+ module has been inserted into eth port %d.\n", eth);
+      xge_read_sfpp_type(I2C0_BASE,1);
     }
-  } else {
-    // MODDET hasn't toggled since last checked.
-    return(SFFP_NO_CHANGE);
   }
 }
   
-void
-xge_sfpp_hotplug_test(const uint32_t eth)
-{  
-  //IJB. In future make eth select correct base addresses.
-  int status = xge_poll_sfpp_status(eth);
-  if (status == SFFP_REMOVED) {
-    printf("INFO: An SFP+ module has been removed from eth port %d.\n", eth);
-    xge_phy_init(XGE0_BASE,MDIO_PORT);
-  } else if (status == SFFP_INSERTED) {
-    printf("INFO: A new SFP+ module has been inserted into eth port %d.\n", eth);
-    xge_phy_init(XGE0_BASE,MDIO_PORT);
-    xge_read_sfpp_type(I2C0_BASE,1);
-    dump_mdio_regs(XGE0_BASE,MDIO_PORT);
-    mdelay(100);
-    dump_mdio_regs(XGE0_BASE,MDIO_PORT);
-    mdelay(100);
-    dump_mdio_regs(XGE0_BASE,MDIO_PORT);
-    mdelay(100);
-    dump_mdio_regs(XGE0_BASE,MDIO_PORT);
-  }  
-}
 
 void
-ethernet_init(const uint32_t eth)
+xge_ethernet_init(const uint32_t eth)
 { 
   xge_mac_init(XGE0_BASE); 
  //xge_hard_phy_reset();  
@@ -325,27 +311,6 @@ ethernet_init(const uint32_t eth)
 // Debug code to verbosely read XGE MDIO registers below here.
 //
 
-/* int get_hex_value(int c) */
-/* { */
-/*   int k; */
-/*   int v; */
-
-/*   v = 0; */
-
-/*   while(((c--)!= 0) && (k = getchar()) != '\n' && (k != '\r')) */
-/*     { */
-/*       putchar(k); */
-/*       v = v << 4; */
-/*       if ((k >= '0') && (k <= '9')) */
-/* 	v = v + k - '0'; */
-/*       else if ((k >= 'a') && (k <= 'f')) */
-/* 	v = v + k - 'a' + 10; */
-/*       else if ((k >= 'A') && (k <= 'F')) */
-/* 	v = v + k - 'A' + 10; */
-/*     } */
-/*   newline(); */
-/*   return (v); */
-/* } */
 
 void decode_reg(uint32_t address, uint32_t device, uint32_t data)
 {

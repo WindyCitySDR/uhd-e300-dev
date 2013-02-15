@@ -31,7 +31,7 @@ typedef void (*ethernet_link_changed_callback_t)(int ethnum, int speed);
 /*!
  * \brief one time call to initialize ethernet
  */
-void ethernet_init(const uint32_t eth);
+void xge_ethernet_init(const uint32_t eth);
 
 /*!
  * \brief Return number of ethernet interfaces
@@ -42,9 +42,10 @@ int ethernet_ninterfaces(void);
 void dump_mdio_regs(const uint32_t base, uint32_t mdio_port);
 
 /*!
- * \brief Handle hotplug of SFP+ modules
+ * \brief Test status of SFP+ modules
  */
-void xge_sfpp_hotplug_test(const uint32_t eth);
+void
+xge_poll_sfpp_status(const uint32_t eth);
 
 
 #endif /* INCLUDED_ETHERNET_H */
