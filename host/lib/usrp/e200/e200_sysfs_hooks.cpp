@@ -28,8 +28,6 @@
 
 #define NPAGES 8
 
-
-
 static int get_params_from_sysfs(unsigned long *buffer_length, unsigned long *control_length, unsigned long *phys_addr)
 {
 	struct udev *udev;
@@ -72,10 +70,13 @@ static int get_params_from_sysfs(unsigned long *buffer_length, unsigned long *co
 	return 0;
 }
 
+#include "e200_fifo_config.hpp"
 #include <uhd/exception.hpp>
 
-void e200_read_sysfs(size_t &ctrl_length_result, size_t &buff_length_result, size_t &phys_addr_result)
+e200_fifo_config_t e200_read_sysfs(void)
 {
+    e200_fifo_config_t config;
+
     unsigned long control_length = 0;
     unsigned long buffer_length = 0;
     unsigned long phys_addr = 0;
@@ -84,7 +85,9 @@ void e200_read_sysfs(size_t &ctrl_length_result, size_t &buff_length_result, siz
     {
         throw uhd::runtime_error("e200: get_params_from_sysfs failed!");
     }
-    ctrl_length_result = control_length;
-    buff_length_result = buffer_length;
-    phys_addr_result = phys_addr;
+
+    config.ctrl_length = control_length;
+    config.buff_length = buffer_length;
+    config.phys_addr = phys_addr;
+    return config;
 }

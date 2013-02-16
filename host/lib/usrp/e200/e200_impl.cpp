@@ -18,15 +18,47 @@
 #include "e200_impl.hpp"
 #include "e200_regs.hpp"
 #include <uhd/utils/static.hpp>
+#include <boost/filesystem.hpp>
 
 using namespace uhd;
+namespace fs = boost::filesystem;
 
 /***********************************************************************
  * Discovery
  **********************************************************************/
 static device_addrs_t e200_find(const device_addr_t &hint)
 {
-    
+    device_addrs_t e200_addrs;
+
+    //return an empty list of addresses when type is set to non-e200
+    if (hint.has_key("type") and hint["type"] != "e200") return e200_addrs;
+
+    //device node not provided, assume its 0
+    if (not hint.has_key("node"))
+    {
+        device_addr_t new_addr = hint;
+        new_addr["node"] = "/dev/axi_fpga";
+        return e200_find(new_addr);
+    }
+
+    //use the given device node name
+    if (fs::exists(hint["node"]))
+    {
+        device_addr_t new_addr;
+        new_addr["type"] = "e200";
+        new_addr["node"] = fs::system_complete(fs::path(hint["node"])).string();
+        //TODO read EEPROM!
+        new_addr["name"] = "";
+        new_addr["serial"] = "";
+        if (
+            (not hint.has_key("name")   or hint["name"]   == new_addr["name"]) and
+            (not hint.has_key("serial") or hint["serial"] == new_addr["serial"])
+        ){
+            e200_addrs.push_back(new_addr);
+        }
+    }
+
+    return e200_addrs;
 }
 
 /***********************************************************************
