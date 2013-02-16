@@ -81,6 +81,11 @@ struct e200_fifo_shadow
     size_t begin_ptr;
     size_t end_ptr;
 
+    UHD_INLINE void enable(const bool enb)
+    {
+        zf_poke32(base_addr + ARBITER_INIT_OFF + which_stream*4, enb?1:0);
+    }
+
     UHD_INLINE void do_sync(void)
     {
         zf_poke32(base_addr + ARBITER_HOST_OFF + which_stream*4, host_ptr);
@@ -135,6 +140,7 @@ struct e200_transport : zero_copy_if
     e200_transport(const e200_fifo_shadow &shadow, const size_t data_base, const size_t num_frames, const size_t frame_size):
         _shadow(shadow), _num_frames(num_frames), _frame_size(frame_size), _index(0)
     {
+        _shadow.enable(false);
         for (size_t i = 0; i < num_frames; i++)
         {
             void *mem = (void *)(data_base + (i*frame_size));
@@ -143,6 +149,7 @@ struct e200_transport : zero_copy_if
             _buffs.push_back(mb);
         }
         _shadow.do_sync();
+        _shadow.enable(true);
     }
 
     template <typename T>
