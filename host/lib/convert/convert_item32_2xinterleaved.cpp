@@ -35,7 +35,7 @@
         cpu_type ## _t *output0 = reinterpret_cast<cpu_type ## _t *>(outputs[0]); \
         cpu_type ## _t *output1 = reinterpret_cast<cpu_type ## _t *>(outputs[1]); \
         for (size_t i = 0; i < nsamps; i++) { \
-            output0[i] = item32_sc16_x1_to_xx<cpu_type ## _t::value_type>(input[2*i+1], scale_factor); \
+            output0[i] = item32_sc16_x1_to_xx<cpu_type ## _t::value_type>(input[2*i+0], scale_factor); \
             output1[i] = item32_sc16_x1_to_xx<cpu_type ## _t::value_type>(input[2*i+1], scale_factor); \
         } \
     }

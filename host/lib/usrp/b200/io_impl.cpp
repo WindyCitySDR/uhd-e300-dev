@@ -209,7 +209,6 @@ rx_streamer::sptr b200_impl::get_rx_stream(const uhd::stream_args_t &args_)
     boost::shared_ptr<sph::recv_packet_streamer> my_streamer = boost::make_shared<sph::recv_packet_streamer>(spp/nchans);
 
     //init some streamer stuff
-    my_streamer->resize(nchans);
     my_streamer->set_vrt_unpacker(&b200_if_hdr_unpack_le);
 
     //set the converter
@@ -220,7 +219,7 @@ rx_streamer::sptr b200_impl::get_rx_stream(const uhd::stream_args_t &args_)
     id.num_outputs = nchans;
     my_streamer->set_converter(id);
 
-    _rx_framer->set_nsamps_per_packet(spp); //seems to be a good place to set this
+    _rx_framer->set_nsamps_per_packet(spp & ~1); //seems to be a good place to set this
     _rx_framer->set_sid(B200_RX_DATA_SID_BASE);
     _rx_framer->setup(args);
     my_streamer->set_xport_chan_get_buff(0, boost::bind(
@@ -272,7 +271,6 @@ tx_streamer::sptr b200_impl::get_tx_stream(const uhd::stream_args_t &args_)
     boost::shared_ptr<sph::send_packet_streamer> my_streamer = boost::make_shared<sph::send_packet_streamer>(spp/nchans);
 
     //init some streamer stuff
-    my_streamer->resize(nchans);
     my_streamer->set_vrt_packer(&b200_if_hdr_pack_le);
 
     //set the converter

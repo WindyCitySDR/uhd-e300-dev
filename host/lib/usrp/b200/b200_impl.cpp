@@ -189,7 +189,7 @@ b200_impl::b200_impl(const device_addr_t &device_addr):
     ////////////////////////////////////////////////////////////////////
     // Load the FPGA image, then reset GPIF
     ////////////////////////////////////////////////////////////////////
-    _iface->load_fpga(b200_fpga_image);
+    /* _iface->load_fpga(b200_fpga_image); */
     _iface->reset_gpif();
 
     ////////////////////////////////////////////////////////////////////
@@ -464,8 +464,8 @@ b200_impl::b200_impl(const device_addr_t &device_addr):
         .subscribe(boost::bind(&b200_ctrl::set_tick_rate, _ctrl, _1))
         .set(3.84e6);
 
-    _tree->access<subdev_spec_t>(mb_path / "rx_subdev_spec").set(subdev_spec_t("A:" + _tree->list(mb_path / "dboards/A/rx_frontends").at(0)));
-    _tree->access<subdev_spec_t>(mb_path / "tx_subdev_spec").set(subdev_spec_t("A:" + _tree->list(mb_path / "dboards/A/tx_frontends").at(0)));
+    _tree->access<subdev_spec_t>(mb_path / "rx_subdev_spec").set(subdev_spec_t("A:RX2"));
+    _tree->access<subdev_spec_t>(mb_path / "tx_subdev_spec").set(subdev_spec_t("A:TX2"));
     _tree->access<std::string>(mb_path / "clock_source/value").set("internal");
     _tree->access<std::string>(mb_path / "time_source/value").set("internal");
 
@@ -625,13 +625,13 @@ void b200_impl::update_gpio_state(void)
 void b200_impl::update_antenna_sel(const std::string& which, const std::string &ant)
 {
 
-    if(ant == "TX/RX") {
-        //TODO
-    } else if(ant == "RX2") {
-        //TODO
-    } else {
-        throw uhd::value_error("update_antenna_sel unknown antenna " + ant);
-    }
+    /* if(ant == "TX/RX") { */
+    /*     //TODO */
+    /* } else if(ant == "RX2") { */
+    /*     //TODO */
+    /* } else { */
+    /*     throw uhd::value_error("update_antenna_sel unknown antenna " + ant); */
+    /* } */
 
     if(which[2] == '1')
     {
