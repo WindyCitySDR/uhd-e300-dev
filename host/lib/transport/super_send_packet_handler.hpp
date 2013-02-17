@@ -72,8 +72,6 @@ public:
         if (this->size() == size) return;
         _task_handlers.clear();
         _props.resize(size);
-        static const boost::uint64_t zero = 0;
-        _zero_buffs.resize(size, &zero);
         _task_barrier_entry.resize(size);
         _task_barrier_exit.resize(size);
         _task_handlers.resize(size);
@@ -173,9 +171,12 @@ public:
 
             //TODO remove this code when sample counts of zero are supported by hardware
             #ifndef SSPH_DONT_PAD_TO_ONE
-            if (nsamps_per_buff == 0) return send_one_packet(
-                _zero_buffs, 1, if_packet_info, timeout
-            ) & 0x0;
+                static const boost::uint64_t zero = 0;
+                _zero_buffs.resize(buffs.size(), &zero);
+
+                if (nsamps_per_buff == 0) return send_one_packet(
+                    _zero_buffs, 1, if_packet_info, timeout
+                ) & 0x0;
             #endif
 
             return send_one_packet(buffs, nsamps_per_buff, if_packet_info, timeout);
