@@ -43,7 +43,7 @@
 
 namespace asio = boost::asio;
 
-static const std::string     B200_FW_FILE_NAME = "/home/jblum/Desktop/b200_rev2_5656.hex";
+static const std::string     B200_FW_FILE_NAME = "usrp_b200_fw.hex";
 static const std::string     B200_FPGA_FILE_NAME = "usrp_b200_fpga.bin";
 static const boost::uint16_t B200_FW_COMPAT_NUM = 0x03;
 static const boost::uint16_t B200_FPGA_COMPAT_NUM = 0x09;

@@ -29,6 +29,7 @@
 #include <vector>
 #include <cstring>
 #include <iomanip>
+#include <libusb-1.0/libusb.h>
 
 using namespace uhd;
 using namespace uhd::transport;
@@ -36,8 +37,12 @@ using namespace uhd::transport;
 static const bool load_img_msg = true;
 
 const static boost::uint8_t FX3_FIRMWARE_LOAD = 0xA0;
-const static boost::uint8_t VRT_VENDOR_OUT = 0x40;
-const static boost::uint8_t VRT_VENDOR_IN = 0xC0;
+const static boost::uint8_t VRT_VENDOR_OUT = (LIBUSB_REQUEST_TYPE_VENDOR
+                                              | LIBUSB_ENDPOINT_OUT);
+const static boost::uint8_t VRT_VENDOR_IN = (LIBUSB_REQUEST_TYPE_VENDOR
+                                             | LIBUSB_ENDPOINT_IN);
+const static boost::uint8_t B200_VREQ_FPGA_START = 0x02;
+const static boost::uint8_t B200_VREQ_FPGA_DATA = 0x12;
 const static boost::uint8_t B200_VREQ_LOOP = 0x22;
 const static boost::uint8_t B200_VREQ_SPI_WRITE = 0x32;
 const static boost::uint8_t B200_VREQ_SPI_READ = 0x42;
@@ -155,14 +160,16 @@ public:
                            boost::uint16_t value,
                            boost::uint16_t index,
                            unsigned char *buff,
-                           boost::uint16_t length)
+                           boost::uint16_t length,
+                           boost::int32_t timeout = 0)
     {
         return _usb_ctrl->submit(VRT_VENDOR_OUT,        // bmReqeustType
                                    request,             // bRequest
                                    value,               // wValue
                                    index,               // wIndex
                                    buff,                // data
-                                   length);             // wLength
+                                   length,              // wLength
+                                   timeout);            // timeout
     }
 
 
@@ -394,8 +401,41 @@ public:
     }
 
 
-    void load_fpga(const std::string filestring)
-    {
+    void load_fpga(const std::string filestring) {
+
+        const char *filename = filestring.c_str();
+
+        hash_type hash = generate_hash(filename);
+
+        std::ifstream file;
+        file.open(filename, std::ios::in | std::ios::binary);
+
+        if(!file.good()) {
+            throw uhd::io_error("load_fpga: cannot open FPGA input file.");
+        }
+
+        if (load_img_msg) UHD_MSG(status) << "Loading FPGA image: " \
+            << filestring << "..." << std::flush;
+
+        unsigned char out_buff[64];
+        memset(out_buff, 0x00, sizeof(out_buff));
+        fx3_control_write(B200_VREQ_FPGA_START, 0, 0, out_buff, 1, 1000);
+
+        while(!file.eof()) {
+            file.read((char *) out_buff, sizeof(out_buff));
+            const std::streamsize n = file.gcount();
+            if(n == 0) continue;
+
+            uint16_t transfer_count = uint16_t(n);
+
+            /* Send the data to the device. */
+            fx3_control_write(B200_VREQ_FPGA_DATA, 0, 0, out_buff, transfer_count, 5000);
+        }
+
+        file.close();
+        if (load_img_msg) UHD_MSG(status) << " done" << std::endl;
+
+        boost::this_thread::sleep(boost::posix_time::milliseconds(1000));
     }
 
 private:
