@@ -161,13 +161,9 @@ b200_impl::b200_impl(const device_addr_t &device_addr):
     _async_md(1000/*messages deep*/)
 {
     //extract the FPGA path for the B200
-    //TODO
-    /*
     std::string b200_fpga_image = find_image_path(
         device_addr.has_key("fpga")? device_addr["fpga"] : B200_FPGA_FILE_NAME
     );
-    */
-
 
     _tree = property_tree::make();
 
@@ -191,8 +187,9 @@ b200_impl::b200_impl(const device_addr_t &device_addr):
     this->check_fw_compat(); //check after making
 
     ////////////////////////////////////////////////////////////////////
-    // Load the FPGA image - init GPIF - hold FPGA in reset
+    // Load the FPGA image, then reset GPIF
     ////////////////////////////////////////////////////////////////////
+    _iface->load_fpga(b200_fpga_image);
     _iface->reset_gpif();
 
     ////////////////////////////////////////////////////////////////////
@@ -309,7 +306,6 @@ b200_impl::b200_impl(const device_addr_t &device_addr):
     _codec_ctrl = b200_codec_ctrl::make(_iface);
     static const std::vector<std::string> frontends = boost::assign::list_of
         ("TX1")("TX2")("RX1")("RX2");
-    //FIXME This names aren't accurate. Should be 1/2, not A/B.
 
     _codec_ctrl->data_port_loopback_on();
     this->codec_loopback_self_test();
@@ -628,6 +624,7 @@ void b200_impl::update_gpio_state(void)
 
 void b200_impl::update_antenna_sel(const std::string& which, const std::string &ant)
 {
+
     if(ant == "TX/RX") {
         //TODO
     } else if(ant == "RX2") {
