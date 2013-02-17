@@ -1603,6 +1603,12 @@ public:
      */
     void set_active_chains(bool tx1, bool tx2, bool rx1, bool rx2) {
 
+        UHD_HERE();
+        UHD_VAR(tx1);
+        UHD_VAR(rx1);
+        UHD_VAR(tx2);
+        UHD_VAR(rx2);
+
         /* Clear out the current active chain settings. */
         reg_txfilt = reg_txfilt & 0x3F;
         reg_rxfilt = reg_rxfilt & 0x3F;
@@ -1669,7 +1675,7 @@ public:
         return tune_freq;
     }
 
-    /* Set the gain of RXA, RXB, TXA, or TXB.
+    /* Set the gain of RX1, RX2, TX1, or TX2.
      *
      * Note that the 'value' passed to this function is the actual gain value,
      * _not_ the gain index. This is the opposite of the eval software's GUI!
@@ -1677,6 +1683,10 @@ public:
      * are done in terms of attenuation. */
     double set_gain(const std::string &which, const std::string &name, \
             const double value) {
+
+        UHD_HERE();
+        UHD_VAR(which);
+        UHD_VAR(name);
 
         if(which[0] == 'R') {
             /* Indexing the gain tables requires an offset from the requested
@@ -1700,7 +1710,7 @@ public:
             if(gain_index > 76) gain_index = 76;
             if(gain_index < 0) gain_index = 0;
 
-            if(which[3] == 'A') {
+            if(which[2] == '1') {
                 _b200_iface->write_reg(0x109, gain_index);
             } else {
                 _b200_iface->write_reg(0x10c, gain_index);
@@ -1716,16 +1726,16 @@ public:
             /* Each gain step is -0.25dB. Calculate the attenuation necessary
              * for the requested gain, convert it into gain steps, then write
              * the attenuation word. Max gain (so zero attenuation) is 89.75. */
-            double atten = get_gain_range("TX_A", "").stop() - value;
+            double atten = get_gain_range("TX1", "").stop() - value;
             int attenreg = atten * 4;
-            if(which[3] == 'A') {
+            if(which[2] == '1') {
                 _b200_iface->write_reg(0x073, attenreg & 0xFF);
                 _b200_iface->write_reg(0x074, (attenreg >> 8) & 0x01);
             } else {
                 _b200_iface->write_reg(0x075, attenreg & 0xFF);
                 _b200_iface->write_reg(0x076, (attenreg >> 8) & 0x01);
             }
-            return get_gain_range("TX_A", "").stop() - (double(attenreg)/ 4);
+            return get_gain_range("TX1", "").stop() - (double(attenreg)/ 4);
         }
     }
 
