@@ -30,18 +30,19 @@
 #define S2H_NUM_STREAMS (1 << S2H_STREAMS_WIDTH)
 #define S2H_NUM_ACONFIG (1 << S2H_ACONFIG_WIDTH)
 
-//offsets for the arbiter memory map
-#define ARBITER_INIT_OFF    (0x0 << (ZF_PAGE_WIDTH-5))
-#define ARBITER_HOST_OFF    (0x4 << (ZF_PAGE_WIDTH-5))
-#define ARBITER_DEVICE_OFF  (0x5 << (ZF_PAGE_WIDTH-5))
-#define ARBITER_BEGIN_OFF   (0x6 << (ZF_PAGE_WIDTH-5))
-#define ARBITER_END_OFF     (0x7 << (ZF_PAGE_WIDTH-5))
-#define ARBITER_ADDR_OFF    (0x8 << (ZF_PAGE_WIDTH-5))
-#define ARBITER_SIZE_OFF    (0xC << (ZF_PAGE_WIDTH-5))
+//offsetsinto the arbiter memory map
+#define ARBITER_WR_CLEAR 0
+#define ARBITER_WR_ADDR 4
+#define ARBITER_WR_SIZE 8
+#define ARBITER_RB_STATUS 16
+#define ARBITER_RB_STATUS_OCC 20
+#define ARBITER_RB_ADDR_SPACE 24
+#define ARBITER_RB_SIZE_SPACE 28
 
 //helper macros to determine config addrs
 #define H2S_BASE(base) (size_t(base) + (ZF_PAGE_SIZE*1))
 #define S2H_BASE(base) (size_t(base) + (ZF_PAGE_SIZE*0))
+#define ZF_STREAM_OFF(which) ((which)*32)
 
 #include <boost/cstdint.hpp>
 
@@ -61,6 +62,8 @@ inline boost::uint32_t zf_peek32(const boost::uint32_t addr)
 #include <sys/mman.h> //mmap
 #include <fcntl.h> //open, close
 #include <uhd/utils/log.hpp>
+#include <uhd/utils/msg.hpp>
+#include <boost/format.hpp>
 
 #define DEFAULT_FRAME_SIZE 16
 #define DEFAULT_NUM_FRAMES 2
@@ -71,51 +74,17 @@ using namespace uhd::transport;
 /***********************************************************************
  * managed buffer
  **********************************************************************/
-struct e200_fifo_shadow
-{
-    size_t base_addr;
-    size_t which_stream;
-
-    size_t host_ptr;
-    size_t device_ptr;
-    size_t begin_ptr;
-    size_t end_ptr;
-
-    UHD_INLINE void enable(const bool enb)
-    {
-        zf_poke32(base_addr + ARBITER_INIT_OFF + which_stream*4, enb?1:0);
-    }
-
-    UHD_INLINE void do_sync(void)
-    {
-        zf_poke32(base_addr + ARBITER_HOST_OFF + which_stream*4, host_ptr);
-        zf_poke32(base_addr + ARBITER_DEVICE_OFF + which_stream*4, device_ptr);
-        zf_poke32(base_addr + ARBITER_BEGIN_OFF + which_stream*4, begin_ptr);
-        zf_poke32(base_addr + ARBITER_END_OFF + which_stream*4, end_ptr);
-    }
-
-    UHD_INLINE void readback(void)
-    {
-        device_ptr = zf_peek32(base_addr + ARBITER_DEVICE_OFF + which_stream*4);
-    }
-
-    UHD_INLINE void do_release(const size_t ptr, const size_t addr, const size_t size)
-    {
-        host_ptr = ptr;
-        zf_poke32(base_addr + ARBITER_ADDR_OFF + ptr*4, addr);
-        zf_poke32(base_addr + ARBITER_SIZE_OFF + ptr*4, size);
-        zf_poke32(base_addr + ARBITER_HOST_OFF + which_stream*4, host_ptr);
-    }
-};
-
 struct e200_fifo_mb : managed_buffer
 {
-    e200_fifo_mb(const size_t ptr, void *mem, const size_t len, e200_fifo_shadow &shadow):
-        ptr(ptr), mem(mem), len(len), shadow(shadow){}
+    e200_fifo_mb(const size_t ctrl_base, const size_t phys_mem, const size_t mem, const size_t len):
+        ctrl_base(ctrl_base), phys_mem(phys_mem), mem((void *)mem), len(len){}
 
     void release(void)
     {
-        shadow.do_release(ptr, size_t(mem), this->size());
+        UHD_HERE();
+        zf_poke32(ctrl_base + ARBITER_WR_ADDR, phys_mem);
+        zf_poke32(ctrl_base + ARBITER_WR_SIZE, this->size());
+        UHD_HERE();
     }
 
     template <typename T>
@@ -124,10 +93,10 @@ struct e200_fifo_mb : managed_buffer
         return make(reinterpret_cast<T *>(this), mem, len);
     }
 
-    const size_t ptr;
-    void *mem;
+    const size_t ctrl_base;
+    const size_t phys_mem;
+    void *const mem;
     const size_t len;
-    e200_fifo_shadow &shadow;
 };
 
 /***********************************************************************
@@ -137,29 +106,38 @@ template <typename BaseClass>
 struct e200_transport : zero_copy_if
 {
 
-    e200_transport(const e200_fifo_shadow &shadow, const size_t data_base, const size_t num_frames, const size_t frame_size):
-        _shadow(shadow), _num_frames(num_frames), _frame_size(frame_size), _index(0)
+    e200_transport(const size_t phys_base, const size_t mem_base, const size_t ctrl_base, const size_t num_frames, const size_t frame_size, const bool auto_release):
+        _ctrl_base(ctrl_base), _num_frames(num_frames), _frame_size(frame_size), _index(0)
     {
-        _shadow.enable(false);
+        UHD_MSG(status) << boost::format("phys_base 0x%x") % phys_base << std::endl;
+        UHD_MSG(status) << boost::format("mem_base 0x%x") % mem_base << std::endl;
+        UHD_MSG(status) << boost::format("ctrl_base 0x%x") % ctrl_base << std::endl;
+        zf_poke32(ctrl_base + ARBITER_WR_CLEAR, 1);
         for (size_t i = 0; i < num_frames; i++)
         {
-            void *mem = (void *)(data_base + (i*frame_size));
+            const size_t phys = phys_base + (i*frame_size);
+            const size_t mem = mem_base + (i*frame_size);
             boost::shared_ptr<e200_fifo_mb> mb;
-            mb.reset(new e200_fifo_mb(shadow.begin_ptr+i, mem, frame_size, _shadow));
+            mb.reset(new e200_fifo_mb(ctrl_base, phys, mem, frame_size));
+            if (auto_release) mb->release();
             _buffs.push_back(mb);
         }
-        _shadow.do_sync();
-        _shadow.enable(true);
     }
 
     template <typename T>
     UHD_INLINE typename T::sptr get_buff(const double)
     {
-        //TODO probably wait in poll
-        //look for device ptr
+        UHD_HERE();
+        while (zf_peek32(_ctrl_base + ARBITER_RB_STATUS_OCC) == 0)
         {
-            _shadow.readback();
+            sleep(1);
         }
+        UHD_HERE();
+
+        //const size_t sts = 
+        zf_peek32(_ctrl_base + ARBITER_RB_STATUS);
+
+        //TODO check tag + assert
 
         if (_index == _num_frames) _index = 0;
         return _buffs[_index++]->get_new<T>();
@@ -195,7 +173,7 @@ struct e200_transport : zero_copy_if
         return _frame_size;
     }
 
-    e200_fifo_shadow _shadow;
+    const size_t _ctrl_base;
     const size_t _num_frames;
     const size_t _frame_size;
     size_t _index;
@@ -247,17 +225,13 @@ struct e200_fifo_interface_impl : e200_fifo_interface
         const size_t num_frames(size_t(args.cast<double>((is_recv)? "num_recv_frames" : "num_send_frames", DEFAULT_NUM_FRAMES)));
         size_t &entries_in_use = (is_recv)? recv_entries_in_use : send_entries_in_use;
 
-        e200_fifo_shadow shadow;
-        shadow.which_stream = which_stream;
-        shadow.base_addr = (is_recv)? S2H_BASE(ctrl_space) : H2S_BASE(ctrl_space);
-        shadow.begin_ptr = entries_in_use;
-        shadow.end_ptr = entries_in_use + num_frames;
-        shadow.host_ptr = shadow.begin_ptr;
-        shadow.device_ptr = shadow.begin_ptr;
+        const size_t phys_base = config.phys_addr + bytes_in_use;
+        const size_t mem_base = data_space + bytes_in_use;
+        const size_t ctrl_base = ((is_recv)? S2H_BASE(ctrl_space) : H2S_BASE(ctrl_space)) + ZF_STREAM_OFF(which_stream);
 
         uhd::transport::zero_copy_if::sptr xport;
-        if (is_recv) xport.reset(new e200_transport<managed_recv_buffer>(shadow, data_space+bytes_in_use, num_frames, frame_size));
-        else         xport.reset(new e200_transport<managed_send_buffer>(shadow, data_space+bytes_in_use, num_frames, frame_size));
+        if (is_recv) xport.reset(new e200_transport<managed_recv_buffer>(phys_base, mem_base, ctrl_base, num_frames, frame_size, is_recv));
+        else         xport.reset(new e200_transport<managed_send_buffer>(phys_base, mem_base, ctrl_base, num_frames, frame_size, is_recv));
 
         bytes_in_use += num_frames*frame_size;
         entries_in_use += num_frames;
