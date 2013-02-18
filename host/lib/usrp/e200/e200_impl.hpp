@@ -15,12 +15,15 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 //
 
+#ifndef INCLUDED_E200_IMPL_HPP
+#define INCLUDED_E200_IMPL_HPP
+
 #include <uhd/device.hpp>
 #include <uhd/property_tree.hpp>
 #include <boost/weak_ptr.hpp>
+#include "e200_fifo_config.hpp"
 
-#ifndef INCLUDED_E200_IMPL_HPP
-#define INCLUDED_E200_IMPL_HPP
+static const std::string E200_FPGA_FILE_NAME = "usrp_e200_fpga.bin";
 
 /*!
  * USRP-E200 implementation guts:
@@ -47,6 +50,10 @@ private:
     {
         return _tree;
     }
+
+    void load_fpga_image(const std::string &path);
+
+    e200_fifo_interface::sptr _fifo_iface;
 
 };
 

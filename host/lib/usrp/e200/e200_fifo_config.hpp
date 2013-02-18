@@ -28,6 +28,8 @@ struct e200_fifo_config_t
     size_t phys_addr;
 };
 
+e200_fifo_config_t e200_read_sysfs(void);
+
 struct e200_fifo_interface
 {
     typedef boost::shared_ptr<e200_fifo_interface> sptr;

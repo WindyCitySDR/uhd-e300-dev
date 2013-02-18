@@ -17,8 +17,11 @@
 
 #include "e200_impl.hpp"
 #include "e200_regs.hpp"
+#include <uhd/utils/msg.hpp>
 #include <uhd/utils/static.hpp>
+#include <uhd/utils/images.hpp>
 #include <boost/filesystem.hpp>
+#include <fstream>
 
 using namespace uhd;
 namespace fs = boost::filesystem;
@@ -79,11 +82,55 @@ UHD_STATIC_BLOCK(register_e200_device)
  **********************************************************************/
 e200_impl::e200_impl(const uhd::device_addr_t &device_addr)
 {
-    _tree = property_tree::make();
+    //extract the FPGA path for the E200
+    const std::string e200_fpga_image = find_image_path(
+        device_addr.get("fpga", E200_FPGA_FILE_NAME)
+    );
 
+    //load fpga image - its super fast
+    this->load_fpga_image(e200_fpga_image);
+
+    _fifo_iface = e200_fifo_interface::make(e200_read_sysfs());
+
+    _tree = property_tree::make();
 }
 
 e200_impl::~e200_impl(void)
 {
     /* NOP */
 }
+
+void e200_impl::load_fpga_image(const std::string &path)
+{
+    if (not fs::exists("/dev/xdevcfg"))
+    {
+        ::system("mknod /dev/xdevcfg c 259 0");
+        //throw uhd::runtime_error("no xdevcfg, please run: mknod /dev/xdevcfg c 259 0");
+    }
+
+    UHD_MSG(status) << "Loading FPGA image: " << path << "..." << std::flush;
+
+    /*
+    std::ifstream fpga_file(path.c_str(), std::ios_base::binary);
+    UHD_ASSERT_THROW(fpga_file.good());
+
+    std::ofstream xdev_file("/dev/xdevcfg", std::ios_base::binary);
+    UHD_ASSERT_THROW(xdev_file.good());
+
+    char buff[(1 << 22)]; //big enough for entire image
+    fpga_file.read(buff, sizeof(buff));
+    xdev_file.write(buff, fpga_file.gcount());
+
+    fpga_file.close();
+    xdev_file.close();
+    //*/
+
+    //cat works, fstream blows
+    const std::string cmd = str(boost::format("cat \"%s\" > /dev/xdevcfg") % path);
+    ::system(cmd.c_str());
+
+    UHD_MSG(status) << " done" << std::endl;
+}
+
+//sshfs jblum@blarg:/home/jblum/src src
+//utils/uhd_usrp_probe --tree --args="fpga=/home/root/b200_xport_t0.bin,type=e200"
