@@ -51,11 +51,54 @@
 #include "e200_fifo_config.hpp"
 #include <sys/mman.h> //mmap
 #include <fcntl.h> //open, close
+#include <poll.h> //poll
 #include <uhd/utils/log.hpp>
 #include <uhd/utils/msg.hpp>
 #include <boost/format.hpp>
 #include <boost/thread/thread.hpp> //sleep
 #include <uhd/types/time_spec.hpp> //timeout
+
+//locking stuff for shared irq
+#include <boost/thread/mutex.hpp>
+#include <boost/thread/condition_variable.hpp>
+
+struct e200_fifo_poll_waiter
+{
+    e200_fifo_poll_waiter(const int fd):
+        poll_claimed(false), fd(fd)
+    {
+        //NOP
+    }
+
+    void wait(const double timeout)
+    {
+        boost::mutex::scoped_lock l(mutex);
+        if (poll_claimed)
+        {
+            cond.wait(l);
+        }
+        else
+        {
+            poll_claimed = true;
+
+            struct pollfd fds[1];
+            fds[0].fd = fd;
+            fds[0].events = POLLIN;
+            const int r = ::poll(fds, 1, long(timeout*1000));
+            std::cout << "r " << r << std::endl;
+            if (fds[0].revents & POLLIN) ::read(fd, NULL, 0);
+
+            poll_claimed = false;
+            l.unlock();
+            cond.notify_all();
+        }
+    }
+
+    boost::condition_variable cond;
+    boost::mutex mutex;
+    bool poll_claimed;
+    int fd;
+};
 
 #define DEFAULT_FRAME_SIZE 2048
 #define DEFAULT_NUM_FRAMES 32
@@ -120,8 +163,8 @@ template <typename BaseClass>
 struct e200_transport : zero_copy_if
 {
 
-    e200_transport(const __mem_addrz_t &addrs, const size_t num_frames, const size_t frame_size, const bool auto_release):
-        _ctrl_base(addrs.ctrl), _num_frames(num_frames), _frame_size(frame_size), _index(0)
+    e200_transport(const __mem_addrz_t &addrs, const size_t num_frames, const size_t frame_size, e200_fifo_poll_waiter *waiter, const bool auto_release):
+        _ctrl_base(addrs.ctrl), _num_frames(num_frames), _frame_size(frame_size), _index(0), _waiter(waiter)
     {
         UHD_MSG(status) << boost::format("phys 0x%x") % addrs.phys << std::endl;
         UHD_MSG(status) << boost::format("data 0x%x") % addrs.data << std::endl;
@@ -163,7 +206,8 @@ struct e200_transport : zero_copy_if
                 if (_index == _num_frames) _index = 0;
                 return _buffs[_index++]->get_new<T>();
             }
-            boost::this_thread::sleep(boost::posix_time::milliseconds(1));
+            _waiter->wait(timeout);
+            //boost::this_thread::sleep(boost::posix_time::milliseconds(1));
         }
         while (time_spec_t::get_system_time() > exit_time);
 
@@ -204,6 +248,7 @@ struct e200_transport : zero_copy_if
     const size_t _num_frames;
     const size_t _frame_size;
     size_t _index;
+    e200_fifo_poll_waiter *_waiter;
     std::vector<boost::shared_ptr<e200_fifo_mb> > _buffs;
 };
 
@@ -243,10 +288,14 @@ struct e200_fifo_interface_impl : e200_fifo_interface
 
         //zero out the data region
         std::memset((void *)data_space, 0, config.buff_length);
+
+        //create a poll waiter for the transports
+        waiter = new e200_fifo_poll_waiter(fd);
     }
 
     ~e200_fifo_interface_impl(void)
     {
+        delete waiter;
         UHD_HERE();
         UHD_LOG << "cleanup: munmap" << std::endl;
         UHD_HERE();
@@ -268,8 +317,8 @@ struct e200_fifo_interface_impl : e200_fifo_interface
         addrs.ctrl = ((is_recv)? S2H_BASE(ctrl_space) : H2S_BASE(ctrl_space)) + ZF_STREAM_OFF(which_stream);
 
         uhd::transport::zero_copy_if::sptr xport;
-        if (is_recv) xport.reset(new e200_transport<managed_recv_buffer>(addrs, num_frames, frame_size, is_recv));
-        else         xport.reset(new e200_transport<managed_send_buffer>(addrs, num_frames, frame_size, is_recv));
+        if (is_recv) xport.reset(new e200_transport<managed_recv_buffer>(addrs, num_frames, frame_size, waiter, is_recv));
+        else         xport.reset(new e200_transport<managed_send_buffer>(addrs, num_frames, frame_size, waiter, is_recv));
 
         bytes_in_use += num_frames*frame_size;
         entries_in_use += num_frames;
@@ -292,6 +341,7 @@ struct e200_fifo_interface_impl : e200_fifo_interface
     }
 
     e200_fifo_config_t config;
+    e200_fifo_poll_waiter *waiter;
     size_t bytes_in_use;
     int fd;
     void *buff;

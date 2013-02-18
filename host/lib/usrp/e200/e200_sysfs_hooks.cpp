@@ -41,6 +41,8 @@ static int get_params_from_sysfs(unsigned long *buffer_length, unsigned long *co
 		return 1;
 	}
 
+//TODO read /sys/devices/amba.0/f8007000.devcfg/prog_done for FPGA load
+
 	enumerate = udev_enumerate_new(udev);
 	udev_enumerate_add_match_sysname(enumerate, "40000000.axi-fpga");
 //	udev_enumerate_add_match_subsystem(enumerate, "amba.0");

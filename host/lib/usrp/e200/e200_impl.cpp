@@ -100,7 +100,7 @@ e200_impl::e200_impl(const uhd::device_addr_t &device_addr)
     uhd::transport::zero_copy_if::sptr recv_xport = _fifo_iface->make_recv_xport(0, xport_args);
     time_spec_t t0 = time_spec_t::get_system_time();
     UHD_HERE();
-    const size_t n = 10000;
+    const size_t n = 100000;
     size_t last_commit_size = 0;
     for (size_t j = 0; j < send_xport->get_num_send_frames(); j++)
     {
