@@ -32,6 +32,7 @@
 
 //offsetsinto the arbiter memory map
 #define ARBITER_WR_CLEAR 0
+#define ARBITER_RD_SIG 0
 #define ARBITER_WR_ADDR 4
 #define ARBITER_WR_SIZE 8
 #define ARBITER_RB_STATUS 16
@@ -45,19 +46,6 @@
 #define ZF_STREAM_OFF(which) ((which)*32)
 
 #include <boost/cstdint.hpp>
-
-inline void zf_poke32(const boost::uint32_t addr, const boost::uint32_t data)
-{
-    volatile boost::uint32_t *p = (boost::uint32_t *)addr;
-    *p = data;
-}
-
-inline boost::uint32_t zf_peek32(const boost::uint32_t addr)
-{
-    volatile const boost::uint32_t *p = (const boost::uint32_t *)addr;
-    return *p;
-}
-
 #include "e200_fifo_config.hpp"
 #include <sys/mman.h> //mmap
 #include <fcntl.h> //open, close
@@ -72,6 +60,25 @@ using namespace uhd;
 using namespace uhd::transport;
 
 /***********************************************************************
+ * peek n' poke mmapped space
+ **********************************************************************/
+inline void zf_poke32(const boost::uint32_t addr, const boost::uint32_t data)
+{
+    UHD_MSG(status) << "zf_poke32 0x" << std::hex << addr << std::dec << std::endl;
+    volatile boost::uint32_t *p = (boost::uint32_t *)addr;
+    *p = data;
+}
+
+inline boost::uint32_t zf_peek32(const boost::uint32_t addr)
+{
+    UHD_MSG(status) << "zf_peek32 0x" << std::hex << addr << std::dec << std::endl;
+    volatile const boost::uint32_t *p = (const boost::uint32_t *)addr;
+    sleep(1);
+    UHD_HERE();
+    return *p;
+}
+
+/***********************************************************************
  * managed buffer
  **********************************************************************/
 struct e200_fifo_mb : managed_buffer
@@ -82,9 +89,13 @@ struct e200_fifo_mb : managed_buffer
     void release(void)
     {
         UHD_HERE();
+        UHD_VAR(zf_peek32(ctrl_base+ARBITER_RB_STATUS_OCC));
+        UHD_VAR(zf_peek32(ctrl_base+ARBITER_RB_ADDR_SPACE));
+        UHD_VAR(zf_peek32(ctrl_base+ARBITER_RB_SIZE_SPACE));
+        if (zf_peek32(ctrl_base+ARBITER_RB_STATUS_OCC)) UHD_VAR(zf_peek32(ctrl_base+ARBITER_RB_STATUS));
+        UHD_HERE();
         zf_poke32(ctrl_base + ARBITER_WR_ADDR, phys_mem);
         zf_poke32(ctrl_base + ARBITER_WR_SIZE, this->size());
-        UHD_HERE();
     }
 
     template <typename T>
@@ -112,6 +123,13 @@ struct e200_transport : zero_copy_if
         UHD_MSG(status) << boost::format("phys_base 0x%x") % phys_base << std::endl;
         UHD_MSG(status) << boost::format("mem_base 0x%x") % mem_base << std::endl;
         UHD_MSG(status) << boost::format("ctrl_base 0x%x") % ctrl_base << std::endl;
+
+    UHD_HERE();
+    sleep(1);
+        const boost::uint32_t sig = zf_peek32(ctrl_base + ARBITER_RD_SIG);
+        UHD_ASSERT_THROW((sig >> 16) == 0xACE0);
+    UHD_HERE();
+
         zf_poke32(ctrl_base + ARBITER_WR_CLEAR, 1);
         for (size_t i = 0; i < num_frames; i++)
         {
@@ -119,7 +137,13 @@ struct e200_transport : zero_copy_if
             const size_t mem = mem_base + (i*frame_size);
             boost::shared_ptr<e200_fifo_mb> mb;
             mb.reset(new e200_fifo_mb(ctrl_base, phys, mem, frame_size));
-            if (auto_release) mb->release();
+            //if (auto_release)
+            while(1)
+            {
+                mb->commit(16);
+                mb->release();
+                sleep(1);
+            }
             _buffs.push_back(mb);
         }
     }
@@ -130,6 +154,7 @@ struct e200_transport : zero_copy_if
         UHD_HERE();
         while (zf_peek32(_ctrl_base + ARBITER_RB_STATUS_OCC) == 0)
         {
+            UHD_VAR(zf_peek32(_ctrl_base + ARBITER_RB_STATUS_OCC));
             sleep(1);
         }
         UHD_HERE();
@@ -200,6 +225,9 @@ struct e200_fifo_interface_impl : e200_fifo_interface
         }
 
         //mmap the control and data regions into virtual space
+        UHD_VAR(config.ctrl_length);
+        UHD_VAR(config.buff_length);
+        UHD_VAR(config.phys_addr);
         void *buff = ::mmap(NULL, config.ctrl_length + config.buff_length, PROT_READ|PROT_WRITE, MAP_SHARED, fd, 0);
         if (buff == MAP_FAILED)
         {

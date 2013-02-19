@@ -82,6 +82,8 @@ UHD_STATIC_BLOCK(register_e200_device)
  **********************************************************************/
 e200_impl::e200_impl(const uhd::device_addr_t &device_addr)
 {
+    _tree = property_tree::make();
+
     //extract the FPGA path for the E200
     const std::string e200_fpga_image = find_image_path(
         device_addr.get("fpga", E200_FPGA_FILE_NAME)
@@ -90,9 +92,23 @@ e200_impl::e200_impl(const uhd::device_addr_t &device_addr)
     //load fpga image - its super fast
     this->load_fpga_image(e200_fpga_image);
 
+    //create fifo interface
     _fifo_iface = e200_fifo_interface::make(e200_read_sysfs());
 
-    _tree = property_tree::make();
+    uhd::device_addr_t xport_args;
+    uhd::transport::zero_copy_if::sptr send_xport = _fifo_iface->make_send_xport(0, xport_args);
+    {
+        uhd::transport::managed_send_buffer::sptr send_buff = send_xport->get_send_buff();
+        
+        boost::uint32_t *p = send_buff->cast<boost::uint32_t *>();
+        p[0] = 0x4;
+        p[1] = 0x0;
+        p[2] = 0x12345678;
+        p[3] = 0x90ABCDEF;
+        send_buff->commit(16);
+    }
+    sleep(1);
+
 }
 
 e200_impl::~e200_impl(void)
@@ -134,3 +150,4 @@ void e200_impl::load_fpga_image(const std::string &path)
 
 //sshfs jblum@blarg:/home/jblum/src src
 //utils/uhd_usrp_probe --tree --args="fpga=/home/root/b200_xport_t0.bin,type=e200"
+//utils/uhd_usrp_probe --tree --args="fpga=/home/root/e200_xport_t1.bin,type=e200"

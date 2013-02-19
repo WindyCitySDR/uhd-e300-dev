@@ -80,7 +80,7 @@ e200_fifo_config_t e200_read_sysfs(void)
     unsigned long control_length = 0;
     unsigned long buffer_length = 0;
     unsigned long phys_addr = 0;
-    const int ret = get_params_from_sysfs(&control_length, &buffer_length, &phys_addr);
+    const int ret = get_params_from_sysfs(&buffer_length, &control_length, &phys_addr);
     if (ret != 0)
     {
         throw uhd::runtime_error("e200: get_params_from_sysfs failed!");
