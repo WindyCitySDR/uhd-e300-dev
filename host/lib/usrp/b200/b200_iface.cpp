@@ -29,7 +29,7 @@
 #include <vector>
 #include <cstring>
 #include <iomanip>
-#include <libusb-1.0/libusb.h>
+#include <libusb.h>
 
 using namespace uhd;
 using namespace uhd::transport;
@@ -43,6 +43,10 @@ const static boost::uint8_t VRT_VENDOR_IN = (LIBUSB_REQUEST_TYPE_VENDOR
                                              | LIBUSB_ENDPOINT_IN);
 const static boost::uint8_t B200_VREQ_FPGA_START = 0x02;
 const static boost::uint8_t B200_VREQ_FPGA_DATA = 0x12;
+const static boost::uint8_t B200_VREQ_SET_FPGA_HASH = 0x1C;
+const static boost::uint8_t B200_VREQ_GET_FPGA_HASH = 0x1D;
+const static boost::uint8_t B200_VREQ_SET_FW_HASH = 0x1E;
+const static boost::uint8_t B200_VREQ_GET_FW_HASH = 0x1F;
 const static boost::uint8_t B200_VREQ_LOOP = 0x22;
 const static boost::uint8_t B200_VREQ_SPI_WRITE = 0x32;
 const static boost::uint8_t B200_VREQ_SPI_READ = 0x42;
@@ -177,14 +181,16 @@ public:
                            boost::uint16_t value,
                            boost::uint16_t index,
                            unsigned char *buff,
-                           boost::uint16_t length)
+                           boost::uint16_t length,
+                           boost::int32_t timeout = 0)
     {
         return _usb_ctrl->submit(VRT_VENDOR_IN,         // bmReqeustType
                                    request,             // bRequest
                                    value,               // wValue
                                    index,               // wIndex
                                    buff,                // data
-                                   length);             // wLength
+                                   length,              // wLength
+                                   timeout);            // timeout
     }
 
 
@@ -255,15 +261,9 @@ public:
     }
 
 
-    void load_firmware(const std::string filestring)
+    void load_firmware(const std::string filestring, bool force = false)
     {
         const char *filename = filestring.c_str();
-
-        hash_type hash = generate_hash(filename);
-
-        //TODO
-        //hash_type loaded_hash; usrp_get_firmware_hash(loaded_hash);
-        //if (not force and (hash == loaded_hash)) return;
 
         /* Fields used in each USB control transfer. */
         boost::uint16_t len = 0;
@@ -370,16 +370,14 @@ public:
         unsigned char data[4];
         memset(data, 0x00, sizeof(data));
 
-        fx3_control_write(B200_VREQ_FX3_RESET, 0x00, \
-                    0x00, data, 4);
+        fx3_control_write(B200_VREQ_FX3_RESET, 0x00, 0x00, data, 4);
     }
 
     void reset_gpif(void) {
         unsigned char data[4];
         memset(data, 0x00, sizeof(data));
 
-        fx3_control_write(B200_VREQ_GPIF_RESET, 0x00, \
-                    0x00, data, 4);
+        fx3_control_write(B200_VREQ_GPIF_RESET, 0x00, 0x00, data, 4);
     }
 
     void set_fpga_reset_pin(const bool reset)
@@ -387,8 +385,7 @@ public:
         unsigned char data[4];
         memset(data, (reset)? 0xFF : 0x00, sizeof(data));
 
-        fx3_control_write(B200_VREQ_FPGA_RESET, 0x00, \
-                0x00, data, 4);
+        fx3_control_write(B200_VREQ_FPGA_RESET, 0x00, 0x00, data, 4);
     }
 
     boost::uint8_t get_usb_speed(void) {
@@ -400,12 +397,33 @@ public:
         return boost::lexical_cast<boost::uint8_t>(rx_data[0]);
     }
 
+    void usrp_get_firmware_hash(hash_type &hash) {
+        fx3_control_read(B200_VREQ_GET_FW_HASH, 0x00, 0x00,
+                (unsigned char*) &hash, 4, 500);
+    }
+
+    void usrp_set_firmware_hash(hash_type hash) {
+        fx3_control_write(B200_VREQ_SET_FW_HASH, 0x00, 0x00,
+                (unsigned char*) &hash, 4);
+    }
+
+    void usrp_get_fpga_hash(hash_type &hash) {
+        fx3_control_read(B200_VREQ_GET_FPGA_HASH, 0x00, 0x00,
+                (unsigned char*) &hash, 4, 500);
+    }
+
+    void usrp_set_fpga_hash(hash_type hash) {
+        fx3_control_write(B200_VREQ_SET_FPGA_HASH, 0x00, 0x00,
+                (unsigned char*) &hash, 4);
+    }
 
     void load_fpga(const std::string filestring) {
 
         const char *filename = filestring.c_str();
 
         hash_type hash = generate_hash(filename);
+        hash_type loaded_hash; usrp_get_fpga_hash(loaded_hash);
+        if (hash == loaded_hash) return;
 
         std::ifstream file;
         file.open(filename, std::ios::in | std::ios::binary);
@@ -433,9 +451,12 @@ public:
         }
 
         file.close();
-        if (load_img_msg) UHD_MSG(status) << " done" << std::endl;
 
         boost::this_thread::sleep(boost::posix_time::milliseconds(1000));
+
+        usrp_set_fpga_hash(hash);
+
+        if (load_img_msg) UHD_MSG(status) << " done" << std::endl;
     }
 
 private:

@@ -38,7 +38,7 @@ public:
     virtual boost::uint8_t get_usb_speed(void) = 0;
 
     //! load a firmware image
-    virtual void load_firmware(const std::string filestring) = 0;
+    virtual void load_firmware(const std::string filestring, bool force=false) = 0;
 
     //! reset the FX3
     virtual void reset_fx3(void) = 0;
