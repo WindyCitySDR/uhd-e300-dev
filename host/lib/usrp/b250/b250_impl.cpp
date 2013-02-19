@@ -160,7 +160,7 @@ b250_impl::b250_impl(const uhd::device_addr_t &dev_addr)
     b250_load_fw(dev_addr["addr"], b250_fw_image);
 
     //create basic communication
-    ctrl.reset(new b250_ctrl_iface(udp_simple::make_connected(dev_addr["addr"], BOOST_STRINGIZE(B250_FW_COMMS_UDP_PORT))));
+    zpu_ctrl.reset(new b250_ctrl_iface(udp_simple::make_connected(dev_addr["addr"], BOOST_STRINGIZE(B250_FW_COMMS_UDP_PORT))));
 }
 
 b250_impl::~b250_impl(void)

@@ -22,6 +22,7 @@
 #include <uhd/device.hpp>
 #include "wb_iface.hpp"
 #include "b250_fw_common.h"
+#include "b250_ctrl.hpp"
 #include <uhd/transport/udp_simple.hpp>
 #include <uhd/utils/byteswap.hpp>
 
@@ -127,7 +128,9 @@ private:
         return _tree;
     }
 
-    wb_iface::sptr ctrl;
+    wb_iface::sptr zpu_ctrl;
+    b250_ctrl::sptr radio_ctrl0;
+    b250_ctrl::sptr radio_ctrl1;
 
 };
 
