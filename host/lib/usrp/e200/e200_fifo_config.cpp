@@ -35,6 +35,8 @@
 #define ARBITER_RD_SIG 0
 #define ARBITER_WR_ADDR 4
 #define ARBITER_WR_SIZE 8
+#define ARBITER_WR_STS_RDY 12
+#define ARBITER_WR_STS 16
 #define ARBITER_RB_STATUS 16
 #define ARBITER_RB_STATUS_OCC 20
 #define ARBITER_RB_ADDR_SPACE 24
@@ -52,6 +54,8 @@
 #include <uhd/utils/log.hpp>
 #include <uhd/utils/msg.hpp>
 #include <boost/format.hpp>
+#include <boost/thread/thread.hpp> //sleep
+#include <uhd/types/time_spec.hpp> //timeout
 
 #define DEFAULT_FRAME_SIZE 16
 #define DEFAULT_NUM_FRAMES 2
@@ -59,22 +63,25 @@
 using namespace uhd;
 using namespace uhd::transport;
 
+struct __mem_addrz_t
+{
+    size_t phys, data, ctrl;
+};
+
 /***********************************************************************
  * peek n' poke mmapped space
  **********************************************************************/
 inline void zf_poke32(const boost::uint32_t addr, const boost::uint32_t data)
 {
-    UHD_MSG(status) << "zf_poke32 0x" << std::hex << addr << std::dec << std::endl;
+    //UHD_MSG(status) << "zf_poke32 0x" << std::hex << addr << std::dec << std::endl;
     volatile boost::uint32_t *p = (boost::uint32_t *)addr;
     *p = data;
 }
 
 inline boost::uint32_t zf_peek32(const boost::uint32_t addr)
 {
-    UHD_MSG(status) << "zf_peek32 0x" << std::hex << addr << std::dec << std::endl;
+    //UHD_MSG(status) << "zf_peek32 0x" << std::hex << addr << std::dec << std::endl;
     volatile const boost::uint32_t *p = (const boost::uint32_t *)addr;
-    sleep(1);
-    UHD_HERE();
     return *p;
 }
 
@@ -83,17 +90,13 @@ inline boost::uint32_t zf_peek32(const boost::uint32_t addr)
  **********************************************************************/
 struct e200_fifo_mb : managed_buffer
 {
-    e200_fifo_mb(const size_t ctrl_base, const size_t phys_mem, const size_t mem, const size_t len):
-        ctrl_base(ctrl_base), phys_mem(phys_mem), mem((void *)mem), len(len){}
+    e200_fifo_mb(const __mem_addrz_t &addrs, const size_t len):
+        ctrl_base(addrs.ctrl), phys_mem(addrs.phys), mem((void *)addrs.data), len(len){}
 
     void release(void)
     {
-        UHD_HERE();
-        UHD_VAR(zf_peek32(ctrl_base+ARBITER_RB_STATUS_OCC));
-        UHD_VAR(zf_peek32(ctrl_base+ARBITER_RB_ADDR_SPACE));
-        UHD_VAR(zf_peek32(ctrl_base+ARBITER_RB_SIZE_SPACE));
-        if (zf_peek32(ctrl_base+ARBITER_RB_STATUS_OCC)) UHD_VAR(zf_peek32(ctrl_base+ARBITER_RB_STATUS));
-        UHD_HERE();
+        UHD_ASSERT_THROW(zf_peek32(ctrl_base+ARBITER_RB_ADDR_SPACE) > 0);
+        UHD_ASSERT_THROW(zf_peek32(ctrl_base+ARBITER_RB_SIZE_SPACE) > 0);
         zf_poke32(ctrl_base + ARBITER_WR_ADDR, phys_mem);
         zf_poke32(ctrl_base + ARBITER_WR_SIZE, this->size());
     }
@@ -117,55 +120,55 @@ template <typename BaseClass>
 struct e200_transport : zero_copy_if
 {
 
-    e200_transport(const size_t phys_base, const size_t mem_base, const size_t ctrl_base, const size_t num_frames, const size_t frame_size, const bool auto_release):
-        _ctrl_base(ctrl_base), _num_frames(num_frames), _frame_size(frame_size), _index(0)
+    e200_transport(const __mem_addrz_t &addrs, const size_t num_frames, const size_t frame_size, const bool auto_release):
+        _ctrl_base(addrs.ctrl), _num_frames(num_frames), _frame_size(frame_size), _index(0)
     {
-        UHD_MSG(status) << boost::format("phys_base 0x%x") % phys_base << std::endl;
-        UHD_MSG(status) << boost::format("mem_base 0x%x") % mem_base << std::endl;
-        UHD_MSG(status) << boost::format("ctrl_base 0x%x") % ctrl_base << std::endl;
+        UHD_MSG(status) << boost::format("phys 0x%x") % addrs.phys << std::endl;
+        UHD_MSG(status) << boost::format("data 0x%x") % addrs.data << std::endl;
+        UHD_MSG(status) << boost::format("ctrl 0x%x") % addrs.ctrl << std::endl;
 
-    UHD_HERE();
-    sleep(1);
-        const boost::uint32_t sig = zf_peek32(ctrl_base + ARBITER_RD_SIG);
+        const boost::uint32_t sig = zf_peek32(_ctrl_base + ARBITER_RD_SIG);
         UHD_ASSERT_THROW((sig >> 16) == 0xACE0);
-    UHD_HERE();
 
-        zf_poke32(ctrl_base + ARBITER_WR_CLEAR, 1);
+        zf_poke32(_ctrl_base + ARBITER_WR_CLEAR, 1);
         for (size_t i = 0; i < num_frames; i++)
         {
-            const size_t phys = phys_base + (i*frame_size);
-            const size_t mem = mem_base + (i*frame_size);
-            boost::shared_ptr<e200_fifo_mb> mb;
-            mb.reset(new e200_fifo_mb(ctrl_base, phys, mem, frame_size));
-            //if (auto_release)
-            while(1)
-            {
-                mb->commit(16);
-                mb->release();
-                sleep(1);
-            }
+            UHD_MSG(status) << "init e200_transport mb " << i << std::endl;
+
+            //create a managed buffer at the given offset
+            __mem_addrz_t mb_addrs = addrs;
+            mb_addrs.phys += (i*frame_size);
+            mb_addrs.data += (i*frame_size);
+            boost::shared_ptr<e200_fifo_mb> mb(new e200_fifo_mb(mb_addrs, frame_size));
+
+            //setup the buffers so they are "positioned for use"
+            if (auto_release) mb->release(); //release for read
+            else zf_poke32(_ctrl_base + ARBITER_WR_STS, 1 << 7); //poke an ok into the sts fifo
+
+            sleep(1);
             _buffs.push_back(mb);
         }
     }
 
     template <typename T>
-    UHD_INLINE typename T::sptr get_buff(const double)
+    UHD_INLINE typename T::sptr get_buff(const double timeout)
     {
-        UHD_HERE();
-        while (zf_peek32(_ctrl_base + ARBITER_RB_STATUS_OCC) == 0)
+        const time_spec_t exit_time = time_spec_t::get_system_time() + time_spec_t(timeout); 
+        do
         {
-            UHD_VAR(zf_peek32(_ctrl_base + ARBITER_RB_STATUS_OCC));
-            sleep(1);
+            if (zf_peek32(_ctrl_base + ARBITER_RB_STATUS_OCC))
+            {
+                const boost::uint32_t sts = zf_peek32(_ctrl_base + ARBITER_RB_STATUS);
+                UHD_ASSERT_THROW((sts >> 7) & 0x1); //assert OK
+                zf_poke32(_ctrl_base + ARBITER_WR_STS_RDY, 1); //pop from sts fifo
+                if (_index == _num_frames) _index = 0;
+                return _buffs[_index++]->get_new<T>();
+            }
+            boost::this_thread::sleep(boost::posix_time::milliseconds(1));
         }
-        UHD_HERE();
+        while (time_spec_t::get_system_time() > exit_time);
 
-        //const size_t sts = 
-        zf_peek32(_ctrl_base + ARBITER_RB_STATUS);
-
-        //TODO check tag + assert
-
-        if (_index == _num_frames) _index = 0;
-        return _buffs[_index++]->get_new<T>();
+        return typename T::sptr();
     }
 
     managed_recv_buffer::sptr get_recv_buff(const double timeout)
@@ -242,9 +245,11 @@ struct e200_fifo_interface_impl : e200_fifo_interface
 
     ~e200_fifo_interface_impl(void)
     {
+        UHD_HERE();
         UHD_LOG << "cleanup: munmap" << std::endl;
         ::munmap(buff, config.ctrl_length + config.buff_length);
         ::close(fd);
+        UHD_HERE();
     }
 
     uhd::transport::zero_copy_if::sptr make_xport(const size_t which_stream, const uhd::device_addr_t &args, const bool is_recv)
@@ -253,13 +258,14 @@ struct e200_fifo_interface_impl : e200_fifo_interface
         const size_t num_frames(size_t(args.cast<double>((is_recv)? "num_recv_frames" : "num_send_frames", DEFAULT_NUM_FRAMES)));
         size_t &entries_in_use = (is_recv)? recv_entries_in_use : send_entries_in_use;
 
-        const size_t phys_base = config.phys_addr + bytes_in_use;
-        const size_t mem_base = data_space + bytes_in_use;
-        const size_t ctrl_base = ((is_recv)? S2H_BASE(ctrl_space) : H2S_BASE(ctrl_space)) + ZF_STREAM_OFF(which_stream);
+        __mem_addrz_t addrs;
+        addrs.phys = config.phys_addr + bytes_in_use;
+        addrs.data = data_space + bytes_in_use;
+        addrs.ctrl = ((is_recv)? S2H_BASE(ctrl_space) : H2S_BASE(ctrl_space)) + ZF_STREAM_OFF(which_stream);
 
         uhd::transport::zero_copy_if::sptr xport;
-        if (is_recv) xport.reset(new e200_transport<managed_recv_buffer>(phys_base, mem_base, ctrl_base, num_frames, frame_size, is_recv));
-        else         xport.reset(new e200_transport<managed_send_buffer>(phys_base, mem_base, ctrl_base, num_frames, frame_size, is_recv));
+        if (is_recv) xport.reset(new e200_transport<managed_recv_buffer>(addrs, num_frames, frame_size, is_recv));
+        else         xport.reset(new e200_transport<managed_send_buffer>(addrs, num_frames, frame_size, is_recv));
 
         bytes_in_use += num_frames*frame_size;
         entries_in_use += num_frames;

@@ -98,14 +98,34 @@ e200_impl::e200_impl(const uhd::device_addr_t &device_addr)
     uhd::device_addr_t xport_args;
     uhd::transport::zero_copy_if::sptr send_xport = _fifo_iface->make_send_xport(0, xport_args);
     {
-        uhd::transport::managed_send_buffer::sptr send_buff = send_xport->get_send_buff();
-        
-        boost::uint32_t *p = send_buff->cast<boost::uint32_t *>();
-        p[0] = 0x4;
-        p[1] = 0x0;
-        p[2] = 0x12345678;
-        p[3] = 0x90ABCDEF;
-        send_buff->commit(16);
+        uhd::transport::managed_send_buffer::sptr buff = send_xport->get_send_buff();
+        UHD_HERE();
+        UHD_ASSERT_THROW(bool(buff));
+        UHD_HERE();
+        boost::uint64_t *p = buff->cast<boost::uint64_t *>();
+        UHD_VAR(buff->size());
+        UHD_VAR(size_t(p));
+        p[0] = 0x4000000000000000;
+        p[1] = 0x1234567890ABCDEF;
+        p[2] = 0x1122334455667788;
+        UHD_HERE();
+        buff->commit(8*3);
+        buff.reset();
+        UHD_HERE();
+    }
+    {
+        uhd::transport::managed_recv_buffer::sptr buff = send_xport->get_recv_buff();
+        UHD_HERE();
+        UHD_ASSERT_THROW(bool(buff));
+        UHD_HERE();
+        const boost::uint64_t *p = buff->cast<const boost::uint64_t *>();
+        UHD_VAR(buff->size());
+        UHD_VAR(size_t(p));
+        UHD_MSG(status) << std::hex << p[0] << std::endl;
+        UHD_MSG(status) << std::hex << p[1] << std::endl;
+        UHD_MSG(status) << std::hex << p[2] << std::endl;
+        buff.reset();
+        UHD_HERE();
     }
     sleep(1);
 
