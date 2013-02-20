@@ -129,8 +129,8 @@ private:
 
         //load packet info
         vrt::if_packet_info_t packet_info;
-        packet_info.link_type = vrt::if_packet_info_t::LINK_TYPE_CHDR;
-        packet_info.packet_type = vrt::if_packet_info_t::PACKET_TYPE_EXTENSION;
+        packet_info.link_type = vrt::if_packet_info_t::LINK_TYPE_VRLP;
+        packet_info.packet_type = vrt::if_packet_info_t::PACKET_TYPE_CONTEXT;
         packet_info.num_payload_words32 = 2;
         packet_info.num_payload_bytes = packet_info.num_payload_words32*sizeof(boost::uint32_t);
         packet_info.packet_count = ++_seq_out;
@@ -145,7 +145,7 @@ private:
         packet_info.has_tlr = false;
 
         //load header
-        vrt::if_hdr_pack_le(pkt, packet_info);
+        vrt::if_hdr_pack_be(pkt, packet_info);
 
         //load payload
         pkt[packet_info.num_header_words32+0] = uhd::htowx(addr);
@@ -173,11 +173,11 @@ private:
             //parse the buffer
             const boost::uint32_t *pkt = buff->cast<const boost::uint32_t *>();
             vrt::if_packet_info_t packet_info;
-            packet_info.link_type = vrt::if_packet_info_t::LINK_TYPE_CHDR;
+            packet_info.link_type = vrt::if_packet_info_t::LINK_TYPE_VRLP;
             packet_info.num_packet_words32 = buff->size()/sizeof(boost::uint32_t);
             try
             {
-                vrt::if_hdr_unpack_le(pkt, packet_info);
+                vrt::if_hdr_unpack_be(pkt, packet_info);
             }
             catch(const std::exception &ex)
             {
@@ -194,7 +194,7 @@ private:
             UHD_ASSERT_THROW(packet_info.sid == boost::uint32_t((_sid >> 16) | (_sid << 16)));
             UHD_ASSERT_THROW(packet_info.packet_count == (seq_to_ack & 0xfff));
             UHD_ASSERT_THROW(packet_info.num_payload_words32 == 2);
-            UHD_ASSERT_THROW(packet_info.packet_type == vrt::if_packet_info_t::PACKET_TYPE_EXTENSION);
+            UHD_ASSERT_THROW(packet_info.packet_type == vrt::if_packet_info_t::PACKET_TYPE_CONTEXT);
 
             //return the readback value
             if (readback and _outstanding_seqs.empty())

@@ -39,4 +39,10 @@ localparam RB64_TIME_NOW        = 8;
 localparam RB64_TIME_PPS        = 16;
 localparam RB32_TEST            = 24;
 
+//wishbone settings map - relevant to host code
+#define SET0_BASE 0xa000
+#define SR_ADDR(base, offset) ((base) + (offset)*4)
+static const int SR_ETHINT0    = 40;
+static const int SR_ETHINT1    = 56;
+
 #endif /* INCLUDED_B250_REGS_HPP */

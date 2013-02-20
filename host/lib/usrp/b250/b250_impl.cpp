@@ -16,10 +16,12 @@
 //
 
 #include "b250_impl.hpp"
+#include "b250_regs.hpp"
 #include <uhd/utils/static.hpp>
 #include <uhd/utils/msg.hpp>
 #include <uhd/utils/images.hpp>
 #include <uhd/transport/if_addrs.hpp>
+#include <uhd/transport/udp_zero_copy.hpp>
 #include <boost/foreach.hpp>
 #include <boost/asio.hpp>
 #include <fstream>
@@ -161,6 +163,18 @@ b250_impl::b250_impl(const uhd::device_addr_t &dev_addr)
 
     //create basic communication
     zpu_ctrl.reset(new b250_ctrl_iface(udp_simple::make_connected(dev_addr["addr"], BOOST_STRINGIZE(B250_FW_COMMS_UDP_PORT))));
+
+    //create radio0 control
+    udp_zero_copy::sptr r0_ctrl_xport = udp_zero_copy::make(dev_addr["addr"], BOOST_STRINGIZE(B250_R0_CTRL_UDP_PORT));
+    radio_ctrl0 = b250_ctrl::make(r0_ctrl_xport, B200_R0_CTRL_SID);
+
+
+    UHD_MSG(status) << "tigger now you asshole" << std::endl;
+    zpu_ctrl->poke32(SR_ADDR(SET0_BASE, (SR_ETHINT0+8+3)), B250_R0_CTRL_UDP_PORT);
+
+    sleep(5);
+    UHD_VAR(radio_ctrl0->peek64(RB64_TIME_NOW));
+
 }
 
 b250_impl::~b250_impl(void)

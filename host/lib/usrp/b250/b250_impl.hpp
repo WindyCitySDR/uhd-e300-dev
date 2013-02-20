@@ -27,6 +27,7 @@
 #include <uhd/utils/byteswap.hpp>
 
 static const std::string B250_FW_FILE_NAME = "b250_fw.bin";
+static const boost::uint32_t B200_R0_CTRL_SID = 0x00000001; //needs to end in a 1 for mux
 
 struct b250_ctrl_iface : wb_iface
 {

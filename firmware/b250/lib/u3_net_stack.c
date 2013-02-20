@@ -306,6 +306,7 @@ static void handle_udp_packet(
             return;
         }
     }
+    printf("Unhandled UDP packet src=%u, dest=%u\n", udp->src, udp->dest);
     //TODO send destination unreachable
 }
 
