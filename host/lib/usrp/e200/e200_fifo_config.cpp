@@ -241,6 +241,9 @@ struct e200_fifo_interface_impl : e200_fifo_interface
         //segment the memory according to zynq fifo arbiter
         ctrl_space = size_t(buff);
         data_space = size_t(buff) + config.ctrl_length;
+
+        //zero out the data region
+        std::memset((void *)data_space, 0, config.buff_length);
     }
 
     ~e200_fifo_interface_impl(void)

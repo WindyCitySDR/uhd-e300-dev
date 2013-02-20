@@ -97,6 +97,7 @@ e200_impl::e200_impl(const uhd::device_addr_t &device_addr)
 
     uhd::device_addr_t xport_args;
     uhd::transport::zero_copy_if::sptr send_xport = _fifo_iface->make_send_xport(0, xport_args);
+    uhd::transport::zero_copy_if::sptr recv_xport = _fifo_iface->make_recv_xport(0, xport_args);
     {
         uhd::transport::managed_send_buffer::sptr buff = send_xport->get_send_buff();
         UHD_HERE();
@@ -114,7 +115,7 @@ e200_impl::e200_impl(const uhd::device_addr_t &device_addr)
         UHD_HERE();
     }
     {
-        uhd::transport::managed_recv_buffer::sptr buff = send_xport->get_recv_buff();
+        uhd::transport::managed_recv_buffer::sptr buff = recv_xport->get_recv_buff();
         UHD_HERE();
         UHD_ASSERT_THROW(bool(buff));
         UHD_HERE();
