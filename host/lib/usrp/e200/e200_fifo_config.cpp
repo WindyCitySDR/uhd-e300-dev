@@ -18,17 +18,17 @@
 // constants coded into the fpga parameters
 #define ZF_CONFIG_BASE 0x40000000
 #define ZF_PAGE_WIDTH 10
-#define H2S_STREAMS_WIDTH 1
-#define H2S_ACONFIG_WIDTH 2
-#define S2H_STREAMS_WIDTH 1
-#define S2H_ACONFIG_WIDTH 2
+#define H2S_STREAMS_WIDTH 2
+#define H2S_CMDFIFO_DEPTH 8
+#define S2H_STREAMS_WIDTH 2
+#define S2H_CMDFIFO_DEPTH 8
 
 // calculate more useful constants for this module
 #define ZF_PAGE_SIZE    (1 << ZF_PAGE_WIDTH)
 #define H2S_NUM_STREAMS (1 << H2S_STREAMS_WIDTH)
-#define H2S_NUM_ACONFIG (1 << H2S_ACONFIG_WIDTH)
+#define H2S_NUM_CMDS (1 << H2S_CMDFIFO_DEPTH)
 #define S2H_NUM_STREAMS (1 << S2H_STREAMS_WIDTH)
-#define S2H_NUM_ACONFIG (1 << S2H_ACONFIG_WIDTH)
+#define S2H_NUM_CMDS (1 << S2H_CMDFIFO_DEPTH)
 
 //offsetsinto the arbiter memory map
 #define ARBITER_WR_CLEAR 0
@@ -273,8 +273,8 @@ struct e200_fifo_interface_impl : e200_fifo_interface
         bytes_in_use += num_frames*frame_size;
         entries_in_use += num_frames;
 
-        UHD_ASSERT_THROW(recv_entries_in_use <= S2H_NUM_ACONFIG);
-        UHD_ASSERT_THROW(send_entries_in_use <= H2S_NUM_ACONFIG);
+        UHD_ASSERT_THROW(recv_entries_in_use <= S2H_NUM_CMDS);
+        UHD_ASSERT_THROW(send_entries_in_use <= H2S_NUM_CMDS);
         UHD_ASSERT_THROW(bytes_in_use <= config.buff_length);
 
         return xport;
