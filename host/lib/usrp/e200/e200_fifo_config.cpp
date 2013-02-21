@@ -57,8 +57,8 @@
 #include <boost/thread/thread.hpp> //sleep
 #include <uhd/types/time_spec.hpp> //timeout
 
-#define DEFAULT_FRAME_SIZE 16
-#define DEFAULT_NUM_FRAMES 2
+#define DEFAULT_FRAME_SIZE 2048
+#define DEFAULT_NUM_FRAMES 32
 
 using namespace uhd;
 using namespace uhd::transport;
@@ -145,7 +145,6 @@ struct e200_transport : zero_copy_if
             if (auto_release) mb->release(); //release for read
             else zf_poke32(_ctrl_base + ARBITER_WR_STS, 1 << 7); //poke an ok into the sts fifo
 
-            sleep(1);
             _buffs.push_back(mb);
         }
     }
@@ -250,7 +249,9 @@ struct e200_fifo_interface_impl : e200_fifo_interface
     {
         UHD_HERE();
         UHD_LOG << "cleanup: munmap" << std::endl;
+        UHD_HERE();
         ::munmap(buff, config.ctrl_length + config.buff_length);
+        UHD_HERE();
         ::close(fd);
         UHD_HERE();
     }

@@ -98,36 +98,52 @@ e200_impl::e200_impl(const uhd::device_addr_t &device_addr)
     uhd::device_addr_t xport_args;
     uhd::transport::zero_copy_if::sptr send_xport = _fifo_iface->make_send_xport(0, xport_args);
     uhd::transport::zero_copy_if::sptr recv_xport = _fifo_iface->make_recv_xport(0, xport_args);
+    time_spec_t t0 = time_spec_t::get_system_time();
+    UHD_HERE();
+    const size_t n = 10000;
+    size_t last_commit_size = 0;
+    for (size_t j = 0; j < send_xport->get_num_send_frames(); j++)
     {
         uhd::transport::managed_send_buffer::sptr buff = send_xport->get_send_buff();
-        UHD_HERE();
         UHD_ASSERT_THROW(bool(buff));
-        UHD_HERE();
         boost::uint64_t *p = buff->cast<boost::uint64_t *>();
-        UHD_VAR(buff->size());
-        UHD_VAR(size_t(p));
         p[0] = 0x4000000000000000;
         p[1] = 0x1234567890ABCDEF;
         p[2] = 0x1122334455667788;
-        UHD_HERE();
-        buff->commit(8*3);
+        last_commit_size = buff->size()-16;
+        buff->commit(last_commit_size);
         buff.reset();
-        UHD_HERE();
     }
+    for (size_t i = 0; i < n; i++)
     {
-        uhd::transport::managed_recv_buffer::sptr buff = recv_xport->get_recv_buff();
-        UHD_HERE();
-        UHD_ASSERT_THROW(bool(buff));
-        UHD_HERE();
-        const boost::uint64_t *p = buff->cast<const boost::uint64_t *>();
-        UHD_VAR(buff->size());
-        UHD_VAR(size_t(p));
-        UHD_MSG(status) << std::hex << p[0] << std::endl;
-        UHD_MSG(status) << std::hex << p[1] << std::endl;
-        UHD_MSG(status) << std::hex << p[2] << std::endl;
-        buff.reset();
-        UHD_HERE();
+        {
+            //recv
+            uhd::transport::managed_recv_buffer::sptr buff = recv_xport->get_recv_buff();
+            UHD_ASSERT_THROW(bool(buff));
+            const boost::uint64_t *p = buff->cast<const boost::uint64_t *>();
+            UHD_ASSERT_THROW(p[0] == 0x4000000000000000);
+            UHD_ASSERT_THROW(p[1] == 0x1234567890ABCDEF);
+            UHD_ASSERT_THROW(p[2] == 0x1122334455667788);
+            buff.reset();
+        }
+        {
+            //new buff to send
+            uhd::transport::managed_send_buffer::sptr buff = send_xport->get_send_buff();
+            UHD_ASSERT_THROW(bool(buff));
+            boost::uint64_t *p = buff->cast<boost::uint64_t *>();
+            p[0] = 0x4000000000000000;
+            p[1] = 0x1234567890ABCDEF;
+            p[2] = 0x1122334455667788;
+            last_commit_size = buff->size()-16;
+            buff->commit(last_commit_size);
+            buff.reset();
+        }
     }
+    UHD_HERE();
+    time_spec_t t1 = time_spec_t::get_system_time();
+    UHD_VAR((t1-t0).get_real_secs());
+    UHD_VAR((n*(last_commit_size))/(t1-t0).get_real_secs());
+    UHD_HERE();
     sleep(1);
 
 }
