@@ -23,6 +23,7 @@
 #include <uhd/transport/if_addrs.hpp>
 #include <boost/foreach.hpp>
 #include <boost/asio.hpp>
+#include <boost/functional/hash.hpp>
 #include <fstream>
 
 using namespace uhd;
@@ -168,7 +169,7 @@ b250_impl::b250_impl(const uhd::device_addr_t &dev_addr)
     radio_ctrl0 = b250_ctrl::make(r0_ctrl_xport, B200_R0_CTRL_SID);
 
     sleep(5);
-    UHD_VAR(radio_ctrl0->peek64(RB64_TIME_NOW));
+    this->register_loopback_self_test();
 
 }
 
@@ -196,4 +197,19 @@ uhd::transport::udp_zero_copy::sptr b250_impl::make_transport(const std::string 
     zpu_ctrl->poke32(SR_ADDR(SET0_BASE, (SR_ETHINT0+8+3)), B250_VITA_UDP_PORT);
 
     return xport;
+}
+
+void b250_impl::register_loopback_self_test(void)
+{
+    bool test_fail = false;
+    UHD_MSG(status) << "Performing register loopback test... " << std::flush;
+    size_t hash = time(NULL);
+    for (size_t i = 0; i < 100; i++)
+    {
+        boost::hash_combine(hash, i);
+        radio_ctrl0->poke32(TOREG(SR_TEST), boost::uint32_t(hash));
+        test_fail = radio_ctrl0->peek32(RB32_TEST) != boost::uint32_t(hash);
+        if (test_fail) break; //exit loop on any failure
+    }
+    UHD_MSG(status) << ((test_fail)? " fail" : "pass") << std::endl;
 }

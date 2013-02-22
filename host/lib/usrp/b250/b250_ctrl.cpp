@@ -148,8 +148,8 @@ private:
         vrt::if_hdr_pack_be(pkt, packet_info);
 
         //load payload
-        pkt[packet_info.num_header_words32+0] = uhd::htowx(addr);
-        pkt[packet_info.num_header_words32+1] = uhd::htowx(data);
+        pkt[packet_info.num_header_words32+0] = uhd::htonx(addr);
+        pkt[packet_info.num_header_words32+1] = uhd::htonx(data);
 
         //send the buffer over the interface
         _outstanding_seqs.push(_seq_out);
@@ -199,8 +199,8 @@ private:
             //return the readback value
             if (readback and _outstanding_seqs.empty())
             {
-                const boost::uint64_t hi = pkt[packet_info.num_header_words32+0];
-                const boost::uint64_t lo = pkt[packet_info.num_header_words32+1];
+                const boost::uint64_t hi = uhd::ntohx(pkt[packet_info.num_header_words32+0]);
+                const boost::uint64_t lo = uhd::ntohx(pkt[packet_info.num_header_words32+1]);
                 return ((hi << 32) | lo);
             }
         }

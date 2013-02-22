@@ -49,6 +49,7 @@ private:
     }
 
     uhd::transport::udp_zero_copy::sptr make_transport(const std::string &addr, const boost::uint32_t sid);
+    void register_loopback_self_test(void);
 
     wb_iface::sptr zpu_ctrl;
     b250_ctrl::sptr radio_ctrl0;
