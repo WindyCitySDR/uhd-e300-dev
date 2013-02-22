@@ -23,6 +23,7 @@
 #include <uhd/utils/static.hpp>
 #include <uhd/utils/images.hpp>
 #include <uhd/utils/safe_call.hpp>
+#include <uhd/usrp/dboard_eeprom.hpp>
 #include <boost/format.hpp>
 #include <boost/assign/list_of.hpp>
 #include <boost/filesystem.hpp>
@@ -277,7 +278,9 @@ b200_impl::b200_impl(const device_addr_t &device_addr):
     ////////////////////////////////////////////////////////////////////
     // TODO
 //    const mboard_eeprom_t mb_eeprom(*_iface, mboard_eeprom_t::MAP_B100);
-    const mboard_eeprom_t mb_eeprom;
+    mboard_eeprom_t mb_eeprom;
+    mb_eeprom["mboard_name"] = "TODO"; //FIXME with real eeprom values
+    mb_eeprom["mboard_serial"] = "TODO"; //FIXME with real eeprom values
     _tree->create<mboard_eeprom_t>(mb_path / "eeprom")
         .set(mb_eeprom)
         .subscribe(boost::bind(&b200_impl::set_mb_eeprom, this, _1));
@@ -404,6 +407,14 @@ b200_impl::b200_impl(const device_addr_t &device_addr):
         .subscribe(boost::bind(&b200_impl::update_clock_source, this, _1));
     static const std::vector<std::string> clock_sources = boost::assign::list_of("internal")("external");
     _tree->create<std::vector<std::string> >(mb_path / "clock_source" / "options").set(clock_sources);
+
+    ////////////////////////////////////////////////////////////////////
+    // dboard eeproms but not really
+    ////////////////////////////////////////////////////////////////////
+    dboard_eeprom_t db_eeprom;
+    _tree->create<dboard_eeprom_t>(mb_path / "dboards" / "A" / "rx_eeprom").set(db_eeprom);
+    _tree->create<dboard_eeprom_t>(mb_path / "dboards" / "A" / "tx_eeprom").set(db_eeprom);
+    _tree->create<dboard_eeprom_t>(mb_path / "dboards" / "A" / "gdb_eeprom").set(db_eeprom);
 
     ////////////////////////////////////////////////////////////////////
     // create RF frontend interfacing
