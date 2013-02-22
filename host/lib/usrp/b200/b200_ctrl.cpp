@@ -201,8 +201,8 @@ private:
             //return the readback value
             if (readback and _outstanding_seqs.empty())
             {
-                const boost::uint64_t hi = pkt[packet_info.num_header_words32+0];
-                const boost::uint64_t lo = pkt[packet_info.num_header_words32+1];
+                const boost::uint64_t hi = uhd::wtohx(pkt[packet_info.num_header_words32+0]);
+                const boost::uint64_t lo = uhd::wtohx(pkt[packet_info.num_header_words32+1]);
                 return ((hi << 32) | lo);
             }
         }
