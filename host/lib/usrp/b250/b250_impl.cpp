@@ -21,7 +21,6 @@
 #include <uhd/utils/msg.hpp>
 #include <uhd/utils/images.hpp>
 #include <uhd/transport/if_addrs.hpp>
-#include <uhd/transport/udp_zero_copy.hpp>
 #include <boost/foreach.hpp>
 #include <boost/asio.hpp>
 #include <fstream>
@@ -165,12 +164,8 @@ b250_impl::b250_impl(const uhd::device_addr_t &dev_addr)
     zpu_ctrl.reset(new b250_ctrl_iface(udp_simple::make_connected(dev_addr["addr"], BOOST_STRINGIZE(B250_FW_COMMS_UDP_PORT))));
 
     //create radio0 control
-    udp_zero_copy::sptr r0_ctrl_xport = udp_zero_copy::make(dev_addr["addr"], BOOST_STRINGIZE(B250_R0_CTRL_UDP_PORT));
+    udp_zero_copy::sptr r0_ctrl_xport = this->make_transport(dev_addr["addr"], B200_R0_CTRL_SID);
     radio_ctrl0 = b250_ctrl::make(r0_ctrl_xport, B200_R0_CTRL_SID);
-
-
-    UHD_MSG(status) << "tigger now you asshole" << std::endl;
-    zpu_ctrl->poke32(SR_ADDR(SET0_BASE, (SR_ETHINT0+8+3)), B250_R0_CTRL_UDP_PORT);
 
     sleep(5);
     UHD_VAR(radio_ctrl0->peek64(RB64_TIME_NOW));
@@ -180,4 +175,25 @@ b250_impl::b250_impl(const uhd::device_addr_t &dev_addr)
 b250_impl::~b250_impl(void)
 {
     //NOP
+}
+
+uhd::transport::udp_zero_copy::sptr b250_impl::make_transport(const std::string &addr, const boost::uint32_t sid)
+{
+    //make a new transport - fpga has no idea how to talk to use on this yet
+    udp_zero_copy::sptr xport = udp_zero_copy::make(addr, BOOST_STRINGIZE(B250_VITA_UDP_PORT));
+
+    //clear the ethernet dispatcher's udp port
+    zpu_ctrl->poke32(SR_ADDR(SET0_BASE, (SR_ETHINT0+8+3)), 0);
+
+    //send a mini packet with SID into the ZPU
+    //ZPU will reprogram the ethernet framer
+    managed_send_buffer::sptr mb = xport->get_send_buff();
+    mb->cast<boost::uint32_t *>()[0] = uhd::htonx(sid);
+    mb->commit(4);
+    mb.reset();
+
+    //reprogram the ethernet dispatcher's udp port
+    zpu_ctrl->poke32(SR_ADDR(SET0_BASE, (SR_ETHINT0+8+3)), B250_VITA_UDP_PORT);
+
+    return xport;
 }
