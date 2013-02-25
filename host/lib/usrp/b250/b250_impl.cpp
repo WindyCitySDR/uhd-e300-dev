@@ -162,14 +162,18 @@ b250_impl::b250_impl(const uhd::device_addr_t &dev_addr)
     b250_load_fw(dev_addr["addr"], b250_fw_image);
 
     //create basic communication
-    zpu_ctrl.reset(new b250_ctrl_iface(udp_simple::make_connected(dev_addr["addr"], BOOST_STRINGIZE(B250_FW_COMMS_UDP_PORT))));
+    _zpu_ctrl.reset(new b250_ctrl_iface(udp_simple::make_connected(dev_addr["addr"], BOOST_STRINGIZE(B250_FW_COMMS_UDP_PORT))));
+    _zpu_spi = spi_core_3000::make(_zpu_ctrl, TOREG(ZPU_SR_SPI), TOREG(ZPU_RB_SPI));
 
     //create radio0 control
     udp_zero_copy::sptr r0_ctrl_xport = this->make_transport(dev_addr["addr"], B200_R0_CTRL_SID);
-    radio_ctrl0 = b250_ctrl::make(r0_ctrl_xport, B200_R0_CTRL_SID);
+    _radio_ctrl0 = b250_ctrl::make(r0_ctrl_xport, B200_R0_CTRL_SID);
 
-    sleep(5);
+    //sleep(5);
     this->register_loopback_self_test();
+
+    _radio_spi0 = spi_core_3000::make(_radio_ctrl0, TOREG(SR_SPI), RB32_SPI);
+    _adc_ctrl0 = b250_adc_ctrl::make(_radio_spi0, 0/*TODO*/);
 
 }
 
@@ -184,7 +188,7 @@ uhd::transport::udp_zero_copy::sptr b250_impl::make_transport(const std::string 
     udp_zero_copy::sptr xport = udp_zero_copy::make(addr, BOOST_STRINGIZE(B250_VITA_UDP_PORT));
 
     //clear the ethernet dispatcher's udp port
-    zpu_ctrl->poke32(SR_ADDR(SET0_BASE, (SR_ETHINT0+8+3)), 0);
+    _zpu_ctrl->poke32(SR_ADDR(SET0_BASE, (ZPU_SR_ETHINT0+8+3)), 0);
 
     //send a mini packet with SID into the ZPU
     //ZPU will reprogram the ethernet framer
@@ -194,7 +198,7 @@ uhd::transport::udp_zero_copy::sptr b250_impl::make_transport(const std::string 
     mb.reset();
 
     //reprogram the ethernet dispatcher's udp port
-    zpu_ctrl->poke32(SR_ADDR(SET0_BASE, (SR_ETHINT0+8+3)), B250_VITA_UDP_PORT);
+    _zpu_ctrl->poke32(SR_ADDR(SET0_BASE, (ZPU_SR_ETHINT0+8+3)), B250_VITA_UDP_PORT);
 
     return xport;
 }
@@ -207,8 +211,8 @@ void b250_impl::register_loopback_self_test(void)
     for (size_t i = 0; i < 100; i++)
     {
         boost::hash_combine(hash, i);
-        radio_ctrl0->poke32(TOREG(SR_TEST), boost::uint32_t(hash));
-        test_fail = radio_ctrl0->peek32(RB32_TEST) != boost::uint32_t(hash);
+        _radio_ctrl0->poke32(TOREG(SR_TEST), boost::uint32_t(hash));
+        test_fail = _radio_ctrl0->peek32(RB32_TEST) != boost::uint32_t(hash);
         if (test_fail) break; //exit loop on any failure
     }
     UHD_MSG(status) << ((test_fail)? " fail" : "pass") << std::endl;

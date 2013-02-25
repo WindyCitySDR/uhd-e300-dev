@@ -25,6 +25,8 @@
 #include "b250_ctrl.hpp"
 #include "b250_fw_ctrl.hpp"
 #include <uhd/transport/udp_zero_copy.hpp>
+#include "spi_core_3000.hpp"
+#include "b250_adc_ctrl.hpp"
 
 static const std::string B250_FW_FILE_NAME = "b250_fw.bin";
 static const boost::uint32_t B200_R0_CTRL_SID = 0x00000001; //needs to end in a 1 for mux
@@ -51,9 +53,17 @@ private:
     uhd::transport::udp_zero_copy::sptr make_transport(const std::string &addr, const boost::uint32_t sid);
     void register_loopback_self_test(void);
 
-    wb_iface::sptr zpu_ctrl;
-    b250_ctrl::sptr radio_ctrl0;
-    b250_ctrl::sptr radio_ctrl1;
+    //perifs in the zpu
+    wb_iface::sptr _zpu_ctrl;
+    spi_core_3000::sptr _zpu_spi;
+
+    //perifs in the radio core
+    b250_ctrl::sptr _radio_ctrl0;
+    b250_ctrl::sptr _radio_ctrl1;
+    spi_core_3000::sptr _radio_spi0;
+    spi_core_3000::sptr _radio_spi1;
+    b250_adc_ctrl::sptr _adc_ctrl0;
+    b250_adc_ctrl::sptr _adc_ctrl1;
 
 };
 

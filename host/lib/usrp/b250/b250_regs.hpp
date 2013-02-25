@@ -42,7 +42,15 @@ localparam RB32_TEST            = 24;
 //wishbone settings map - relevant to host code
 #define SET0_BASE 0xa000
 #define SR_ADDR(base, offset) ((base) + (offset)*4)
-static const int SR_ETHINT0    = 40;
-static const int SR_ETHINT1    = 56;
+
+localparam ZPU_SR_LEDS       = 00;
+localparam ZPU_SR_PHY_RST    = 01;
+localparam ZPU_SR_CLOCK_CTRL = 02;
+localparam ZPU_SR_XB_LOCAL   = 03;
+localparam ZPU_SR_SPI        = 32;
+localparam ZPU_SR_ETHINT0    = 40;
+localparam ZPU_SR_ETHINT1    = 56;
+
+localparam ZPU_RB_SPI = 2;
 
 #endif /* INCLUDED_B250_REGS_HPP */

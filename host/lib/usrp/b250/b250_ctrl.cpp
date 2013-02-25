@@ -43,8 +43,8 @@ class b250_ctrl_impl : public b250_ctrl
 public:
 
     b250_ctrl_impl(zero_copy_if::sptr xport, const boost::uint32_t sid):
-        _sid(sid),
         _xport(xport),
+        _sid(sid),
         _seq_out(0),
         _timeout(ACK_TIMEOUT)
     {
