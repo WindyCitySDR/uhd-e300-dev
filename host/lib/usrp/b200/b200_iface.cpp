@@ -235,10 +235,10 @@ public:
     }
 
 
-    void write_reg(uint16_t reg, uint8_t val)
+    void write_reg(boost::uint16_t reg, boost::uint8_t val)
     {
         //std::cout << "SPIWrite\t" << std::hex << std::setw(3) << std::setfill('0') << (int) reg << "," << std::setw(2) << (int) val << std::endl;
-        uint8_t buf[3];
+        boost::uint8_t buf[3];
         buf[0] = (0x80 | ((reg >> 8) & 0x3F));
         buf[1] = (reg & 0x00FF);
         buf[2] = val;
@@ -246,7 +246,7 @@ public:
     }
 
     uint8_t read_reg(uint16_t reg) {
-        uint8_t buf[3];
+        boost::uint8_t buf[3];
         buf[0] = (reg >> 8) & 0x3F;
         buf[1] = (reg & 0x00FF);
         transact_spi(buf, 16, buf, 24);
@@ -444,7 +444,7 @@ public:
             const std::streamsize n = file.gcount();
             if(n == 0) continue;
 
-            uint16_t transfer_count = uint16_t(n);
+            boost::uint16_t transfer_count = boost::uint16_t(n);
 
             /* Send the data to the device. */
             fx3_control_write(B200_VREQ_FPGA_DATA, 0, 0, out_buff, transfer_count, 5000);

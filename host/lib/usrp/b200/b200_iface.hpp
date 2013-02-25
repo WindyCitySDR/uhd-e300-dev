@@ -56,8 +56,8 @@ public:
     virtual void transact_spi( unsigned char *tx_data, size_t num_tx_bits, \
             unsigned char *rx_data, size_t num_rx_bits) = 0;
 
-    virtual void write_reg(uint16_t reg, uint8_t val) = 0;
-    virtual uint8_t read_reg(uint16_t reg) = 0;
+    virtual void write_reg(boost::uint16_t reg, boost::uint8_t val) = 0;
+    virtual uint8_t read_reg(boost::uint16_t reg) = 0;
 };
 
 

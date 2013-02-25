@@ -17,6 +17,7 @@
 #include <cmath>
 #include <limits>
 #include <vector>
+#include <stdint.h>
 
 using namespace uhd;
 using namespace uhd::transport; 
