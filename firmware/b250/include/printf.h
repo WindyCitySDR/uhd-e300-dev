@@ -102,5 +102,7 @@ void tfp_format(void* putp,void (*putf) (void*,char),char *fmt, va_list va);
 
 #define printf tfp_printf 
 #define sprintf tfp_sprintf 
+#define PRINTF_LONG_SUPPORT 1
+//#define PRINTF_LONG_LONG_SUPPORT 1 //IJB gcc for ZPU long long appears to have bugs
 
 #endif

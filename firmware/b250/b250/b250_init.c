@@ -12,6 +12,7 @@
 #include <u3_net_stack.h>
 
 
+
 static wb_pkt_iface64_config_t pkt_config;
 
 static void init_network(void)
@@ -69,6 +70,36 @@ self-clearing bits so just set bit 6 only, no masking required.
 --n
 */
 
+//
+// 64bit division of unsigned integers. Remainder is not calculated.
+//
+uint64_t div_u64(const uint64_t dividend, const uint64_t divisor)
+{
+  uint64_t x,z=0;
+  int8_t y=0;
+  
+  while (dividend >= (divisor << y))
+    y++;
+  // Early return if divisor larger than dividend
+  if (y==0) return(0);
+
+  x = dividend;
+
+  while((--y) >= 0) {
+    z = z << 1;
+    // Try to subtract the shifted divisor and if the result is non-negative record a one
+    // for this bit in the result and recalculate the remaining dividend.
+    // 
+    if (x >= (divisor << y)) {
+      z = z | 1;
+      x = x - (divisor << y);
+    }
+  }
+  
+  return (z);
+}
+
+
 void dco_write(const uint8_t addr, const uint8_t val)
 {
     uint8_t buff[2];
@@ -84,6 +115,119 @@ uint8_t dco_read(const uint8_t addr)
   wb_i2c_read(I2C0_BASE, 0x55, &val, 1);
   return val;
 }
+
+void dco_show_config(void)
+{
+  printf("DEBUG: DCO configuration:\n");
+  printf("0x7=%x\n",dco_read(0x07));
+  printf("0x8=%x\n",dco_read(0x08));
+  printf("0x9=%x\n",dco_read(0x09));
+  printf("0xA=%x\n",dco_read(0x0A));
+  printf("0xB=%x\n",dco_read(0x0B));
+  printf("0xC=%x\n",dco_read(0x0C));
+}
+
+/*
+1) Read Si570 current register values.
+2) Try to guess if it's currently programmed for 10/125/156.25MHz
+3) Based on guess, determine actual Fxtal.
+4) Program new Fout configuration
+*/
+// ***NOTE: This SI750 programming code is still unproven and suspect!***
+
+void set_si570_freq(const dco_freq_t new_freq)
+{
+  uint8_t si570_regs[6];
+  uint32_t x;
+  uint64_t hs_div; 
+  uint64_t n1; 
+  uint64_t rfreq; 
+  uint64_t fxtal; 
+  //  uint32_t fout;
+
+  for (x=0;x<6;x++) 
+    si570_regs[x] = dco_read(x+7);
+
+  rfreq =
+    (uint64_t)si570_regs[5] |
+    ((uint64_t)si570_regs[4] << 8) |
+    ((uint64_t)si570_regs[3] << 16) |
+    ((uint64_t)si570_regs[2] << 24) |
+    (((uint64_t)si570_regs[1] & 0x3F) << 32);
+
+  n1 =
+    (
+     ((uint64_t)(si570_regs[1] & 0xC0) >> 6) |
+     ((uint64_t)(si570_regs[0] & 0x1F) << 2)
+     ) + 1;
+
+  hs_div =  ((uint64_t)(si570_regs[0] & 0xE0) >> 5) + 4;
+  
+  /* // Fxtal is approximately 114.3MHz. Use this knowledge to guess current programmed Fout. */
+  //fxtal = (10^7 * hs_div * n1 * 2^28) / rfreq;
+  
+  fxtal = (156250000 * hs_div * n1 * (2<<27));
+  fxtal = div_u64(fxtal, rfreq);
+
+  if ((fxtal < 114000000) || (fxtal > 115000000)) {
+    // It's not currently programmed for 156.25MHz
+    // Try 125MHz....
+    fxtal = (125000000 * hs_div * n1 * (2<<27));
+    fxtal = div_u64(fxtal, rfreq);
+    if ((fxtal < 114000000) || (fxtal > 115000000)) {
+      // It's not currently programmed for 125MHz
+      // Try (Assume!) 10MHz....
+      fxtal = (10000000 * hs_div * n1 * (2<<27));
+      fxtal = div_u64(fxtal, rfreq);
+    }
+  }
+
+  printf("DEBUG: original HS_DIV=%08lx%08lx\n",(unsigned long)(hs_div>>32),(unsigned long)(hs_div&0xFFFFFFFF));
+  printf("DEBUG: original RFREQ=%08lx%08lx\n",(unsigned long)(rfreq>>32),(unsigned long)(rfreq&0xFFFFFFFF));
+  printf("DEBUG: original N1=%08lx%08lx\n",(unsigned long)(n1>>32),(unsigned long)(n1&0xFFFFFFFF));
+  printf("DEBUG: Calculated FXTAL=%08lx%08lx\n",(unsigned long)(fxtal>>32),(unsigned long)(fxtal&0xFFFFFFFF));
+  printf("DEBUG: (In decimal FXTAL=%ld MHz)\n",(unsigned long)(fxtal&0xFFFFFFFF));
+ 
+  switch(new_freq) {
+  case DCO_156p25: 
+    printf("DEBUG: New DCO Fout will be 156.25MHz\n");
+    n1 = 4;
+    hs_div = 9;
+    rfreq =  div_u64((156250000 * n1 * hs_div * (2<<27)),fxtal);
+    break;
+  case DCO_125:
+    printf("DEBUG: New DCO Fout will be 125MHz\n");
+    n1 = 4;
+    hs_div = 11;
+    rfreq =  div_u64((125000000 * n1 * hs_div * (2<<27)),fxtal);
+    break;
+  case DCO_10:
+    printf("DEBUG: New DCO Fout will be 10MHz\n");
+    n1 = 54;
+    hs_div = 9;
+    rfreq =  div_u64((10000000 * n1 * hs_div * (2<<27)),fxtal);
+    break;
+  }
+  printf("DEBUG: new HS_DIV=%08lx%08lx\n",(unsigned long)(hs_div>>32),(unsigned long)(hs_div&0xFFFFFFFF));
+  printf("DEBUG: new RFREQ=%08lx%08lx\n",(unsigned long)(rfreq>>32),(unsigned long)(rfreq&0xFFFFFFFF));
+  printf("DEBUG: new N1=%08lx%08lx\n",(unsigned long)(n1>>32),(unsigned long)(n1&0xFFFFFFFF));
+  printf("DEBUG: Calculated RFREQ=%08lx%08lx\n",(unsigned long)(rfreq>>32),(unsigned long)(rfreq&0xFFFFFFFF));
+  
+  // Freeze DCO ready for update.
+  dco_write(0x89, 1 << 4);
+  // Program new clock.
+  dco_write(0x07, ((hs_div-4)<<5)|((n1-1)>>2));
+  dco_write(0x08, (((n1-1)&0x3)<<6)|((rfreq>>32)&0x3F));
+  dco_write(0x09, (rfreq>>24)&0xFF);
+  dco_write(0x0A, (rfreq>>16)&0xFF);
+  dco_write(0x0B, (rfreq>>8)&0xFF);
+  dco_write(0x0C, (rfreq)&0xFF);
+  // Re-Enbale DCO
+  dco_write(0x89, 0 << 4);
+  dco_write(0x87, 1 << 6);
+    
+}
+  
 
 
 void b250_init(void)
@@ -106,44 +250,41 @@ void b250_init(void)
 
     //init clock - i2c perif
     // Show power-on or after reset value of DCO.
-    printf("DEBUG: DCO after power up reads:\n");
-    printf("0x7=%x\n",dco_read(0x07));
-    printf("0x8=%x\n",dco_read(0x08));
-    printf("0x9=%x\n",dco_read(0x09));
-    printf("0xA=%x\n",dco_read(0x0A));
-    printf("0xB=%x\n",dco_read(0x0B));
-    printf("0xC=%x\n",dco_read(0x0C));
+    // dco_show_config();
 
     printf("DEBUG: Version reports %8x\n",wb_peek32(SR_ADDR(RB0_BASE, RB_VERSION)));
 
     if (wb_peek32(SR_ADDR(RB0_BASE, RB_VERSION)) == 0) {
-    // 125MHZ
-    dco_write(0x89, 1 << 4);
-    dco_write(0x07, 0xe0);
-    dco_write(0x08, 0xc3);
-    dco_write(0x09, 0x02);
-    dco_write(0x0a, 0x01);
-    dco_write(0x0b, 0x3b);
-    dco_write(0x0c, 0x64);
-    dco_write(0x89, 0 << 4);
-    dco_write(0x87, 1 << 6);
-    //    } else if (wb_peek32(SR_ADDR(RB0_BASE, RB_VERSION)) == 1) {
+      /* // 125MHZ */
+      //  set_si570_freq(DCO_125);
+      dco_write(0x89, 1 << 4);
+      dco_write(0x07, 0xe0);
+      dco_write(0x08, 0xc3);
+      dco_write(0x09, 0x02);
+      dco_write(0x0a, 0x01);
+      dco_write(0x0b, 0x3b);
+      dco_write(0x0c, 0x64);
+      dco_write(0x89, 0 << 4);
+      dco_write(0x87, 1 << 6);
+      //    } else if (wb_peek32(SR_ADDR(RB0_BASE, RB_VERSION)) == 1) {
 
     } else {    // 156.25MHz
-    dco_write(0x89, 1 << 4);
-    dco_write(0x07, 0xA0);
-    dco_write(0x08, 0xC3); 
-    dco_write(0x09, 0x13);  
-    dco_write(0x0a, 0x1F);  
-    dco_write(0x0b, 0x3D);  
-    dco_write(0x0c, 0x66);  
-    dco_write(0x89, 0 << 4);  
-    dco_write(0x87, 1 << 6);  
-    //    } else printf("ERROR: Version %8x is unrecognized.\n",wb_peek32(SR_ADDR(RB0_BASE, RB_VERSION)));
+      // Do nothing. 10GE image currently uses dedicated 156.25MHz clock source from U509
+      //  set_si570_freq(DCO_156p25);
+      /* dco_write(0x89, 1 << 4); */
+      /* dco_write(0x07, 0xA0); */
+      /* dco_write(0x08, 0xC3);  */
+      /* dco_write(0x09, 0x13);   */
+      /* dco_write(0x0a, 0x1F);   */
+      /* dco_write(0x0b, 0x3D);   */
+      /* dco_write(0x0c, 0x66);   */
+      /* dco_write(0x89, 0 << 4);   */
+      /* dco_write(0x87, 1 << 6);   */
+      //    } else printf("ERROR: Version %8x is unrecognized.\n",wb_peek32(SR_ADDR(RB0_BASE, RB_VERSION)));
     }    
     //setup net stack and eth state machines
     init_network();
-    printf("DEBUG: Returned from init_network\n");
+  
     //phy reset release
     wb_poke32(SR_ADDR(SET0_BASE, SR_PHY_RST), 0);
     // Run only for 10GE
@@ -153,17 +294,6 @@ void b250_init(void)
     }
 
 
-/* #ifdef ETH10G */
-/*     // Initialise XGE PHY and MAC for port0. */
-    
-/*     xge_ethernet_init(0); */
-/*     mdelay(100); */
-/*     dump_mdio_regs(XGE0_BASE,MDIO_PORT); */
-/*     mdelay(100); */
-/*     dump_mdio_regs(XGE0_BASE,MDIO_PORT); */
-/* #endif */
-    
-    
 }
 
 static uint32_t hex_char_to_num(const int ch)
