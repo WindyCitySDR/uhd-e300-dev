@@ -38,9 +38,9 @@ public:
     ~b250_impl(void);
 
     //the io interface
-    uhd::rx_streamer::sptr get_rx_stream(const uhd::stream_args_t &args){}
-    uhd::tx_streamer::sptr get_tx_stream(const uhd::stream_args_t &args){}
-    bool recv_async_msg(uhd::async_metadata_t &, double){}
+    uhd::rx_streamer::sptr get_rx_stream(const uhd::stream_args_t &){return uhd::rx_streamer::sptr();}
+    uhd::tx_streamer::sptr get_tx_stream(const uhd::stream_args_t &){return uhd::tx_streamer::sptr();}
+    bool recv_async_msg(uhd::async_metadata_t &, double){return false;}
 
 private:
     uhd::property_tree::sptr _tree;
@@ -56,6 +56,7 @@ private:
     //perifs in the zpu
     wb_iface::sptr _zpu_ctrl;
     spi_core_3000::sptr _zpu_spi;
+    void setup_ad9510_clock(void);
 
     //perifs in the radio core
     b250_ctrl::sptr _radio_ctrl0;

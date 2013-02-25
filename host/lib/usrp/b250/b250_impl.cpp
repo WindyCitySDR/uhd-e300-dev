@@ -163,7 +163,8 @@ b250_impl::b250_impl(const uhd::device_addr_t &dev_addr)
 
     //create basic communication
     _zpu_ctrl.reset(new b250_ctrl_iface(udp_simple::make_connected(dev_addr["addr"], BOOST_STRINGIZE(B250_FW_COMMS_UDP_PORT))));
-    _zpu_spi = spi_core_3000::make(_zpu_ctrl, TOREG(ZPU_SR_SPI), TOREG(ZPU_RB_SPI));
+    _zpu_spi = spi_core_3000::make(_zpu_ctrl, SR_ADDR(SET0_BASE, ZPU_SR_SPI), SR_ADDR(SET0_BASE, ZPU_RB_SPI));
+    this->setup_ad9510_clock();
 
     //create radio0 control
     udp_zero_copy::sptr r0_ctrl_xport = this->make_transport(dev_addr["addr"], B200_R0_CTRL_SID);
@@ -216,4 +217,25 @@ void b250_impl::register_loopback_self_test(void)
         if (test_fail) break; //exit loop on any failure
     }
     UHD_MSG(status) << ((test_fail)? " fail" : "pass") << std::endl;
+}
+
+void b250_impl::setup_ad9510_clock(void)
+{
+    _zpu_spi->write_spi(1, spi_config_t::EDGE_RISE, 0x3C08, 24); // TEST_CLK on
+    _zpu_spi->write_spi(1, spi_config_t::EDGE_RISE, 0x3D02, 24); // NC off
+    _zpu_spi->write_spi(1, spi_config_t::EDGE_RISE, 0x3E08, 24); // RX_CLK on
+    _zpu_spi->write_spi(1, spi_config_t::EDGE_RISE, 0x3F08, 24); // TX_CLK on
+    _zpu_spi->write_spi(1, spi_config_t::EDGE_RISE, 0x4002, 24); // FPGA_CLK on
+    _zpu_spi->write_spi(1, spi_config_t::EDGE_RISE, 0x4101, 24); // NC off
+    _zpu_spi->write_spi(1, spi_config_t::EDGE_RISE, 0x4201, 24); // MIMO off
+    _zpu_spi->write_spi(1, spi_config_t::EDGE_RISE, 0x4301, 24); // NC off
+    _zpu_spi->write_spi(1, spi_config_t::EDGE_RISE, 0x4980, 24); // TEST_CLK bypass div
+    _zpu_spi->write_spi(1, spi_config_t::EDGE_RISE, 0x4B80, 24); // NC bypass div
+    _zpu_spi->write_spi(1, spi_config_t::EDGE_RISE, 0x4D80, 24); // RX_CLK bypass div
+    _zpu_spi->write_spi(1, spi_config_t::EDGE_RISE, 0x4F80, 24); // TX_CLK bypass div
+    _zpu_spi->write_spi(1, spi_config_t::EDGE_RISE, 0x5180, 24); // FPGA_CLK bypass div
+    _zpu_spi->write_spi(1, spi_config_t::EDGE_RISE, 0x5380, 24); // NC bypass div
+    _zpu_spi->write_spi(1, spi_config_t::EDGE_RISE, 0x5580, 24); // MIMO bypass div
+    _zpu_spi->write_spi(1, spi_config_t::EDGE_RISE, 0x5780, 24); // NC bypass div
+    _zpu_spi->write_spi(1, spi_config_t::EDGE_RISE, 0x5a01, 24); // Apply settings
 }
