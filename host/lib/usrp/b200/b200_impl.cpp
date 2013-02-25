@@ -279,8 +279,8 @@ b200_impl::b200_impl(const device_addr_t &device_addr):
     // TODO
 //    const mboard_eeprom_t mb_eeprom(*_iface, mboard_eeprom_t::MAP_B100);
     mboard_eeprom_t mb_eeprom;
-    mb_eeprom["mboard_name"] = "TODO"; //FIXME with real eeprom values
-    mb_eeprom["mboard_serial"] = "TODO"; //FIXME with real eeprom values
+    mb_eeprom["name"] = "TODO"; //FIXME with real eeprom values
+    mb_eeprom["serial"] = "TODO"; //FIXME with real eeprom values
     _tree->create<mboard_eeprom_t>(mb_path / "eeprom")
         .set(mb_eeprom)
         .subscribe(boost::bind(&b200_impl::set_mb_eeprom, this, _1));
