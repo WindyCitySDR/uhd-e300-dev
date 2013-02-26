@@ -29,7 +29,21 @@
 #include "b250_adc_ctrl.hpp"
 
 static const std::string B250_FW_FILE_NAME = "b250_fw.bin";
-static const boost::uint32_t B200_R0_CTRL_SID = 0x00000001; //needs to end in a 1 for mux
+
+
+#define XB_DST_E0 0
+#define XB_DST_E1 1
+#define XB_DST_R0 2
+#define XB_DST_R1 3
+
+#define HOST_ADDR 0
+#define FPGA_ADDR 1
+
+#define RADIO0_CTRL_DST 1
+#define RADIO0_CTRL_SRC 1 //on the host...
+
+//static const boost::uint32_t B200_R0_CTRL_SID = 0x00000001; //needs to end in a 1 for mux
+static const boost::uint32_t B200_R0_CTRL_SID = (HOST_ADDR << 24) | (RADIO0_CTRL_SRC << 16) | (FPGA_ADDR << 8) | (RADIO0_CTRL_DST << 0);
 
 class b250_impl : public uhd::device
 {
@@ -67,6 +81,7 @@ private:
     b250_adc_ctrl::sptr _adc_ctrl1;
 
     void set_ad9146_dac(spi_core_3000::sptr);
+    void setup_crossbar_router(void);
 
 };
 

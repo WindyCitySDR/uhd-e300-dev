@@ -166,6 +166,8 @@ b250_impl::b250_impl(const uhd::device_addr_t &dev_addr)
     _zpu_spi = spi_core_3000::make(_zpu_ctrl, SR_ADDR(SET0_BASE, ZPU_SR_SPI), SR_ADDR(SET0_BASE, ZPU_RB_SPI));
     this->setup_ad9510_clock(_zpu_spi);
 
+    this->setup_crossbar_router();
+
     //create radio0 control
     udp_zero_copy::sptr r0_ctrl_xport = this->make_transport(dev_addr["addr"], B200_R0_CTRL_SID);
     _radio_ctrl0 = b250_ctrl::make(r0_ctrl_xport, B200_R0_CTRL_SID);
@@ -205,6 +207,13 @@ uhd::transport::udp_zero_copy::sptr b250_impl::make_transport(const std::string 
     _zpu_ctrl->poke32(SR_ADDR(SET0_BASE, (ZPU_SR_ETHINT0+8+3)), B250_VITA_UDP_PORT);
 
     return xport;
+}
+
+void b250_impl::setup_crossbar_router(void)
+{
+    _zpu_ctrl->poke32(SR_ADDR(SET0_BASE, ZPU_SR_XB_LOCAL), FPGA_ADDR);
+    _zpu_ctrl->poke32(SR_ADDR(SETXB_BASE, 256 + (RADIO0_CTRL_DST & 0xff)), XB_DST_R0);
+    _zpu_ctrl->poke32(SR_ADDR(SETXB_BASE, 0   + (RADIO0_CTRL_SRC & 0xff)), XB_DST_E0);
 }
 
 void b250_impl::register_loopback_self_test(void)
