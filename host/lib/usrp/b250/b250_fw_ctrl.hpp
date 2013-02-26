@@ -25,7 +25,15 @@
 struct b250_ctrl_iface : wb_iface
 {
     b250_ctrl_iface(uhd::transport::udp_simple::sptr udp):
-        udp(udp), seq(0){this->flush();}
+        udp(udp), seq(0)
+    {
+        this->flush();
+        try
+        {
+            this->peek32(0);
+        }
+        catch(...){}
+    }
 
     uhd::transport::udp_simple::sptr udp;
     size_t seq;

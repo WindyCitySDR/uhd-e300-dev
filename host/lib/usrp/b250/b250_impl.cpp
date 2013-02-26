@@ -20,13 +20,19 @@
 #include <uhd/utils/static.hpp>
 #include <uhd/utils/msg.hpp>
 #include <uhd/utils/images.hpp>
+#include <uhd/usrp/subdev_spec.hpp>
+#include <uhd/usrp/dboard_eeprom.hpp>
+#include <uhd/usrp/mboard_eeprom.hpp>
 #include <uhd/transport/if_addrs.hpp>
 #include <boost/foreach.hpp>
 #include <boost/asio.hpp>
+#include <boost/bind.hpp>
 #include <boost/functional/hash.hpp>
+#include <boost/assign/list_of.hpp>
 #include <fstream>
 
 using namespace uhd;
+using namespace uhd::usrp;
 using namespace uhd::transport;
 namespace asio = boost::asio;
 
@@ -153,6 +159,8 @@ static void b250_load_fw(const std::string &addr, const std::string &file_name)
 b250_impl::b250_impl(const uhd::device_addr_t &dev_addr)
 {
     _tree = uhd::property_tree::make();
+    _last_sid = 0;
+    _addr = dev_addr["addr"];
 
     //extract the FW path for the B250
     //and live load fw over ethernet link
@@ -164,22 +172,133 @@ b250_impl::b250_impl(const uhd::device_addr_t &dev_addr)
     //create basic communication
     _zpu_ctrl.reset(new b250_ctrl_iface(udp_simple::make_connected(dev_addr["addr"], BOOST_STRINGIZE(B250_FW_COMMS_UDP_PORT))));
     _zpu_spi = spi_core_3000::make(_zpu_ctrl, SR_ADDR(SET0_BASE, ZPU_SR_SPI), SR_ADDR(SET0_BASE, ZPU_RB_SPI));
+
+    ////////////////////////////////////////////////////////////////////
+    // Initialize the properties tree
+    ////////////////////////////////////////////////////////////////////
+    _tree->create<std::string>("/name").set("B-Series Device");
+    const fs_path mb_path = "/mboards/0";
+    _tree->create<std::string>(mb_path / "name").set("B250");
+    _tree->create<std::string>(mb_path / "codename").set("Yetti");
+
+    ////////////////////////////////////////////////////////////////////
+    // create clock control objects
+    ////////////////////////////////////////////////////////////////////
+    _tree->create<double>(mb_path / "tick_rate");
     this->setup_ad9510_clock(_zpu_spi);
 
-    this->setup_crossbar_router();
-
-    //create radio0 control
-    udp_zero_copy::sptr r0_ctrl_xport = this->make_transport(dev_addr["addr"], B200_R0_CTRL_SID);
-    _radio_ctrl0 = b250_ctrl::make(r0_ctrl_xport, B200_R0_CTRL_SID);
+    ////////////////////////////////////////////////////////////////////
+    // radio control
+    ////////////////////////////////////////////////////////////////////
+    sid_config_t ctrl0_config;
+    ctrl0_config.router_addr_there = B250_DEVICE_THERE;
+    ctrl0_config.dst_prefix = B250_RADIO_DEST_PREFIX_CTRL;
+    ctrl0_config.router_dst_there = B250_XB_DST_R0;
+    ctrl0_config.router_dst_here = B250_XB_DST_E0;
+    const boost::uint32_t ctrl0_sid = this->allocate_sid(ctrl0_config);
+    udp_zero_copy::sptr r0_ctrl_xport = this->make_transport(dev_addr["addr"], ctrl0_sid);
+    _radio_ctrl0 = b250_ctrl::make(r0_ctrl_xport, ctrl0_sid);
     _radio_ctrl0->poke32(TOREG(SR_MISC_OUTS), (1 << 2)); //reset adc + dac
     _radio_ctrl0->poke32(TOREG(SR_MISC_OUTS), (1 << 1) | (1 << 0)); //out of reset + dac enable
 
-    //sleep(5);
     this->register_loopback_self_test();
 
     _radio_spi0 = spi_core_3000::make(_radio_ctrl0, TOREG(SR_SPI), RB32_SPI);
     _adc_ctrl0 = b250_adc_ctrl::make(_radio_spi0, DB_ADC_SEN);
     this->set_ad9146_dac(_radio_spi0);
+
+    ////////////////////////////////////////////////////////////////////
+    // create rx dsp control objects
+    ////////////////////////////////////////////////////////////////////
+    _rx_framer = rx_vita_core_3000::make(_radio_ctrl0, TOREG(SR_RX_CTRL+4), TOREG(SR_RX_CTRL));
+    for (size_t dspno = 0; dspno < 1; dspno++)
+    {
+        const fs_path rx_dsp_path = mb_path / "rx_dsps" / str(boost::format("%u") % dspno);
+        _tree->create<meta_range_t>(rx_dsp_path / "rate" / "range")
+            .set(meta_range_t(120e6, 120e6));
+        _tree->create<double>(rx_dsp_path / "rate" / "value")
+            .set(120e6);
+        _tree->create<double>(rx_dsp_path / "freq" / "value")
+            .set(0.0);
+        _tree->create<meta_range_t>(rx_dsp_path / "freq/range")
+            .set(meta_range_t(0.0, 0.0));
+        _tree->create<stream_cmd_t>(rx_dsp_path / "stream_cmd")
+            .subscribe(boost::bind(&rx_vita_core_3000::issue_stream_command, _rx_framer, _1));
+    }
+
+    ////////////////////////////////////////////////////////////////////
+    // create tx dsp control objects
+    ////////////////////////////////////////////////////////////////////
+    _tx_deframer = tx_vita_core_3000::make(_radio_ctrl0, TOREG(SR_TX_CTRL+2), TOREG(SR_TX_CTRL));
+    for (size_t dspno = 0; dspno < 1; dspno++)
+    {
+        const fs_path tx_dsp_path = mb_path / "tx_dsps" / str(boost::format("%u") % dspno);
+        _tree->create<meta_range_t>(tx_dsp_path / "rate" / "range")
+            .set(meta_range_t(120e6, 120e6));
+        _tree->create<double>(tx_dsp_path / "rate" / "value")
+            .set(120e6);
+        _tree->create<double>(tx_dsp_path / "freq" / "value")
+            .set(0.0);
+        _tree->create<meta_range_t>(tx_dsp_path / "freq" / "range")
+            .set(meta_range_t(0.0, 0.0));
+    }
+
+    ////////////////////////////////////////////////////////////////////
+    // create time control objects
+    ////////////////////////////////////////////////////////////////////
+    time_core_3000::readback_bases_type time64_rb_bases;
+    time64_rb_bases.rb_now = RB64_TIME_NOW;
+    time64_rb_bases.rb_pps = RB64_TIME_PPS;
+    _time64 = time_core_3000::make(_radio_ctrl0, TOREG(SR_TIME), time64_rb_bases);
+    _tree->create<time_spec_t>(mb_path / "time" / "now")
+        .publish(boost::bind(&time_core_3000::get_time_now, _time64))
+        .subscribe(boost::bind(&time_core_3000::set_time_now, _time64, _1));
+    _tree->create<time_spec_t>(mb_path / "time" / "pps")
+        .publish(boost::bind(&time_core_3000::get_time_last_pps, _time64))
+        .subscribe(boost::bind(&time_core_3000::set_time_next_pps, _time64, _1));
+    //setup time source props
+    _tree->create<std::string>(mb_path / "time_source" / "value")
+        .subscribe(boost::bind(&time_core_3000::set_time_source, _time64, _1));
+    _tree->create<std::vector<std::string> >(mb_path / "time_source" / "options")
+        .publish(boost::bind(&time_core_3000::get_time_sources, _time64));
+    //setup reference source props
+    _tree->create<std::string>(mb_path / "clock_source" / "value")
+        .subscribe(boost::bind(&b250_impl::update_clock_source, this, _1));
+    static const std::vector<std::string> clock_sources = boost::assign::list_of("internal")("external");
+    _tree->create<std::vector<std::string> >(mb_path / "clock_source" / "options").set(clock_sources);
+
+    ////////////////////////////////////////////////////////////////////
+    // create frontend mapping
+    ////////////////////////////////////////////////////////////////////
+    _tree->create<subdev_spec_t>(mb_path / "rx_subdev_spec");
+    _tree->create<subdev_spec_t>(mb_path / "tx_subdev_spec");
+
+    ////////////////////////////////////////////////////////////////////
+    // create RF frontend interfacing
+    ////////////////////////////////////////////////////////////////////
+
+    dboard_eeprom_t db_eeprom;
+    _tree->create<dboard_eeprom_t>(mb_path / "dboards" / "A" / "rx_eeprom").set(db_eeprom);
+    _tree->create<dboard_eeprom_t>(mb_path / "dboards" / "A" / "tx_eeprom").set(db_eeprom);
+    _tree->create<dboard_eeprom_t>(mb_path / "dboards" / "A" / "gdb_eeprom").set(db_eeprom);
+
+    //create a new dboard interface and manager
+    _dboard_iface0 = b250_make_dboard_iface();
+    _tree->create<dboard_iface::sptr>(mb_path / "dboards" / "A" / "iface").set(_dboard_iface0);
+    _dboard_manager0 = dboard_manager::make(
+        db_eeprom.id, db_eeprom.id, db_eeprom.id,
+        _dboard_iface0, _tree->subtree(mb_path / "dboards" / "A")
+    );
+
+    ////////////////////////////////////////////////////////////////////
+    // do some post-init tasks
+    ////////////////////////////////////////////////////////////////////
+
+    _tree->access<double>(mb_path / "tick_rate") //now subscribe the clock rate setter
+        .set(B250_RADIO_CLOCK_RATE);
+
+    _tree->access<subdev_spec_t>(mb_path / "rx_subdev_spec").set(subdev_spec_t("A:0"));
+    _tree->access<subdev_spec_t>(mb_path / "tx_subdev_spec").set(subdev_spec_t("A:0"));
 
 }
 
@@ -209,11 +328,24 @@ uhd::transport::udp_zero_copy::sptr b250_impl::make_transport(const std::string 
     return xport;
 }
 
-void b250_impl::setup_crossbar_router(void)
+boost::uint32_t b250_impl::allocate_sid(const sid_config_t &config)
 {
-    _zpu_ctrl->poke32(SR_ADDR(SET0_BASE, ZPU_SR_XB_LOCAL), FPGA_ADDR);
-    _zpu_ctrl->poke32(SR_ADDR(SETXB_BASE, 256 + (RADIO0_CTRL_DST & 0xff)), XB_DST_R0);
-    _zpu_ctrl->poke32(SR_ADDR(SETXB_BASE, 0   + (RADIO0_CTRL_SRC & 0xff)), XB_DST_E0);
+    _last_sid++;
+
+    const boost::uint32_t stream = (config.dst_prefix | (_last_sid << 2)) & 0xff;
+
+    const boost::uint32_t sid = 0
+        | (0/*here*/ << 24)
+        | (config.router_addr_there << 8)
+        | (stream << 0)
+        | (stream << 16)
+    ;
+
+    _zpu_ctrl->poke32(SR_ADDR(SET0_BASE, ZPU_SR_XB_LOCAL), config.router_addr_there);
+    _zpu_ctrl->poke32(SR_ADDR(SETXB_BASE, 256 + (stream)), config.router_dst_there);
+    _zpu_ctrl->poke32(SR_ADDR(SETXB_BASE, 0   + (stream)), config.router_dst_here);
+
+    return sid;
 }
 
 void b250_impl::register_loopback_self_test(void)
@@ -276,4 +408,9 @@ void b250_impl::set_ad9146_dac(spi_core_3000::sptr iface)
     UHD_MSG(status) << std::hex << read_ad9146_reg(0x0) << std::endl;
     write_ad9146_reg(0x8, 0x3f);
     UHD_MSG(status) << std::hex << read_ad9146_reg(0x8) << std::endl;
+}
+
+void b250_impl::update_clock_source(const std::string &)
+{
+    
 }
