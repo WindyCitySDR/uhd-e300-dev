@@ -48,6 +48,10 @@ public:
         this->send_ads62p44_reg(0x12);
         this->send_ads62p44_reg(0x14);
         this->set_rx_analog_gain(1);
+
+        _ads62p44_regs.test_patterns = ads62p44_regs_t::TEST_PATTERNS_NORMAL;
+        this->send_ads62p44_reg(22);
+
     }
 
     ~b250_adc_ctrl_impl(void)
@@ -55,7 +59,7 @@ public:
         UHD_SAFE_CALL
         (
             _ads62p44_regs.power_down = ads62p44_regs_t::POWER_DOWN_GLOBAL_PD;
-            this->send_ads62p44_reg(0x14);
+            //this->send_ads62p44_reg(0x14);
         )
     }
 

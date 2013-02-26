@@ -53,4 +53,14 @@ localparam ZPU_SR_ETHINT1    = 56;
 
 localparam ZPU_RB_SPI = 2;
 
+//spi slaves on radio
+#define DB_DAC_SEN (1 << 7)
+#define DB_ADC_SEN (1 << 6)
+#define DB_RX_LSADC_SEN (1 << 5)
+#define DB_RX_LSDAC_SEN (1 << 4)
+#define DB_TX_LSADC_SEN (1 << 3)
+#define DB_TX_LSDAC_SEN (1 << 2)
+#define DB_RX_SEN (1 << 1)
+#define DB_TX_SEN (1 << 0)
+
 #endif /* INCLUDED_B250_REGS_HPP */

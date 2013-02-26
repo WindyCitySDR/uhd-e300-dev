@@ -164,17 +164,20 @@ b250_impl::b250_impl(const uhd::device_addr_t &dev_addr)
     //create basic communication
     _zpu_ctrl.reset(new b250_ctrl_iface(udp_simple::make_connected(dev_addr["addr"], BOOST_STRINGIZE(B250_FW_COMMS_UDP_PORT))));
     _zpu_spi = spi_core_3000::make(_zpu_ctrl, SR_ADDR(SET0_BASE, ZPU_SR_SPI), SR_ADDR(SET0_BASE, ZPU_RB_SPI));
-    this->setup_ad9510_clock();
+    this->setup_ad9510_clock(_zpu_spi);
 
     //create radio0 control
     udp_zero_copy::sptr r0_ctrl_xport = this->make_transport(dev_addr["addr"], B200_R0_CTRL_SID);
     _radio_ctrl0 = b250_ctrl::make(r0_ctrl_xport, B200_R0_CTRL_SID);
+    _radio_ctrl0->poke32(TOREG(SR_MISC_OUTS), (1 << 2)); //reset adc + dac
+    _radio_ctrl0->poke32(TOREG(SR_MISC_OUTS), (1 << 1) | (1 << 0)); //out of reset + dac enable
 
     //sleep(5);
     this->register_loopback_self_test();
 
     _radio_spi0 = spi_core_3000::make(_radio_ctrl0, TOREG(SR_SPI), RB32_SPI);
-    _adc_ctrl0 = b250_adc_ctrl::make(_radio_spi0, 0/*TODO*/);
+    _adc_ctrl0 = b250_adc_ctrl::make(_radio_spi0, DB_ADC_SEN);
+    this->set_ad9146_dac(_radio_spi0);
 
 }
 
@@ -219,23 +222,49 @@ void b250_impl::register_loopback_self_test(void)
     UHD_MSG(status) << ((test_fail)? " fail" : "pass") << std::endl;
 }
 
-void b250_impl::setup_ad9510_clock(void)
+void b250_impl::setup_ad9510_clock(spi_core_3000::sptr iface)
 {
-    _zpu_spi->write_spi(1, spi_config_t::EDGE_RISE, 0x3C08, 24); // TEST_CLK on
-    _zpu_spi->write_spi(1, spi_config_t::EDGE_RISE, 0x3D02, 24); // NC off
-    _zpu_spi->write_spi(1, spi_config_t::EDGE_RISE, 0x3E08, 24); // RX_CLK on
-    _zpu_spi->write_spi(1, spi_config_t::EDGE_RISE, 0x3F08, 24); // TX_CLK on
-    _zpu_spi->write_spi(1, spi_config_t::EDGE_RISE, 0x4002, 24); // FPGA_CLK on
-    _zpu_spi->write_spi(1, spi_config_t::EDGE_RISE, 0x4101, 24); // NC off
-    _zpu_spi->write_spi(1, spi_config_t::EDGE_RISE, 0x4201, 24); // MIMO off
-    _zpu_spi->write_spi(1, spi_config_t::EDGE_RISE, 0x4301, 24); // NC off
-    _zpu_spi->write_spi(1, spi_config_t::EDGE_RISE, 0x4980, 24); // TEST_CLK bypass div
-    _zpu_spi->write_spi(1, spi_config_t::EDGE_RISE, 0x4B80, 24); // NC bypass div
-    _zpu_spi->write_spi(1, spi_config_t::EDGE_RISE, 0x4D80, 24); // RX_CLK bypass div
-    _zpu_spi->write_spi(1, spi_config_t::EDGE_RISE, 0x4F80, 24); // TX_CLK bypass div
-    _zpu_spi->write_spi(1, spi_config_t::EDGE_RISE, 0x5180, 24); // FPGA_CLK bypass div
-    _zpu_spi->write_spi(1, spi_config_t::EDGE_RISE, 0x5380, 24); // NC bypass div
-    _zpu_spi->write_spi(1, spi_config_t::EDGE_RISE, 0x5580, 24); // MIMO bypass div
-    _zpu_spi->write_spi(1, spi_config_t::EDGE_RISE, 0x5780, 24); // NC bypass div
-    _zpu_spi->write_spi(1, spi_config_t::EDGE_RISE, 0x5a01, 24); // Apply settings
+    #define write_ad9510_reg(addr, data) \
+        iface->write_spi(1, spi_config_t::EDGE_RISE, ((addr) << 8) | (data), 24)
+    write_ad9510_reg(0x3C, 0x08); // TEST_CLK on
+    write_ad9510_reg(0x3D, 0x02); // NC off
+    write_ad9510_reg(0x3E, 0x08); // RX_CLK on
+    write_ad9510_reg(0x3F, 0x08); // TX_CLK on
+    write_ad9510_reg(0x40, 0x02); // FPGA_CLK on
+    write_ad9510_reg(0x41, 0x01); // NC off
+    write_ad9510_reg(0x42, 0x01); // MIMO off
+    write_ad9510_reg(0x43, 0x01); // NC off
+    write_ad9510_reg(0x49, 0x80); // TEST_CLK bypass div
+    write_ad9510_reg(0x4B, 0x80); // NC bypass div
+    write_ad9510_reg(0x4D, 0x80); // RX_CLK bypass div
+    write_ad9510_reg(0x4F, 0x80); // TX_CLK bypass div
+    write_ad9510_reg(0x51, 0x80); // FPGA_CLK bypass div
+    write_ad9510_reg(0x53, 0x80); // NC bypass div
+    write_ad9510_reg(0x55, 0x80); // MIMO bypass div
+    write_ad9510_reg(0x57, 0x80); // NC bypass div
+    write_ad9510_reg(0x5a, 0x01); // Apply settings
+}
+
+void b250_impl::set_ad9146_dac(spi_core_3000::sptr iface)
+{
+    spi_config_t spi_config(spi_config_t::EDGE_FALL);
+    spi_config.mosi_edge = spi_config_t::EDGE_RISE;
+    spi_config.miso_edge = spi_config_t::EDGE_RISE;
+
+    #define write_ad9146_reg(addr, data) \
+        iface->write_spi(DB_DAC_SEN, spi_config, ((addr) << 8) | (data), 16)
+    #define read_ad9146_reg(addr) \
+        (iface->read_spi(DB_DAC_SEN, spi_config, ((addr) << 8) | (1 << 15), 16) & 0xffff)
+    //
+    write_ad9146_reg(0x0, 1 << 5); //reset
+    write_ad9146_reg(0x0, 1 << 7); //config + out of reset
+    write_ad9146_reg(0x1, 0x0); //out of power down
+    UHD_MSG(status) << std::hex << read_ad9146_reg(0x7f) << std::endl;
+    UHD_MSG(status) << std::hex << read_ad9146_reg(0x49) << std::endl;
+    UHD_MSG(status) << std::hex << read_ad9146_reg(0x4A) << std::endl;
+    UHD_MSG(status) << std::hex << read_ad9146_reg(0xE) << std::endl;
+    UHD_MSG(status) << std::hex << read_ad9146_reg(0xF) << std::endl;
+    UHD_MSG(status) << std::hex << read_ad9146_reg(0x0) << std::endl;
+    write_ad9146_reg(0x8, 0x3f);
+    UHD_MSG(status) << std::hex << read_ad9146_reg(0x8) << std::endl;
 }

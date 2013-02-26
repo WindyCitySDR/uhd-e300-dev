@@ -56,7 +56,7 @@ private:
     //perifs in the zpu
     wb_iface::sptr _zpu_ctrl;
     spi_core_3000::sptr _zpu_spi;
-    void setup_ad9510_clock(void);
+    void setup_ad9510_clock(spi_core_3000::sptr);
 
     //perifs in the radio core
     b250_ctrl::sptr _radio_ctrl0;
@@ -65,6 +65,8 @@ private:
     spi_core_3000::sptr _radio_spi1;
     b250_adc_ctrl::sptr _adc_ctrl0;
     b250_adc_ctrl::sptr _adc_ctrl1;
+
+    void set_ad9146_dac(spi_core_3000::sptr);
 
 };
 
