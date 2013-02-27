@@ -33,7 +33,7 @@ static void b250_if_hdr_unpack_be(
     vrt::if_packet_info_t &if_packet_info
 ){
     if_packet_info.link_type = vrt::if_packet_info_t::LINK_TYPE_VRLP;
-    return vrt::if_hdr_unpack_le(packet_buff, if_packet_info);
+    return vrt::if_hdr_unpack_be(packet_buff, if_packet_info);
 }
 
 static void b250_if_hdr_pack_be(
@@ -41,7 +41,7 @@ static void b250_if_hdr_pack_be(
     vrt::if_packet_info_t &if_packet_info
 ){
     if_packet_info.link_type = vrt::if_packet_info_t::LINK_TYPE_VRLP;
-    return vrt::if_hdr_pack_le(packet_buff, if_packet_info);
+    return vrt::if_hdr_pack_be(packet_buff, if_packet_info);
 }
 
 /***********************************************************************
@@ -87,6 +87,8 @@ rx_streamer::sptr b250_impl::get_rx_stream(const uhd::stream_args_t &args_)
     data_config.router_dst_here = B250_XB_DST_E0;
     const boost::uint32_t data_sid = this->allocate_sid(data_config);
     udp_zero_copy::sptr data_xport = this->make_transport(_addr, data_sid);
+
+    UHD_MSG(status) << boost::format("data_sid = 0x%08x\n") % data_sid << std::endl;
 
     //send a fc packet to enable some stuff
     {
