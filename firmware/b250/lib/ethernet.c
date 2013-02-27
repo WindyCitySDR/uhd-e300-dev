@@ -180,7 +180,24 @@ xge_read_sfpp_type(const uint32_t base, const uint32_t delay_ms)
       printf("DEBUG: SFFP_TYPE_LRM.\n");
       return SFFP_TYPE_LRM;
     }
-  
+  // Search for legacy 1000-Base SFP types
+  x = xge_i2c_rd(base, MODULE_DEV_ADDR, 0x6);
+  if (x < 0) {
+    printf("DEBUG: I2C error in SFPP_TYPE.\n");
+    return x;
+  }
+  if (x & 0x01) {
+    printf("DEBUG: SFFP_TYPE_1000BASE_SX.\n");
+    return SFFP_TYPE_1000BASE_SX;
+  }
+  if (x & 0x02) {
+    printf("DEBUG: SFFP_TYPE_1000BASE_LX.\n");
+    return SFFP_TYPE_1000BASE_LX;
+  }
+  if (x & 0x08) {
+    printf("DEBUG: SFFP_TYPE_1000BASE_T.\n");
+    return SFFP_TYPE_1000BASE_T;
+  }
   // Not one of the standard optical types..now try to deduce if it's twinax aka 10GSFP+CU
   // which is not covered explicitly in SFF-8472
   x = xge_i2c_rd(base, MODULE_DEV_ADDR, 8);
