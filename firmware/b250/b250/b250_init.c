@@ -21,7 +21,7 @@ static void init_network(void)
     printf("PKT RAM0 BASE %u\n", (&pkt_config)->base);
     u3_net_stack_init(&pkt_config);
 
-    static struct ip_addr my_ip0 = {(192 << 24 | 168 << 16 | 50  << 8  | 2 << 0)};
+    static struct ip_addr my_ip0 = {(192 << 24 | 168 << 16 | 10  << 8  | 2 << 0)};
     //IJB static struct ip_addr my_ip0 = {(192 << 24 | 168 << 16 | 10  << 8  | 2 << 0)};
     static eth_mac_addr_t my_mac0 = {{0x00, 0x50, 0xC2, 0x85, 0x3f, 0xff}};
     u3_net_stack_init_eth(0, &my_mac0, &my_ip0);
@@ -228,7 +228,6 @@ void set_si570_freq(const dco_freq_t new_freq)
     
 }
   
-
 
 void b250_init(void)
 {

@@ -271,12 +271,15 @@ xge_poll_sfpp_status(const uint32_t eth)
 
   if (x & (SFPP_STATUS_RXLOS_CHG|SFPP_STATUS_TXFAULT_CHG|SFPP_STATUS_MODABS_CHG))
     if (( x & (SFPP_STATUS_RXLOS|SFPP_STATUS_TXFAULT|SFPP_STATUS_MODABS)) == 0) {
-      xge_ethernet_init(0);
-      dump_mdio_regs(XGE0_BASE,MDIO_PORT);
-      mdelay(100);
-      dump_mdio_regs(XGE0_BASE,MDIO_PORT);
-      mdelay(100);
-      dump_mdio_regs(XGE0_BASE,MDIO_PORT);
+      // Only re-init if it's 10GE
+      if (wb_peek32(SR_ADDR(RB0_BASE, RB_VERSION)) != 0) {
+	xge_ethernet_init(0);
+	dump_mdio_regs(XGE0_BASE,MDIO_PORT);
+	mdelay(100);
+	dump_mdio_regs(XGE0_BASE,MDIO_PORT);
+	mdelay(100);
+	dump_mdio_regs(XGE0_BASE,MDIO_PORT);
+      }
     }
 
   if (x & SFPP_STATUS_MODABS_CHG) {
