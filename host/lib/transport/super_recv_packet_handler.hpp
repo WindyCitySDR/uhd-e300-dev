@@ -1,5 +1,5 @@
 //
-// Copyright 2011-2012 Ettus Research LLC
+// Copyright 2011-2013 Ettus Research LLC
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -316,8 +316,9 @@ private:
 
         //2) check for sequence errors
         #ifndef SRPH_DONT_CHECK_SEQUENCE
+        const size_t seq_mask = (info.ifpi.link_type == vrt::if_packet_info_t::LINK_TYPE_NONE)? 0xf : 0xfff;
         const size_t expected_packet_count = _props[index].packet_count;
-        _props[index].packet_count = (info.ifpi.packet_count + 1)%16;
+        _props[index].packet_count = (info.ifpi.packet_count + 1) & seq_mask;
         if (expected_packet_count != info.ifpi.packet_count){
             return PACKET_SEQUENCE_ERROR;
         }
@@ -461,7 +462,7 @@ private:
                 curr_info.metadata.start_of_burst = false;
                 curr_info.metadata.end_of_burst = false;
                 curr_info.metadata.error_code = rx_metadata_t::ERROR_CODE_OVERFLOW;
-                UHD_MSG(fastpath) << "O";
+                UHD_MSG(fastpath) << "D";
                 return;
 
             }
