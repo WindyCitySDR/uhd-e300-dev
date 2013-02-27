@@ -172,6 +172,16 @@ b250_impl::b250_impl(const uhd::device_addr_t &dev_addr)
     //create basic communication
     _zpu_ctrl.reset(new b250_ctrl_iface(udp_simple::make_connected(dev_addr["addr"], BOOST_STRINGIZE(B250_FW_COMMS_UDP_PORT))));
     _zpu_spi = spi_core_3000::make(_zpu_ctrl, SR_ADDR(SET0_BASE, ZPU_SR_SPI), SR_ADDR(SET0_BASE, ZPU_RB_SPI));
+    _zpu_i2c = i2c_core_100_wb32::make(_zpu_ctrl, I2C1_BASE);
+    _zpu_i2c->set_clock_rate(B250_BUS_CLOCK_RATE);
+
+    for (size_t i = 0; i < 7; i++)
+    {
+        dboard_eeprom_t rx_db_eeprom;
+        rx_db_eeprom.load(*_zpu_i2c, 0x50 | i);
+        UHD_VAR(i);
+        UHD_VAR(rx_db_eeprom.id.to_uint16());
+    }
 
     ////////////////////////////////////////////////////////////////////
     // Initialize the properties tree
@@ -184,12 +194,17 @@ b250_impl::b250_impl(const uhd::device_addr_t &dev_addr)
     ////////////////////////////////////////////////////////////////////
     // create clock control objects
     ////////////////////////////////////////////////////////////////////
+    UHD_HERE();
     _tree->create<double>(mb_path / "tick_rate");
     this->setup_ad9510_clock(_zpu_spi);
 
+    //clear router?
+    for (size_t i = 0; i < 512; i++) _zpu_ctrl->poke32(SR_ADDR(SETXB_BASE, i), 0);
+
     ////////////////////////////////////////////////////////////////////
-    // radio control
+    // radio control 0
     ////////////////////////////////////////////////////////////////////
+    UHD_HERE();
     sid_config_t ctrl0_config;
     ctrl0_config.router_addr_there = B250_DEVICE_THERE;
     ctrl0_config.dst_prefix = B250_RADIO_DEST_PREFIX_CTRL;
@@ -201,16 +216,33 @@ b250_impl::b250_impl(const uhd::device_addr_t &dev_addr)
     _radio_ctrl0->poke32(TOREG(SR_MISC_OUTS), (1 << 2)); //reset adc + dac
     _radio_ctrl0->poke32(TOREG(SR_MISC_OUTS), (1 << 1) | (1 << 0)); //out of reset + dac enable
 
-    this->register_loopback_self_test();
+    this->register_loopback_self_test(_radio_ctrl0);
 
     _radio_spi0 = spi_core_3000::make(_radio_ctrl0, TOREG(SR_SPI), RB32_SPI);
     _adc_ctrl0 = b250_adc_ctrl::make(_radio_spi0, DB_ADC_SEN);
     this->set_ad9146_dac(_radio_spi0);
 
     ////////////////////////////////////////////////////////////////////
+    // radio control 1
+    ////////////////////////////////////////////////////////////////////
+    UHD_HERE();
+    /*
+    sid_config_t ctrl1_config;
+    ctrl1_config.router_addr_there = B250_DEVICE_THERE;
+    ctrl1_config.dst_prefix = B250_RADIO_DEST_PREFIX_CTRL;
+    ctrl1_config.router_dst_there = B250_XB_DST_R1;
+    ctrl1_config.router_dst_here = B250_XB_DST_E0;
+    const boost::uint32_t ctrl1_sid = this->allocate_sid(ctrl1_config);
+    udp_zero_copy::sptr r1_ctrl_xport = this->make_transport(dev_addr["addr"], ctrl1_sid);
+    _radio_ctrl1 = b250_ctrl::make(r1_ctrl_xport, ctrl1_sid);
+    this->register_loopback_self_test(_radio_ctrl1);
+    */
+
+    ////////////////////////////////////////////////////////////////////
     // create rx dsp control objects
     ////////////////////////////////////////////////////////////////////
     _rx_framer = rx_vita_core_3000::make(_radio_ctrl0, TOREG(SR_RX_CTRL+4), TOREG(SR_RX_CTRL));
+    _rx_framer->set_tick_rate(B250_RADIO_CLOCK_RATE);
     for (size_t dspno = 0; dspno < 1; dspno++)
     {
         const fs_path rx_dsp_path = mb_path / "rx_dsps" / str(boost::format("%u") % dspno);
@@ -230,6 +262,7 @@ b250_impl::b250_impl(const uhd::device_addr_t &dev_addr)
     // create tx dsp control objects
     ////////////////////////////////////////////////////////////////////
     _tx_deframer = tx_vita_core_3000::make(_radio_ctrl0, TOREG(SR_TX_CTRL+2), TOREG(SR_TX_CTRL));
+    _tx_deframer->set_tick_rate(B250_RADIO_CLOCK_RATE);
     for (size_t dspno = 0; dspno < 1; dspno++)
     {
         const fs_path tx_dsp_path = mb_path / "tx_dsps" / str(boost::format("%u") % dspno);
@@ -250,6 +283,8 @@ b250_impl::b250_impl(const uhd::device_addr_t &dev_addr)
     time64_rb_bases.rb_now = RB64_TIME_NOW;
     time64_rb_bases.rb_pps = RB64_TIME_PPS;
     _time64 = time_core_3000::make(_radio_ctrl0, TOREG(SR_TIME), time64_rb_bases);
+    _time64->set_tick_rate(B250_RADIO_CLOCK_RATE);
+    _time64->self_test();
     _tree->create<time_spec_t>(mb_path / "time" / "now")
         .publish(boost::bind(&time_core_3000::get_time_now, _time64))
         .subscribe(boost::bind(&time_core_3000::set_time_now, _time64, _1));
@@ -333,12 +368,13 @@ boost::uint32_t b250_impl::allocate_sid(const sid_config_t &config)
     _last_sid++;
 
     const boost::uint32_t stream = (config.dst_prefix | (_last_sid << 2)) & 0xff;
+    UHD_VAR(stream);
 
     const boost::uint32_t sid = 0
-        | (0/*here*/ << 24)
+        | (4 << 24)
+        | (stream << 16)
         | (config.router_addr_there << 8)
         | (stream << 0)
-        | (stream << 16)
     ;
 
     _zpu_ctrl->poke32(SR_ADDR(SET0_BASE, ZPU_SR_XB_LOCAL), config.router_addr_there);
@@ -348,7 +384,7 @@ boost::uint32_t b250_impl::allocate_sid(const sid_config_t &config)
     return sid;
 }
 
-void b250_impl::register_loopback_self_test(void)
+void b250_impl::register_loopback_self_test(wb_iface::sptr iface)
 {
     bool test_fail = false;
     UHD_MSG(status) << "Performing register loopback test... " << std::flush;
@@ -356,8 +392,8 @@ void b250_impl::register_loopback_self_test(void)
     for (size_t i = 0; i < 100; i++)
     {
         boost::hash_combine(hash, i);
-        _radio_ctrl0->poke32(TOREG(SR_TEST), boost::uint32_t(hash));
-        test_fail = _radio_ctrl0->peek32(RB32_TEST) != boost::uint32_t(hash);
+        iface->poke32(TOREG(SR_TEST), boost::uint32_t(hash));
+        test_fail = iface->peek32(RB32_TEST) != boost::uint32_t(hash);
         if (test_fail) break; //exit loop on any failure
     }
     UHD_MSG(status) << ((test_fail)? " fail" : "pass") << std::endl;

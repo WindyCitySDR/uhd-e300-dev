@@ -31,14 +31,16 @@
 #include "rx_vita_core_3000.hpp"
 #include "tx_vita_core_3000.hpp"
 #include "time_core_3000.hpp"
+#include "i2c_core_100_wb32.hpp"
 #include <boost/weak_ptr.hpp>
 
 static const std::string B250_FW_FILE_NAME = "b250_fw.bin";
 static const double B250_RADIO_CLOCK_RATE = 120e6;
+static const double B250_BUS_CLOCK_RATE = 200e6;
 
-#define B250_RADIO_DEST_PREFIX_TX_DATA 0
+#define B250_RADIO_DEST_PREFIX_TX 0
 #define B250_RADIO_DEST_PREFIX_CTRL 1
-#define B250_RADIO_DEST_PREFIX_RX_FLOW 2
+#define B250_RADIO_DEST_PREFIX_RX 2
 
 #define B250_XB_DST_E0 0
 #define B250_XB_DST_E1 1
@@ -46,6 +48,7 @@ static const double B250_RADIO_CLOCK_RATE = 120e6;
 #define B250_XB_DST_R1 3
 
 #define B250_DEVICE_THERE 2
+#define B250_DEVICE_HERE 0
 
 uhd::usrp::dboard_iface::sptr b250_make_dboard_iface(void);
 
@@ -69,13 +72,14 @@ private:
     }
 
     uhd::transport::udp_zero_copy::sptr make_transport(const std::string &addr, const boost::uint32_t sid);
-    void register_loopback_self_test(void);
+    void register_loopback_self_test(wb_iface::sptr iface);
 
     std::string _addr;
 
     //perifs in the zpu
     wb_iface::sptr _zpu_ctrl;
     spi_core_3000::sptr _zpu_spi;
+    i2c_core_100_wb32::sptr _zpu_i2c;
     void setup_ad9510_clock(spi_core_3000::sptr);
 
     //perifs in the radio core

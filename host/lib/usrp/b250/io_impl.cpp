@@ -82,11 +82,47 @@ rx_streamer::sptr b250_impl::get_rx_stream(const uhd::stream_args_t &args_)
     //allocate sid and create transport
     sid_config_t data_config;
     data_config.router_addr_there = B250_DEVICE_THERE;
-    data_config.dst_prefix = B250_RADIO_DEST_PREFIX_RX_FLOW;
+    data_config.dst_prefix = B250_RADIO_DEST_PREFIX_RX;
     data_config.router_dst_there = B250_XB_DST_R0;
     data_config.router_dst_here = B250_XB_DST_E0;
     const boost::uint32_t data_sid = this->allocate_sid(data_config);
     udp_zero_copy::sptr data_xport = this->make_transport(_addr, data_sid);
+
+    //send a fc packet to enable some stuff
+    {
+        managed_send_buffer::sptr buff = data_xport->get_send_buff(0.0);
+        if (not buff){
+            throw uhd::runtime_error("fifo ctrl timed out getting a send buffer");
+        }
+        boost::uint32_t *pkt = buff->cast<boost::uint32_t *>();
+
+        //load packet info
+        vrt::if_packet_info_t packet_info;
+        packet_info.link_type = vrt::if_packet_info_t::LINK_TYPE_VRLP;
+        packet_info.packet_type = vrt::if_packet_info_t::PACKET_TYPE_CONTEXT;
+        packet_info.num_payload_words32 = 1;
+        packet_info.num_payload_bytes = packet_info.num_payload_words32*sizeof(boost::uint32_t);
+        packet_info.packet_count = 0;
+        packet_info.sob = false;
+        packet_info.eob = false;
+        packet_info.sid = data_sid;
+        packet_info.has_sid = true;
+        packet_info.has_cid = false;
+        packet_info.has_tsi = false;
+        packet_info.has_tsf = false;
+        packet_info.has_tlr = false;
+
+        //load header
+        vrt::if_hdr_pack_be(pkt, packet_info);
+
+        //load payload
+        pkt[packet_info.num_header_words32+0] = uhd::htonx<boost::uint32_t>(0xffffffff);
+
+        //send the buffer over the interface
+        buff->commit(sizeof(boost::uint32_t)*(packet_info.num_packet_words32));
+        UHD_HERE();
+        buff.reset();
+    }
 
     //make the new streamer given the samples per packet
     boost::shared_ptr<sph::recv_packet_streamer> my_streamer = boost::make_shared<sph::recv_packet_streamer>(spp);
@@ -103,7 +139,7 @@ rx_streamer::sptr b250_impl::get_rx_stream(const uhd::stream_args_t &args_)
     my_streamer->set_converter(id);
 
     _rx_framer->set_nsamps_per_packet(spp); //seems to be a good place to set this
-    _rx_framer->set_sid(0);
+    _rx_framer->set_sid((data_sid << 16) | (data_sid >> 16));
     _rx_framer->setup(args);
     my_streamer->set_xport_chan_get_buff(0, boost::bind(
         &zero_copy_if::get_recv_buff, data_xport, _1

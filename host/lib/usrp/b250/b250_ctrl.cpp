@@ -56,9 +56,11 @@ public:
     ~b250_ctrl_impl(void)
     {
         _timeout = ACK_TIMEOUT; //reset timeout to something small
+            UHD_HERE();
         UHD_SAFE_CALL(
             this->peek32(0); //dummy peek with the purpose of ack'ing all packets
         )
+            UHD_HERE();
     }
 
     /*******************************************************************
