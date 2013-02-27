@@ -242,7 +242,7 @@ void b250_init(void)
     wb_i2c_init(I2C0_BASE, CPU_CLOCK);
 
     //hold phy in reset
-    wb_poke32(SR_ADDR(SET0_BASE, SR_PHY_RST), 1);
+    wb_poke32(SR_ADDR(SET0_BASE, SR_SW_RST), SW_RST_PHY);
 
     // IJB. NOTE, SiLabs state that we should first read the factory default 10MHz settings
     // to determine Fxtal and hence derive and exact value for RFREQ. Currently we are just hard coding it.
@@ -285,7 +285,7 @@ void b250_init(void)
     init_network();
   
     //phy reset release
-    wb_poke32(SR_ADDR(SET0_BASE, SR_PHY_RST), 0);
+    wb_poke32(SR_ADDR(SET0_BASE, SR_SW_RST), 0);
     // Run only for 10GE
     if (wb_peek32(SR_ADDR(RB0_BASE, RB_VERSION)) != 0) {
 	 mdelay(100);

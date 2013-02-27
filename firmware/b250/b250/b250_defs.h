@@ -22,7 +22,7 @@
 
 // Setting Regs Memeory Map
 static const int SR_LEDS       = 0;
-static const int SR_PHY_RST    = 1;
+static const int SR_SW_RST    = 1;
 static const int SR_CLOCK_CTRL = 2;
 static const int SR_XB_LOCAL   = 3;
 static const int SR_SFPP_CTRL  = 4;
@@ -37,5 +37,8 @@ static const int RB_SPI_DATA    = 2;
 static const int RB_SFPP_STATUS = 3;
 static const int RB_VERSION     = 4;
 
+#define SW_RST_PHY 0x01
+#define SW_RST_RADIO 0x02
+#define SW_RST_RADIO_PLL 0x04
 
 #endif /* INCLUDED_B250_DEFS_H */
