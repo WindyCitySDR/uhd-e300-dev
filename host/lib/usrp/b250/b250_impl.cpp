@@ -175,14 +175,6 @@ b250_impl::b250_impl(const uhd::device_addr_t &dev_addr)
     _zpu_i2c = i2c_core_100_wb32::make(_zpu_ctrl, I2C1_BASE);
     _zpu_i2c->set_clock_rate(B250_BUS_CLOCK_RATE);
 
-    for (size_t i = 0; i < 7; i++)
-    {
-        dboard_eeprom_t rx_db_eeprom;
-        rx_db_eeprom.load(*_zpu_i2c, 0x50 | i);
-        UHD_VAR(i);
-        UHD_VAR(rx_db_eeprom.id.to_uint16());
-    }
-
     ////////////////////////////////////////////////////////////////////
     // Initialize the properties tree
     ////////////////////////////////////////////////////////////////////
@@ -190,6 +182,17 @@ b250_impl::b250_impl(const uhd::device_addr_t &dev_addr)
     const fs_path mb_path = "/mboards/0";
     _tree->create<std::string>(mb_path / "name").set("B250");
     _tree->create<std::string>(mb_path / "codename").set("Yetti");
+
+    ////////////////////////////////////////////////////////////////////
+    // setup the mboard eeprom
+    ////////////////////////////////////////////////////////////////////
+    // TODO
+//    const mboard_eeprom_t mb_eeprom(*_iface, mboard_eeprom_t::MAP_B100);
+    mboard_eeprom_t mb_eeprom;
+    mb_eeprom["name"] = "TODO"; //FIXME with real eeprom values
+    mb_eeprom["serial"] = "TODO"; //FIXME with real eeprom values
+    _tree->create<mboard_eeprom_t>(mb_path / "eeprom")
+        .set(mb_eeprom);
 
     ////////////////////////////////////////////////////////////////////
     // create clock control objects
@@ -237,6 +240,18 @@ b250_impl::b250_impl(const uhd::device_addr_t &dev_addr)
     _radio_ctrl1 = b250_ctrl::make(r1_ctrl_xport, ctrl1_sid);
     this->register_loopback_self_test(_radio_ctrl1);
     */
+
+    ////////////////////////////////////////////////////////////////
+    // create codec control objects
+    ////////////////////////////////////////////////////////////////
+    _tree->create<int>(mb_path / "rx_codecs" / "A" / "gains"); //phony property so this dir exists
+    _tree->create<int>(mb_path / "tx_codecs" / "A" / "gains"); //phony property so this dir exists
+    _tree->create<std::string>(mb_path / "rx_codecs" / "A" / "name").set("ads62p44");
+    _tree->create<std::string>(mb_path / "tx_codecs" / "A" / "name").set("ad9146");
+    _tree->create<int>(mb_path / "rx_codecs" / "B" / "gains"); //phony property so this dir exists
+    _tree->create<int>(mb_path / "tx_codecs" / "B" / "gains"); //phony property so this dir exists
+    _tree->create<std::string>(mb_path / "rx_codecs" / "B" / "name").set("ads62p44");
+    _tree->create<std::string>(mb_path / "tx_codecs" / "B" / "name").set("ad9146");
 
     ////////////////////////////////////////////////////////////////////
     // create rx dsp control objects
@@ -312,18 +327,39 @@ b250_impl::b250_impl(const uhd::device_addr_t &dev_addr)
     // create RF frontend interfacing
     ////////////////////////////////////////////////////////////////////
 
-    dboard_eeprom_t db_eeprom;
-    _tree->create<dboard_eeprom_t>(mb_path / "dboards" / "A" / "rx_eeprom").set(db_eeprom);
-    _tree->create<dboard_eeprom_t>(mb_path / "dboards" / "A" / "tx_eeprom").set(db_eeprom);
-    _tree->create<dboard_eeprom_t>(mb_path / "dboards" / "A" / "gdb_eeprom").set(db_eeprom);
+    //read all the eeproms, some may not be present
+    dboard_eeprom_t db_eeproms[8];
+    for (size_t i = 0; i < 8; i++)
+    {
+        db_eeproms[i].load(*_zpu_i2c, 0x50 | i);
+    }
+
+    _tree->create<dboard_eeprom_t>(mb_path / "dboards" / "A" / "rx_eeprom").set(db_eeproms[B250_DB0_RX_EEPROM]);
+    _tree->create<dboard_eeprom_t>(mb_path / "dboards" / "A" / "tx_eeprom").set(db_eeproms[B250_DB0_TX_EEPROM]);
+    _tree->create<dboard_eeprom_t>(mb_path / "dboards" / "A" / "gdb_eeprom").set(db_eeproms[B250_DB0_GDB_EEPROM]);
+    _tree->create<dboard_eeprom_t>(mb_path / "dboards" / "B" / "rx_eeprom").set(db_eeproms[B250_DB1_RX_EEPROM]);
+    _tree->create<dboard_eeprom_t>(mb_path / "dboards" / "B" / "tx_eeprom").set(db_eeproms[B250_DB1_TX_EEPROM]);
+    _tree->create<dboard_eeprom_t>(mb_path / "dboards" / "B" / "gdb_eeprom").set(db_eeproms[B250_DB1_GDB_EEPROM]);
 
     //create a new dboard interface and manager
     _dboard_iface0 = b250_make_dboard_iface();
     _tree->create<dboard_iface::sptr>(mb_path / "dboards" / "A" / "iface").set(_dboard_iface0);
     _dboard_manager0 = dboard_manager::make(
-        db_eeprom.id, db_eeprom.id, db_eeprom.id,
+        db_eeproms[B250_DB0_RX_EEPROM].id, db_eeproms[B250_DB0_TX_EEPROM].id, db_eeproms[B250_DB0_GDB_EEPROM].id,
         _dboard_iface0, _tree->subtree(mb_path / "dboards" / "A")
     );
+    _dboard_iface1 = b250_make_dboard_iface();
+    _tree->create<dboard_iface::sptr>(mb_path / "dboards" / "B" / "iface").set(_dboard_iface1);
+    _dboard_manager1 = dboard_manager::make(
+        db_eeproms[B250_DB1_RX_EEPROM].id, db_eeproms[B250_DB1_TX_EEPROM].id, db_eeproms[B250_DB1_GDB_EEPROM].id,
+        _dboard_iface1, _tree->subtree(mb_path / "dboards" / "B")
+    );
+
+    ////////////////////////////////////////////////////////////////////
+    // and do the misc mboard sensors
+    ////////////////////////////////////////////////////////////////////
+    //none for now...
+    _tree->create<int>(mb_path / "sensors"); //phony property so this dir exists
 
     ////////////////////////////////////////////////////////////////////
     // do some post-init tasks
@@ -332,8 +368,10 @@ b250_impl::b250_impl(const uhd::device_addr_t &dev_addr)
     _tree->access<double>(mb_path / "tick_rate") //now subscribe the clock rate setter
         .set(B250_RADIO_CLOCK_RATE);
 
-    _tree->access<subdev_spec_t>(mb_path / "rx_subdev_spec").set(subdev_spec_t("A:0"));
-    _tree->access<subdev_spec_t>(mb_path / "tx_subdev_spec").set(subdev_spec_t("A:0"));
+    _tree->access<subdev_spec_t>(mb_path / "rx_subdev_spec").set(subdev_spec_t("A:" + _tree->list(mb_path / "dboards" / "A" / "rx_frontends").at(0)));
+    _tree->access<subdev_spec_t>(mb_path / "tx_subdev_spec").set(subdev_spec_t("A:" + _tree->list(mb_path / "dboards" / "A" / "tx_frontends").at(0)));
+    _tree->access<std::string>(mb_path / "clock_source" / "value").set("internal");
+    _tree->access<std::string>(mb_path / "time_source" / "value").set("internal");
 
 }
 

@@ -50,6 +50,17 @@ static const double B250_BUS_CLOCK_RATE = 200e6;
 #define B250_DEVICE_THERE 2
 #define B250_DEVICE_HERE 0
 
+//eeprom addrs for various boards
+enum
+{
+    B250_DB0_RX_EEPROM = 0x5,
+    B250_DB0_TX_EEPROM = 0x4,
+    B250_DB0_GDB_EEPROM = 0x1,
+    B250_DB1_RX_EEPROM = 0x7,
+    B250_DB1_TX_EEPROM = 0x6,
+    B250_DB1_GDB_EEPROM = 0x3,
+};
+
 uhd::usrp::dboard_iface::sptr b250_make_dboard_iface(void);
 
 class b250_impl : public uhd::device
