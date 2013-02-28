@@ -428,7 +428,7 @@ b200_impl::b200_impl(const device_addr_t &device_addr):
 
         _tree->create<std::string>(rf_fe_path / "name").set(fe_name);
         _tree->create<int>(rf_fe_path / "sensors"); //empty TODO
-        _tree->create<sensor_value_t>(rf_fe_path / "sensors " / "lo_locked");
+        _tree->create<sensor_value_t>(rf_fe_path / "sensors" / "lo_locked");
         BOOST_FOREACH(const std::string &name, _codec_ctrl->get_gain_names(fe_name))
         {
             _tree->create<meta_range_t>(rf_fe_path / "gains" / name / "range")
