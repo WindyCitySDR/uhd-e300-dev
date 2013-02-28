@@ -18,6 +18,7 @@
 #ifndef INCLUDED_B200_IFACE_HPP
 #define INCLUDED_B200_IFACE_HPP
 
+#include <stdint.h>
 #include <uhd/transport/usb_control.hpp>
 #include <uhd/types/serial.hpp> //i2c iface
 #include <boost/shared_ptr.hpp>

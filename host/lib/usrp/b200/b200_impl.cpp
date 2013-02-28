@@ -241,6 +241,7 @@ b200_impl::b200_impl(const device_addr_t &device_addr):
     _tree->create<std::string>(mb_path / "name").set("B200");
     _tree->create<std::string>(mb_path / "codename").set("Sasquatch");
     _tree->create<double>(mb_path / "fw_version").set(1.0);
+    _tree->create<double>(mb_path / "fpga_version").set(1.0);
 
     ////////////////////////////////////////////////////////////////////
     // Initialize control (settings regs and async messages)
