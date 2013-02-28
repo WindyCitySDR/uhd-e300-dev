@@ -21,7 +21,6 @@
 #include <uhd/utils/msg.hpp>
 #include <uhd/utils/images.hpp>
 #include <uhd/usrp/subdev_spec.hpp>
-#include <uhd/usrp/dboard_eeprom.hpp>
 #include <uhd/usrp/mboard_eeprom.hpp>
 #include <uhd/transport/if_addrs.hpp>
 #include <boost/foreach.hpp>
@@ -169,6 +168,8 @@ b250_impl::b250_impl(const uhd::device_addr_t &dev_addr)
     );
     b250_load_fw(dev_addr["addr"], b250_fw_image);
 
+    const std::vector<std::string> DB_NAMES = boost::assign::list_of("A")("B");
+
     //create basic communication
     _zpu_ctrl.reset(new b250_ctrl_iface(udp_simple::make_connected(dev_addr["addr"], BOOST_STRINGIZE(B250_FW_COMMS_UDP_PORT))));
     _zpu_spi = spi_core_3000::make(_zpu_ctrl, SR_ADDR(SET0_BASE, ZPU_SR_SPI), SR_ADDR(SET0_BASE, ZPU_RB_SPI));
@@ -244,14 +245,13 @@ b250_impl::b250_impl(const uhd::device_addr_t &dev_addr)
     ////////////////////////////////////////////////////////////////
     // create codec control objects
     ////////////////////////////////////////////////////////////////
-    _tree->create<int>(mb_path / "rx_codecs" / "A" / "gains"); //phony property so this dir exists
-    _tree->create<int>(mb_path / "tx_codecs" / "A" / "gains"); //phony property so this dir exists
-    _tree->create<std::string>(mb_path / "rx_codecs" / "A" / "name").set("ads62p44");
-    _tree->create<std::string>(mb_path / "tx_codecs" / "A" / "name").set("ad9146");
-    _tree->create<int>(mb_path / "rx_codecs" / "B" / "gains"); //phony property so this dir exists
-    _tree->create<int>(mb_path / "tx_codecs" / "B" / "gains"); //phony property so this dir exists
-    _tree->create<std::string>(mb_path / "rx_codecs" / "B" / "name").set("ads62p44");
-    _tree->create<std::string>(mb_path / "tx_codecs" / "B" / "name").set("ad9146");
+    BOOST_FOREACH (const std::string &db_name, DB_NAMES)
+    {
+        _tree->create<int>(mb_path / "rx_codecs" / db_name / "gains"); //phony property so this dir exists
+        _tree->create<int>(mb_path / "tx_codecs" / db_name / "gains"); //phony property so this dir exists
+        _tree->create<std::string>(mb_path / "rx_codecs" / db_name / "name").set("ads62p44");
+        _tree->create<std::string>(mb_path / "tx_codecs" / db_name / "name").set("ad9146");
+    }
 
     ////////////////////////////////////////////////////////////////////
     // create rx dsp control objects
@@ -334,26 +334,30 @@ b250_impl::b250_impl(const uhd::device_addr_t &dev_addr)
         db_eeproms[i].load(*_zpu_i2c, 0x50 | i);
     }
 
-    _tree->create<dboard_eeprom_t>(mb_path / "dboards" / "A" / "rx_eeprom").set(db_eeproms[B250_DB0_RX_EEPROM]);
-    _tree->create<dboard_eeprom_t>(mb_path / "dboards" / "A" / "tx_eeprom").set(db_eeproms[B250_DB0_TX_EEPROM]);
-    _tree->create<dboard_eeprom_t>(mb_path / "dboards" / "A" / "gdb_eeprom").set(db_eeproms[B250_DB0_GDB_EEPROM]);
-    _tree->create<dboard_eeprom_t>(mb_path / "dboards" / "B" / "rx_eeprom").set(db_eeproms[B250_DB1_RX_EEPROM]);
-    _tree->create<dboard_eeprom_t>(mb_path / "dboards" / "B" / "tx_eeprom").set(db_eeproms[B250_DB1_TX_EEPROM]);
-    _tree->create<dboard_eeprom_t>(mb_path / "dboards" / "B" / "gdb_eeprom").set(db_eeproms[B250_DB1_GDB_EEPROM]);
+    BOOST_FOREACH (const std::string &db_name, DB_NAMES)
+    {
+        const size_t j = (db_name == "B")? 0x2 : 0x0;
+        _tree->create<dboard_eeprom_t>(mb_path / "dboards" / db_name / "rx_eeprom")
+            .set(db_eeproms[B250_DB0_RX_EEPROM | j])
+            .subscribe(boost::bind(&b250_impl::set_db_eeprom, this, (0x50 | B250_DB0_RX_EEPROM | j), _1));
+        _tree->create<dboard_eeprom_t>(mb_path / "dboards" / db_name / "tx_eeprom")
+            .set(db_eeproms[B250_DB0_TX_EEPROM | j])
+            .subscribe(boost::bind(&b250_impl::set_db_eeprom, this, (0x50 | B250_DB0_TX_EEPROM | j), _1));
+        _tree->create<dboard_eeprom_t>(mb_path / "dboards" / db_name / "gdb_eeprom")
+            .set(db_eeproms[B250_DB0_GDB_EEPROM | j])
+            .subscribe(boost::bind(&b250_impl::set_db_eeprom, this, (0x50 | B250_DB0_GDB_EEPROM | j), _1));
 
-    //create a new dboard interface and manager
-    _dboard_iface0 = b250_make_dboard_iface();
-    _tree->create<dboard_iface::sptr>(mb_path / "dboards" / "A" / "iface").set(_dboard_iface0);
-    _dboard_manager0 = dboard_manager::make(
-        db_eeproms[B250_DB0_RX_EEPROM].id, db_eeproms[B250_DB0_TX_EEPROM].id, db_eeproms[B250_DB0_GDB_EEPROM].id,
-        _dboard_iface0, _tree->subtree(mb_path / "dboards" / "A")
-    );
-    _dboard_iface1 = b250_make_dboard_iface();
-    _tree->create<dboard_iface::sptr>(mb_path / "dboards" / "B" / "iface").set(_dboard_iface1);
-    _dboard_manager1 = dboard_manager::make(
-        db_eeproms[B250_DB1_RX_EEPROM].id, db_eeproms[B250_DB1_TX_EEPROM].id, db_eeproms[B250_DB1_GDB_EEPROM].id,
-        _dboard_iface1, _tree->subtree(mb_path / "dboards" / "B")
-    );
+        //create a new dboard interface and manager
+        _dboard_ifaces[db_name] = b250_make_dboard_iface();
+        _tree->create<dboard_iface::sptr>(mb_path / "dboards" / db_name / "iface").set(_dboard_ifaces[db_name]);
+        _dboard_managers[db_name] = dboard_manager::make(
+            db_eeproms[B250_DB0_RX_EEPROM | j].id,
+            db_eeproms[B250_DB0_TX_EEPROM | j].id,
+            db_eeproms[B250_DB0_GDB_EEPROM | j].id,
+            _dboard_ifaces[db_name],
+            _tree->subtree(mb_path / "dboards" / db_name)
+        );
+    }
 
     ////////////////////////////////////////////////////////////////////
     // and do the misc mboard sensors
@@ -487,4 +491,9 @@ void b250_impl::set_ad9146_dac(spi_core_3000::sptr iface)
 void b250_impl::update_clock_source(const std::string &)
 {
     
+}
+
+void b250_impl::set_db_eeprom(const size_t addr, const uhd::usrp::dboard_eeprom_t &db_eeprom)
+{
+    db_eeprom.store(*_zpu_i2c, addr);
 }

@@ -21,6 +21,7 @@
 #include <uhd/property_tree.hpp>
 #include <uhd/device.hpp>
 #include <uhd/usrp/dboard_manager.hpp>
+#include <uhd/usrp/dboard_eeprom.hpp>
 #include "wb_iface.hpp"
 #include "b250_fw_common.h"
 #include "b250_ctrl.hpp"
@@ -120,13 +121,11 @@ private:
     boost::weak_ptr<uhd::rx_streamer> _rx_streamer;
     boost::weak_ptr<uhd::tx_streamer> _tx_streamer;
 
-    uhd::usrp::dboard_manager::sptr _dboard_manager0;
-    uhd::usrp::dboard_manager::sptr _dboard_manager1;
-
-    uhd::usrp::dboard_iface::sptr _dboard_iface0;
-    uhd::usrp::dboard_iface::sptr _dboard_iface1;
+    uhd::dict<std::string, uhd::usrp::dboard_manager::sptr> _dboard_managers;
+    uhd::dict<std::string, uhd::usrp::dboard_iface::sptr> _dboard_ifaces;
 
     void update_clock_source(const std::string &);
+    void set_db_eeprom(const size_t, const uhd::usrp::dboard_eeprom_t &);
 };
 
 #endif /* INCLUDED_B250_IMPL_HPP */

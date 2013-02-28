@@ -121,7 +121,8 @@ public:
 
 private:
     void i2c_wait(void) {
-        for (size_t i = 0; i < 100; i++){
+        for (size_t i = 0; i < 10; i++)
+        {
             if ((_iface->peek32(REG_I2C_CMD_STATUS) & I2C_ST_TIP) == 0) return;
             boost::this_thread::sleep(boost::posix_time::milliseconds(1));
         }
