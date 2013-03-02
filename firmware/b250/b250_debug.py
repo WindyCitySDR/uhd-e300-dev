@@ -83,7 +83,7 @@ class ctrl_socket(object):
         print("   "),
         for in_prt in range (0, 8):
             print("%10d  " % in_prt),
-        print("   Ingress Port")
+        print("   Egress Port")
         print("  "),
         for in_prt in range (0, 8):
             print("____________"),
@@ -91,7 +91,7 @@ class ctrl_socket(object):
         for in_prt in range (0, 8):
             print("%1d |" % in_prt),
             for out_prt in range (0, 8):
-                out_pkt = pack_reg_peek_poke_fmt(B250_FW_COMMS_FLAGS_PEEK32|B250_FW_COMMS_FLAGS_ACK, seq(), 0xA000+256+((in_prt+out_prt)*4), 0)
+                out_pkt = pack_reg_peek_poke_fmt(B250_FW_COMMS_FLAGS_PEEK32|B250_FW_COMMS_FLAGS_ACK, seq(), 0xA000+256+((in_prt*8+out_prt)*4), 0)
                 in_pkt = self.send_and_recv(out_pkt)
                 (flags, rxseq, addr, data) = unpack_reg_peek_poke_fmt(in_pkt)
                 if flags & B250_FW_COMMS_FLAGS_ERROR == B250_FW_COMMS_FLAGS_ERROR:
