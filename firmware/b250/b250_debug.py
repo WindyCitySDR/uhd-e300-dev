@@ -79,8 +79,18 @@ class ctrl_socket(object):
         return self._sock.recv(UDP_MAX_XFER_BYTES)
 
     def read_router_stats(self):
-        for in_prt in range (0, 7):
-            for out_prt in range (0, 7):
+        print
+        print("   "),
+        for in_prt in range (0, 8):
+            print("%10d  " % in_prt),
+        print("   Ingress Port")
+        print("  "),
+        for in_prt in range (0, 8):
+            print("____________"),
+        print
+        for in_prt in range (0, 8):
+            print("%1d |" % in_prt),
+            for out_prt in range (0, 8):
                 out_pkt = pack_reg_peek_poke_fmt(B250_FW_COMMS_FLAGS_PEEK32|B250_FW_COMMS_FLAGS_ACK, seq(), 0xA000+256+((in_prt+out_prt)*4), 0)
                 in_pkt = self.send_and_recv(out_pkt)
                 (flags, rxseq, addr, data) = unpack_reg_peek_poke_fmt(in_pkt)
@@ -88,6 +98,7 @@ class ctrl_socket(object):
                     raise Exception("B250 peek returns error code")
                 print("%10d  " % (data)),
             print
+        print
 
     def peek(self,peek_addr):
         out_pkt = pack_reg_peek_poke_fmt(B250_FW_COMMS_FLAGS_PEEK32|B250_FW_COMMS_FLAGS_ACK, seq(), peek_addr, 0)
