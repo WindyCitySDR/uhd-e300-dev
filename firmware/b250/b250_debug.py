@@ -80,16 +80,17 @@ class ctrl_socket(object):
 
     def read_router_stats(self):
         print
-        print("   "),
-        for in_prt in range (0, 8):
-            print("%10d  " % in_prt),
+        print("            "),
+        ports = ['        eth0','        eth1','      radio0','      radio1','    compute0','    compute1','    compute2','        pcie']
+        for in_prt in ports:
+            print("%s" % in_prt),
         print("   Egress Port")
-        print("  "),
+        print("             "),
         for in_prt in range (0, 8):
             print("____________"),
         print
         for in_prt in range (0, 8):
-            print("%1d |" % in_prt),
+            print("%s |" % ports[in_prt]),
             for out_prt in range (0, 8):
                 out_pkt = pack_reg_peek_poke_fmt(B250_FW_COMMS_FLAGS_PEEK32|B250_FW_COMMS_FLAGS_ACK, seq(), 0xA000+256+((in_prt*8+out_prt)*4), 0)
                 in_pkt = self.send_and_recv(out_pkt)
@@ -99,6 +100,9 @@ class ctrl_socket(object):
                 print("%10d  " % (data)),
             print
         print
+        print("Ingress Port")
+        print
+
 
     def peek(self,peek_addr):
         out_pkt = pack_reg_peek_poke_fmt(B250_FW_COMMS_FLAGS_PEEK32|B250_FW_COMMS_FLAGS_ACK, seq(), peek_addr, 0)
