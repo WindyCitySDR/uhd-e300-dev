@@ -33,6 +33,7 @@ localparam SR_READBACK  = 32;
 localparam SR_TX_CTRL   = 64;
 localparam SR_RX_CTRL   = 96;
 localparam SR_TIME      = 128;
+localparam SR_RX_DSP    = 144;
 
 localparam RB32_GPIO            = 0;
 localparam RB32_SPI             = 4;

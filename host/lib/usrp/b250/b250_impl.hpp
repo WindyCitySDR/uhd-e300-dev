@@ -22,6 +22,7 @@
 #include <uhd/device.hpp>
 #include <uhd/usrp/dboard_manager.hpp>
 #include <uhd/usrp/dboard_eeprom.hpp>
+#include <uhd/usrp/subdev_spec.hpp>
 #include "wb_iface.hpp"
 #include "b250_fw_common.h"
 #include "b250_ctrl.hpp"
@@ -32,10 +33,11 @@
 #include "rx_vita_core_3000.hpp"
 #include "tx_vita_core_3000.hpp"
 #include "time_core_3000.hpp"
+#include "rx_dsp_core_3000.hpp"
 #include "i2c_core_100_wb32.hpp"
 #include <boost/weak_ptr.hpp>
 
-static const std::string B250_FW_FILE_NAME = "b250_fw.bin";
+static const std::string B250_FW_FILE_NAME = "/home/jblum/src/ettus/b250_dev/uhd/firmware/b250/build/b250/b250_main.bin";
 static const double B250_RADIO_CLOCK_RATE = 120e6;
 static const double B250_BUS_CLOCK_RATE = 200e6;
 
@@ -116,6 +118,7 @@ private:
     boost::uint32_t allocate_sid(const sid_config_t &config);
 
     rx_vita_core_3000::sptr _rx_framer;
+    rx_dsp_core_3000::sptr _rx_dsp;
     tx_vita_core_3000::sptr _tx_deframer;
 
     boost::weak_ptr<uhd::rx_streamer> _rx_streamer;
@@ -123,6 +126,9 @@ private:
 
     uhd::dict<std::string, uhd::usrp::dboard_manager::sptr> _dboard_managers;
     uhd::dict<std::string, uhd::usrp::dboard_iface::sptr> _dboard_ifaces;
+
+    void update_rx_subdev_spec(const uhd::usrp::subdev_spec_t &spec);
+    void update_tx_subdev_spec(const uhd::usrp::subdev_spec_t &spec);
 
     void update_clock_source(const std::string &);
     void set_db_eeprom(const size_t, const uhd::usrp::dboard_eeprom_t &);

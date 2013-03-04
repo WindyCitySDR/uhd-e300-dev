@@ -28,6 +28,57 @@ using namespace uhd;
 using namespace uhd::usrp;
 using namespace uhd::transport;
 
+
+/***********************************************************************
+ * Setup dboard muxing for IQ
+ **********************************************************************/
+void b250_impl::update_rx_subdev_spec(const subdev_spec_t &spec)
+{
+    fs_path root = "/mboards/0/dboards";
+
+    //sanity checking
+    validate_subdev_spec(_tree, spec, "rx");
+
+    //setup mux for this spec
+    bool fe_swapped = false;
+    for (size_t i = 0; i < spec.size(); i++)
+    {
+        const std::string conn = _tree->access<std::string>(root / spec[i].db_name / "rx_frontends" / spec[i].sd_name / "connection").get();
+        if (i == 0 and (conn == "QI" or conn == "Q")) fe_swapped = true;
+        _rx_dsp->set_mux(conn, fe_swapped); //TODO which frontend?
+    }
+    //TODO _rx_fe->set_mux(fe_swapped);
+
+    /*
+    //compute the new occupancy and resize
+    _mbc[which_mb].rx_chan_occ = spec.size();
+    size_t nchan = 0;
+    BOOST_FOREACH(const std::string &mb, _mbc.keys()) nchan += _mbc[mb].rx_chan_occ;
+    */
+}
+
+void b250_impl::update_tx_subdev_spec(const subdev_spec_t &spec)
+{
+    /*
+    fs_path root = "/mboards/" + which_mb + "/dboards";
+
+    //sanity checking
+    validate_subdev_spec(_tree, spec, "tx", which_mb);
+
+    //set the mux for this spec
+    const std::string conn = _tree->access<std::string>(root / spec[0].db_name / "tx_frontends" / spec[0].sd_name / "connection").get();
+    _mbc[which_mb].tx_fe->set_mux(conn);
+
+    //compute the new occupancy and resize
+    _mbc[which_mb].tx_chan_occ = spec.size();
+    size_t nchan = 0;
+    BOOST_FOREACH(const std::string &mb, _mbc.keys()) nchan += _mbc[mb].tx_chan_occ;
+    */
+}
+
+/***********************************************************************
+ * VITA stuff
+ **********************************************************************/
 static void b250_if_hdr_unpack_be(
     const boost::uint32_t *packet_buff,
     vrt::if_packet_info_t &if_packet_info
@@ -75,9 +126,9 @@ rx_streamer::sptr b250_impl::get_rx_stream(const uhd::stream_args_t &args_)
         - sizeof(vrt::if_packet_info_t().cid) //no class id ever used
         - sizeof(vrt::if_packet_info_t().tsi) //no int time ever used
     ;
-    const size_t bpp = 1400/*TOD0*/ - hdr_size;
-    const size_t bpi = convert::get_bytes_per_item(args.otw_format);
-    const size_t spp = unsigned(args.args.cast<double>("spp", bpp/bpi));
+    //const size_t bpp = 1400/*TOD0*/ - hdr_size;
+    //const size_t bpi = convert::get_bytes_per_item(args.otw_format);
+    const size_t spp = 100;//unsigned(args.args.cast<double>("spp", bpp/bpi));
 
     //allocate sid and create transport
     sid_config_t data_config;
