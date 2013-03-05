@@ -434,6 +434,7 @@ public:
 
         if (load_img_msg) UHD_MSG(status) << "Loading FPGA image: " \
             << filestring << "..." << std::flush;
+        boost::system_time next_dot = boost::get_system_time() + boost::posix_time::milliseconds(700);
 
         unsigned char out_buff[64];
         memset(out_buff, 0x00, sizeof(out_buff));
@@ -448,6 +449,13 @@ public:
 
             /* Send the data to the device. */
             fx3_control_write(B200_VREQ_FPGA_DATA, 0, 0, out_buff, transfer_count, 5000);
+
+            if (boost::get_system_time() > next_dot)
+            {
+                if (load_img_msg) UHD_MSG(status) << "." << std::flush;
+                next_dot = boost::get_system_time() + boost::posix_time::milliseconds(700);
+            }
+
         }
 
         file.close();
