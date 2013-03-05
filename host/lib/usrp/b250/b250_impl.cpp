@@ -393,8 +393,22 @@ b250_impl::~b250_impl(void)
 
 uhd::transport::udp_zero_copy::sptr b250_impl::make_transport(const std::string &addr, const boost::uint32_t sid)
 {
+    device_addr_t device_addr;
+
+    //setup the dsp transport hints (default to a large recv buff)
+    if (not device_addr.has_key("recv_buff_size"))
+    {
+        #if defined(UHD_PLATFORM_MACOS) || defined(UHD_PLATFORM_BSD)
+            //limit buffer resize on macos or it will error
+            device_addr["recv_buff_size"] = "1e6";
+        #elif defined(UHD_PLATFORM_LINUX) || defined(UHD_PLATFORM_WIN32)
+            //set to half-a-second of buffering at max rate
+            device_addr["recv_buff_size"] = "50e6";
+        #endif
+    }
+
     //make a new transport - fpga has no idea how to talk to use on this yet
-    udp_zero_copy::sptr xport = udp_zero_copy::make(addr, BOOST_STRINGIZE(B250_VITA_UDP_PORT));
+    udp_zero_copy::sptr xport = udp_zero_copy::make(addr, BOOST_STRINGIZE(B250_VITA_UDP_PORT), device_addr);
 
     //clear the ethernet dispatcher's udp port
     _zpu_ctrl->poke32(SR_ADDR(SET0_BASE, (ZPU_SR_ETHINT0+8+3)), 0);

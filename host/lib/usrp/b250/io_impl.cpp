@@ -128,7 +128,7 @@ rx_streamer::sptr b250_impl::get_rx_stream(const uhd::stream_args_t &args_)
     ;
     //const size_t bpp = 1400/*TOD0*/ - hdr_size;
     //const size_t bpi = convert::get_bytes_per_item(args.otw_format);
-    const size_t spp = 100;//unsigned(args.args.cast<double>("spp", bpp/bpi));
+    const size_t spp = 360;//unsigned(args.args.cast<double>("spp", bpp/bpi));
 
     //allocate sid and create transport
     sid_config_t data_config;
@@ -138,6 +138,7 @@ rx_streamer::sptr b250_impl::get_rx_stream(const uhd::stream_args_t &args_)
     data_config.router_dst_here = B250_XB_DST_E0;
     const boost::uint32_t data_sid = this->allocate_sid(data_config);
     udp_zero_copy::sptr data_xport = this->make_transport(_addr, data_sid);
+    sleep(1);
 
     UHD_MSG(status) << boost::format("data_sid = 0x%08x\n") % data_sid << std::endl;
 
@@ -153,7 +154,7 @@ rx_streamer::sptr b250_impl::get_rx_stream(const uhd::stream_args_t &args_)
         vrt::if_packet_info_t packet_info;
         packet_info.link_type = vrt::if_packet_info_t::LINK_TYPE_VRLP;
         packet_info.packet_type = vrt::if_packet_info_t::PACKET_TYPE_CONTEXT;
-        packet_info.num_payload_words32 = 1;
+        packet_info.num_payload_words32 = 2;
         packet_info.num_payload_bytes = packet_info.num_payload_words32*sizeof(boost::uint32_t);
         packet_info.packet_count = 0;
         packet_info.sob = false;
@@ -169,7 +170,8 @@ rx_streamer::sptr b250_impl::get_rx_stream(const uhd::stream_args_t &args_)
         vrt::if_hdr_pack_be(pkt, packet_info);
 
         //load payload
-        pkt[packet_info.num_header_words32+0] = uhd::htonx<boost::uint32_t>(0xffffffff);
+        pkt[packet_info.num_header_words32+0] = uhd::htonx<boost::uint32_t>(~0);
+        pkt[packet_info.num_header_words32+1] = uhd::htonx<boost::uint32_t>(~0);
 
         //send the buffer over the interface
         buff->commit(sizeof(boost::uint32_t)*(packet_info.num_packet_words32));
