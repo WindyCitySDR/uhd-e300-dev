@@ -66,16 +66,34 @@ static const boost::uint32_t LED_TXRX_TX2 = (1 << 0);
 /* Note that Side 2 is DIFFERENT than FDX on side one, on rev 2,
  * because of a couple of crossed switch control lines. */
 static const boost::uint32_t STATE_OFF = 0x00;
+static const boost::uint32_t STATE_RX1_RX2 = (SFDX1_RX
+                                                | SFDX1_TX
+                                                | LED_RX1);
+
 static const boost::uint32_t STATE_FDX_TXRX1 = (TX_ENABLE1
                                                 | SFDX1_RX
                                                 | SFDX1_TX
                                                 | LED_TXRX_TX1
                                                 | LED_RX1);
 
+static const boost::uint32_t STATE_TX1_TXRX1 = (TX_ENABLE1
+                                                | SFDX1_RX
+                                                | SFDX1_TX
+                                                | LED_TXRX_TX1);
+
 static const boost::uint32_t STATE_FDX_TXRX2 = (TX_ENABLE2
                                                 | SFDX2_RX
                                                 | SRX2_TX
                                                 | LED_TXRX_TX2
+                                                | LED_RX2);
+
+static const boost::uint32_t STATE_TX2_TXRX2 = (TX_ENABLE2
+                                                | SFDX2_RX
+                                                | SRX2_TX
+                                                | LED_TXRX_TX2);
+
+static const boost::uint32_t STATE_RX2_RX2 = (SFDX2_RX
+                                                | SRX2_TX
                                                 | LED_RX2);
 
 #endif /* INCLUDED_B200_REGS_HPP */

@@ -51,6 +51,10 @@ void b200_impl::update_rx_subdev_spec(const uhd::usrp::subdev_spec_t &spec)
     validate_subdev_spec(_tree, spec, "rx");
     UHD_ASSERT_THROW(spec.size() == 1 or spec.size() == 2);
 
+
+    _enable_rx1 = false;
+    _enable_rx2 = false;
+
     if (spec.size() == 1)
     {
         UHD_ASSERT_THROW(spec[0].db_name == "A");
@@ -76,6 +80,9 @@ void b200_impl::update_tx_subdev_spec(const uhd::usrp::subdev_spec_t &spec)
     //sanity checking
     validate_subdev_spec(_tree, spec, "tx");
     UHD_ASSERT_THROW(spec.size() == 1 or spec.size() == 2);
+
+    _enable_tx1 = false;
+    _enable_tx2 = false;
 
     if (spec.size() == 1)
     {

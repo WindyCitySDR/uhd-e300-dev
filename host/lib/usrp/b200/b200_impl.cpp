@@ -638,37 +638,25 @@ void b200_impl::update_gpio_state(void)
 
 void b200_impl::update_antenna_sel(const std::string& which, const std::string &ant)
 {
-
-    /* if(ant == "TX/RX") { */
-    /*     //TODO */
-    /* } else if(ant == "RX2") { */
-    /*     //TODO */
-    /* } else { */
-    /*     throw uhd::value_error("update_antenna_sel unknown antenna " + ant); */
-    /* } */
-
-    if(which[2] == '1')
-    {
-        _atr0->set_atr_reg(dboard_iface::ATR_REG_IDLE, STATE_FDX_TXRX1);
-        _atr0->set_atr_reg(dboard_iface::ATR_REG_RX_ONLY, STATE_FDX_TXRX1);
-        _atr0->set_atr_reg(dboard_iface::ATR_REG_TX_ONLY, STATE_FDX_TXRX1);
+    if(which[2] == '1') {
+        _atr0->set_atr_reg(dboard_iface::ATR_REG_IDLE, STATE_OFF);
+        _atr0->set_atr_reg(dboard_iface::ATR_REG_RX_ONLY, STATE_RX1_RX2);
+        _atr0->set_atr_reg(dboard_iface::ATR_REG_TX_ONLY, STATE_TX1_TXRX1);
         _atr0->set_atr_reg(dboard_iface::ATR_REG_FULL_DUPLEX, STATE_FDX_TXRX1);
 
-        _atr1->set_atr_reg(dboard_iface::ATR_REG_IDLE, STATE_FDX_TXRX2);
-        _atr1->set_atr_reg(dboard_iface::ATR_REG_RX_ONLY, STATE_FDX_TXRX2);
-        _atr1->set_atr_reg(dboard_iface::ATR_REG_TX_ONLY, STATE_FDX_TXRX2);
+        _atr1->set_atr_reg(dboard_iface::ATR_REG_IDLE, STATE_OFF);
+        _atr1->set_atr_reg(dboard_iface::ATR_REG_RX_ONLY, STATE_RX2_RX2);
+        _atr1->set_atr_reg(dboard_iface::ATR_REG_TX_ONLY, STATE_TX2_TXRX2);
         _atr1->set_atr_reg(dboard_iface::ATR_REG_FULL_DUPLEX, STATE_FDX_TXRX2);
-    }
-    else if(which[2] == '2')
-    {
-        _atr0->set_atr_reg(dboard_iface::ATR_REG_IDLE, STATE_FDX_TXRX1);
-        _atr0->set_atr_reg(dboard_iface::ATR_REG_RX_ONLY, STATE_FDX_TXRX1);
-        _atr0->set_atr_reg(dboard_iface::ATR_REG_TX_ONLY, STATE_FDX_TXRX1);
+    } else if(which[2] == '2') {
+        _atr0->set_atr_reg(dboard_iface::ATR_REG_IDLE, STATE_OFF);
+        _atr0->set_atr_reg(dboard_iface::ATR_REG_RX_ONLY, STATE_RX1_RX2);
+        _atr0->set_atr_reg(dboard_iface::ATR_REG_TX_ONLY, STATE_TX1_TXRX1);
         _atr0->set_atr_reg(dboard_iface::ATR_REG_FULL_DUPLEX, STATE_FDX_TXRX1);
 
-        _atr1->set_atr_reg(dboard_iface::ATR_REG_IDLE, STATE_FDX_TXRX2);
-        _atr1->set_atr_reg(dboard_iface::ATR_REG_RX_ONLY, STATE_FDX_TXRX2);
-        _atr1->set_atr_reg(dboard_iface::ATR_REG_TX_ONLY, STATE_FDX_TXRX2);
+        _atr1->set_atr_reg(dboard_iface::ATR_REG_IDLE, STATE_OFF);
+        _atr1->set_atr_reg(dboard_iface::ATR_REG_RX_ONLY, STATE_RX2_RX2);
+        _atr1->set_atr_reg(dboard_iface::ATR_REG_TX_ONLY, STATE_TX2_TXRX2);
         _atr1->set_atr_reg(dboard_iface::ATR_REG_FULL_DUPLEX, STATE_FDX_TXRX2);
     } else {
         throw uhd::value_error("update_antenna_sel unknown side " + which);
