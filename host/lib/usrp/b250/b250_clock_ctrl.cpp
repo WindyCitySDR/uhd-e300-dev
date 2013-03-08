@@ -34,9 +34,10 @@ struct b250_clock_ctrl_impl : b250_clock_ctrl
 
     ~b250_clock_ctrl_impl(void)
     {
+        _enables = uhd::dict<b250_clock_which_t, bool>(); //clears enables
         UHD_SAFE_CALL
         (
-            //TODO
+            this->update_enables();
         )
     }
 
@@ -49,6 +50,16 @@ struct b250_clock_ctrl_impl : b250_clock_ctrl
     {
         _enables[which] = enb;
         this->update_enables();
+    }
+
+    template <typename Db, typename Hi, typename Lo>
+    void set_divider_foo(Db &db, Hi &hi, Lo &lo, const size_t divider)
+    {
+        const size_t high = divider/2;
+        const size_t low = divider - high;
+        db = (divider == 1)? 1 : 0;
+        hi = high - 1;
+        lo = low - 1;
     }
 
     void update_enables(void)
@@ -70,7 +81,10 @@ struct b250_clock_ctrl_impl : b250_clock_ctrl
             ad9510_regs_t::POWER_DOWN_LVPECL_OUT2_NORMAL :
             ad9510_regs_t::POWER_DOWN_LVPECL_OUT2_SAFE_PD;
         _ad9510_regs.output_level_lvpecl_out2 = ad9510_regs_t::OUTPUT_LEVEL_LVPECL_OUT2_810MV;
-        _ad9510_regs.bypass_divider_out2 = 1;
+        const double rx0_div = _rates.get(B250_CLOCK_WHICH_DB0_RX, get_master_clock_rate());
+        const double rx1_div = _rates.get(B250_CLOCK_WHICH_DB1_RX, get_master_clock_rate());
+        const size_t rxdiv = size_t((2*get_master_clock_rate())/(rx0_div + rx1_div));
+        set_divider_foo(_ad9510_regs.bypass_divider_out2, _ad9510_regs.divider_low_cycles_out2, _ad9510_regs.divider_high_cycles_out2, rxdiv);
 
         //3
         const bool enb_tx = _enables.get(B250_CLOCK_WHICH_DB0_TX, false) or _enables.get(B250_CLOCK_WHICH_DB1_TX, false);
@@ -78,7 +92,10 @@ struct b250_clock_ctrl_impl : b250_clock_ctrl
             ad9510_regs_t::POWER_DOWN_LVPECL_OUT3_NORMAL :
             ad9510_regs_t::POWER_DOWN_LVPECL_OUT3_SAFE_PD;
         _ad9510_regs.output_level_lvpecl_out3 = ad9510_regs_t::OUTPUT_LEVEL_LVPECL_OUT3_810MV;
-        _ad9510_regs.bypass_divider_out3 = 1;
+        const double tx0_div = _rates.get(B250_CLOCK_WHICH_DB0_TX, get_master_clock_rate());
+        const double tx1_div = _rates.get(B250_CLOCK_WHICH_DB1_TX, get_master_clock_rate());
+        const size_t txdiv = size_t((2*get_master_clock_rate())/(tx0_div + tx1_div));
+        set_divider_foo(_ad9510_regs.bypass_divider_out3, _ad9510_regs.divider_low_cycles_out3, _ad9510_regs.divider_high_cycles_out3, txdiv);
 
         //4
         _ad9510_regs.power_down_lvds_cmos_out4 = 0; //always FPGA CLOCK ON
@@ -111,9 +128,9 @@ struct b250_clock_ctrl_impl : b250_clock_ctrl
         this->update_regs();
     }
 
-    void set_rate(const b250_clock_which_t, double)
+    void set_rate(const b250_clock_which_t which, double rate)
     {
-        //TODO
+        _rates[which] = rate;
     }
 
     std::vector<double> get_rates(const b250_clock_which_t)
@@ -146,6 +163,7 @@ struct b250_clock_ctrl_impl : b250_clock_ctrl
     const size_t _slaveno;
     ad9510_regs_t _ad9510_regs;
     uhd::dict<b250_clock_which_t, bool> _enables;
+    uhd::dict<b250_clock_which_t, double> _rates;
 
 };
 
