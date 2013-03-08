@@ -34,6 +34,7 @@
 #include "tx_vita_core_3000.hpp"
 #include "time_core_3000.hpp"
 #include "rx_dsp_core_3000.hpp"
+#include "tx_dsp_core_3000.hpp"
 #include "i2c_core_100_wb32.hpp"
 #include "gpio_core_200.hpp"
 #include <boost/weak_ptr.hpp>
@@ -130,6 +131,7 @@ private:
     rx_vita_core_3000::sptr _rx_framer;
     rx_dsp_core_3000::sptr _rx_dsp;
     tx_vita_core_3000::sptr _tx_deframer;
+    tx_dsp_core_3000::sptr _tx_dsp;
 
     boost::weak_ptr<uhd::rx_streamer> _rx_streamer;
     boost::weak_ptr<uhd::tx_streamer> _tx_streamer;

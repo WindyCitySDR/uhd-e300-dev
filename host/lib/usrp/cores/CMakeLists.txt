@@ -39,4 +39,5 @@ LIBUHD_APPEND_SOURCES(
     ${CMAKE_CURRENT_SOURCE_DIR}/spi_core_3000.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/i2c_core_100_wb32.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/rx_dsp_core_3000.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/tx_dsp_core_3000.cpp
 )

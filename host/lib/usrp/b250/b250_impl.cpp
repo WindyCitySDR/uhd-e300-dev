@@ -283,17 +283,22 @@ b250_impl::b250_impl(const uhd::device_addr_t &dev_addr)
     ////////////////////////////////////////////////////////////////////
     _tx_deframer = tx_vita_core_3000::make(_radio_ctrl0, TOREG(SR_TX_CTRL+2), TOREG(SR_TX_CTRL));
     _tx_deframer->set_tick_rate(B250_RADIO_CLOCK_RATE);
+    _tx_dsp = tx_dsp_core_3000::make(_radio_ctrl0, TOREG(SR_TX_DSP));
+    _tx_dsp->set_link_rate(10e9/8); //whatever
+    _tx_dsp->set_tick_rate(B250_RADIO_CLOCK_RATE);
     for (size_t dspno = 0; dspno < 1; dspno++)
     {
         const fs_path tx_dsp_path = mb_path / "tx_dsps" / str(boost::format("%u") % dspno);
         _tree->create<meta_range_t>(tx_dsp_path / "rate" / "range")
-            .set(meta_range_t(120e6, 120e6));
+            .publish(boost::bind(&tx_dsp_core_3000::get_host_rates, _tx_dsp));
         _tree->create<double>(tx_dsp_path / "rate" / "value")
-            .set(120e6);
+            .coerce(boost::bind(&tx_dsp_core_3000::set_host_rate, _tx_dsp, _1))
+            .set(1e6);
         _tree->create<double>(tx_dsp_path / "freq" / "value")
+            .coerce(boost::bind(&tx_dsp_core_3000::set_freq, _tx_dsp, _1))
             .set(0.0);
         _tree->create<meta_range_t>(tx_dsp_path / "freq" / "range")
-            .set(meta_range_t(0.0, 0.0));
+            .publish(boost::bind(&tx_dsp_core_3000::get_freq_range, _tx_dsp));
     }
 
     ////////////////////////////////////////////////////////////////////
