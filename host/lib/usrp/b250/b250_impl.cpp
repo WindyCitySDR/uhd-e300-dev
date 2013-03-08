@@ -354,8 +354,17 @@ b250_impl::b250_impl(const uhd::device_addr_t &dev_addr)
             .set(db_eeproms[B250_DB0_GDB_EEPROM | j])
             .subscribe(boost::bind(&b250_impl::set_db_eeprom, this, (0x50 | B250_DB0_GDB_EEPROM | j), _1));
 
-        //create a new dboard interface and manager
-        _dboard_ifaces[db_name] = b250_make_dboard_iface();
+        //create a new dboard interface
+        b250_dboard_iface_config_t config;
+        b250_ctrl::sptr ctrl = (db_name == "A")? _radio_ctrl0 : _radio_ctrl1;
+        config.gpio = gpio_core_200::make(ctrl, TOREG(SR_GPIO), RB32_GPIO);
+        config.spi = (db_name == "A")? _radio_spi0 : _radio_spi1;
+        config.rx_spi_slaveno = DB_RX_SEN;
+        config.tx_spi_slaveno = DB_TX_SEN;
+        config.i2c = _zpu_i2c;
+        _dboard_ifaces[db_name] = b250_make_dboard_iface(config);
+
+        //create a new dboard manager
         _tree->create<dboard_iface::sptr>(mb_path / "dboards" / db_name / "iface").set(_dboard_ifaces[db_name]);
         _dboard_managers[db_name] = dboard_manager::make(
             db_eeproms[B250_DB0_RX_EEPROM | j].id,

@@ -35,6 +35,7 @@
 #include "time_core_3000.hpp"
 #include "rx_dsp_core_3000.hpp"
 #include "i2c_core_100_wb32.hpp"
+#include "gpio_core_200.hpp"
 #include <boost/weak_ptr.hpp>
 
 static const std::string B250_FW_FILE_NAME = "/home/jblum/src/ettus/b250_dev/uhd/firmware/b250/build/b250/b250_main.bin";
@@ -64,7 +65,16 @@ enum
     B250_DB1_GDB_EEPROM = 0x3,
 };
 
-uhd::usrp::dboard_iface::sptr b250_make_dboard_iface(void);
+struct b250_dboard_iface_config_t
+{
+    gpio_core_200::sptr gpio;
+    spi_core_3000::sptr spi;
+    size_t rx_spi_slaveno;
+    size_t tx_spi_slaveno;
+    i2c_core_100_wb32::sptr i2c;
+};
+
+uhd::usrp::dboard_iface::sptr b250_make_dboard_iface(const b250_dboard_iface_config_t &);
 
 class b250_impl : public uhd::device
 {
