@@ -1,5 +1,5 @@
 #
-# Copyright 2010-2013 Ettus Research LLC
+# Copyright 2013 Ettus Research LLC
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -18,23 +18,18 @@
 ########################################################################
 # This file included, use CMake directory variables
 ########################################################################
-LIBUHD_APPEND_SOURCES(
-    ${CMAKE_CURRENT_SOURCE_DIR}/dboard_base.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/dboard_eeprom.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/dboard_id.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/dboard_iface.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/dboard_manager.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/gps_ctrl.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/mboard_eeprom.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/multi_usrp.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/subdev_spec.cpp
-)
 
-INCLUDE_SUBDIRECTORY(cores)
-INCLUDE_SUBDIRECTORY(dboard)
-INCLUDE_SUBDIRECTORY(common)
-INCLUDE_SUBDIRECTORY(usrp1)
-INCLUDE_SUBDIRECTORY(usrp2)
-INCLUDE_SUBDIRECTORY(b100)
-INCLUDE_SUBDIRECTORY(e100)
-INCLUDE_SUBDIRECTORY(b250)
+########################################################################
+# Conditionally configure the B250 support
+########################################################################
+LIBUHD_REGISTER_COMPONENT("B250" ENABLE_B250 ON "ENABLE_LIBUHD" OFF)
+
+IF(ENABLE_B250)
+    LIBUHD_APPEND_SOURCES(
+        ${CMAKE_CURRENT_SOURCE_DIR}/b250_impl.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/b250_ctrl.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/b250_adc_ctrl.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/io_impl.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/dboard_iface.cpp
+    )
+ENDIF(ENABLE_B250)

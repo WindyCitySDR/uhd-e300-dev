@@ -43,6 +43,8 @@ public:
         const readback_bases_type &readback_bases
     );
 
+    virtual void self_test(void) = 0;
+
     virtual void set_tick_rate(const double rate) = 0;
 
     virtual uhd::time_spec_t get_time_now(void) = 0;

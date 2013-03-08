@@ -17,6 +17,8 @@
 
 #include "time_core_3000.hpp"
 #include <uhd/utils/safe_call.hpp>
+#include <uhd/utils/msg.hpp>
+#include <boost/thread/thread.hpp>
 
 #define REG_TIME_HI       _base + 0
 #define REG_TIME_LO       _base + 4
@@ -53,6 +55,17 @@ struct time_core_3000_impl : time_core_3000
     void set_tick_rate(const double rate)
     {
         _tick_rate = rate;
+    }
+
+    void self_test(void)
+    {
+        UHD_MSG(status) << "Performing timer loopback test... " << std::flush;
+        const time_spec_t time0 = this->get_time_now();
+        boost::this_thread::sleep(boost::posix_time::milliseconds(100));
+        const time_spec_t time1 = this->get_time_now();
+        const double approx_secs = (time1 - time0).get_real_secs();
+        const bool test_fail = (approx_secs > 0.15) or (approx_secs < 0.05);
+        UHD_MSG(status) << ((test_fail)? " fail" : "pass") << std::endl;
     }
 
     uhd::time_spec_t get_time_now(void)
