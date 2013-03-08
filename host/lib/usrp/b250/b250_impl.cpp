@@ -199,10 +199,13 @@ b250_impl::b250_impl(const uhd::device_addr_t &dev_addr)
     // create clock control objects
     ////////////////////////////////////////////////////////////////////
     UHD_HERE();
-    _tree->create<double>(mb_path / "tick_rate");
-    this->setup_ad9510_clock(_zpu_spi);
+    _clock = b250_clock_ctrl::make(_zpu_spi, 1/*slaveno*/);
+    _tree->create<double>(mb_path / "tick_rate")
+        .set(B250_RADIO_CLOCK_RATE);
 
+    ////////////////////////////////////////////////////////////////////
     //clear router?
+    ////////////////////////////////////////////////////////////////////
     for (size_t i = 0; i < 512; i++) _zpu_ctrl->poke32(SR_ADDR(SETXB_BASE, i), 0);
 
     ////////////////////////////////////////////////////////////////////
@@ -338,7 +341,6 @@ b250_impl::b250_impl(const uhd::device_addr_t &dev_addr)
     ////////////////////////////////////////////////////////////////////
     // create RF frontend interfacing
     ////////////////////////////////////////////////////////////////////
-
     //read all the eeproms, some may not be present
     dboard_eeprom_t db_eeproms[8];
     for (size_t i = 0; i < 8; i++)
@@ -348,6 +350,9 @@ b250_impl::b250_impl(const uhd::device_addr_t &dev_addr)
 
     BOOST_FOREACH (const std::string &db_name, DB_NAMES)
     {
+        //FIXME need radio1 working, or this will segfault on B
+        if (db_name == "B") continue;
+
         const size_t j = (db_name == "B")? 0x2 : 0x0;
         _tree->create<dboard_eeprom_t>(mb_path / "dboards" / db_name / "rx_eeprom")
             .set(db_eeproms[B250_DB0_RX_EEPROM | j])
@@ -367,6 +372,9 @@ b250_impl::b250_impl(const uhd::device_addr_t &dev_addr)
         config.rx_spi_slaveno = DB_RX_SEN;
         config.tx_spi_slaveno = DB_TX_SEN;
         config.i2c = _zpu_i2c;
+        config.clock = _clock;
+        config.which_rx_clk = (db_name == "A")? B250_CLOCK_WHICH_DB0_RX : B250_CLOCK_WHICH_DB1_RX;
+        config.which_tx_clk = (db_name == "A")? B250_CLOCK_WHICH_DB0_TX : B250_CLOCK_WHICH_DB1_TX;
         _dboard_ifaces[db_name] = b250_make_dboard_iface(config);
 
         //create a new dboard manager
@@ -383,12 +391,14 @@ b250_impl::b250_impl(const uhd::device_addr_t &dev_addr)
     ////////////////////////////////////////////////////////////////////
     // and do the misc mboard sensors
     ////////////////////////////////////////////////////////////////////
+    UHD_HERE();
     //none for now...
     _tree->create<int>(mb_path / "sensors"); //phony property so this dir exists
 
     ////////////////////////////////////////////////////////////////////
     // do some post-init tasks
     ////////////////////////////////////////////////////////////////////
+    UHD_HERE();
 
     _tree->access<double>(mb_path / "tick_rate") //now subscribe the clock rate setter
         .set(B250_RADIO_CLOCK_RATE);
@@ -474,29 +484,6 @@ void b250_impl::register_loopback_self_test(wb_iface::sptr iface)
         if (test_fail) break; //exit loop on any failure
     }
     UHD_MSG(status) << ((test_fail)? " fail" : "pass") << std::endl;
-}
-
-void b250_impl::setup_ad9510_clock(spi_core_3000::sptr iface)
-{
-    #define write_ad9510_reg(addr, data) \
-        iface->write_spi(1, spi_config_t::EDGE_RISE, ((addr) << 8) | (data), 24)
-    write_ad9510_reg(0x3C, 0x08); // TEST_CLK on
-    write_ad9510_reg(0x3D, 0x02); // NC off
-    write_ad9510_reg(0x3E, 0x08); // RX_CLK on
-    write_ad9510_reg(0x3F, 0x08); // TX_CLK on
-    write_ad9510_reg(0x40, 0x02); // FPGA_CLK on
-    write_ad9510_reg(0x41, 0x01); // NC off
-    write_ad9510_reg(0x42, 0x01); // MIMO off
-    write_ad9510_reg(0x43, 0x01); // NC off
-    write_ad9510_reg(0x49, 0x80); // TEST_CLK bypass div
-    write_ad9510_reg(0x4B, 0x80); // NC bypass div
-    write_ad9510_reg(0x4D, 0x80); // RX_CLK bypass div
-    write_ad9510_reg(0x4F, 0x80); // TX_CLK bypass div
-    write_ad9510_reg(0x51, 0x80); // FPGA_CLK bypass div
-    write_ad9510_reg(0x53, 0x80); // NC bypass div
-    write_ad9510_reg(0x55, 0x80); // MIMO bypass div
-    write_ad9510_reg(0x57, 0x80); // NC bypass div
-    write_ad9510_reg(0x5a, 0x01); // Apply settings
 }
 
 void b250_impl::set_ad9146_dac(spi_core_3000::sptr iface)

@@ -29,7 +29,8 @@ IF(ENABLE_B250)
         ${CMAKE_CURRENT_SOURCE_DIR}/b250_impl.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/b250_ctrl.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/b250_adc_ctrl.cpp
-        ${CMAKE_CURRENT_SOURCE_DIR}/io_impl.cpp
-        ${CMAKE_CURRENT_SOURCE_DIR}/dboard_iface.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/b250_io_impl.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/b250_dboard_iface.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/b250_clock_ctrl.cpp
     )
 ENDIF(ENABLE_B250)

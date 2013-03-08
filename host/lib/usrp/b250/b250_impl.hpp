@@ -24,6 +24,7 @@
 #include <uhd/usrp/dboard_eeprom.hpp>
 #include <uhd/usrp/subdev_spec.hpp>
 #include "wb_iface.hpp"
+#include "b250_clock_ctrl.hpp"
 #include "b250_fw_common.h"
 #include "b250_ctrl.hpp"
 #include "b250_fw_ctrl.hpp"
@@ -73,6 +74,9 @@ struct b250_dboard_iface_config_t
     size_t rx_spi_slaveno;
     size_t tx_spi_slaveno;
     i2c_core_100_wb32::sptr i2c;
+    b250_clock_ctrl::sptr clock;
+    b250_clock_which_t which_rx_clk;
+    b250_clock_which_t which_tx_clk;
 };
 
 uhd::usrp::dboard_iface::sptr b250_make_dboard_iface(const b250_dboard_iface_config_t &);
@@ -105,7 +109,6 @@ private:
     wb_iface::sptr _zpu_ctrl;
     spi_core_3000::sptr _zpu_spi;
     i2c_core_100_wb32::sptr _zpu_i2c;
-    void setup_ad9510_clock(spi_core_3000::sptr);
 
     //perifs in the radio core
     b250_ctrl::sptr _radio_ctrl0;
@@ -115,6 +118,7 @@ private:
     b250_adc_ctrl::sptr _adc_ctrl0;
     b250_adc_ctrl::sptr _adc_ctrl1;
     time_core_3000::sptr _time64;
+    b250_clock_ctrl::sptr _clock;
 
     void set_ad9146_dac(spi_core_3000::sptr);
 

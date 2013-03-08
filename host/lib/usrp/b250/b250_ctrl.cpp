@@ -135,7 +135,7 @@ private:
         packet_info.packet_type = vrt::if_packet_info_t::PACKET_TYPE_CONTEXT;
         packet_info.num_payload_words32 = 2;
         packet_info.num_payload_bytes = packet_info.num_payload_words32*sizeof(boost::uint32_t);
-        packet_info.packet_count = ++_seq_out;
+        packet_info.packet_count = _seq_out;
         packet_info.tsf = _time.to_ticks(_tick_rate);
         packet_info.sob = false;
         packet_info.eob = false;
@@ -156,6 +156,8 @@ private:
         //send the buffer over the interface
         _outstanding_seqs.push(_seq_out);
         buff->commit(sizeof(boost::uint32_t)*(packet_info.num_packet_words32));
+
+        _seq_out++; //inc seq for next call
     }
 
     UHD_INLINE boost::uint64_t wait_for_ack(const bool readback)

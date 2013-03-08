@@ -113,7 +113,8 @@ b250_dboard_iface::~b250_dboard_iface(void)
 {
     UHD_SAFE_CALL
     (
-    //TODO shut down
+        this->set_clock_enabled(UNIT_RX, false);
+        this->set_clock_enabled(UNIT_TX, false);
     )
 }
 
@@ -123,10 +124,11 @@ b250_dboard_iface::~b250_dboard_iface(void)
 void b250_dboard_iface::set_clock_rate(unit_t unit, double rate)
 {
     _clock_rates[unit] = rate; //set to shadow
-    //switch(unit){
-    //case UNIT_RX: _clock_ctrl->set_rate_rx_dboard_clock(rate); return;
-    //case UNIT_TX: _clock_ctrl->set_rate_tx_dboard_clock(rate); return;
-    //}
+    switch(unit)
+    {
+    case UNIT_RX: _config.clock->set_rate(_config.which_rx_clk, rate); return;
+    case UNIT_TX: _config.clock->set_rate(_config.which_tx_clk, rate); return;
+    }
 }
 
 double b250_dboard_iface::get_clock_rate(unit_t unit)
@@ -136,19 +138,21 @@ double b250_dboard_iface::get_clock_rate(unit_t unit)
 
 std::vector<double> b250_dboard_iface::get_clock_rates(unit_t unit)
 {
-    //switch(unit){
-    //case UNIT_RX: return _clock_ctrl->get_rates_rx_dboard_clock();
-    //case UNIT_TX: return _clock_ctrl->get_rates_tx_dboard_clock();
-    //default: UHD_THROW_INVALID_CODE_PATH();
-    //}
+    switch(unit)
+    {
+    case UNIT_RX: return _config.clock->get_rates(_config.which_rx_clk);
+    case UNIT_TX: return _config.clock->get_rates(_config.which_tx_clk);
+    default: UHD_THROW_INVALID_CODE_PATH();
+    }
 }
 
 void b250_dboard_iface::set_clock_enabled(unit_t unit, bool enb)
 {
-    //switch(unit){
-    //case UNIT_RX: _clock_ctrl->enable_rx_dboard_clock(enb); return;
-    //case UNIT_TX: _clock_ctrl->enable_tx_dboard_clock(enb); return;
-    //}
+    switch(unit)
+    {
+    case UNIT_RX: _config.clock->enable_clock(_config.which_rx_clk, enb); return;
+    case UNIT_TX: _config.clock->enable_clock(_config.which_tx_clk, enb); return;
+    }
 }
 
 double b250_dboard_iface::get_codec_rate(unit_t)

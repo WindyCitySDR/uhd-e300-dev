@@ -59,7 +59,7 @@ public:
         UHD_SAFE_CALL
         (
             _ads62p44_regs.power_down = ads62p44_regs_t::POWER_DOWN_GLOBAL_PD;
-            //this->send_ads62p44_reg(0x14);
+            this->send_ads62p44_reg(0x14);
         )
     }
 

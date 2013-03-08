@@ -21,6 +21,7 @@
 #include "wb_iface.hpp"
 #include <uhd/transport/udp_simple.hpp>
 #include <uhd/utils/byteswap.hpp>
+#include <uhd/utils/msg.hpp>
 
 struct b250_ctrl_iface : wb_iface
 {
@@ -62,6 +63,11 @@ struct b250_ctrl_iface : wb_iface
         const size_t nbytes = udp->recv(boost::asio::buffer(&reply, sizeof(reply)));
 
         //sanity checks
+        if (not (nbytes == sizeof(reply)))
+        {
+            UHD_VAR(nbytes);
+            UHD_VAR(sizeof(reply));
+        }
         UHD_ASSERT_THROW(nbytes == sizeof(reply));
         UHD_ASSERT_THROW(not (uhd::ntohx(reply.flags) & B250_FW_COMMS_FLAGS_ERROR));
         UHD_ASSERT_THROW(uhd::ntohx(reply.flags) & B250_FW_COMMS_FLAGS_POKE32);
