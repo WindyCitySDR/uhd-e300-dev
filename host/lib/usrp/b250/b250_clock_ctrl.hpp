@@ -29,6 +29,7 @@ enum b250_clock_which_t
     B250_CLOCK_WHICH_DB0_TX,
     B250_CLOCK_WHICH_DB1_RX,
     B250_CLOCK_WHICH_DB1_TX,
+    B250_CLOCK_WHICH_TEST,
 };
 
 struct b250_clock_ctrl : boost::noncopyable
