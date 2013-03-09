@@ -35,6 +35,7 @@ struct tx_vita_core_3000_impl : tx_vita_core_3000
     {
         this->set_tick_rate(1); //init to non zero
         this->clear();
+        this->set_underflow_policy("next_packet");
     }
 
     ~tx_vita_core_3000_impl(void)
