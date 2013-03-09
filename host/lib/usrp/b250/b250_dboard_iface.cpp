@@ -107,6 +107,12 @@ b250_dboard_iface::b250_dboard_iface(const b250_dboard_iface_config_t &config):
         _dac_regs[unit].cmd  = ad5623_regs_t::CMD_RESET;
         this->_write_aux_dac(unit);
     }
+
+    this->set_clock_enabled(UNIT_RX, false);
+    this->set_clock_enabled(UNIT_TX, false);
+
+    this->set_clock_rate(UNIT_RX, B250_RADIO_CLOCK_RATE);
+    this->set_clock_rate(UNIT_TX, B250_RADIO_CLOCK_RATE);
 }
 
 b250_dboard_iface::~b250_dboard_iface(void)
