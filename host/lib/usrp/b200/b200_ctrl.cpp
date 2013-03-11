@@ -80,7 +80,7 @@ public:
         this->send_pkt(SR_READBACK, addr/8);
         this->wait_for_ack(false);
 
-        this->send_pkt(addr);
+        this->send_pkt(0);
         const boost::uint64_t res = this->wait_for_ack(true);
         const boost::uint32_t lo = boost::uint32_t(res & 0xffffffff);
         const boost::uint32_t hi = boost::uint32_t(res >> 32);
@@ -94,7 +94,7 @@ public:
         this->send_pkt(SR_READBACK, addr/8);
         this->wait_for_ack(false);
 
-        this->send_pkt(addr);
+        this->send_pkt(0);
         return this->wait_for_ack(true);
     }
 
