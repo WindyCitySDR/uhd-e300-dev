@@ -112,7 +112,6 @@ private:
 
     void register_loopback_self_test(void);
     void codec_loopback_self_test(void);
-    void time_loopback_self_test(void);
     void set_mb_eeprom(const uhd::usrp::mboard_eeprom_t &);
     void check_fw_compat(void);
     void check_fpga_compat(void);
