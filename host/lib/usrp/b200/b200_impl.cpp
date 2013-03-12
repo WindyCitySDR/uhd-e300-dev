@@ -401,13 +401,13 @@ b200_impl::b200_impl(const device_addr_t &device_addr):
         .subscribe(boost::bind(&time_core_3000::set_time_next_pps, _time64, _1));
     //setup time source props
     _tree->create<std::string>(mb_path / "time_source" / "value")
-        .subscribe(boost::bind(&time_core_3000::set_time_source, _time64, _1));
-    _tree->create<std::vector<std::string> >(mb_path / "time_source" / "options")
-        .publish(boost::bind(&time_core_3000::get_time_sources, _time64));
+        .subscribe(boost::bind(&b200_impl::update_time_source, this, _1));
+    static const std::vector<std::string> time_sources = boost::assign::list_of("none")("external")("gpsdo")("gpsdo_out");
+    _tree->create<std::vector<std::string> >(mb_path / "time_source" / "options").set(time_sources);
     //setup reference source props
     _tree->create<std::string>(mb_path / "clock_source" / "value")
         .subscribe(boost::bind(&b200_impl::update_clock_source, this, _1));
-    static const std::vector<std::string> clock_sources = boost::assign::list_of("internal")("external");
+    static const std::vector<std::string> clock_sources = boost::assign::list_of("internal")("external")("gpsdo")("gpsdo_out");;
     _tree->create<std::vector<std::string> >(mb_path / "clock_source" / "options").set(clock_sources);
 
     ////////////////////////////////////////////////////////////////////
@@ -481,7 +481,7 @@ b200_impl::b200_impl(const device_addr_t &device_addr):
     _tree->access<subdev_spec_t>(mb_path / "rx_subdev_spec").set(subdev_spec_t("A:RX2"));
     _tree->access<subdev_spec_t>(mb_path / "tx_subdev_spec").set(subdev_spec_t("A:TX2"));
     _tree->access<std::string>(mb_path / "clock_source/value").set("internal");
-    _tree->access<std::string>(mb_path / "time_source/value").set("internal");
+    _tree->access<std::string>(mb_path / "time_source/value").set("none");
 
     //radio clock init'd -> time register readback self test
     this->time_loopback_self_test();
@@ -577,9 +577,29 @@ void b200_impl::check_fpga_compat(void)
     //_ctrl->peek32(REG_RB_COMPAT);....
 }
 
-void b200_impl::update_clock_source(const std::string &)
+void b200_impl::update_clock_source(const std::string &source)
 {
-    //TODO
+    if (source == "internal"){}
+    else if (source == "external"){}
+    else if (source == "gpsdo"){}
+    else if (source == "gpsdo_out"){}
+    else throw uhd::runtime_error("update_clock_source: unknown source: " + source);
+    _gpio_state.gps_out_enable = (source == "gpsdo_out");
+    _gpio_state.gps_ref_enable = (source == "gpsdo") or (source == "gpsdo_out");
+    _gpio_state.ext_ref_enable = (source == "external");
+    this->update_gpio_state();
+}
+
+void b200_impl::update_time_source(const std::string &source)
+{
+    if (source == "none"){}
+    else if (source == "external"){}
+    else if (source == "gpsdo"){}
+    else if (source == "gpsdo_out"){}
+    else throw uhd::runtime_error("update_time_source: unknown source: " + source);
+    _time64->set_time_source((source == "external")? "external" : "internal");
+    _gpio_state.pps_fpga_out_enable = (source == "gpsdo_out");
+    this->update_gpio_state();
 }
 
 void b200_impl::update_bandsel(const std::string& which, double freq)

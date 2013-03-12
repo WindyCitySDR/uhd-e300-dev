@@ -118,6 +118,7 @@ private:
     void check_fpga_compat(void);
     void update_rx_subdev_spec(const uhd::usrp::subdev_spec_t &);
     void update_tx_subdev_spec(const uhd::usrp::subdev_spec_t &);
+    void update_time_source(const std::string &);
     void update_clock_source(const std::string &);
     void update_streamer_rates(const double rate);
     void update_bandsel(const std::string& which, double freq);
