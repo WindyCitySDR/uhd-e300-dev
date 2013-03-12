@@ -120,7 +120,7 @@ private:
     /*******************************************************************
      * Primary control and interaction private methods
      ******************************************************************/
-    UHD_INLINE void send_pkt(const wb_addr_type addr, const boost::uint32_t data = 0)
+    UHD_INLINE void send_pkt(const boost::uint32_t addr, const boost::uint32_t data = 0)
     {
         managed_send_buffer::sptr buff = _xport->get_send_buff(0.0);
         if (not buff){

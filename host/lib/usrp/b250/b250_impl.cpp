@@ -140,7 +140,7 @@ static void b250_load_fw(const std::string &addr, const std::string &file_name)
         request.flags = uhd::htonx<boost::uint32_t>(B250_FW_COMMS_FLAGS_POKE32 | (ack?B250_FW_COMMS_FLAGS_ACK : 0));
         request.sequence = uhd::htonx<boost::uint32_t>(seq++);
         request.addr = uhd::htonx<boost::uint32_t>(B250_FW_NUM_BYTES+i);
-        request.data = uhd::htonx(uhd::byteswap(fw_file_buff[i/sizeof(boost::uint32_t)]));
+        request.data = uhd::htonx(uhd::byteswap<boost::uint32_t>(fw_file_buff[i/sizeof(boost::uint32_t)]));
 
         //send request
         comm->send(asio::buffer(&request, sizeof(request)));
