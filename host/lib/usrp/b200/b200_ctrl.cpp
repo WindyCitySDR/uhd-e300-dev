@@ -169,16 +169,14 @@ private:
             _outstanding_seqs.pop();
 
             //get buffer from response endpoing - or die in timeout
-            managed_recv_buffer::sptr buff;
-            UHD_ASSERT_THROW(_resp_queue.pop_with_timed_wait(buff, _timeout));
-            UHD_ASSERT_THROW(bool(buff));
-            UHD_ASSERT_THROW(bool(buff->size()));
+            resp_buff_type resp_buff;
+            UHD_ASSERT_THROW(_resp_queue.pop_with_timed_wait(resp_buff, _timeout));
 
             //parse the buffer
-            const boost::uint32_t *pkt = buff->cast<const boost::uint32_t *>();
+            const boost::uint32_t *pkt = resp_buff.data;
             vrt::if_packet_info_t packet_info;
             packet_info.link_type = vrt::if_packet_info_t::LINK_TYPE_CHDR;
-            packet_info.num_packet_words32 = buff->size()/sizeof(boost::uint32_t);
+            packet_info.num_packet_words32 = sizeof(resp_buff)/sizeof(boost::uint32_t);
             try
             {
                 vrt::if_hdr_unpack_le(pkt, packet_info);
@@ -186,7 +184,6 @@ private:
             catch(const std::exception &ex)
             {
                 UHD_MSG(error) << "B200 ctrl bad VITA packet: " << ex.what() << std::endl;
-                UHD_VAR(buff->size());
                 UHD_MSG(status) << std::hex << pkt[0] << std::dec << std::endl;
                 UHD_MSG(status) << std::hex << pkt[1] << std::dec << std::endl;
                 UHD_MSG(status) << std::hex << pkt[2] << std::dec << std::endl;
@@ -211,9 +208,11 @@ private:
         return 0;
     }
 
-    void push_resp(uhd::transport::managed_recv_buffer::sptr resp)
+    void push_resp(const boost::uint32_t *buff)
     {
-        _resp_queue.push_with_haste(resp);
+        resp_buff_type resp_buff;
+        std::memcpy(resp_buff.data, buff, sizeof(resp_buff));
+        _resp_queue.push_with_haste(resp_buff);
     }
 
     zero_copy_if::sptr _xport;
@@ -224,7 +223,11 @@ private:
     double _tick_rate;
     double _timeout;
     std::queue<size_t> _outstanding_seqs;
-    bounded_buffer<managed_recv_buffer::sptr> _resp_queue;
+    struct resp_buff_type
+    {
+        boost::uint32_t data[8];
+    };
+    bounded_buffer<resp_buff_type> _resp_queue;
 };
 
 

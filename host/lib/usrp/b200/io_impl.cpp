@@ -148,7 +148,7 @@ void b200_impl::handle_async_task(void)
     //if the packet is a control response
     if (sid == B200_RESP_MSG_SID)
     {
-        _ctrl->push_resp(buff);
+        _ctrl->push_resp(buff->cast<const boost::uint32_t *>());
         return;
     }
 

@@ -44,7 +44,7 @@ public:
     //! Set the tick rate (converting time into ticks)
     virtual void set_tick_rate(const double rate) = 0;
 
-    virtual void push_resp(uhd::transport::managed_recv_buffer::sptr) = 0;
+    virtual void push_resp(const boost::uint32_t *buff) = 0;
 };
 
 #endif /* INCLUDED_B200_CTRL_HPP */
