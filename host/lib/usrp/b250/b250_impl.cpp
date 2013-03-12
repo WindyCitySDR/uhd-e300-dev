@@ -488,9 +488,7 @@ void b250_impl::register_loopback_self_test(wb_iface::sptr iface)
 
 void b250_impl::set_ad9146_dac(spi_core_3000::sptr iface)
 {
-    spi_config_t spi_config(spi_config_t::EDGE_FALL);
-    spi_config.mosi_edge = spi_config_t::EDGE_RISE;
-    spi_config.miso_edge = spi_config_t::EDGE_RISE;
+    spi_config_t spi_config(spi_config_t::EDGE_RISE);
 
     #define write_ad9146_reg(addr, data) \
         iface->write_spi(DB_DAC_SEN, spi_config, ((addr) << 8) | (data), 16)
@@ -500,6 +498,8 @@ void b250_impl::set_ad9146_dac(spi_core_3000::sptr iface)
     write_ad9146_reg(0x0, 1 << 5); //reset
     write_ad9146_reg(0x0, 1 << 7); //config + out of reset
     write_ad9146_reg(0x1, 0x0); //out of power down
+    //UHD_MSG(status) << "trigger now!\n";
+    //sleep(5);
     UHD_MSG(status) << std::hex << read_ad9146_reg(0x7f) << std::endl;
     UHD_MSG(status) << std::hex << read_ad9146_reg(0x49) << std::endl;
     UHD_MSG(status) << std::hex << read_ad9146_reg(0x4A) << std::endl;

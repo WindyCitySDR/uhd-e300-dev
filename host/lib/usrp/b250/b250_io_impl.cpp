@@ -77,6 +77,45 @@ void b250_impl::update_tx_subdev_spec(const subdev_spec_t &spec)
 }
 
 /***********************************************************************
+ * RX flow control handler
+ **********************************************************************/
+static void handle_rx_flowctrl(const boost::uint32_t sid, udp_zero_copy::sptr xport, const size_t last_seq)
+{
+    managed_send_buffer::sptr buff = xport->get_send_buff(0.0);
+    if (not buff)
+    {
+        throw uhd::runtime_error("handle_rx_flowctrl timed out getting a send buffer");
+    }
+    boost::uint32_t *pkt = buff->cast<boost::uint32_t *>();
+
+    //load packet info
+    vrt::if_packet_info_t packet_info;
+    packet_info.link_type = vrt::if_packet_info_t::LINK_TYPE_VRLP;
+    packet_info.packet_type = vrt::if_packet_info_t::PACKET_TYPE_CONTEXT;
+    packet_info.num_payload_words32 = 2;
+    packet_info.num_payload_bytes = packet_info.num_payload_words32*sizeof(boost::uint32_t);
+    packet_info.packet_count = 0;
+    packet_info.sob = false;
+    packet_info.eob = false;
+    packet_info.sid = sid;
+    packet_info.has_sid = true;
+    packet_info.has_cid = false;
+    packet_info.has_tsi = false;
+    packet_info.has_tsf = false;
+    packet_info.has_tlr = false;
+
+    //load header
+    vrt::if_hdr_pack_be(pkt, packet_info);
+
+    //load payload
+    pkt[packet_info.num_header_words32+0] = 0;//uhd::htonx<boost::uint32_t>(~0);
+    pkt[packet_info.num_header_words32+1] = uhd::htonx<boost::uint32_t>(last_seq + 0xfff); //assume max... for now its just testing
+
+    //send the buffer over the interface
+    buff->commit(sizeof(boost::uint32_t)*(packet_info.num_packet_words32));
+}
+
+/***********************************************************************
  * VITA stuff
  **********************************************************************/
 static void b250_if_hdr_unpack_be(
@@ -142,43 +181,6 @@ rx_streamer::sptr b250_impl::get_rx_stream(const uhd::stream_args_t &args_)
 
     UHD_MSG(status) << boost::format("data_sid = 0x%08x\n") % data_sid << std::endl;
 
-    //send a fc packet to enable some stuff
-    {
-        managed_send_buffer::sptr buff = data_xport->get_send_buff(0.0);
-        if (not buff){
-            throw uhd::runtime_error("fifo ctrl timed out getting a send buffer");
-        }
-        boost::uint32_t *pkt = buff->cast<boost::uint32_t *>();
-
-        //load packet info
-        vrt::if_packet_info_t packet_info;
-        packet_info.link_type = vrt::if_packet_info_t::LINK_TYPE_VRLP;
-        packet_info.packet_type = vrt::if_packet_info_t::PACKET_TYPE_CONTEXT;
-        packet_info.num_payload_words32 = 2;
-        packet_info.num_payload_bytes = packet_info.num_payload_words32*sizeof(boost::uint32_t);
-        packet_info.packet_count = 0;
-        packet_info.sob = false;
-        packet_info.eob = false;
-        packet_info.sid = data_sid;
-        packet_info.has_sid = true;
-        packet_info.has_cid = false;
-        packet_info.has_tsi = false;
-        packet_info.has_tsf = false;
-        packet_info.has_tlr = false;
-
-        //load header
-        vrt::if_hdr_pack_be(pkt, packet_info);
-
-        //load payload
-        pkt[packet_info.num_header_words32+0] = uhd::htonx<boost::uint32_t>(~0);
-        pkt[packet_info.num_header_words32+1] = uhd::htonx<boost::uint32_t>(~0);
-
-        //send the buffer over the interface
-        buff->commit(sizeof(boost::uint32_t)*(packet_info.num_packet_words32));
-        UHD_HERE();
-        buff.reset();
-    }
-
     //make the new streamer given the samples per packet
     boost::shared_ptr<sph::recv_packet_streamer> my_streamer = boost::make_shared<sph::recv_packet_streamer>(spp);
 
@@ -202,6 +204,9 @@ rx_streamer::sptr b250_impl::get_rx_stream(const uhd::stream_args_t &args_)
     my_streamer->set_overflow_handler(0, boost::bind(
         &rx_vita_core_3000::handle_overflow, _rx_framer
     ));
+    my_streamer->set_xport_handle_flowctrl(0, boost::bind(
+        &handle_rx_flowctrl, data_sid, data_xport, _1
+    ), 0xfff/8, true/*init*/);
     _rx_streamer = my_streamer; //store weak pointer
 
     //sets all tick and samp rates on this streamer

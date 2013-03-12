@@ -63,6 +63,7 @@ static inline void handle_overflow_nop(void){}
 class recv_packet_handler{
 public:
     typedef boost::function<managed_recv_buffer::sptr(double)> get_buff_type;
+    typedef boost::function<void(const size_t)> handle_flowctrl_type;
     typedef void(*vrt_unpacker_type)(const boost::uint32_t *, vrt::if_packet_info_t &);
     //typedef boost::function<void(const boost::uint32_t *, vrt::if_packet_info_t &)> vrt_unpacker_type;
 
@@ -139,6 +140,18 @@ public:
             while (get_buff(0.0));
         }
         _props.at(xport_chan).get_buff = get_buff;
+    }
+
+    /*!
+     * Set the function to handle flow control
+     * \param xport_chan which transport channel
+     * \param handle_flowctrl the callback function
+     */
+    void set_xport_handle_flowctrl(const size_t xport_chan, const handle_flowctrl_type &handle_flowctrl, const size_t update_window, const bool do_init = false)
+    {
+        _props.at(xport_chan).handle_flowctrl = handle_flowctrl;
+        _props.at(xport_chan).fc_update_window = update_window;
+        if (do_init) handle_flowctrl(0);
     }
 
     //! Set the conversion routine for all channels
@@ -223,6 +236,8 @@ private:
         get_buff_type get_buff;
         size_t packet_count;
         handle_overflow_type handle_overflow;
+        handle_flowctrl_type handle_flowctrl;
+        size_t fc_update_window;
     };
     std::vector<xport_chan_props_type> _props;
     size_t _num_outputs;
@@ -303,6 +318,15 @@ private:
         _vrt_unpacker(info.vrt_hdr, info.ifpi);
         info.time = time_spec_t::from_ticks(info.ifpi.tsf, _tick_rate); //assumes has_tsf is true
         info.copy_buff = reinterpret_cast<const char *>(info.vrt_hdr + info.ifpi.num_header_words32);
+
+        //handle flow control
+        if (_props[index].handle_flowctrl)
+        {
+            if ((info.ifpi.packet_count % _props[index].fc_update_window) == 0)
+            {
+                _props[index].handle_flowctrl(info.ifpi.packet_count);
+            }
+        }
 
         //--------------------------------------------------------------
         //-- Determine return conditions:
