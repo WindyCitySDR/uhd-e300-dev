@@ -63,15 +63,16 @@ struct b250_ctrl_iface : wb_iface
         const size_t nbytes = udp->recv(boost::asio::buffer(&reply, sizeof(reply)));
 
         //sanity checks
+        const size_t flags = uhd::ntohx<boost::uint32_t>(reply.flags);
         if (not (nbytes == sizeof(reply)))
         {
             UHD_VAR(nbytes);
             UHD_VAR(sizeof(reply));
         }
         UHD_ASSERT_THROW(nbytes == sizeof(reply));
-        UHD_ASSERT_THROW(not (uhd::ntohx(reply.flags) & B250_FW_COMMS_FLAGS_ERROR));
-        UHD_ASSERT_THROW(uhd::ntohx(reply.flags) & B250_FW_COMMS_FLAGS_POKE32);
-        UHD_ASSERT_THROW(uhd::ntohx(reply.flags) & B250_FW_COMMS_FLAGS_ACK);
+        UHD_ASSERT_THROW(not (flags & B250_FW_COMMS_FLAGS_ERROR));
+        UHD_ASSERT_THROW(flags & B250_FW_COMMS_FLAGS_POKE32);
+        UHD_ASSERT_THROW(flags & B250_FW_COMMS_FLAGS_ACK);
         UHD_ASSERT_THROW(reply.sequence == request.sequence);
         UHD_ASSERT_THROW(reply.addr == request.addr);
         UHD_ASSERT_THROW(reply.data == request.data);
@@ -95,10 +96,11 @@ struct b250_ctrl_iface : wb_iface
         const size_t nbytes = udp->recv(boost::asio::buffer(&reply, sizeof(reply)));
 
         //sanity checks
+        const size_t flags = uhd::ntohx<boost::uint32_t>(reply.flags);
         UHD_ASSERT_THROW(nbytes == sizeof(reply));
-        UHD_ASSERT_THROW(not (uhd::ntohx(reply.flags) & B250_FW_COMMS_FLAGS_ERROR));
-        UHD_ASSERT_THROW(uhd::ntohx(reply.flags) & B250_FW_COMMS_FLAGS_PEEK32);
-        UHD_ASSERT_THROW(uhd::ntohx(reply.flags) & B250_FW_COMMS_FLAGS_ACK);
+        UHD_ASSERT_THROW(not (flags & B250_FW_COMMS_FLAGS_ERROR));
+        UHD_ASSERT_THROW(flags & B250_FW_COMMS_FLAGS_PEEK32);
+        UHD_ASSERT_THROW(flags & B250_FW_COMMS_FLAGS_ACK);
         UHD_ASSERT_THROW(reply.sequence == request.sequence);
         UHD_ASSERT_THROW(reply.addr == request.addr);
 
