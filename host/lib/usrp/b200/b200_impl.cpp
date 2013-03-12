@@ -584,9 +584,9 @@ void b200_impl::update_clock_source(const std::string &source)
     else if (source == "gpsdo"){}
     else if (source == "gpsdo_out"){}
     else throw uhd::runtime_error("update_clock_source: unknown source: " + source);
-    _gpio_state.gps_out_enable = (source == "gpsdo_out");
-    _gpio_state.gps_ref_enable = (source == "gpsdo") or (source == "gpsdo_out");
-    _gpio_state.ext_ref_enable = (source == "external");
+    _gpio_state.gps_out_enable = (source == "gpsdo_out")? 0 : 1;
+    _gpio_state.gps_ref_enable = ((source == "gpsdo") or (source == "gpsdo_out"))? 0 : 1;
+    _gpio_state.ext_ref_enable = (source == "external")? 0 : 1;
     this->update_gpio_state();
 }
 
@@ -598,7 +598,7 @@ void b200_impl::update_time_source(const std::string &source)
     else if (source == "gpsdo_out"){}
     else throw uhd::runtime_error("update_time_source: unknown source: " + source);
     _time64->set_time_source((source == "external")? "external" : "internal");
-    _gpio_state.pps_fpga_out_enable = (source == "gpsdo_out");
+    _gpio_state.pps_fpga_out_enable = (source == "gpsdo_out")? 1 : 0;
     this->update_gpio_state();
 }
 
