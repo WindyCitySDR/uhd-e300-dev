@@ -540,7 +540,8 @@ void b200_impl::codec_loopback_self_test(void)
 
 double b200_impl::set_sample_rate(const double rate)
 {
-    _tick_rate = _codec_ctrl->set_clock_rate(rate);
+    const size_t factor = (_gpio_state.mimo_rx or _gpio_state.mimo_tx)? 2:1;
+    _tick_rate = _codec_ctrl->set_clock_rate(rate*factor);
     this->update_streamer_rates(_tick_rate);
     _time64->set_tick_rate(_tick_rate);
     _rx_framer->set_tick_rate(_tick_rate);

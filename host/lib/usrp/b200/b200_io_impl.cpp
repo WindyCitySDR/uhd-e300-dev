@@ -35,13 +35,13 @@ void b200_impl::update_streamer_rates(const double rate)
         boost::shared_ptr<sph::recv_packet_streamer> my_streamer =
             boost::dynamic_pointer_cast<sph::recv_packet_streamer>(_rx_streamer.lock());
         if (my_streamer) my_streamer->set_tick_rate(rate);
-        if (my_streamer) my_streamer->set_samp_rate(rate);
+        if (my_streamer) my_streamer->set_samp_rate(rate/((_gpio_state.mimo_rx)?2:1));
     }
     {
         boost::shared_ptr<sph::send_packet_streamer> my_streamer =
             boost::dynamic_pointer_cast<sph::send_packet_streamer>(_tx_streamer.lock());
         if (my_streamer) my_streamer->set_tick_rate(rate);
-        if (my_streamer) my_streamer->set_samp_rate(rate);
+        if (my_streamer) my_streamer->set_samp_rate(rate/((_gpio_state.mimo_tx)?2:1));
     }
 }
 
