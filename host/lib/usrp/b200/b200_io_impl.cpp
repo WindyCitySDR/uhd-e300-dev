@@ -28,20 +28,20 @@ using namespace uhd;
 using namespace uhd::usrp;
 using namespace uhd::transport;
 
-void b200_impl::update_streamer_rates(const double rate)
+void b200_impl::update_streamer_rates(void)
 {
     //update the tick rate on all existing streamers -> thread safe
     {
         boost::shared_ptr<sph::recv_packet_streamer> my_streamer =
             boost::dynamic_pointer_cast<sph::recv_packet_streamer>(_rx_streamer.lock());
-        if (my_streamer) my_streamer->set_tick_rate(rate);
-        if (my_streamer) my_streamer->set_samp_rate(rate/((_gpio_state.mimo_rx)?2:1));
+        if (my_streamer) my_streamer->set_tick_rate(this->get_tick_rate());
+        if (my_streamer) my_streamer->set_samp_rate(this->get_rx_sample_rate());
     }
     {
         boost::shared_ptr<sph::send_packet_streamer> my_streamer =
             boost::dynamic_pointer_cast<sph::send_packet_streamer>(_tx_streamer.lock());
-        if (my_streamer) my_streamer->set_tick_rate(rate);
-        if (my_streamer) my_streamer->set_samp_rate(rate/((_gpio_state.mimo_tx)?2:1));
+        if (my_streamer) my_streamer->set_tick_rate(this->get_tick_rate());
+        if (my_streamer) my_streamer->set_samp_rate(this->get_tx_sample_rate());
     }
 }
 
@@ -238,7 +238,7 @@ rx_streamer::sptr b200_impl::get_rx_stream(const uhd::stream_args_t &args_)
     _rx_streamer = my_streamer; //store weak pointer
 
     //sets all tick and samp rates on this streamer
-    this->update_streamer_rates(_tick_rate);
+    this->update_streamer_rates();
 
     //set the mimo bit as per number of channels
     _gpio_state.mimo_rx = (nchans == 2)? 1 : 0;
@@ -297,7 +297,7 @@ tx_streamer::sptr b200_impl::get_tx_stream(const uhd::stream_args_t &args_)
     _tx_streamer = my_streamer; //store weak pointer
 
     //sets all tick and samp rates on this streamer
-    this->update_streamer_rates(_tick_rate);
+    this->update_streamer_rates();
 
     //set the mimo bit as per number of channels
     _gpio_state.mimo_tx = (nchans == 2)? 1 : 0;

@@ -299,12 +299,6 @@ b200_impl::b200_impl(const device_addr_t &device_addr):
     update_bandsel("RX", 800e6);
     update_bandsel("TX", 850e6);
 
-    /* TODO lock to ext ref
-    _gpio_state.gps_ref_enable = 1;
-    _gpio_state.gps_out_enable = 1;
-    _gpio_state.ext_ref_enable = 0;
-    */
-
     ////////////////////////////////////////////////////////////////////
     // create codec control objects
     ////////////////////////////////////////////////////////////////////
@@ -332,8 +326,8 @@ b200_impl::b200_impl(const device_addr_t &device_addr):
     ////////////////////////////////////////////////////////////////////
     //^^^ clock created up top, just reg props here... ^^^
     _tree->create<double>(mb_path / "tick_rate")
-        .publish(boost::bind(&b200_impl::get_clock_rate, this))
-        .coerce(boost::bind(&b200_impl::set_sample_rate, this, _1));
+        .publish(boost::bind(&b200_impl::get_tick_rate, this))
+        .subscribe(boost::bind(&b200_impl::set_tick_rate, this, _1));
 
     ////////////////////////////////////////////////////////////////////
     // and do the misc mboard sensors
@@ -358,8 +352,8 @@ b200_impl::b200_impl(const device_addr_t &device_addr):
         _tree->create<meta_range_t>(rx_dsp_path / "rate" / "range")
             .publish(boost::bind(&b200_impl::get_possible_rates, this));
         _tree->create<double>(rx_dsp_path / "rate" / "value")
-            .publish(boost::bind(&b200_impl::get_clock_rate, this))
-            .coerce(boost::bind(&b200_impl::set_sample_rate, this, _1));
+            .publish(boost::bind(&b200_impl::get_rx_sample_rate, this))
+            .subscribe(boost::bind(&b200_impl::set_rx_sample_rate, this, _1));
         _tree->create<double>(rx_dsp_path / "freq" / "value")
             .publish(boost::bind(&b200_impl::get_dsp_freq, this));
         _tree->create<meta_range_t>(rx_dsp_path / "freq/range")
@@ -378,8 +372,8 @@ b200_impl::b200_impl(const device_addr_t &device_addr):
         _tree->create<meta_range_t>(tx_dsp_path / "rate" / "range")
             .publish(boost::bind(&b200_impl::get_possible_rates, this));
         _tree->create<double>(tx_dsp_path / "rate" / "value")
-            .publish(boost::bind(&b200_impl::get_clock_rate, this))
-            .coerce(boost::bind(&b200_impl::set_sample_rate, this, _1));
+            .publish(boost::bind(&b200_impl::get_tx_sample_rate, this))
+            .subscribe(boost::bind(&b200_impl::set_tx_sample_rate, this, _1));
         _tree->create<double>(tx_dsp_path / "freq" / "value")
             .publish(boost::bind(&b200_impl::get_dsp_freq, this));
         _tree->create<meta_range_t>(tx_dsp_path / "freq" / "range")
@@ -503,6 +497,11 @@ b200_impl::~b200_impl(void)
     _async_task.reset();
 }
 
+
+/***********************************************************************
+ * loopback tests
+ **********************************************************************/
+ 
 void b200_impl::register_loopback_self_test(void)
 {
     bool test_fail = false;
@@ -538,22 +537,45 @@ void b200_impl::codec_loopback_self_test(void)
     UHD_MSG(status) << ((test_fail)? " fail" : "pass") << std::endl;
 }
 
-double b200_impl::set_sample_rate(const double rate)
+/***********************************************************************
+ * Sample and tick rate comprehension below
+ **********************************************************************/
+void b200_impl::set_tick_rate(const double rate)
 {
-    const size_t factor = (_gpio_state.mimo_rx or _gpio_state.mimo_tx)? 2:1;
-    _tick_rate = _codec_ctrl->set_clock_rate(rate*factor);
-    this->update_streamer_rates(_tick_rate);
+    _tick_rate = _codec_ctrl->set_clock_rate(rate);
+    this->update_streamer_rates();
     _time64->set_tick_rate(_tick_rate);
     _rx_framer->set_tick_rate(_tick_rate);
     _tx_deframer->set_tick_rate(_tick_rate);
-    return _tick_rate;
 }
 
-void b200_impl::set_mb_eeprom(const uhd::usrp::mboard_eeprom_t &mb_eeprom)
+void b200_impl::set_rx_sample_rate(const double rate)
 {
-    //TODO
-    //mb_eeprom.commit(*_iface, mboard_eeprom_t::MAP_B100);
+    const size_t factor = (_enable_rx1 and _enable_rx2)? 2:1;
+    this->set_tick_rate(rate*factor);
 }
+
+void b200_impl::set_tx_sample_rate(const double rate)
+{
+    const size_t factor = (_enable_tx1 and _enable_tx2)? 2:1;
+    this->set_tick_rate(rate*factor);
+}
+
+double b200_impl::get_rx_sample_rate(void)
+{
+    const size_t factor = (_enable_rx1 and _enable_rx2)? 2:1;
+    return _tick_rate/factor;
+}
+
+double b200_impl::get_tx_sample_rate(void)
+{
+    const size_t factor = (_enable_tx1 and _enable_tx2)? 2:1;
+    return _tick_rate/factor;
+}
+
+/***********************************************************************
+ * compat checks
+ **********************************************************************/
 
 void b200_impl::check_fw_compat(void)
 {
@@ -565,6 +587,17 @@ void b200_impl::check_fpga_compat(void)
     //TODO
     //_ctrl->peek32(REG_RB_COMPAT);....
 }
+
+void b200_impl::set_mb_eeprom(const uhd::usrp::mboard_eeprom_t &mb_eeprom)
+{
+    //TODO
+    //mb_eeprom.commit(*_iface, mboard_eeprom_t::MAP_B100);
+}
+
+
+/***********************************************************************
+ * Reference time and clock
+ **********************************************************************/
 
 void b200_impl::update_clock_source(const std::string &source)
 {
@@ -590,6 +623,10 @@ void b200_impl::update_time_source(const std::string &source)
     _gpio_state.pps_fpga_out_enable = (source == "gpsdo_out")? 1 : 0;
     this->update_gpio_state();
 }
+
+/***********************************************************************
+ * GPIO setup
+ **********************************************************************/
 
 void b200_impl::update_bandsel(const std::string& which, double freq)
 {

@@ -89,8 +89,6 @@ private:
     time_core_3000::sptr _time64;
     gpio_core_200_32wo::sptr _atr0;
     gpio_core_200_32wo::sptr _atr1;
-    double _tick_rate;
-    double get_clock_rate(void){return _tick_rate;}
 
     //transports
     uhd::transport::zero_copy_if::sptr _data_transport;
@@ -119,7 +117,7 @@ private:
     void update_tx_subdev_spec(const uhd::usrp::subdev_spec_t &);
     void update_time_source(const std::string &);
     void update_clock_source(const std::string &);
-    void update_streamer_rates(const double rate);
+    void update_streamer_rates(void);
     void update_bandsel(const std::string& which, double freq);
     void update_antenna_sel(const std::string& which, const std::string &ant);
 
@@ -153,7 +151,13 @@ private:
     uhd::meta_range_t get_dsp_freq_range(void){return uhd::meta_range_t(0.0, 0.0);};
     uhd::meta_range_t get_possible_rates(void){return b200_samp_range;};
 
-    double set_sample_rate(const double rate);
+    double _tick_rate;
+    double get_tick_rate(void){return _tick_rate;}
+    void set_tick_rate(const double rate);
+    void set_rx_sample_rate(const double rate);
+    void set_tx_sample_rate(const double rate);
+    double get_rx_sample_rate(void);
+    double get_tx_sample_rate(void);
 
     uhd::task::sptr _server;
     void run_server(void);
