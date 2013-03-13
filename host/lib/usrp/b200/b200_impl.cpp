@@ -468,17 +468,13 @@ b200_impl::b200_impl(const device_addr_t &device_addr):
     // do some post-init tasks
     ////////////////////////////////////////////////////////////////////
 
-    _tree->access<double>(mb_path / "tick_rate") //now subscribe the clock rate setter
-        .subscribe(boost::bind(&b200_ctrl::set_tick_rate, _ctrl, _1))
-        .set(3.84e6);
-
     _tree->access<subdev_spec_t>(mb_path / "rx_subdev_spec").set(subdev_spec_t("A:RX2"));
     _tree->access<subdev_spec_t>(mb_path / "tx_subdev_spec").set(subdev_spec_t("A:TX2"));
     _tree->access<std::string>(mb_path / "clock_source/value").set("internal");
     _tree->access<std::string>(mb_path / "time_source/value").set("none");
 
-    //radio clock init'd -> time register readback self test
-    _time64->self_test();
+    //init the tick rate to something
+    _tree->access<double>(mb_path / "tick_rate").set(3.84e6);
 
     _server = task::make(boost::bind(&b200_impl::run_server, this));
 
@@ -542,9 +538,13 @@ void b200_impl::codec_loopback_self_test(void)
  **********************************************************************/
 void b200_impl::set_tick_rate(const double rate)
 {
-    _tick_rate = _codec_ctrl->set_clock_rate(rate);
+    const size_t factor = ((_enable_rx1 and _enable_rx2) or (_enable_tx1 and _enable_tx2))? 2:1;
+    //UHD_MSG(status) << "asking for clock rate " << rate/1e6 << " MHz\n";
+    _tick_rate = _codec_ctrl->set_clock_rate(rate/factor)*factor;
+    //UHD_MSG(status) << "actually got clock rate " << _tick_rate/1e6 << " MHz\n";
     this->update_streamer_rates();
     _time64->set_tick_rate(_tick_rate);
+    _time64->self_test();
     _rx_framer->set_tick_rate(_tick_rate);
     _tx_deframer->set_tick_rate(_tick_rate);
 }
