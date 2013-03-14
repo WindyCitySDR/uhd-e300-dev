@@ -94,7 +94,7 @@ private:
 };
 
 /***********************************************************************
- * Public make function for the usrp2 codec control
+ * Public make function for the ADC control
  **********************************************************************/
 b250_adc_ctrl::sptr b250_adc_ctrl::make(uhd::spi_iface::sptr iface, const size_t slaveno)
 {

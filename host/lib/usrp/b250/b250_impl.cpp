@@ -20,6 +20,7 @@
 #include <uhd/utils/static.hpp>
 #include <uhd/utils/msg.hpp>
 #include <uhd/utils/images.hpp>
+#include <uhd/utils/safe_call.hpp>
 #include <uhd/usrp/subdev_spec.hpp>
 #include <uhd/usrp/mboard_eeprom.hpp>
 #include <uhd/transport/if_addrs.hpp>
@@ -227,7 +228,7 @@ b250_impl::b250_impl(const uhd::device_addr_t &dev_addr)
 
     _radio_spi0 = spi_core_3000::make(_radio_ctrl0, TOREG(SR_SPI), RB32_SPI);
     _adc_ctrl0 = b250_adc_ctrl::make(_radio_spi0, DB_ADC_SEN);
-    this->set_ad9146_dac(_radio_spi0);
+    _dac_ctrl0 = b250_dac_ctrl::make(_radio_spi0, DB_DAC_SEN);
 
     ////////////////////////////////////////////////////////////////////
     // radio control 1
@@ -407,12 +408,16 @@ b250_impl::b250_impl(const uhd::device_addr_t &dev_addr)
     _tree->access<subdev_spec_t>(mb_path / "tx_subdev_spec").set(subdev_spec_t("A:" + _tree->list(mb_path / "dboards" / "A" / "tx_frontends").at(0)));
     _tree->access<std::string>(mb_path / "clock_source" / "value").set("internal");
     _tree->access<std::string>(mb_path / "time_source" / "value").set("internal");
+    sleep(20);
 
 }
 
 b250_impl::~b250_impl(void)
 {
-    _zpu_ctrl->peek32(0);
+    UHD_SAFE_CALL
+    (
+        _radio_ctrl0->poke32(TOREG(SR_MISC_OUTS), (1 << 2)); //disable/reset ADC/DAC
+    )
 }
 
 uhd::transport::udp_zero_copy::sptr b250_impl::make_transport(const std::string &addr, const boost::uint32_t sid)
@@ -484,30 +489,6 @@ void b250_impl::register_loopback_self_test(wb_iface::sptr iface)
         if (test_fail) break; //exit loop on any failure
     }
     UHD_MSG(status) << ((test_fail)? " fail" : "pass") << std::endl;
-}
-
-void b250_impl::set_ad9146_dac(spi_core_3000::sptr iface)
-{
-    spi_config_t spi_config(spi_config_t::EDGE_RISE);
-
-    #define write_ad9146_reg(addr, data) \
-        iface->write_spi(DB_DAC_SEN, spi_config, ((addr) << 8) | (data), 16)
-    #define read_ad9146_reg(addr) \
-        (iface->read_spi(DB_DAC_SEN, spi_config, ((addr) << 8) | (1 << 15), 16) & 0xffff)
-    //
-    write_ad9146_reg(0x0, 1 << 5); //reset
-    write_ad9146_reg(0x0, 1 << 7); //config + out of reset
-    write_ad9146_reg(0x1, 0x0); //out of power down
-    //UHD_MSG(status) << "trigger now!\n";
-    //sleep(5);
-    UHD_MSG(status) << std::hex << read_ad9146_reg(0x7f) << std::endl;
-    UHD_MSG(status) << std::hex << read_ad9146_reg(0x49) << std::endl;
-    UHD_MSG(status) << std::hex << read_ad9146_reg(0x4A) << std::endl;
-    UHD_MSG(status) << std::hex << read_ad9146_reg(0xE) << std::endl;
-    UHD_MSG(status) << std::hex << read_ad9146_reg(0xF) << std::endl;
-    UHD_MSG(status) << std::hex << read_ad9146_reg(0x0) << std::endl;
-    write_ad9146_reg(0x8, 0x3f);
-    UHD_MSG(status) << std::hex << read_ad9146_reg(0x8) << std::endl;
 }
 
 void b250_impl::update_clock_source(const std::string &)

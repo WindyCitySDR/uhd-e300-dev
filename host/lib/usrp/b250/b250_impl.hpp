@@ -31,6 +31,7 @@
 #include <uhd/transport/udp_zero_copy.hpp>
 #include "spi_core_3000.hpp"
 #include "b250_adc_ctrl.hpp"
+#include "b250_dac_ctrl.hpp"
 #include "rx_vita_core_3000.hpp"
 #include "tx_vita_core_3000.hpp"
 #include "time_core_3000.hpp"
@@ -117,10 +118,10 @@ private:
     spi_core_3000::sptr _radio_spi1;
     b250_adc_ctrl::sptr _adc_ctrl0;
     b250_adc_ctrl::sptr _adc_ctrl1;
+    b250_dac_ctrl::sptr _dac_ctrl0;
+    b250_dac_ctrl::sptr _dac_ctrl1;
     time_core_3000::sptr _time64;
     b250_clock_ctrl::sptr _clock;
-
-    void set_ad9146_dac(spi_core_3000::sptr);
 
     size_t _last_sid;
     struct sid_config_t
