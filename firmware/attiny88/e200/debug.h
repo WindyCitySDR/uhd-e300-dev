@@ -38,7 +38,7 @@
 #else
 
 //DEBUG_INLINE void debug_init(void) DEBUG_NOOP
-DEBUG_INLINE void debug_set(io_pin_t pin, bool enable) DEBUG_NOOP;
+DEBUG_INLINE void debug_set(io_pin_t pin, bool enable) DEBUG_NOOP
 DEBUG_INLINE void debug_blink(uint8_t count) DEBUG_NOOP
 //DEBUG_INLINE void debug_blink_rev(uint8_t count) DEBUG_NOOP
 void debug_blink_rev(uint8_t count);
@@ -59,6 +59,12 @@ void debug_log_ex_P(const char* message, bool new_line);
 void debug_log_hex_ex(uint8_t n, bool new_line);
 void debug_log_byte_ex(uint8_t n, bool new_line);
 void _debug_log_ex(const char* message, bool new_line);
+
+// Prototypes to silence avr-gcc
+inline void debug_log_P(const char* message);
+inline void debug_log_hex(uint8_t n);
+inline void debug_log_byte(uint8_t n);
+inline void _debug_log(const char* message);
 
 inline void debug_log_P(const char* message) { debug_log_ex_P(message, true); }
 inline void debug_log_hex(uint8_t n) { debug_log_hex_ex(n, true); }

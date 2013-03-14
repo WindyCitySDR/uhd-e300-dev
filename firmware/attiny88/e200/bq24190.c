@@ -14,10 +14,13 @@
 
 #include "io.h"
 #include "i2c.h"
-#include "power.h"
 #include "debug.h"
 #include "global.h"
 #include "error.h"
+
+#ifndef I2C_REWORK
+#include "power.h"
+#endif // I2C_REWORK
 
 static io_pin_t USBPM_IRQ	= IO_PB(1);
 

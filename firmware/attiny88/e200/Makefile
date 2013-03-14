@@ -10,16 +10,18 @@ OBJCOPY = avr-objcopy
 STRIP = avr-strip
 OBJDUMP = avr-objdump
 SREC = srec_cat
-CFLAGS = -O2 -std=gnu99 -fshort-enums -pedantic-errors -Wall -Werror \
-	-Wstrict-prototypes -Wmissing-prototypes -Wcast-align -Wshadow
+CFLAGS = -O2 -std=gnu99 -Wall -fshort-enums -pedantic-errors \
+	-Wstrict-prototypes -Wmissing-prototypes -Wcast-align -Wshadow \
+	-DENABLE_SERIAL -DCHARGER_TI -DDEBUG_VOID
 
+#-Werror
 #-D IO_DEBUG
 
 ##################################################
 # Files
 ##################################################
 HDRS =
-SRCS =  main.c io.c spi.c power.c ltc3675.c i2c.c
+SRCS =  main.c io.c spi.c power.c ltc3675.c i2c.c debug.c bq24190.c
 TARGET = main
 
 ##################################################

@@ -12,6 +12,7 @@
 #include <avr/sleep.h>
 
 #include "io.h"
+#include "i2c.h"
 #include "ltc3675.h"
 #include "ltc4155.h"
 #include "bq24190.h"

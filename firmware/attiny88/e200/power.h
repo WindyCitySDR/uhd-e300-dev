@@ -46,6 +46,8 @@ bool power_is_subsys_on(power_subsystem_t index);
 //bool ltc3675_reg_helper(uint8_t address);
 
 #ifndef I2C_REWORK
+#include "io.h"
+
 extern io_pin_t PWR_SDA;
 extern io_pin_t PWR_SCL;
 #endif // I2C_REWORK

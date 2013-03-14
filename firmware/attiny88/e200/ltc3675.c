@@ -20,6 +20,10 @@
 #include "global.h"
 #include "error.h"
 
+#ifndef I2C_REWORK
+#include "power.h"
+#endif // I2C_REWORK
+
 const bool _ltc3675_pull_up =
 #ifdef I2C_REWORK
 	true
