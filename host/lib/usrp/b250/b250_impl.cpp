@@ -79,8 +79,8 @@ static device_addrs_t b250_find(const device_addr_t &hint)
         device_addrs_t reply_addrs = b250_find_with_addr(hint);
         BOOST_FOREACH(const device_addr_t &reply_addr, reply_addrs)
         {
-            if (b250_find_with_addr(reply_addr).empty()) continue;
-            addrs.push_back(reply_addr);
+            device_addrs_t new_addrs = b250_find_with_addr(reply_addr);
+            addrs.insert(addrs.begin(), new_addrs.begin(), new_addrs.end());
         }
         return addrs;
     }

@@ -159,12 +159,11 @@ void b200_impl::handle_async_task(void)
         vrt::if_packet_info_t if_packet_info;
         if_packet_info.num_packet_words32 = buff->size()/sizeof(boost::uint32_t);
         const boost::uint32_t *packet_buff = buff->cast<const boost::uint32_t *>();
-        if_packet_info.link_type = vrt::if_packet_info_t::LINK_TYPE_CHDR;
 
         //unpacking can fail
         try
         {
-            vrt::if_hdr_unpack_le(packet_buff, if_packet_info);
+            b200_if_hdr_unpack_le(packet_buff, if_packet_info);
         }
         catch(const std::exception &ex)
         {

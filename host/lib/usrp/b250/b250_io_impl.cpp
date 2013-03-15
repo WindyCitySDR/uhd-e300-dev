@@ -21,7 +21,9 @@
 #include "../../transport/super_recv_packet_handler.hpp"
 #include "../../transport/super_send_packet_handler.hpp"
 #include "async_packet_handler.hpp"
+#include <uhd/transport/bounded_buffer.hpp>
 #include <boost/bind.hpp>
+#include <uhd/utils/tasks.hpp>
 #include <boost/foreach.hpp>
 #include <boost/make_shared.hpp>
 
@@ -112,45 +114,6 @@ void b250_impl::update_tx_subdev_spec(const subdev_spec_t &spec)
 }
 
 /***********************************************************************
- * RX flow control handler
- **********************************************************************/
-static void handle_rx_flowctrl(const boost::uint32_t sid, udp_zero_copy::sptr xport, const size_t last_seq)
-{
-    managed_send_buffer::sptr buff = xport->get_send_buff(0.0);
-    if (not buff)
-    {
-        throw uhd::runtime_error("handle_rx_flowctrl timed out getting a send buffer");
-    }
-    boost::uint32_t *pkt = buff->cast<boost::uint32_t *>();
-
-    //load packet info
-    vrt::if_packet_info_t packet_info;
-    packet_info.link_type = vrt::if_packet_info_t::LINK_TYPE_VRLP;
-    packet_info.packet_type = vrt::if_packet_info_t::PACKET_TYPE_CONTEXT;
-    packet_info.num_payload_words32 = 2;
-    packet_info.num_payload_bytes = packet_info.num_payload_words32*sizeof(boost::uint32_t);
-    packet_info.packet_count = 0;
-    packet_info.sob = false;
-    packet_info.eob = false;
-    packet_info.sid = sid;
-    packet_info.has_sid = true;
-    packet_info.has_cid = false;
-    packet_info.has_tsi = false;
-    packet_info.has_tsf = false;
-    packet_info.has_tlr = false;
-
-    //load header
-    vrt::if_hdr_pack_be(pkt, packet_info);
-
-    //load payload
-    pkt[packet_info.num_header_words32+0] = 0;//uhd::htonx<boost::uint32_t>(~0);
-    pkt[packet_info.num_header_words32+1] = uhd::htonx<boost::uint32_t>(last_seq + 0xfff); //assume max... for now its just testing
-
-    //send the buffer over the interface
-    buff->commit(sizeof(boost::uint32_t)*(packet_info.num_packet_words32));
-}
-
-/***********************************************************************
  * VITA stuff
  **********************************************************************/
 static void b250_if_hdr_unpack_be(
@@ -167,6 +130,115 @@ static void b250_if_hdr_pack_be(
 ){
     if_packet_info.link_type = vrt::if_packet_info_t::LINK_TYPE_VRLP;
     return vrt::if_hdr_pack_be(packet_buff, if_packet_info);
+}
+
+/***********************************************************************
+ * RX flow control handler
+ **********************************************************************/
+static void handle_rx_flowctrl(const boost::uint32_t sid, udp_zero_copy::sptr xport, const size_t last_seq)
+{
+    managed_send_buffer::sptr buff = xport->get_send_buff(0.0);
+    if (not buff)
+    {
+        throw uhd::runtime_error("handle_rx_flowctrl timed out getting a send buffer");
+    }
+    boost::uint32_t *pkt = buff->cast<boost::uint32_t *>();
+
+    //load packet info
+    vrt::if_packet_info_t packet_info;
+    packet_info.packet_type = vrt::if_packet_info_t::PACKET_TYPE_CONTEXT;
+    packet_info.num_payload_words32 = 2;
+    packet_info.num_payload_bytes = packet_info.num_payload_words32*sizeof(boost::uint32_t);
+    packet_info.packet_count = 0;
+    packet_info.sob = false;
+    packet_info.eob = false;
+    packet_info.sid = sid;
+    packet_info.has_sid = true;
+    packet_info.has_cid = false;
+    packet_info.has_tsi = false;
+    packet_info.has_tsf = false;
+    packet_info.has_tlr = false;
+
+    //load header
+    b250_if_hdr_pack_be(pkt, packet_info);
+
+    //load payload
+    pkt[packet_info.num_header_words32+0] = 0;//uhd::htonx<boost::uint32_t>(~0);
+    pkt[packet_info.num_header_words32+1] = uhd::htonx<boost::uint32_t>(last_seq + 0xfff); //assume max... for now its just testing
+
+    //send the buffer over the interface
+    buff->commit(sizeof(boost::uint32_t)*(packet_info.num_packet_words32));
+}
+
+
+/***********************************************************************
+ * TX flow control handler
+ **********************************************************************/
+struct tx_fc_guts_t
+{
+    tx_fc_guts_t(void):
+        last_seq_out(0),
+        last_seq_ack(0),
+        seq_queue(1){}
+    size_t last_seq_out;
+    size_t last_seq_ack;
+    bounded_buffer<size_t> seq_queue;
+};
+
+static void handle_tx_async_msgs(boost::shared_ptr<tx_fc_guts_t> guts, udp_zero_copy::sptr xport)
+{
+    managed_recv_buffer::sptr buff = xport->get_recv_buff();
+    if (not buff) return;
+
+    //extract packet info
+    vrt::if_packet_info_t if_packet_info;
+    if_packet_info.num_packet_words32 = buff->size()/sizeof(boost::uint32_t);
+    const boost::uint32_t *packet_buff = buff->cast<const boost::uint32_t *>();
+
+    //unpacking can fail
+    try
+    {
+        b250_if_hdr_unpack_be(packet_buff, if_packet_info);
+    }
+    catch(const std::exception &ex)
+    {
+        UHD_MSG(error) << "Error parsing async message packet: " << ex.what() << std::endl;
+        return;
+    }
+
+    //catch the flow control packets and react
+    if (uhd::ntohx(packet_buff[if_packet_info.num_header_words32+0]) == 0)
+    {
+        const size_t seq = uhd::ntohx(packet_buff[if_packet_info.num_header_words32+1]);
+        guts->seq_queue.push_with_haste(seq);
+        return;
+    }
+
+    //fill in the async metadata
+    async_metadata_t metadata;
+    load_metadata_from_buff(uhd::ntohx<boost::uint32_t>, metadata, if_packet_info, packet_buff, B250_RADIO_CLOCK_RATE/*FIXME set from rate update*/);
+    //_async_md.push_with_pop_on_full(metadata);
+    standard_async_msg_prints(metadata);
+}
+
+static managed_send_buffer::sptr get_tx_buff_with_flowctrl(
+    task::sptr /*holds ref*/,
+    boost::shared_ptr<tx_fc_guts_t> guts,
+    udp_zero_copy::sptr xport,
+    const double timeout
+){
+    while (true)
+    {
+        const size_t delta = (guts->last_seq_out & 0xfff) - (guts->last_seq_ack & 0xfff);
+        if ((delta & 0xfff) <= B250_TX_FC_PKT_WINDOW) break;
+
+        const bool ok = guts->seq_queue.pop_with_timed_wait(guts->last_seq_ack, timeout);
+        if (not ok) return managed_send_buffer::sptr(); //timeout waiting for flow control
+    }
+
+    managed_send_buffer::sptr buff = xport->get_send_buff(timeout);
+    if (buff) guts->last_seq_out++; //update seq, this will actually be a send
+    return buff;
 }
 
 /***********************************************************************
@@ -300,9 +372,14 @@ tx_streamer::sptr b250_impl::get_tx_stream(const uhd::stream_args_t &args_)
     my_streamer->set_converter(id);
 
     _tx_deframer->setup(args);
-    _tx_deframer->configure_flow_control(10000/*cycs*/, 100/*pkts*/);
+
+    //flow control setup
+    _tx_deframer->configure_flow_control(0/*cycs off*/, B250_TX_FC_PKT_WINDOW/8/*pkts*/);
+    boost::shared_ptr<tx_fc_guts_t> guts(new tx_fc_guts_t());
+    task::sptr task = task::make(boost::bind(&handle_tx_async_msgs, guts, data_xport));
+
     my_streamer->set_xport_chan_get_buff(0, boost::bind(
-        &zero_copy_if::get_send_buff, data_xport, _1
+        &get_tx_buff_with_flowctrl, task, guts, data_xport, _1
     ));
     my_streamer->set_xport_chan_sid(0, true, data_sid);
     my_streamer->set_enable_trailer(false); //TODO not implemented trailer support yet
