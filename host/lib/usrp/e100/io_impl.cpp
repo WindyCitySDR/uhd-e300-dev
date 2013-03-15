@@ -220,6 +220,7 @@ tx_streamer::sptr e100_impl::get_tx_stream(const uhd::stream_args_t &args_){
         my_streamer->set_xport_chan_get_buff(chan_i, boost::bind(
             &zero_copy_if::get_send_buff, _data_transport, _1
         ));
+        my_streamer->set_async_receiver(boost::bind(&fifo_ctrl_excelsior::pop_async_msg, _fifo_ctrl, _1, _2));
         _tx_streamers[dsp] = my_streamer; //store weak pointer
     }
 

@@ -133,7 +133,7 @@ int UHD_SAFE_MAIN(int argc, char *argv[]){
          * Check the async messages for result
          **************************************************************/
         uhd::async_metadata_t async_md;
-        if (not usrp->get_device()->recv_async_msg(async_md)){
+        if (not tx_stream->recv_async_msg(async_md)){
             std::cout << boost::format("failed:\n    Async message recv timed out.\n") << std::endl;
             continue;
         }

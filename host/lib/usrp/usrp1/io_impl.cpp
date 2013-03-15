@@ -410,6 +410,12 @@ public:
         return num_samps_sent;
     }
 
+    bool recv_async_msg(
+        async_metadata_t &async_metadata, double timeout = 0.1
+    ){
+        return _stc->get_async_queue().pop_with_timed_wait(async_metadata, timeout);
+    }
+
 private:
     size_t _max_num_samps;
     soft_time_ctrl::sptr _stc;
