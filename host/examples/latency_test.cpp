@@ -103,7 +103,7 @@ int UHD_SAFE_MAIN(int argc, char *argv[]){
         stream_cmd.num_samps = buffer.size();
         stream_cmd.stream_now = false;
         stream_cmd.time_spec = usrp->get_time_now() + uhd::time_spec_t(0.01);
-        usrp->issue_stream_cmd(stream_cmd);
+        rx_stream->issue_stream_cmd(stream_cmd);
 
         /***************************************************************
          * Receive the requested packet

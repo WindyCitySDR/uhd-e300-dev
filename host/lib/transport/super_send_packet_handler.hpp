@@ -145,11 +145,13 @@ public:
         _converter->set_scalar(scale_factor);
     }
 
+    //! Set the callback to get async messages
     void set_async_receiver(const async_receiver_type &async_receiver)
     {
         _async_receiver = async_receiver;
     }
 
+    //! Overload call to get async metadata
     bool recv_async_msg(
         uhd::async_metadata_t &async_metadata, double timeout = 0.1
     ){

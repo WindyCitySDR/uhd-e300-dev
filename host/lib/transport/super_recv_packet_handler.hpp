@@ -63,6 +63,7 @@ static inline void handle_overflow_nop(void){}
 class recv_packet_handler{
 public:
     typedef boost::function<managed_recv_buffer::sptr(double)> get_buff_type;
+    typedef boost::function<void(const stream_cmd_t&)> issue_stream_cmd_type;
     typedef void(*vrt_unpacker_type)(const boost::uint32_t *, vrt::if_packet_info_t &);
     //typedef boost::function<void(const boost::uint32_t *, vrt::if_packet_info_t &)> vrt_unpacker_type;
 
@@ -160,6 +161,21 @@ public:
         _converter->set_scalar(scale_factor);
     }
 
+    //! Set the callback to issue stream commands
+    void set_issue_stream_cmd(const size_t xport_chan, const issue_stream_cmd_type &issue_stream_cmd)
+    {
+        _props.at(xport_chan).issue_stream_cmd = issue_stream_cmd;
+    }
+
+    //! Overload call to issue stream commands
+    void issue_stream_cmd(const stream_cmd_t &stream_cmd)
+    {
+        for (size_t i = 0; i < _props.size(); i++)
+        {
+            if (_props[i].issue_stream_cmd) _props[i].issue_stream_cmd(stream_cmd);
+        }
+    }
+
     /*******************************************************************
      * Receive:
      * The entry point for the fast-path receive calls.
@@ -221,6 +237,7 @@ private:
             handle_overflow(&handle_overflow_nop)
         {}
         get_buff_type get_buff;
+        issue_stream_cmd_type issue_stream_cmd;
         size_t packet_count;
         handle_overflow_type handle_overflow;
     };
@@ -623,6 +640,11 @@ public:
         const bool one_packet
     ){
         return recv_packet_handler::recv(buffs, nsamps_per_buff, metadata, timeout, one_packet);
+    }
+
+    void issue_stream_cmd(const stream_cmd_t &stream_cmd)
+    {
+        return recv_packet_handler::issue_stream_cmd(stream_cmd);
     }
 
 private:

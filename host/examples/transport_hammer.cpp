@@ -68,7 +68,7 @@ void rx_hammer(uhd::usrp::multi_usrp::sptr usrp, const std::string &rx_cpu, uhd:
 
     while (not boost::this_thread::interruption_requested()){
         cmd.num_samps = rand() % 100000;
-        usrp->issue_stream_cmd(cmd);
+        rx_stream->issue_stream_cmd(cmd);
         num_rx_samps += rx_stream->recv(buffs, max_samps_per_packet, md, timeout, true);
 
         //handle the error codes

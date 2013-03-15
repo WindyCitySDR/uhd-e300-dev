@@ -356,6 +356,11 @@ public:
         return _stc->recv_post(metadata, num_samps_recvd);
     }
 
+    void issue_stream_cmd(const stream_cmd_t &stream_cmd)
+    {
+        _stc->issue_stream_cmd(stream_cmd);
+    }
+
 private:
     size_t _max_num_samps;
     soft_time_ctrl::sptr _stc;

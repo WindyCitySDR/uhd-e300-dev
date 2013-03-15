@@ -183,7 +183,7 @@ public:
      *
      * \param stream_cmd the stream command to issue
      */
-    //virtual void issue_stream_cmd(const stream_cmd_t &stream_cmd) = 0;
+    virtual void issue_stream_cmd(const stream_cmd_t &stream_cmd) = 0;
 };
 
 /*!

@@ -166,6 +166,8 @@ rx_streamer::sptr e100_impl::get_rx_stream(const uhd::stream_args_t &args_){
         my_streamer->set_overflow_handler(chan_i, boost::bind(
             &rx_dsp_core_200::handle_overflow, _rx_dsps[dsp]
         ));
+        my_streamer->set_issue_stream_cmd(chan_i, boost::bind(
+            &rx_dsp_core_200::issue_stream_command, _rx_dsps[dsp], _1));
         _rx_streamers[dsp] = my_streamer; //store weak pointer
     }
 

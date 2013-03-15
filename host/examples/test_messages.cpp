@@ -46,7 +46,7 @@ bool test_late_command_message(uhd::usrp::multi_usrp::sptr usrp, uhd::rx_streame
     stream_cmd.num_samps = rx_stream->get_max_num_samps();
     stream_cmd.stream_now = false;
     stream_cmd.time_spec = uhd::time_spec_t(100.0); //time in the past
-    usrp->issue_stream_cmd(stream_cmd);
+    rx_stream->issue_stream_cmd(stream_cmd);
 
     std::vector<std::complex<float> > buff(rx_stream->get_max_num_samps());
     uhd::rx_metadata_t md;
@@ -90,7 +90,7 @@ bool test_broken_chain_message(uhd::usrp::multi_usrp::sptr usrp, uhd::rx_streame
     uhd::stream_cmd_t stream_cmd(uhd::stream_cmd_t::STREAM_MODE_NUM_SAMPS_AND_MORE);
     stream_cmd.stream_now = true;
     stream_cmd.num_samps = rx_stream->get_max_num_samps();
-    usrp->issue_stream_cmd(stream_cmd);
+    rx_stream->issue_stream_cmd(stream_cmd);
 
     std::vector<std::complex<float> > buff(rx_stream->get_max_num_samps());
     uhd::rx_metadata_t md;
