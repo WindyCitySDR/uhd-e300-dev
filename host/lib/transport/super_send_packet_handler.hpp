@@ -47,6 +47,7 @@ namespace uhd{ namespace transport{ namespace sph{
 class send_packet_handler{
 public:
     typedef boost::function<managed_send_buffer::sptr(double)> get_buff_type;
+    typedef boost::function<bool(uhd::async_metadata_t &, const double)> async_receiver_type;
     typedef void(*vrt_packer_type)(boost::uint32_t *, vrt::if_packet_info_t &);
     //typedef boost::function<void(boost::uint32_t *, vrt::if_packet_info_t &)> vrt_packer_type;
 
@@ -144,6 +145,21 @@ public:
         _converter->set_scalar(scale_factor);
     }
 
+    //! Set the callback to get async messages
+    void set_async_receiver(const async_receiver_type &async_receiver)
+    {
+        _async_receiver = async_receiver;
+    }
+
+    //! Overload call to get async metadata
+    bool recv_async_msg(
+        uhd::async_metadata_t &async_metadata, double timeout = 0.1
+    ){
+        if (_async_receiver) return _async_receiver(async_metadata, timeout);
+        boost::this_thread::sleep(boost::posix_time::microseconds(long(timeout*1e6)));
+        return false;
+    }
+
     /*******************************************************************
      * Send:
      * The entry point for the fast-path send calls.
@@ -238,6 +254,7 @@ private:
     std::vector<const void *> _zero_buffs;
     size_t _next_packet_seq;
     bool _has_tlr;
+    async_receiver_type _async_receiver;
 
     /*******************************************************************
      * Send a single packet:
@@ -345,6 +362,12 @@ public:
         const double timeout
     ){
         return send_packet_handler::send(buffs, nsamps_per_buff, metadata, timeout);
+    }
+
+    bool recv_async_msg(
+        uhd::async_metadata_t &async_metadata, double timeout = 0.1
+    ){
+        return send_packet_handler::recv_async_msg(async_metadata, timeout);
     }
 
 private:
