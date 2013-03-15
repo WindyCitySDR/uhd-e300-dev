@@ -28,7 +28,6 @@ struct b250_ctrl_iface : wb_iface
     b250_ctrl_iface(uhd::transport::udp_simple::sptr udp):
         udp(udp), seq(0)
     {
-        this->flush();
         try
         {
             this->peek32(0);
@@ -55,20 +54,15 @@ struct b250_ctrl_iface : wb_iface
         request.data = uhd::htonx(data);
 
         //send request
+        this->flush();
         udp->send(boost::asio::buffer(&request, sizeof(request)));
 
         //recv reply
-        this->flush();
         b250_fw_comms_t reply = b250_fw_comms_t();
         const size_t nbytes = udp->recv(boost::asio::buffer(&reply, sizeof(reply)));
 
         //sanity checks
         const size_t flags = uhd::ntohx<boost::uint32_t>(reply.flags);
-        if (not (nbytes == sizeof(reply)))
-        {
-            UHD_VAR(nbytes);
-            UHD_VAR(sizeof(reply));
-        }
         UHD_ASSERT_THROW(nbytes == sizeof(reply));
         UHD_ASSERT_THROW(not (flags & B250_FW_COMMS_FLAGS_ERROR));
         UHD_ASSERT_THROW(flags & B250_FW_COMMS_FLAGS_POKE32);
@@ -88,10 +82,10 @@ struct b250_ctrl_iface : wb_iface
         request.data = 0;
 
         //send request
+        this->flush();
         udp->send(boost::asio::buffer(&request, sizeof(request)));
 
         //recv reply
-        this->flush();
         b250_fw_comms_t reply = b250_fw_comms_t();
         const size_t nbytes = udp->recv(boost::asio::buffer(&reply, sizeof(reply)));
 

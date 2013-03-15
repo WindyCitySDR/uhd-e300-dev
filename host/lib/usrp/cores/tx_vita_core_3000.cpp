@@ -19,6 +19,8 @@
 #include <uhd/utils/safe_call.hpp>
 
 #define REG_CTRL_ERROR_POLICY           _ctrl_base + 0
+#define REG_DEFRAMER_CYCLE_FC_UPS       _deframer_base + 0
+#define REG_DEFRAMER_PACKET_FC_UPS      _deframer_base + 4
 
 using namespace uhd;
 
@@ -48,7 +50,7 @@ struct tx_vita_core_3000_impl : tx_vita_core_3000
 
     void clear(void)
     {
-        //TODO
+        this->configure_flow_control(0, 0);
     }
 
     void set_tick_rate(const double rate)
@@ -79,6 +81,15 @@ struct tx_vita_core_3000_impl : tx_vita_core_3000
         {
             this->set_underflow_policy(stream_args.args["underflow_policy"]);
         }
+    }
+
+    void configure_flow_control(const size_t cycs_per_up, const size_t pkts_per_up)
+    {
+        if (cycs_per_up == 0) _iface->poke32(REG_DEFRAMER_CYCLE_FC_UPS, 0);
+        else _iface->poke32(REG_DEFRAMER_CYCLE_FC_UPS, (1 << 31) | ((cycs_per_up) & 0xffffff));
+
+        if (pkts_per_up == 0) _iface->poke32(REG_DEFRAMER_PACKET_FC_UPS, 0);
+        else _iface->poke32(REG_DEFRAMER_PACKET_FC_UPS, (1 << 31) | ((pkts_per_up) & 0xffff));
     }
 
     wb_iface::sptr _iface;

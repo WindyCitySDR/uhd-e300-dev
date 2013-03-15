@@ -138,14 +138,18 @@ private:
     tx_vita_core_3000::sptr _tx_deframer;
     tx_dsp_core_3000::sptr _tx_dsp;
 
-    boost::weak_ptr<uhd::rx_streamer> _rx_streamer;
-    boost::weak_ptr<uhd::tx_streamer> _tx_streamer;
+    uhd::dict<size_t, boost::weak_ptr<uhd::rx_streamer> > _rx_streamers;
+    uhd::dict<size_t, boost::weak_ptr<uhd::tx_streamer> > _tx_streamers;
 
     uhd::dict<std::string, uhd::usrp::dboard_manager::sptr> _dboard_managers;
     uhd::dict<std::string, uhd::usrp::dboard_iface::sptr> _dboard_ifaces;
 
     void update_rx_subdev_spec(const uhd::usrp::subdev_spec_t &spec);
     void update_tx_subdev_spec(const uhd::usrp::subdev_spec_t &spec);
+
+    void update_tick_rate(const double);
+    void update_rx_samp_rate(const size_t, const double);
+    void update_tx_samp_rate(const size_t, const double);
 
     void update_clock_source(const std::string &);
     void set_db_eeprom(const size_t, const uhd::usrp::dboard_eeprom_t &);

@@ -272,6 +272,7 @@ b250_impl::b250_impl(const uhd::device_addr_t &dev_addr)
             .publish(boost::bind(&rx_dsp_core_3000::get_host_rates, _rx_dsp));
         _tree->create<double>(rx_dsp_path / "rate" / "value")
             .coerce(boost::bind(&rx_dsp_core_3000::set_host_rate, _rx_dsp, _1))
+            .subscribe(boost::bind(&b250_impl::update_rx_samp_rate, this, dspno, _1))
             .set(1e6);
         _tree->create<double>(rx_dsp_path / "freq" / "value")
             .coerce(boost::bind(&rx_dsp_core_3000::set_freq, _rx_dsp, _1))
@@ -297,6 +298,7 @@ b250_impl::b250_impl(const uhd::device_addr_t &dev_addr)
             .publish(boost::bind(&tx_dsp_core_3000::get_host_rates, _tx_dsp));
         _tree->create<double>(tx_dsp_path / "rate" / "value")
             .coerce(boost::bind(&tx_dsp_core_3000::set_host_rate, _tx_dsp, _1))
+            .subscribe(boost::bind(&b250_impl::update_tx_samp_rate, this, dspno, _1))
             .set(1e6);
         _tree->create<double>(tx_dsp_path / "freq" / "value")
             .coerce(boost::bind(&tx_dsp_core_3000::set_freq, _tx_dsp, _1))
@@ -402,13 +404,13 @@ b250_impl::b250_impl(const uhd::device_addr_t &dev_addr)
     UHD_HERE();
 
     _tree->access<double>(mb_path / "tick_rate") //now subscribe the clock rate setter
+        .subscribe(boost::bind(&b250_impl::update_tick_rate, this, _1))
         .set(B250_RADIO_CLOCK_RATE);
 
     _tree->access<subdev_spec_t>(mb_path / "rx_subdev_spec").set(subdev_spec_t("A:" + _tree->list(mb_path / "dboards" / "A" / "rx_frontends").at(0)));
     _tree->access<subdev_spec_t>(mb_path / "tx_subdev_spec").set(subdev_spec_t("A:" + _tree->list(mb_path / "dboards" / "A" / "tx_frontends").at(0)));
     _tree->access<std::string>(mb_path / "clock_source" / "value").set("internal");
     _tree->access<std::string>(mb_path / "time_source" / "value").set("internal");
-    sleep(20);
 
 }
 

@@ -22,12 +22,47 @@
 #include "../../transport/super_send_packet_handler.hpp"
 #include "async_packet_handler.hpp"
 #include <boost/bind.hpp>
+#include <boost/foreach.hpp>
 #include <boost/make_shared.hpp>
 
 using namespace uhd;
 using namespace uhd::usrp;
 using namespace uhd::transport;
 
+/***********************************************************************
+ * update streamer rates
+ **********************************************************************/
+void b250_impl::update_tick_rate(const double rate)
+{
+    BOOST_FOREACH(const size_t &dspno, _rx_streamers.keys())
+    {
+        boost::shared_ptr<sph::recv_packet_streamer> my_streamer =
+            boost::dynamic_pointer_cast<sph::recv_packet_streamer>(_rx_streamers[dspno].lock());
+        if (my_streamer) my_streamer->set_tick_rate(rate);
+    }
+    BOOST_FOREACH(const size_t &dspno, _tx_streamers.keys())
+    {
+        boost::shared_ptr<sph::send_packet_streamer> my_streamer =
+            boost::dynamic_pointer_cast<sph::send_packet_streamer>(_tx_streamers[dspno].lock());
+        if (my_streamer) my_streamer->set_tick_rate(rate);
+    }
+}
+
+void b250_impl::update_rx_samp_rate(const size_t dspno, const double rate)
+{
+    if (not _rx_streamers.has_key(dspno)) return;
+    boost::shared_ptr<sph::recv_packet_streamer> my_streamer =
+        boost::dynamic_pointer_cast<sph::recv_packet_streamer>(_rx_streamers[dspno].lock());
+    if (my_streamer) my_streamer->set_samp_rate(rate);
+}
+
+void b250_impl::update_tx_samp_rate(const size_t dspno, const double rate)
+{
+    if (not _tx_streamers.has_key(dspno)) return;
+    boost::shared_ptr<sph::send_packet_streamer> my_streamer =
+        boost::dynamic_pointer_cast<sph::send_packet_streamer>(_tx_streamers[dspno].lock());
+    if (my_streamer) my_streamer->set_samp_rate(rate);
+}
 
 /***********************************************************************
  * Setup dboard muxing for IQ
@@ -158,17 +193,6 @@ rx_streamer::sptr b250_impl::get_rx_stream(const uhd::stream_args_t &args_)
     args.otw_format = "sc16";
     args.channels = args.channels.empty()? std::vector<size_t>(1, 0) : args.channels;
 
-    //calculate packet size
-    static const size_t hdr_size = 0
-        + vrt::max_if_hdr_words32*sizeof(boost::uint32_t)
-        + sizeof(vrt::if_packet_info_t().tlr) //forced to have trailer
-        - sizeof(vrt::if_packet_info_t().cid) //no class id ever used
-        - sizeof(vrt::if_packet_info_t().tsi) //no int time ever used
-    ;
-    //const size_t bpp = 1400/*TOD0*/ - hdr_size;
-    //const size_t bpi = convert::get_bytes_per_item(args.otw_format);
-    const size_t spp = 360;//unsigned(args.args.cast<double>("spp", bpp/bpi));
-
     //allocate sid and create transport
     sid_config_t data_config;
     data_config.router_addr_there = B250_DEVICE_THERE;
@@ -177,9 +201,18 @@ rx_streamer::sptr b250_impl::get_rx_stream(const uhd::stream_args_t &args_)
     data_config.router_dst_here = B250_XB_DST_E0;
     const boost::uint32_t data_sid = this->allocate_sid(data_config);
     udp_zero_copy::sptr data_xport = this->make_transport(_addr, data_sid);
-    sleep(1);
-
     UHD_MSG(status) << boost::format("data_sid = 0x%08x\n") % data_sid << std::endl;
+
+    //calculate packet size
+    static const size_t hdr_size = 0
+        + vrt::max_if_hdr_words32*sizeof(boost::uint32_t)
+        + sizeof(vrt::if_packet_info_t().tlr) //forced to have trailer
+        - sizeof(vrt::if_packet_info_t().cid) //no class id ever used
+        - sizeof(vrt::if_packet_info_t().tsi) //no int time ever used
+    ;
+    const size_t bpp = data_xport->get_recv_frame_size() - hdr_size;
+    const size_t bpi = convert::get_bytes_per_item(args.otw_format);
+    const size_t spp = unsigned(args.args.cast<double>("spp", bpp/bpi));
 
     //make the new streamer given the samples per packet
     boost::shared_ptr<sph::recv_packet_streamer> my_streamer = boost::make_shared<sph::recv_packet_streamer>(spp);
@@ -207,11 +240,11 @@ rx_streamer::sptr b250_impl::get_rx_stream(const uhd::stream_args_t &args_)
     my_streamer->set_xport_handle_flowctrl(0, boost::bind(
         &handle_rx_flowctrl, data_sid, data_xport, _1
     ), 0xfff/8, true/*init*/);
-    _rx_streamer = my_streamer; //store weak pointer
+    _rx_streamers[0] = my_streamer; //store weak pointer
 
     //sets all tick and samp rates on this streamer
-    my_streamer->set_tick_rate(B250_RADIO_CLOCK_RATE);
-    my_streamer->set_samp_rate(B250_RADIO_CLOCK_RATE);
+    _tree->access<double>("/mboards/0/tick_rate").update();
+    _tree->access<double>(str(boost::format("/mboards/0/rx_dsps/%u/rate/value") % 0)).update();
 
     return my_streamer;
 }
@@ -222,7 +255,7 @@ rx_streamer::sptr b250_impl::get_rx_stream(const uhd::stream_args_t &args_)
 tx_streamer::sptr b250_impl::get_tx_stream(const uhd::stream_args_t &args_)
 {
     stream_args_t args = args_;
-/*
+
     //setup defaults for unspecified values
     if (not args.otw_format.empty() and args.otw_format != "sc16")
     {
@@ -231,6 +264,16 @@ tx_streamer::sptr b250_impl::get_tx_stream(const uhd::stream_args_t &args_)
     args.otw_format = "sc16";
     args.channels = args.channels.empty()? std::vector<size_t>(1, 0) : args.channels;
 
+    //allocate sid and create transport
+    sid_config_t data_config;
+    data_config.router_addr_there = B250_DEVICE_THERE;
+    data_config.dst_prefix = B250_RADIO_DEST_PREFIX_TX;
+    data_config.router_dst_there = B250_XB_DST_R0;
+    data_config.router_dst_here = B250_XB_DST_E0;
+    const boost::uint32_t data_sid = this->allocate_sid(data_config);
+    udp_zero_copy::sptr data_xport = this->make_transport(_addr, data_sid);
+    UHD_MSG(status) << boost::format("data_sid = 0x%08x\n") % data_sid << std::endl;
+
     //calculate packet size
     static const size_t hdr_size = 0
         + vrt::max_if_hdr_words32*sizeof(boost::uint32_t)
@@ -238,11 +281,12 @@ tx_streamer::sptr b250_impl::get_tx_stream(const uhd::stream_args_t &args_)
         - sizeof(vrt::if_packet_info_t().cid) //no class id ever used
         - sizeof(vrt::if_packet_info_t().tsi) //no int time ever used
     ;
-    static const size_t bpp = _data_transport->get_send_frame_size() - hdr_size;
-    const size_t spp = bpp/convert::get_bytes_per_item(args.otw_format);
+    const size_t bpp = data_xport->get_send_frame_size() - hdr_size;
+    const size_t bpi = convert::get_bytes_per_item(args.otw_format);
+    const size_t spp = unsigned(args.args.cast<double>("spp", bpp/bpi));
 
     //make the new streamer given the samples per packet
-    boost::shared_ptr<sph::send_packet_streamer> my_streamer = boost::make_shared<sph::send_packet_streamer>(spp/nchans);
+    boost::shared_ptr<sph::send_packet_streamer> my_streamer = boost::make_shared<sph::send_packet_streamer>(spp);
 
     //init some streamer stuff
     my_streamer->set_vrt_packer(&b250_if_hdr_pack_be);
@@ -250,22 +294,23 @@ tx_streamer::sptr b250_impl::get_tx_stream(const uhd::stream_args_t &args_)
     //set the converter
     uhd::convert::id_type id;
     id.input_format = args.cpu_format;
-    id.num_inputs = nchans;
+    id.num_inputs = 1;
     id.output_format = args.otw_format + "_item32_be";
     id.num_outputs = 1;
     my_streamer->set_converter(id);
 
     _tx_deframer->setup(args);
+    _tx_deframer->configure_flow_control(10000/*cycs*/, 100/*pkts*/);
     my_streamer->set_xport_chan_get_buff(0, boost::bind(
-        &zero_copy_if::get_send_buff, _data_transport, _1
+        &zero_copy_if::get_send_buff, data_xport, _1
     ));
-    my_streamer->set_xport_chan_sid(0, true, B200_TX_DATA_SID_BASE);
+    my_streamer->set_xport_chan_sid(0, true, data_sid);
     my_streamer->set_enable_trailer(false); //TODO not implemented trailer support yet
-    _tx_streamer = my_streamer; //store weak pointer
+    _tx_streamers[0] = my_streamer; //store weak pointer
 
     //sets all tick and samp rates on this streamer
-    this->update_streamer_rates(_tick_rate);
+    _tree->access<double>("/mboards/0/tick_rate").update();
+    _tree->access<double>(str(boost::format("/mboards/0/tx_dsps/%u/rate/value") % 0)).update();
 
     return my_streamer;
-    */
 }

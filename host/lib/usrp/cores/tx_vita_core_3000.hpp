@@ -43,6 +43,8 @@ public:
     virtual void set_tick_rate(const double rate) = 0;
 
     virtual void setup(const uhd::stream_args_t &stream_args) = 0;
+
+    virtual void configure_flow_control(const size_t cycs_per_up, const size_t pkts_per_up) = 0;
 };
 
 #endif /* INCLUDED_LIBUHD_USRP_TX_VITA_CORE_3000_HPP */

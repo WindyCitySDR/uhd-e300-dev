@@ -46,12 +46,21 @@ public:
         write_ad9146_reg(0x4, 0x0); //no interrupt
         write_ad9146_reg(0x5, 0x0); //no interrupt
 
-        write_ad9146_reg(0x8, (0xf << 4)); //duty correction, no pll
+        write_ad9146_reg(0x8, (0xf << 4)); //duty correction
+
+        write_ad9146_reg(0xd, (0x0 << 6) | (1 << 4) | (0x2 << 2) | (0x1 << 0));
+
         write_ad9146_reg(0x1b, (1 << 7) | (1 << 6) | (1 << 5) | (1 << 2)); //defaults
         write_ad9146_reg(0x1e, 1); //data path config - set for proper operation
 
+        //write_ad9146_reg(0xa, 0xcf); write_ad9146_reg(0xa, 0xa0); //auto VCO select
+
+        write_ad9146_reg(0xa, 0x0); //disable PLL
+
         UHD_MSG(status) << std::hex << read_ad9146_reg(0x7f) << std::endl;
         UHD_MSG(status) << std::hex << read_ad9146_reg(0x1f) << std::endl;
+        UHD_MSG(status) << std::hex << read_ad9146_reg(0xe) << std::endl;
+        UHD_MSG(status) << std::hex << read_ad9146_reg(0xf) << std::endl;
     }
 
     ~b250_dac_ctrl_impl(void)
