@@ -136,7 +136,10 @@ static void b200_if_hdr_pack_le(
 bool b200_impl::recv_async_msg(
     async_metadata_t &async_metadata, double timeout
 ){
-    return _async_md.pop_with_timed_wait(async_metadata, timeout);
+    boost::shared_ptr<sph::send_packet_streamer> my_streamer =
+        boost::dynamic_pointer_cast<sph::send_packet_streamer>(_tx_streamer.lock());
+    if (my_streamer) return my_streamer->recv_async_msg(async_metadata, timeout);
+    return false;
 }
 
 void b200_impl::handle_async_task(void)
@@ -234,6 +237,9 @@ rx_streamer::sptr b200_impl::get_rx_stream(const uhd::stream_args_t &args_)
     my_streamer->set_overflow_handler(0, boost::bind(
         &rx_vita_core_3000::handle_overflow, _rx_framer
     ));
+    my_streamer->set_issue_stream_cmd(0, boost::bind(
+        &b200_impl::issue_stream_cmd, this, 0, _1
+    ));
     _rx_streamer = my_streamer; //store weak pointer
 
     //sets all tick and samp rates on this streamer
@@ -290,6 +296,9 @@ tx_streamer::sptr b200_impl::get_tx_stream(const uhd::stream_args_t &args_)
     _tx_deframer->setup(args);
     my_streamer->set_xport_chan_get_buff(0, boost::bind(
         &zero_copy_if::get_send_buff, _data_transport, _1
+    ));
+    my_streamer->set_async_receiver(boost::bind(
+        &bounded_buffer<async_metadata_t>::pop_with_timed_wait, &_async_md, _1, _2
     ));
     my_streamer->set_xport_chan_sid(0, true, B200_TX_DATA_SID_BASE);
     my_streamer->set_enable_trailer(false); //TODO not implemented trailer support yet
