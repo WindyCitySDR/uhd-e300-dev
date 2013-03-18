@@ -51,15 +51,14 @@ void b200_impl::update_rx_subdev_spec(const uhd::usrp::subdev_spec_t &spec)
     validate_subdev_spec(_tree, spec, "rx");
     UHD_ASSERT_THROW(spec.size() == 1 or spec.size() == 2);
 
-
-    _enable_rx1 = false;
-    _enable_rx2 = false;
+    _fe_enb_map["RX1"] = false;
+    _fe_enb_map["RX2"] = false;
 
     if (spec.size() == 1)
     {
         UHD_ASSERT_THROW(spec[0].db_name == "A");
-        _enable_rx1 = spec[0].sd_name == "RX1";
-        _enable_rx2 = spec[0].sd_name == "RX2";
+        _fe_enb_map["RX1"] = spec[0].sd_name == "RX1";
+        _fe_enb_map["RX2"] = spec[0].sd_name == "RX2";
     }
     if (spec.size() == 2)
     {
@@ -68,8 +67,8 @@ void b200_impl::update_rx_subdev_spec(const uhd::usrp::subdev_spec_t &spec)
         UHD_ASSERT_THROW(spec[0].sd_name == "RX1");
         UHD_ASSERT_THROW(spec[1].db_name == "A");
         UHD_ASSERT_THROW(spec[1].sd_name == "RX2");
-        _enable_rx1 = true;
-        _enable_rx2 = true;
+        _fe_enb_map["RX1"] = true;
+        _fe_enb_map["RX2"] = true;
     }
 
     this->update_enables();
@@ -81,14 +80,14 @@ void b200_impl::update_tx_subdev_spec(const uhd::usrp::subdev_spec_t &spec)
     validate_subdev_spec(_tree, spec, "tx");
     UHD_ASSERT_THROW(spec.size() == 1 or spec.size() == 2);
 
-    _enable_tx1 = false;
-    _enable_tx2 = false;
+    _fe_enb_map["TX1"] = false;
+    _fe_enb_map["TX2"] = false;
 
     if (spec.size() == 1)
     {
         UHD_ASSERT_THROW(spec[0].db_name == "A");
-        _enable_tx1 = spec[0].sd_name == "TX1";
-        _enable_tx2 = spec[0].sd_name == "TX2";
+        _fe_enb_map["TX1"] = spec[0].sd_name == "TX1";
+        _fe_enb_map["TX2"] = spec[0].sd_name == "TX2";
     }
     if (spec.size() == 2)
     {
@@ -97,8 +96,8 @@ void b200_impl::update_tx_subdev_spec(const uhd::usrp::subdev_spec_t &spec)
         UHD_ASSERT_THROW(spec[0].sd_name == "TX1");
         UHD_ASSERT_THROW(spec[1].db_name == "A");
         UHD_ASSERT_THROW(spec[1].sd_name == "TX2");
-        _enable_tx1 = true;
-        _enable_tx2 = true;
+        _fe_enb_map["TX1"] = true;
+        _fe_enb_map["TX2"] = true;
     }
 
     this->update_enables();

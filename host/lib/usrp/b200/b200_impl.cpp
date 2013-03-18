@@ -306,10 +306,10 @@ b200_impl::b200_impl(const device_addr_t &device_addr):
     static const std::vector<std::string> frontends = boost::assign::list_of
         ("TX1")("TX2")("RX1")("RX2");
 
-    _codec_ctrl->data_port_loopback_on();
-    this->codec_loopback_self_test();
-    _codec_ctrl->data_port_loopback_off();
-
+    BOOST_FOREACH(const std::string &fe_name, frontends)
+    {
+        _fe_enb_map[fe_name] = false;
+    }
     {
         const fs_path codec_path = mb_path / ("rx_codecs") / "A";
         _tree->create<std::string>(codec_path / "name").set("B200 RX dual ADC");
@@ -476,6 +476,11 @@ b200_impl::b200_impl(const device_addr_t &device_addr):
     //init the tick rate to something
     _tree->access<double>(mb_path / "tick_rate").set(3.84e6);
 
+    //now that frontends are on, clocks are set, do codec test
+    _codec_ctrl->data_port_loopback_on();
+    this->codec_loopback_self_test();
+    _codec_ctrl->data_port_loopback_off();
+
     _server = task::make(boost::bind(&b200_impl::run_server, this));
 
     /* Attempting to lock to external reference. */
@@ -538,7 +543,7 @@ void b200_impl::codec_loopback_self_test(void)
  **********************************************************************/
 void b200_impl::set_tick_rate(const double rate)
 {
-    const size_t factor = ((_enable_rx1 and _enable_rx2) or (_enable_tx1 and _enable_tx2))? 2:1;
+    const size_t factor = ((_fe_enb_map["RX1"] and _fe_enb_map["RX2"]) or (_fe_enb_map["TX1"] and _fe_enb_map["TX2"]))? 2:1;
     //UHD_MSG(status) << "asking for clock rate " << rate/1e6 << " MHz\n";
     _tick_rate = _codec_ctrl->set_clock_rate(rate/factor)*factor;
     //UHD_MSG(status) << "actually got clock rate " << _tick_rate/1e6 << " MHz\n";
@@ -551,25 +556,25 @@ void b200_impl::set_tick_rate(const double rate)
 
 void b200_impl::set_rx_sample_rate(const double rate)
 {
-    const size_t factor = (_enable_rx1 and _enable_rx2)? 2:1;
+    const size_t factor = (_fe_enb_map["RX1"] and _fe_enb_map["RX2"])? 2:1;
     this->set_tick_rate(rate*factor);
 }
 
 void b200_impl::set_tx_sample_rate(const double rate)
 {
-    const size_t factor = (_enable_tx1 and _enable_tx2)? 2:1;
+    const size_t factor = (_fe_enb_map["TX1"] and _fe_enb_map["TX2"])? 2:1;
     this->set_tick_rate(rate*factor);
 }
 
 double b200_impl::get_rx_sample_rate(void)
 {
-    const size_t factor = (_enable_rx1 and _enable_rx2)? 2:1;
+    const size_t factor = (_fe_enb_map["RX1"] and _fe_enb_map["RX2"])? 2:1;
     return _tick_rate/factor;
 }
 
 double b200_impl::get_tx_sample_rate(void)
 {
-    const size_t factor = (_enable_tx1 and _enable_tx2)? 2:1;
+    const size_t factor = (_fe_enb_map["TX1"] and _fe_enb_map["TX2"])? 2:1;
     return _tick_rate/factor;
 }
 
@@ -682,38 +687,46 @@ void b200_impl::update_gpio_state(void)
     _ctrl->poke32(TOREG(SR_MISC_OUTS), misc_word);
 }
 
+void b200_impl::update_atrs(void)
+{
+    {
+        const bool is_rx2 = _fe_ant_map.get("RX1", "RX2") == "RX2";
+        const size_t rxonly = (_fe_enb_map["RX1"])? ((is_rx2)? STATE_RX1_RX2 : STATE_RX1_TXRX) : STATE_OFF;
+        const size_t txonly = (_fe_enb_map["TX1"])? (STATE_TX1_TXRX) : STATE_OFF;
+        size_t fd = STATE_OFF;
+        if (_fe_enb_map["RX1"] and _fe_enb_map["TX1"]) fd = STATE_FDX1_TXRX;
+        if (_fe_enb_map["RX1"] and not _fe_enb_map["TX1"]) fd = rxonly;
+        if (not _fe_enb_map["RX1"] and _fe_enb_map["TX1"]) fd = txonly;
+        _atr0->set_atr_reg(dboard_iface::ATR_REG_IDLE, STATE_OFF);
+        _atr0->set_atr_reg(dboard_iface::ATR_REG_RX_ONLY, rxonly);
+        _atr0->set_atr_reg(dboard_iface::ATR_REG_TX_ONLY, txonly);
+        _atr0->set_atr_reg(dboard_iface::ATR_REG_FULL_DUPLEX, fd);
+    }
+    {
+        const bool is_rx2 = _fe_ant_map.get("RX2", "RX2") == "RX2";
+        const size_t rxonly = (_fe_enb_map["RX2"])? ((is_rx2)? STATE_RX2_RX2 : STATE_RX2_TXRX) : STATE_OFF;
+        const size_t txonly = (_fe_enb_map["TX2"])? (STATE_TX2_TXRX) : STATE_OFF;
+        size_t fd = STATE_OFF;
+        if (_fe_enb_map["RX2"] and _fe_enb_map["TX2"]) fd = STATE_FDX2_TXRX;
+        if (_fe_enb_map["RX2"] and not _fe_enb_map["TX2"]) fd = rxonly;
+        if (not _fe_enb_map["RX2"] and _fe_enb_map["TX2"]) fd = txonly;
+        _atr1->set_atr_reg(dboard_iface::ATR_REG_IDLE, STATE_OFF);
+        _atr1->set_atr_reg(dboard_iface::ATR_REG_RX_ONLY, rxonly);
+        _atr1->set_atr_reg(dboard_iface::ATR_REG_TX_ONLY, txonly);
+        _atr1->set_atr_reg(dboard_iface::ATR_REG_FULL_DUPLEX, fd);
+    }
+}
+
 void b200_impl::update_antenna_sel(const std::string& which, const std::string &ant)
 {
-    if(which[2] == '1') {
-        _atr0->set_atr_reg(dboard_iface::ATR_REG_IDLE, STATE_OFF);
-        _atr0->set_atr_reg(dboard_iface::ATR_REG_RX_ONLY, STATE_RX1_RX2);
-        _atr0->set_atr_reg(dboard_iface::ATR_REG_TX_ONLY, STATE_TX1_TXRX1);
-        _atr0->set_atr_reg(dboard_iface::ATR_REG_FULL_DUPLEX, STATE_FDX_TXRX1);
-
-        _atr1->set_atr_reg(dboard_iface::ATR_REG_IDLE, STATE_OFF);
-        _atr1->set_atr_reg(dboard_iface::ATR_REG_RX_ONLY, STATE_RX2_RX2);
-        _atr1->set_atr_reg(dboard_iface::ATR_REG_TX_ONLY, STATE_TX2_TXRX2);
-        _atr1->set_atr_reg(dboard_iface::ATR_REG_FULL_DUPLEX, STATE_FDX_TXRX2);
-    } else if(which[2] == '2') {
-        _atr0->set_atr_reg(dboard_iface::ATR_REG_IDLE, STATE_OFF);
-        _atr0->set_atr_reg(dboard_iface::ATR_REG_RX_ONLY, STATE_RX1_RX2);
-        _atr0->set_atr_reg(dboard_iface::ATR_REG_TX_ONLY, STATE_TX1_TXRX1);
-        _atr0->set_atr_reg(dboard_iface::ATR_REG_FULL_DUPLEX, STATE_FDX_TXRX1);
-
-        _atr1->set_atr_reg(dboard_iface::ATR_REG_IDLE, STATE_OFF);
-        _atr1->set_atr_reg(dboard_iface::ATR_REG_RX_ONLY, STATE_RX2_RX2);
-        _atr1->set_atr_reg(dboard_iface::ATR_REG_TX_ONLY, STATE_TX2_TXRX2);
-        _atr1->set_atr_reg(dboard_iface::ATR_REG_FULL_DUPLEX, STATE_FDX_TXRX2);
-    } else {
-        throw uhd::value_error("update_antenna_sel unknown side " + which);
-    }
+    _fe_ant_map[which] = ant;
+    this->update_atrs();
 }
 
 void b200_impl::update_enables(void)
 {
-    //TODO setup ATR here
-    UHD_HERE();
-    _codec_ctrl->set_active_chains(_enable_tx1, _enable_tx2, _enable_rx1, _enable_rx2);
+    _codec_ctrl->set_active_chains(_fe_enb_map["TX1"], _fe_enb_map["TX2"], _fe_enb_map["RX1"], _fe_enb_map["RX2"]);
+    this->update_atrs();
 }
 
 static inline bool wait_for_recv_ready(int sock_fd, const size_t timeout_ms)

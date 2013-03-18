@@ -142,8 +142,10 @@ private:
 
     void update_gpio_state(void);
 
-    bool _enable_tx1, _enable_tx2, _enable_rx1, _enable_rx2;
+    uhd::dict<std::string, std::string> _fe_ant_map;
+    uhd::dict<std::string, bool> _fe_enb_map;
     void update_enables(void);
+    void update_atrs(void);
 
     //no dsp in fpga
     double get_dsp_freq(void){return 0.0;}

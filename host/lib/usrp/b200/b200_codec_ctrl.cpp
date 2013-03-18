@@ -1180,7 +1180,7 @@ public:
         _b200_iface->write_reg(0x15C, 0x67); // Power Measurement Duration
 
         /* Turn on the default RX & TX chains. */
-        set_active_chains(true, false, true, false);
+        //set_active_chains(true, false, true, false);
 
         /* Set TXers & RXers on (only works in FDD mode) */
         _b200_iface->write_reg(0x014, 0x21);
