@@ -330,7 +330,7 @@ b250_impl::b250_impl(const uhd::device_addr_t &dev_addr)
     //setup reference source props
     _tree->create<std::string>(mb_path / "clock_source" / "value")
         .subscribe(boost::bind(&b250_impl::update_clock_source, this, _1));
-    static const std::vector<std::string> clock_sources = boost::assign::list_of("internal")("external");
+    static const std::vector<std::string> clock_sources = boost::assign::list_of("internal")("external")("gpsdo");
     _tree->create<std::vector<std::string> >(mb_path / "clock_source" / "options").set(clock_sources);
 
     ////////////////////////////////////////////////////////////////////
@@ -394,9 +394,8 @@ b250_impl::b250_impl(const uhd::device_addr_t &dev_addr)
     ////////////////////////////////////////////////////////////////////
     // and do the misc mboard sensors
     ////////////////////////////////////////////////////////////////////
-    UHD_HERE();
-    //none for now...
-    _tree->create<int>(mb_path / "sensors"); //phony property so this dir exists
+    _tree->create<sensor_value_t>(mb_path / "sensors" / "ref_locked")
+        .publish(boost::bind(&b250_impl::get_ref_locked, this));
 
     ////////////////////////////////////////////////////////////////////
     // do some post-init tasks
@@ -493,9 +492,20 @@ void b250_impl::register_loopback_self_test(wb_iface::sptr iface)
     UHD_MSG(status) << ((test_fail)? " fail" : "pass") << std::endl;
 }
 
-void b250_impl::update_clock_source(const std::string &)
+void b250_impl::update_clock_source(const std::string &source)
 {
-    
+    size_t value = 0x1;
+    if (source == "internal") value |= (0x2 << 1);
+    else if (source == "external") value |= (0x0 << 1);
+    else if (source == "gpsdo") value |= (0x3 << 1);
+    else throw uhd::key_error("update_clock_source: unknown source: " + source);
+    _zpu_ctrl->poke32(SR_ADDR(SET0_BASE, ZPU_SR_CLOCK_CTRL), value);
+}
+
+sensor_value_t b250_impl::get_ref_locked(void)
+{
+    const bool lock = (_zpu_ctrl->peek32(SR_ADDR(SET0_BASE, 0)) & (1 << 1)) != 0;
+    return sensor_value_t("Ref", lock, "locked", "unlocked");
 }
 
 void b250_impl::set_db_eeprom(const size_t addr, const uhd::usrp::dboard_eeprom_t &db_eeprom)

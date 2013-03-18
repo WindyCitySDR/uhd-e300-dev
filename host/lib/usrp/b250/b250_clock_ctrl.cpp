@@ -28,8 +28,15 @@ struct b250_clock_ctrl_impl : b250_clock_ctrl
     b250_clock_ctrl_impl(uhd::spi_iface::sptr spiface, const size_t slaveno):
         _spiface(spiface), _slaveno(slaveno)
     {
+        _ad9510_regs.soft_reset = 1;
+        this->write_reg(0x0);
+        this->update_regs();
+        _ad9510_regs.soft_reset = 0;
+        this->write_reg(0x0);
+
         _enables[B250_CLOCK_WHICH_TEST] = true;
         this->update_enables();
+        this->update_regs();
     }
 
     ~b250_clock_ctrl_impl(void)
