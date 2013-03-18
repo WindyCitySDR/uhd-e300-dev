@@ -163,7 +163,7 @@ static void handle_rx_flowctrl(const boost::uint32_t sid, udp_zero_copy::sptr xp
     b250_if_hdr_pack_be(pkt, packet_info);
 
     //load payload
-    pkt[packet_info.num_header_words32+0] = 0;//uhd::htonx<boost::uint32_t>(~0);
+    pkt[packet_info.num_header_words32+0] = uhd::htonx<boost::uint32_t>(B250_ENABLE_RX_FC? 0 : ~0);
     pkt[packet_info.num_header_words32+1] = uhd::htonx<boost::uint32_t>(last_seq + 0xfff); //assume max... for now its just testing
 
     //send the buffer over the interface
