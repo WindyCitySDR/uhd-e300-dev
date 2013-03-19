@@ -48,8 +48,8 @@ void b200_impl::update_streamer_rates(void)
 void b200_impl::update_rx_subdev_spec(const uhd::usrp::subdev_spec_t &spec)
 {
     //sanity checking
-    validate_subdev_spec(_tree, spec, "rx");
-    UHD_ASSERT_THROW(spec.size() == 1 or spec.size() == 2);
+    if (spec.size()) validate_subdev_spec(_tree, spec, "rx");
+    UHD_ASSERT_THROW(spec.size() <= 2);
 
     _fe_enb_map["RX1"] = false;
     _fe_enb_map["RX2"] = false;
@@ -77,8 +77,8 @@ void b200_impl::update_rx_subdev_spec(const uhd::usrp::subdev_spec_t &spec)
 void b200_impl::update_tx_subdev_spec(const uhd::usrp::subdev_spec_t &spec)
 {
     //sanity checking
-    validate_subdev_spec(_tree, spec, "tx");
-    UHD_ASSERT_THROW(spec.size() == 1 or spec.size() == 2);
+    if (spec.size()) validate_subdev_spec(_tree, spec, "tx");
+    UHD_ASSERT_THROW(spec.size() <= 2);
 
     _fe_enb_map["TX1"] = false;
     _fe_enb_map["TX2"] = false;
