@@ -311,6 +311,13 @@ b200_impl::b200_impl(const device_addr_t &device_addr):
         _fe_enb_map[fe_name] = false;
     }
     {
+        _codec_ctrl->set_active_chains(true, false, true, false);
+        _codec_ctrl->data_port_loopback_on();
+        this->codec_loopback_self_test();
+        _codec_ctrl->data_port_loopback_off();
+        _codec_ctrl->set_active_chains(false, false, false, false);
+    }
+    {
         const fs_path codec_path = mb_path / ("rx_codecs") / "A";
         _tree->create<std::string>(codec_path / "name").set("B200 RX dual ADC");
         _tree->create<int>(codec_path / "gains"); //empty cuz gains are in frontend
@@ -338,8 +345,10 @@ b200_impl::b200_impl(const device_addr_t &device_addr):
     // create frontend mapping
     ////////////////////////////////////////////////////////////////////
     _tree->create<subdev_spec_t>(mb_path / "rx_subdev_spec")
+        .set(subdev_spec_t())
         .subscribe(boost::bind(&b200_impl::update_rx_subdev_spec, this, _1));
     _tree->create<subdev_spec_t>(mb_path / "tx_subdev_spec")
+        .set(subdev_spec_t())
         .subscribe(boost::bind(&b200_impl::update_tx_subdev_spec, this, _1));
 
     ////////////////////////////////////////////////////////////////////
@@ -468,18 +477,13 @@ b200_impl::b200_impl(const device_addr_t &device_addr):
     // do some post-init tasks
     ////////////////////////////////////////////////////////////////////
 
-    _tree->access<subdev_spec_t>(mb_path / "rx_subdev_spec").set(subdev_spec_t("A:RX2"));
-    _tree->access<subdev_spec_t>(mb_path / "tx_subdev_spec").set(subdev_spec_t("A:TX2"));
+    //_tree->access<subdev_spec_t>(mb_path / "rx_subdev_spec").set(subdev_spec_t("A:RX2"));
+    //_tree->access<subdev_spec_t>(mb_path / "tx_subdev_spec").set(subdev_spec_t("A:TX2"));
     _tree->access<std::string>(mb_path / "clock_source/value").set("internal");
     _tree->access<std::string>(mb_path / "time_source/value").set("none");
 
     //init the tick rate to something
-    _tree->access<double>(mb_path / "tick_rate").set(3.84e6);
-
-    //now that frontends are on, clocks are set, do codec test
-    _codec_ctrl->data_port_loopback_on();
-    this->codec_loopback_self_test();
-    _codec_ctrl->data_port_loopback_off();
+    //_tree->access<double>(mb_path / "tick_rate").set(3.84e6);
 
     _server = task::make(boost::bind(&b200_impl::run_server, this));
 
@@ -493,9 +497,12 @@ b200_impl::b200_impl(const device_addr_t &device_addr):
 
 b200_impl::~b200_impl(void)
 {
-    //TODO kill any threads here
-    //_iface->set_fpga_reset_pin(true);
-    _async_task.reset();
+    UHD_SAFE_CALL
+    (
+        _async_task.reset();
+        _codec_ctrl->set_active_chains(false, false, false, false);
+        //_iface->set_fpga_reset_pin(true);
+    )
 }
 
 

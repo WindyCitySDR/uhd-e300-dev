@@ -1685,10 +1685,6 @@ public:
     double set_gain(const std::string &which, const std::string &name, \
             const double value) {
 
-        UHD_HERE();
-        UHD_VAR(which);
-        UHD_VAR(name);
-
         if(which[0] == 'R') {
             /* Indexing the gain tables requires an offset from the requested
              * amount of total gain in dB:
