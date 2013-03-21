@@ -53,7 +53,13 @@ const static boost::uint8_t B200_VREQ_SPI_READ = 0x42;
 const static boost::uint8_t B200_VREQ_FPGA_RESET = 0x62;
 const static boost::uint8_t B200_VREQ_GPIF_RESET = 0x72;
 const static boost::uint8_t B200_VREQ_GET_USB = 0x80;
+const static boost::uint8_t B200_VREQ_GET_STATUS = 0x83;
 const static boost::uint8_t B200_VREQ_FX3_RESET = 0x99;
+
+const static boost::uint8_t FX3_STATE_FPGA_READY = 0x00;
+const static boost::uint8_t FX3_STATE_CONFIGURING_FPGA = 0x01;
+const static boost::uint8_t FX3_STATE_BUSY = 0x02;
+const static boost::uint8_t FX3_STATE_RUNNING = 0x03;
 
 typedef boost::uint32_t hash_type;
 
@@ -397,6 +403,16 @@ public:
         return boost::lexical_cast<boost::uint8_t>(rx_data[0]);
     }
 
+
+    boost::uint8_t get_fx3_status(void) {
+
+        unsigned char rx_data[1];
+
+        fx3_control_read(B200_VREQ_GET_STATUS, 0x00, 0x00, rx_data, 1);
+
+        return boost::lexical_cast<boost::uint8_t>(rx_data[0]);
+    }
+
     void usrp_get_firmware_hash(hash_type &hash) {
         fx3_control_read(B200_VREQ_GET_FW_HASH, 0x00, 0x00,
                 (unsigned char*) &hash, 4, 500);
@@ -419,6 +435,8 @@ public:
 
     void load_fpga(const std::string filestring) {
 
+        boost::uint8_t fx3_state = 0;
+
         const char *filename = filestring.c_str();
 
         hash_type hash = generate_hash(filename);
@@ -432,6 +450,11 @@ public:
             throw uhd::io_error("load_fpga: cannot open FPGA input file.");
         }
 
+        do {
+            fx3_state = get_fx3_status();
+            boost::this_thread::sleep(boost::posix_time::milliseconds(10));
+        } while(fx3_state != FX3_STATE_FPGA_READY);
+
         if (load_img_msg) UHD_MSG(status) << "Loading FPGA image: " \
             << filestring << "..." << std::flush;
         boost::system_time next_dot = boost::get_system_time() + boost::posix_time::milliseconds(700);
@@ -439,6 +462,12 @@ public:
         unsigned char out_buff[64];
         memset(out_buff, 0x00, sizeof(out_buff));
         fx3_control_write(B200_VREQ_FPGA_START, 0, 0, out_buff, 1, 1000);
+
+        do {
+            fx3_state = get_fx3_status();
+            boost::this_thread::sleep(boost::posix_time::milliseconds(10));
+        } while(fx3_state != FX3_STATE_CONFIGURING_FPGA);
+
 
         while(!file.eof()) {
             file.read((char *) out_buff, sizeof(out_buff));
@@ -460,7 +489,10 @@ public:
 
         file.close();
 
-        boost::this_thread::sleep(boost::posix_time::milliseconds(1000));
+        do {
+            fx3_state = get_fx3_status();
+            boost::this_thread::sleep(boost::posix_time::milliseconds(10));
+        } while(fx3_state != FX3_STATE_RUNNING);
 
         usrp_set_fpga_hash(hash);
 
