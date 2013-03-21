@@ -262,9 +262,9 @@ b200_impl::b200_impl(const device_addr_t &device_addr):
     // before being cleared.
     ////////////////////////////////////////////////////////////////////
     device_addr_t data_xport_args;
-    data_xport_args["recv_frame_size"] = device_addr.get("recv_frame_size", "4096");
+    data_xport_args["recv_frame_size"] = device_addr.get("recv_frame_size", "8192");
     data_xport_args["num_recv_frames"] = device_addr.get("num_recv_frames", "16");
-    data_xport_args["send_frame_size"] = device_addr.get("send_frame_size", "4096");
+    data_xport_args["send_frame_size"] = device_addr.get("send_frame_size", "8192");
     data_xport_args["num_send_frames"] = device_addr.get("num_send_frames", "16");
 
     _data_transport = usb_zero_copy::make(

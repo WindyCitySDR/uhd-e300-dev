@@ -27,7 +27,6 @@
 localparam SR_TEST      = 7;
 localparam SR_SPI       = 8;
 localparam SR_GPIO      = 16;
-localparam SR_LEDS      = 20;
 localparam SR_MISC_OUTS = 24;
 localparam SR_READBACK  = 32;
 localparam SR_TX_CTRL   = 64;
@@ -35,6 +34,7 @@ localparam SR_RX_CTRL   = 96;
 localparam SR_TIME      = 128;
 localparam SR_RX_DSP    = 144;
 localparam SR_TX_DSP    = 184;
+localparam SR_LEDS      = 196;
 
 localparam RB32_GPIO            = 0;
 localparam RB32_SPI             = 4;
