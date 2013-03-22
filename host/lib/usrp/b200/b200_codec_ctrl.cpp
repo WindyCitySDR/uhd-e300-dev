@@ -1039,6 +1039,10 @@ public:
         _adcclock_freq = 0.0;
         _rx_bbf_tunediv = 0;
         _curr_gain_table = 0;
+        _rx1_gain = 0;
+        _rx2_gain = 0;
+        _tx1_gain = 0;
+        _tx2_gain = 0;
 
         /* Initialize control interfaces. */
         _b200_iface = iface;
@@ -1363,6 +1367,20 @@ public:
         return _adcclock_freq;
     }
 
+
+    /* This function re-programs all of the gains in the system.
+     *
+     * Because the gain values match to different gain indices based on the
+     * current operating band, this function can be called to update all gain
+     * settings to the appropriate index after a re-tune. */
+    void program_gains() {
+        set_gain("RX1", "", _rx1_gain);
+        set_gain("RX2", "", _rx2_gain);
+        set_gain("TX1", "", _tx1_gain);
+        set_gain("TX2", "", _tx2_gain);
+    }
+
+
     /* This is the internal tune function, not available outside of this class.
      *
      * Calculate the VCO settings for the requested frquency, and then either
@@ -1543,6 +1561,7 @@ public:
         program_mixer_gm_subtable();
         program_gain_table();
         setup_gain_control();
+        program_gains();
 
         calibrate_baseband_rx_analog_filter();
         calibrate_baseband_tx_analog_filter();
@@ -1665,6 +1684,10 @@ public:
             program_gain_table();
         }
 
+        /* Update the gain settings. */
+        program_gains();
+
+        /* Run the calibration algorithms. */
         calibrate_tx_quadrature();
         calibrate_rx_quadrature();
 
@@ -1708,8 +1731,10 @@ public:
             if(gain_index < 0) gain_index = 0;
 
             if(which[2] == '1') {
+                _rx1_gain = value;
                 _b200_iface->write_reg(0x109, gain_index);
             } else {
+                _rx2_gain = value;
                 _b200_iface->write_reg(0x10c, gain_index);
             }
 
@@ -1726,9 +1751,11 @@ public:
             double atten = get_gain_range("TX1", "").stop() - value;
             int attenreg = atten * 4;
             if(which[2] == '1') {
+                _tx1_gain = value;
                 _b200_iface->write_reg(0x073, attenreg & 0xFF);
                 _b200_iface->write_reg(0x074, (attenreg >> 8) & 0x01);
             } else {
+                _tx2_gain = value;
                 _b200_iface->write_reg(0x075, attenreg & 0xFF);
                 _b200_iface->write_reg(0x076, (attenreg >> 8) & 0x01);
             }
@@ -1741,8 +1768,10 @@ private:
     double _rx_freq, _tx_freq, _req_rx_freq, _req_tx_freq;
     double _baseband_bw, _bbpll_freq, _adcclock_freq;
     double _req_clock_rate, _req_coreclk;
-    uint16_t _rx_bbf_tunediv;
-    uint8_t _curr_gain_table;
+    boost::uint16_t _rx_bbf_tunediv;
+    boost::uint8_t _curr_gain_table;
+
+    boost::uint32_t _rx1_gain, _rx2_gain, _tx1_gain, _tx2_gain;
 
     int _tfir_factor;
 
