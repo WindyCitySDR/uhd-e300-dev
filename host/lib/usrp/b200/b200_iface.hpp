@@ -41,6 +41,9 @@ public:
     //! get the current status of the FX3
     virtual boost::uint8_t get_fx3_status(void) = 0;
 
+    //! get the current status of the FX3
+    virtual boost::uint16_t get_compat_num(void) = 0;
+
     //! load a firmware image
     virtual void load_firmware(const std::string filestring, bool force=false) = 0;
 

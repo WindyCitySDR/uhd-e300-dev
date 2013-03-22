@@ -43,6 +43,7 @@ const static boost::uint8_t VRT_VENDOR_IN = (LIBUSB_REQUEST_TYPE_VENDOR
                                              | LIBUSB_ENDPOINT_IN);
 const static boost::uint8_t B200_VREQ_FPGA_START = 0x02;
 const static boost::uint8_t B200_VREQ_FPGA_DATA = 0x12;
+const static boost::uint8_t B200_VREQ_GET_COMPAT = 0x15;
 const static boost::uint8_t B200_VREQ_SET_FPGA_HASH = 0x1C;
 const static boost::uint8_t B200_VREQ_GET_FPGA_HASH = 0x1D;
 const static boost::uint8_t B200_VREQ_SET_FW_HASH = 0x1E;
@@ -411,6 +412,19 @@ public:
         fx3_control_read(B200_VREQ_GET_STATUS, 0x00, 0x00, rx_data, 1);
 
         return boost::lexical_cast<boost::uint8_t>(rx_data[0]);
+    }
+
+    boost::uint16_t get_compat_num(void) {
+
+        unsigned char rx_data[2];
+
+        fx3_control_read(B200_VREQ_GET_COMPAT , 0x00, 0x00, rx_data, 2);
+
+        boost::uint16_t compat = 0x0000;
+        compat |= (((uint16_t) rx_data[0]) << 8);
+        compat |= (rx_data[1] & 0x00FF);
+
+        return compat;
     }
 
     void usrp_get_firmware_hash(hash_type &hash) {

@@ -240,7 +240,6 @@ b200_impl::b200_impl(const device_addr_t &device_addr):
     const fs_path mb_path = "/mboards/0";
     _tree->create<std::string>(mb_path / "name").set("B200");
     _tree->create<std::string>(mb_path / "codename").set("Sasquatch");
-    _tree->create<std::string>(mb_path / "fw_version").set("1.0");
     _tree->create<std::string>(mb_path / "fpga_version").set("1.0");
 
     ////////////////////////////////////////////////////////////////////
@@ -591,7 +590,20 @@ double b200_impl::get_tx_sample_rate(void)
 
 void b200_impl::check_fw_compat(void)
 {
-    //TODO
+    boost::uint16_t compat_num = _iface->get_compat_num();
+    boost::uint32_t compat_major = (uint32_t) (compat_num >> 8);
+    boost::uint32_t compat_minor = (uint32_t) (compat_num & 0x00FF);
+
+    if (compat_major != B200_FW_COMPAT_NUM_MAJOR){
+        throw uhd::runtime_error(str(boost::format(
+            "Expected firmware compatibility number %x.x, but got %x.%x:\n"
+            "The firmware build is not compatible with the host code build.\n"
+            "%s"
+        ) % B200_FW_COMPAT_NUM_MAJOR % ((int) compat_major) % ((int) compat_minor) 
+          % print_images_error()));
+    }
+    _tree->create<std::string>("/mboards/0/fw_version").set(str(boost::format("%u.%u")
+                % compat_major % compat_minor));
 }
 
 void b200_impl::check_fpga_compat(void)
