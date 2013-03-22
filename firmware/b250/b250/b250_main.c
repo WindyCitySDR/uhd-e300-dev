@@ -111,7 +111,7 @@ int main(void)
 	last_counter = counter;
 
         //run the serial loader - poll and handle
-        b250_serial_loader_run1();
+        //b250_serial_loader_run1();
 
         //run the network stack - poll and handle
         u3_net_stack_handle_one();

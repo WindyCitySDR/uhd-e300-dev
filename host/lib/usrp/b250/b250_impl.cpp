@@ -167,12 +167,12 @@ b250_impl::b250_impl(const uhd::device_addr_t &dev_addr)
     const std::string b250_fw_image = find_image_path(
         dev_addr.has_key("fw")? dev_addr["fw"] : B250_FW_FILE_NAME
     );
-    b250_load_fw(dev_addr["addr"], b250_fw_image);
+    b250_load_fw(_addr, b250_fw_image);
 
     const std::vector<std::string> DB_NAMES = boost::assign::list_of("A")("B");
 
     //create basic communication
-    _zpu_ctrl.reset(new b250_ctrl_iface(udp_simple::make_connected(dev_addr["addr"], BOOST_STRINGIZE(B250_FW_COMMS_UDP_PORT))));
+    _zpu_ctrl.reset(new b250_ctrl_iface(udp_simple::make_connected(_addr, BOOST_STRINGIZE(B250_FW_COMMS_UDP_PORT))));
     _zpu_spi = spi_core_3000::make(_zpu_ctrl, SR_ADDR(SET0_BASE, ZPU_SR_SPI), SR_ADDR(SET0_BASE, ZPU_RB_SPI));
     _zpu_i2c = i2c_core_100_wb32::make(_zpu_ctrl, I2C1_BASE);
     _zpu_i2c->set_clock_rate(B250_BUS_CLOCK_RATE);
@@ -205,6 +205,42 @@ b250_impl::b250_impl(const uhd::device_addr_t &dev_addr)
         .set(B250_RADIO_CLOCK_RATE);
 
     ////////////////////////////////////////////////////////////////////
+    // Create the GPSDO control
+    ////////////////////////////////////////////////////////////////////
+    static const boost::uint32_t dont_look_for_gpsdo = 0x1234abcdul;
+
+    //otherwise if not disabled, look for the internal GPSDO
+    //TODO if (_iface->peekfw(U2_FW_REG_HAS_GPSDO) != dont_look_for_gpsdo)
+    if (false)
+    {
+        UHD_MSG(status) << "Detecting internal GPSDO.... " << std::flush;
+        try
+        {
+            _gps = gps_ctrl::make(udp_simple::make_uart(udp_simple::make_connected(
+                _addr, BOOST_STRINGIZE(B250_GPSDO_UDP_PORT)
+            )));
+        }
+        catch(std::exception &e)
+        {
+            UHD_MSG(error) << "An error occurred making GPSDO control: " << e.what() << std::endl;
+        }
+        if (_gps and _gps->gps_detected())
+        {
+            UHD_MSG(status) << "found" << std::endl;
+            BOOST_FOREACH(const std::string &name, _gps->get_sensors())
+            {
+                _tree->create<sensor_value_t>(mb_path / "sensors" / name)
+                    .publish(boost::bind(&gps_ctrl::get_sensor, _gps, name));
+            }
+        }
+        else
+        {
+            UHD_MSG(status) << "not found" << std::endl;
+            //TODO _iface->pokefw(U2_FW_REG_HAS_GPSDO, dont_look_for_gpsdo);
+        }
+    }
+
+    ////////////////////////////////////////////////////////////////////
     //clear router?
     ////////////////////////////////////////////////////////////////////
     for (size_t i = 0; i < 512; i++) _zpu_ctrl->poke32(SR_ADDR(SETXB_BASE, i), 0);
@@ -219,7 +255,7 @@ b250_impl::b250_impl(const uhd::device_addr_t &dev_addr)
     ctrl0_config.router_dst_there = B250_XB_DST_R0;
     ctrl0_config.router_dst_here = B250_XB_DST_E0;
     const boost::uint32_t ctrl0_sid = this->allocate_sid(ctrl0_config);
-    udp_zero_copy::sptr r0_ctrl_xport = this->make_transport(dev_addr["addr"], ctrl0_sid);
+    udp_zero_copy::sptr r0_ctrl_xport = this->make_transport(_addr, ctrl0_sid);
     _radio_ctrl0 = b250_ctrl::make(r0_ctrl_xport, ctrl0_sid);
     _radio_ctrl0->poke32(TOREG(SR_MISC_OUTS), (1 << 2)); //reset adc + dac
     _radio_ctrl0->poke32(TOREG(SR_MISC_OUTS), (1 << 1) | (1 << 0)); //out of reset + dac enable
@@ -241,7 +277,7 @@ b250_impl::b250_impl(const uhd::device_addr_t &dev_addr)
     ctrl1_config.router_dst_there = B250_XB_DST_R1;
     ctrl1_config.router_dst_here = B250_XB_DST_E0;
     const boost::uint32_t ctrl1_sid = this->allocate_sid(ctrl1_config);
-    udp_zero_copy::sptr r1_ctrl_xport = this->make_transport(dev_addr["addr"], ctrl1_sid);
+    udp_zero_copy::sptr r1_ctrl_xport = this->make_transport(_addr, ctrl1_sid);
     _radio_ctrl1 = b250_ctrl::make(r1_ctrl_xport, ctrl1_sid);
     this->register_loopback_self_test(_radio_ctrl1);
     */

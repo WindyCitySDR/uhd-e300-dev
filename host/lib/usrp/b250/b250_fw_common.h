@@ -33,6 +33,7 @@ extern "C" {
 #define B250_FW_COMMS_MTU (1 << 13) //8k
 #define B250_FW_COMMS_UDP_PORT 49152
 #define B250_VITA_UDP_PORT 49153
+#define B250_GPSDO_UDP_PORT 49156
 
 #define B250_FW_COMMS_FLAGS_ACK        (1 << 0)
 #define B250_FW_COMMS_FLAGS_ERROR      (1 << 1)

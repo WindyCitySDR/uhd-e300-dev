@@ -10,6 +10,8 @@
 #include <printf.h>
 #include <wb_pkt_iface64.h>
 #include <u3_net_stack.h>
+#include <udp_uart.h>
+#include "b250_fw_common.h"
 
 
 
@@ -234,6 +236,7 @@ void b250_init(void)
     //first - uart
     wb_uart_init(UART0_BASE, CPU_CLOCK/UART0_BAUD);
     init_printf(NULL,putc);
+    //udp_uart_init(UART0_BASE, B250_GPSDO_UDP_PORT);
 
     //now we can init the rest with prints
     printf("B250 ZPU Init Begin -- CPU CLOCK is %d MHz\n", CPU_CLOCK/1000000);
