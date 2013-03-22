@@ -44,7 +44,7 @@ struct b250_ctrl_iface : wb_iface
         while (udp->recv(boost::asio::buffer(buff), 0.0)){} //flush
     }
 
-    void poke32(wb_addr_type addr, boost::uint32_t data)
+    void poke32(const wb_addr_type addr, const boost::uint32_t data)
     {
         //load request struct
         b250_fw_comms_t request = b250_fw_comms_t();
@@ -72,7 +72,7 @@ struct b250_ctrl_iface : wb_iface
         UHD_ASSERT_THROW(reply.data == request.data);
     }
 
-    boost::uint32_t peek32(wb_addr_type addr)
+    boost::uint32_t peek32(const wb_addr_type addr)
     {
         //load request struct
         b250_fw_comms_t request = b250_fw_comms_t();
@@ -99,17 +99,7 @@ struct b250_ctrl_iface : wb_iface
         UHD_ASSERT_THROW(reply.addr == request.addr);
 
         //return result!
-        return uhd::ntohx(reply.data);
-    }
-
-    void poke16(wb_addr_type, boost::uint16_t)
-    {
-        throw uhd::not_implemented_error("b250_ctrl_iface::poke16");
-    }
-
-    boost::uint16_t peek16(wb_addr_type)
-    {
-        throw uhd::not_implemented_error("b250_ctrl_iface::peek16");
+        return uhd::ntohx<boost::uint32_t>(reply.data);
     }
 };
 

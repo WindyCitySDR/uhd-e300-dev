@@ -65,7 +65,7 @@ public:
     /*******************************************************************
      * Peek and poke 32 bit implementation
      ******************************************************************/
-    void poke32(wb_addr_type addr, boost::uint32_t data)
+    void poke32(const wb_addr_type addr, const boost::uint32_t data)
     {
         boost::mutex::scoped_lock lock(_mutex);
 
@@ -73,7 +73,7 @@ public:
         this->wait_for_ack(false);
     }
 
-    boost::uint32_t peek32(wb_addr_type addr)
+    boost::uint32_t peek32(const wb_addr_type addr)
     {
         boost::mutex::scoped_lock lock(_mutex);
 
@@ -87,7 +87,7 @@ public:
         return ((addr/4) & 0x1)? hi : lo;
     }
 
-    boost::uint64_t peek64(wb_addr_type addr)
+    boost::uint64_t peek64(const wb_addr_type addr)
     {
         boost::mutex::scoped_lock lock(_mutex);
 
