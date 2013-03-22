@@ -164,7 +164,7 @@ static void handle_rx_flowctrl(const boost::uint32_t sid, udp_zero_copy::sptr xp
 
     //load payload
     pkt[packet_info.num_header_words32+0] = uhd::htonx<boost::uint32_t>(B250_ENABLE_RX_FC? 0 : ~0);
-    pkt[packet_info.num_header_words32+1] = uhd::htonx<boost::uint32_t>(last_seq + 0xfff); //assume max... for now its just testing
+    pkt[packet_info.num_header_words32+1] = uhd::htonx<boost::uint32_t>(last_seq + B250_RX_FC_PKT_WINDOW);
 
     //send the buffer over the interface
     buff->commit(sizeof(boost::uint32_t)*(packet_info.num_packet_words32));
@@ -317,7 +317,7 @@ rx_streamer::sptr b250_impl::get_rx_stream(const uhd::stream_args_t &args_)
     ));
     my_streamer->set_xport_handle_flowctrl(0, boost::bind(
         &handle_rx_flowctrl, data_sid, data_xport, _1
-    ), 0xfff/8, true/*init*/);
+    ), B250_RX_FC_PKT_WINDOW/8, true/*init*/);
     my_streamer->set_issue_stream_cmd(0, boost::bind(
         &rx_vita_core_3000::issue_stream_command, _rx_framer, _1
     ));

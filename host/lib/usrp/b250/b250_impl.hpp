@@ -41,8 +41,10 @@
 #include "i2c_core_100_wb32.hpp"
 #include "gpio_core_200.hpp"
 #include <boost/weak_ptr.hpp>
+#include <uhd/usrp/gps_ctrl.hpp>
 
 static const size_t B250_TX_FC_PKT_WINDOW = 100;
+static const size_t B250_RX_FC_PKT_WINDOW = 0xfff/32;
 static const std::string B250_FW_FILE_NAME = "usrp_b250_fw.bin";
 static const double B250_RADIO_CLOCK_RATE = 120e6;
 static const double B250_BUS_CLOCK_RATE = 200e6;
@@ -125,6 +127,7 @@ private:
     b250_dac_ctrl::sptr _dac_ctrl1;
     time_core_3000::sptr _time64;
     b250_clock_ctrl::sptr _clock;
+    uhd::gps_ctrl::sptr _gps;
 
     size_t _last_sid;
     struct sid_config_t
