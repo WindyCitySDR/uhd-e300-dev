@@ -40,10 +40,10 @@ public:
     virtual std::vector<std::string> get_gain_names(const std::string &which) = 0;
 
     //! set the gain for a particular gain element
-    virtual double set_gain(const std::string &which, const std::string &name, const double value) = 0;
+    virtual double set_gain(const std::string &which, const double value) = 0;
 
     //! get the gain range for a particular gain element
-    virtual uhd::meta_range_t get_gain_range(const std::string &which, const std::string &name) = 0;
+    virtual uhd::meta_range_t get_gain_range(const std::string &which) = 0;
 
     //! get the freq range for the frontend which
     virtual uhd::meta_range_t get_rf_freq_range(const std::string &which) = 0;

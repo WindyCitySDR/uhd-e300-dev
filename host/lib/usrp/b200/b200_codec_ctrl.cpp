@@ -28,8 +28,7 @@ public:
     /***********************************************************************
      * Information retrieval functions
      **********************************************************************/
-    uhd::meta_range_t get_gain_range(const std::string &which, \
-            const std::string &name) {
+    uhd::meta_range_t get_gain_range(const std::string &which) {
         if(which[0] == 'R') {
             return uhd::meta_range_t(0.0, 73.0, 1.0);
         } else {
@@ -1374,10 +1373,10 @@ public:
      * current operating band, this function can be called to update all gain
      * settings to the appropriate index after a re-tune. */
     void program_gains() {
-        set_gain("RX1", "", _rx1_gain);
-        set_gain("RX2", "", _rx2_gain);
-        set_gain("TX1", "", _tx1_gain);
-        set_gain("TX2", "", _tx2_gain);
+        set_gain("RX1", _rx1_gain);
+        set_gain("RX2", _rx2_gain);
+        set_gain("TX1", _tx1_gain);
+        set_gain("TX2", _tx2_gain);
     }
 
 
@@ -1622,13 +1621,6 @@ public:
      *  RX2             Side B              RX2
      */
     void set_active_chains(bool tx1, bool tx2, bool rx1, bool rx2) {
-
-        UHD_HERE();
-        UHD_VAR(tx1);
-        UHD_VAR(rx1);
-        UHD_VAR(tx2);
-        UHD_VAR(rx2);
-
         /* Clear out the current active chain settings. */
         reg_txfilt = reg_txfilt & 0x3F;
         reg_rxfilt = reg_rxfilt & 0x3F;
@@ -1705,8 +1697,7 @@ public:
      * _not_ the gain index. This is the opposite of the eval software's GUI!
      * Also note that the RX chains are done in terms of gain, and the TX chains
      * are done in terms of attenuation. */
-    double set_gain(const std::string &which, const std::string &name, \
-            const double value) {
+    double set_gain(const std::string &which, const double value) {
 
         if(which[0] == 'R') {
             /* Indexing the gain tables requires an offset from the requested
@@ -1748,7 +1739,7 @@ public:
             /* Each gain step is -0.25dB. Calculate the attenuation necessary
              * for the requested gain, convert it into gain steps, then write
              * the attenuation word. Max gain (so zero attenuation) is 89.75. */
-            double atten = get_gain_range("TX1", "").stop() - value;
+            double atten = get_gain_range("TX1").stop() - value;
             int attenreg = atten * 4;
             if(which[2] == '1') {
                 _tx1_gain = value;
@@ -1759,7 +1750,7 @@ public:
                 _b200_iface->write_reg(0x075, attenreg & 0xFF);
                 _b200_iface->write_reg(0x076, (attenreg >> 8) & 0x01);
             }
-            return get_gain_range("TX1", "").stop() - (double(attenreg)/ 4);
+            return get_gain_range("TX1").stop() - (double(attenreg)/ 4);
         }
     }
 

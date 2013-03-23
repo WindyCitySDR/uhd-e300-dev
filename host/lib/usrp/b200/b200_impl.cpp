@@ -434,10 +434,10 @@ b200_impl::b200_impl(const device_addr_t &device_addr):
         BOOST_FOREACH(const std::string &name, _codec_ctrl->get_gain_names(fe_name))
         {
             _tree->create<meta_range_t>(rf_fe_path / "gains" / name / "range")
-                    .set(_codec_ctrl->get_gain_range(fe_name, name));
+                    .set(_codec_ctrl->get_gain_range(fe_name));
 
             _tree->create<double>(rf_fe_path / "gains" / name / "value")
-                .coerce(boost::bind(&b200_codec_ctrl::set_gain, _codec_ctrl, fe_name, name, _1))
+                .coerce(boost::bind(&b200_codec_ctrl::set_gain, _codec_ctrl, fe_name, _1))
                 .set(0.0);
         }
         _tree->create<std::string>(rf_fe_path / "connection").set("IQ");
