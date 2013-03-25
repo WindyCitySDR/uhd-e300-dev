@@ -64,7 +64,7 @@ static void handle_uart_data_packet(
     //handle ICMP destination unreachable
     if (buff == NULL)
     {
-        const size_t which = udp_uart_lookup(dst_port);
+        const size_t which = udp_uart_lookup(src_port);
         if (which == -1) return;
         _states[which].host_port = 0;
     }
@@ -92,11 +92,13 @@ void udp_uart_init(const uint32_t uart_base, const uint16_t udp_port)
     for (size_t i = 0; i < MAX_NUM_UARTS; i++)
     {
         if (_states[i].uart_base != 0) continue;
+        _states[i].uart_base = uart_base;
         _states[i].local_port = udp_port;
         _states[i].host_port = 0; //reset to null port
         _states[i].len = 0;
         _states[i].cyc = 0;
         u3_net_stack_register_udp_handler(udp_port, &handle_uart_data_packet);
+        return;
     }
 }
 
@@ -107,13 +109,13 @@ void udp_uart_poll(void)
 {
     for (size_t i = 0; i < MAX_NUM_UARTS; i++)
     {
-        if (_states[i].uart_base != 0) continue;
+        if (_states[i].uart_base == 0) continue;
 
         bool newline = false;
         udp_uart_state_t *state = &_states[i];
 
         //read all characters we can without blocking
-        for (size_t j = state->len; j < sizeof(_states[0].buf); j++)
+        for (size_t j = state->len; j < sizeof(state->buf); j++)
         {
             int ret = wb_uart_getc(state->uart_base);
             if (ret == -1) break;

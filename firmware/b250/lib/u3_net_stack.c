@@ -381,8 +381,8 @@ static void handle_icmp_packet(
             if (udp_handler_ports[i] == udp->src)
             {
                 udp_handlers[i](ethno,
-                    u3_net_stack_get_ip_addr(ethno), src,
-                    udp->dest, udp->src, NULL, 0
+                    src, u3_net_stack_get_ip_addr(ethno),
+                    udp->src, udp->dest, NULL, 0
                 );
                 return;
             }
