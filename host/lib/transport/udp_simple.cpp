@@ -117,6 +117,7 @@ public:
 
             //recv a new packet into the buffer
             _len = _udp->recv(asio::buffer(_buf), std::max((exit_time - boost::get_system_time()).total_milliseconds()/1000., 0.0));
+            std::cout << "udp->recv uart " << _len  << " " << std::string((const char *)_buf, _len) << std::endl;
             _off = 0;
 
         } while (_len != 0);

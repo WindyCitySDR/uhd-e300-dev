@@ -43,7 +43,11 @@ static void init_network(void)
 
 static void putc(void *p, char c)
 {
-    wb_uart_putc(UART0_BASE, c);
+    const uint32_t enter_time = wb_peek32(RB0_BASE + 0*4);
+    while (((uint32_t)(wb_peek32(RB0_BASE + 0*4)-enter_time)) < CPU_CLOCK/10)
+    {
+        if (wb_uart_try_putc(UART0_BASE, c)) return;
+    }
 }
 
 /*
@@ -236,7 +240,7 @@ void b250_init(void)
     //first - uart
     wb_uart_init(UART0_BASE, CPU_CLOCK/UART0_BAUD);
     init_printf(NULL,putc);
-    //udp_uart_init(UART0_BASE, B250_GPSDO_UDP_PORT);
+    udp_uart_init(UART0_BASE, B250_GPSDO_UDP_PORT);
 
     //now we can init the rest with prints
     printf("B250 ZPU Init Begin -- CPU CLOCK is %d MHz\n", CPU_CLOCK/1000000);

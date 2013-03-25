@@ -211,7 +211,7 @@ b250_impl::b250_impl(const uhd::device_addr_t &dev_addr)
 
     //otherwise if not disabled, look for the internal GPSDO
     //TODO if (_iface->peekfw(U2_FW_REG_HAS_GPSDO) != dont_look_for_gpsdo)
-    if (false)
+    //if (false)
     {
         UHD_MSG(status) << "Detecting internal GPSDO.... " << std::flush;
         try

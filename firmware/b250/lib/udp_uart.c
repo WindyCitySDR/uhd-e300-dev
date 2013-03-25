@@ -64,7 +64,7 @@ static void handle_uart_data_packet(
     //handle ICMP destination unreachable
     if (buff == NULL)
     {
-        const size_t which = udp_uart_lookup(src_port);
+        const size_t which = udp_uart_lookup(dst_port);
         if (which == -1) return;
         _states[which].host_port = 0;
     }
@@ -103,7 +103,8 @@ void udp_uart_init(const uint32_t uart_base, const uint16_t udp_port)
 /***********************************************************************
  * Public poll function
  **********************************************************************/
-void udp_uart_poll(void){
+void udp_uart_poll(void)
+{
     for (size_t i = 0; i < MAX_NUM_UARTS; i++)
     {
         if (_states[i].uart_base != 0) continue;

@@ -7,6 +7,7 @@
 #include "ethernet.h"
 
 #include <wb_utils.h>
+#include <udp_uart.h>
 #include <u3_net_stack.h>
 #include <printf.h>
 #include <string.h>
@@ -95,7 +96,6 @@ int main(void)
 {
   uint32_t last_counter = 0;
   uint32_t xge_sfpp_hotplug_count = 0;
-  static struct ip_addr test_ip = {(192 << 24 | 168 << 16 | 50  << 8  | 3 << 0)};
   
     b250_init();
     u3_net_stack_register_udp_handler(B250_FW_COMMS_UDP_PORT, &handle_udp_fw_comms);
@@ -105,17 +105,18 @@ int main(void)
         //makes leds do something alive
         const uint32_t counter = wb_peek32(RB0_BASE + 0*4);
         wb_poke32(SET0_BASE + 0*4, counter/CPU_CLOCK);
-	if (counter/CPU_CLOCK != last_counter/CPU_CLOCK)
-	  u3_net_stack_send_arp_request(0, &test_ip);
+        if (counter/CPU_CLOCK != last_counter/CPU_CLOCK)
 
-	last_counter = counter;
+        last_counter = counter;
 
         //run the serial loader - poll and handle
         //b250_serial_loader_run1();
 
         //run the network stack - poll and handle
         u3_net_stack_handle_one();
-  
+
+        //run the udp uart handler for incoming serial data
+        udp_uart_poll();
 
 	if ((xge_sfpp_hotplug_count++) == 1000) {
           // Every so often poll XGE Phy to look for SFP+ hotplug events.

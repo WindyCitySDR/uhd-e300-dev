@@ -152,7 +152,7 @@ private:
         //load payload
         pkt[packet_info.num_header_words32+0] = uhd::htonx(addr);
         pkt[packet_info.num_header_words32+1] = uhd::htonx(data);
-        UHD_MSG(status) << boost::format("0x%08x, 0x%08x\n") % addr % data;
+        //UHD_MSG(status) << boost::format("0x%08x, 0x%08x\n") % addr % data;
 
         //send the buffer over the interface
         _outstanding_seqs.push(_seq_out);

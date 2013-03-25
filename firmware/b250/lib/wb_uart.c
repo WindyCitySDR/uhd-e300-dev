@@ -20,6 +20,13 @@ void wb_uart_putc(const uint32_t base, const int ch)
     wb_poke32(base + SUART_TXCHAR*4, ch);
 }
 
+bool wb_uart_try_putc(const uint32_t base, const int ch)
+{
+    if (wb_peek32(base + SUART_TXLEVEL*4) == 0) return false;
+    wb_poke32(base + SUART_TXCHAR*4, ch);
+    return true;
+}
+
 int wb_uart_getc(const uint32_t base)
 {
     if (wb_peek32(base + SUART_RXLEVEL*4) == 0) return -1;

@@ -373,7 +373,20 @@ static void handle_icmp_packet(
 
     if (icmp->type == ICMP_DUR && icmp->code == ICMP_DUR_PORT)
     {
-        //TODO call handler
+        struct ip_hdr *ip = (struct ip_hdr *)(((uint8_t*)icmp) + sizeof(struct icmp_echo_hdr));
+        struct udp_hdr *udp = (struct udp_hdr *)(((char *)ip) + IP_HLEN);
+        if (IPH_PROTO(ip) != IP_PROTO_UDP) return;
+        for (size_t i = 0; i < udp_handlers_index; i++)
+        {
+            if (udp_handler_ports[i] == udp->src)
+            {
+                udp_handlers[i](ethno,
+                    u3_net_stack_get_ip_addr(ethno), src,
+                    udp->dest, udp->src, NULL, 0
+                );
+                return;
+            }
+        }
     }
 }
 
