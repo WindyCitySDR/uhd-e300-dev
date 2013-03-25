@@ -28,3 +28,8 @@ add_executable(b250_main.elf ${b250_sources})
 target_link_libraries(b250_main.elf usrpfw)
 GEN_OUTPUTS(b250_main.elf)
 
+INSTALL(
+    FILES ${CMAKE_CURRENT_BINARY_DIR}/b250_main.bin
+    DESTINATION share/uhd/images
+    RENAME usrp_b250_fw.bin
+)
