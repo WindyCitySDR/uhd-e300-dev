@@ -126,15 +126,15 @@ static void send_eth_pkt(
     size_t buff_i = 0;
 
     uint32_t *buff32 = (uint32_t *)ptr;
-    for (size_t i = 0; i < l0/4; i++)
+    for (size_t i = 0; i < (l0+3)/4; i++)
     {
         buff32[buff_i++] = ((const uint32_t *)p0)[i];
     }
-    for (size_t i = 0; i < l1/4; i++)
+    for (size_t i = 0; i < (l1+3)/4; i++)
     {
         buff32[buff_i++] = ((const uint32_t *)p1)[i];
     }
-    for (size_t i = 0; i < l2/4; i++)
+    for (size_t i = 0; i < (l2+3)/4; i++)
     {
         buff32[buff_i++] = ((const uint32_t *)p2)[i];
     }

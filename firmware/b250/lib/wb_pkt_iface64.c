@@ -32,7 +32,7 @@ const void *wb_pkt_iface64_rx_try_claim(wb_pkt_iface64_config_t *config, size_t 
     const uint32_t status = get_status(config);
     const uint32_t rx_state_flag = (status >> 31) & 0x1;
     *num_bytes = (status & NUM_BYTES_MASK);
-    if (*num_bytes & 0x7) *num_bytes -= 8; //adjust for tuser
+    //if (*num_bytes & 0x7) *num_bytes -= 8; //adjust for tuser
     if (rx_state_flag == 0) return NULL;
     return (void *)config->base;
 }

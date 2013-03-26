@@ -24,7 +24,7 @@
  **********************************************************************/
 #define MAX_NUM_UARTS 4
 
-static const size_t num_idle_cyc_b4_flush = 11; //small but lucky number
+static const size_t num_idle_cyc_b4_flush = 22;
 
 /***********************************************************************
  * Globals
@@ -79,7 +79,10 @@ static void handle_uart_data_packet(
         _states[which].host_port = src_port;
         for (size_t i = 0; i < num_bytes; i++)
         {
-            wb_uart_putc(_states[which].uart_base, (int)(((char *)buff)[i]));
+            const char ch = ((const char *)buff)[i];
+            if (ch == '\n') wb_uart_putc(_states[which].uart_base, (int)'\r');
+            wb_uart_putc(_states[which].uart_base, (int)ch);
+            udp_uart_poll();
         }
     }
 }

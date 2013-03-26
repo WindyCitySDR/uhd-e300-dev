@@ -43,11 +43,7 @@ static void init_network(void)
 
 static void putc(void *p, char c)
 {
-    const uint32_t enter_time = wb_peek32(RB0_BASE + 0*4);
-    while (((uint32_t)(wb_peek32(RB0_BASE + 0*4)-enter_time)) < CPU_CLOCK/10)
-    {
-        if (wb_uart_try_putc(UART0_BASE, c)) return;
-    }
+    //wb_uart_putc(UART0_BASE, c);
 }
 
 /*
