@@ -57,7 +57,7 @@ static device_addrs_t b250_find_with_addr(const device_addr_t &dev_addr)
     while (true)
     {
         char buff[B250_FW_COMMS_MTU] = {};
-        const size_t nbytes = comm->recv(asio::buffer(buff));
+        const size_t nbytes = comm->recv(asio::buffer(buff), 0.050);
         if (nbytes == 0) break;
         device_addr_t new_addr;
         new_addr["type"] = "b250";
@@ -164,10 +164,13 @@ b250_impl::b250_impl(const uhd::device_addr_t &dev_addr)
 
     //extract the FW path for the B250
     //and live load fw over ethernet link
-    const std::string b250_fw_image = find_image_path(
-        dev_addr.has_key("fw")? dev_addr["fw"] : B250_FW_FILE_NAME
-    );
-    b250_load_fw(_addr, b250_fw_image);
+    if (dev_addr.has_key("fw"))
+    {
+        const std::string b250_fw_image = find_image_path(
+            dev_addr.has_key("fw")? dev_addr["fw"] : B250_FW_FILE_NAME
+        );
+        b250_load_fw(_addr, b250_fw_image);
+    }
 
     const std::vector<std::string> DB_NAMES = boost::assign::list_of("A")("B");
 
