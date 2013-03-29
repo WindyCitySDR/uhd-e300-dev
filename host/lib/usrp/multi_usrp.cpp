@@ -545,8 +545,17 @@ public:
         }
     }
 
-    subdev_spec_t get_rx_subdev_spec(size_t mboard){
-        return _tree->access<subdev_spec_t>(mb_root(mboard) / "rx_subdev_spec").get();
+    subdev_spec_t get_rx_subdev_spec(size_t mboard)
+    {
+        subdev_spec_t spec = _tree->access<subdev_spec_t>(mb_root(mboard) / "rx_subdev_spec").get();
+        if (spec.empty())
+        {
+            const std::string db_name = _tree->list(mb_root(mboard) / "dboards").at(0);
+            const std::string fe_name = _tree->list(mb_root(mboard) / "dboards" / db_name / "rx_frontends").at(0);
+            spec.push_back(subdev_spec_pair_t(db_name, fe_name));
+            _tree->access<subdev_spec_t>(mb_root(mboard) / "rx_subdev_spec").set(spec);
+        }
+        return spec;
     }
 
     size_t get_rx_num_channels(void){
@@ -697,8 +706,17 @@ public:
         }
     }
 
-    subdev_spec_t get_tx_subdev_spec(size_t mboard){
-        return _tree->access<subdev_spec_t>(mb_root(mboard) / "tx_subdev_spec").get();
+    subdev_spec_t get_tx_subdev_spec(size_t mboard)
+    {
+        subdev_spec_t spec = _tree->access<subdev_spec_t>(mb_root(mboard) / "tx_subdev_spec").get();
+        if (spec.empty())
+        {
+            const std::string db_name = _tree->list(mb_root(mboard) / "dboards").at(0);
+            const std::string fe_name = _tree->list(mb_root(mboard) / "dboards" / db_name / "tx_frontends").at(0);
+            spec.push_back(subdev_spec_pair_t(db_name, fe_name));
+            _tree->access<subdev_spec_t>(mb_root(mboard) / "tx_subdev_spec").set(spec);
+        }
+        return spec;
     }
 
     size_t get_tx_num_channels(void){

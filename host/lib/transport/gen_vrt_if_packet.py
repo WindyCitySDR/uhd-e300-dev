@@ -365,6 +365,7 @@ void vrt::if_hdr_unpack_$(suffix)(
         if ($(XE_MACRO)(packet_buff[(vrl_hdr & 0xfffff)-1]) != VEND) throw uhd::value_error("bad vrl trailer VEND");
         __if_hdr_unpack_$(suffix)(packet_buff+2, if_packet_info, vrt_hdr_word32);
         if_packet_info.num_header_words32 += 2; //add vrl header
+        if_packet_info.packet_count = (vrl_hdr >> 20) & 0xfff;
         break;
     }
     }

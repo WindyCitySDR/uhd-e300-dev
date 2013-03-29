@@ -1,5 +1,5 @@
 //
-// Copyright 2010-2012 Ettus Research LLC
+// Copyright 2010-2013 Ettus Research LLC
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -36,6 +36,12 @@ static const size_t DEFAULT_XFER_SIZE = 32*512; //bytes
     #define LIBUSB_CALL
 #endif /*LIBUSB_CALL*/
 
+//! libusb_handle_events_timeout_completed is only in newer API
+#ifndef HAVE_LIBUSB_HANDLE_EVENTS_TIMEOUT_COMPLETED
+    #define libusb_handle_events_timeout_completed(ctx, tx, completed)\
+        libusb_handle_events_timeout(ctx, tx)
+#endif
+
 /*!
  * All libusb callback functions should be marked with the LIBUSB_CALL macro
  * to ensure that they are compiled with the same calling convention as libusb.
@@ -43,7 +49,8 @@ static const size_t DEFAULT_XFER_SIZE = 32*512; //bytes
 
 //! helper function: handles all async callbacks
 static void LIBUSB_CALL libusb_async_cb(libusb_transfer *lut){
-    *(static_cast<bool *>(lut->user_data)) = true;
+    int *completed = (int *)lut->user_data;
+    *completed = 1;
 }
 
 /*!
@@ -61,7 +68,7 @@ static void LIBUSB_CALL libusb_async_cb(libusb_transfer *lut){
  * \param completed a reference to the completed flag
  * \return true for completion, false for timeout
  */
-UHD_INLINE bool wait_for_completion(libusb_context *ctx, const double timeout, bool &completed){
+UHD_INLINE bool wait_for_completion(libusb_context *ctx, const double timeout, int &completed){
     //already completed by a previous call?
     if (completed) return true;
 
@@ -69,7 +76,7 @@ UHD_INLINE bool wait_for_completion(libusb_context *ctx, const double timeout, b
     timeval tv;
     tv.tv_sec = 0;
     tv.tv_usec = 0;
-    libusb_handle_events_timeout(ctx, &tv);
+    libusb_handle_events_timeout_completed(ctx, &tv, &completed);
     if (completed) return true;
 
     //finish the rest with a timeout loop
@@ -78,7 +85,7 @@ UHD_INLINE bool wait_for_completion(libusb_context *ctx, const double timeout, b
         timeval tv;
         tv.tv_sec = 0;
         tv.tv_usec = 10000; /*10ms*/
-        libusb_handle_events_timeout(ctx, &tv);
+        libusb_handle_events_timeout_completed(ctx, &tv, &completed);
     }
 
     return completed;
@@ -96,7 +103,7 @@ public:
         _lut(lut), _frame_size(frame_size) { /* NOP */ }
 
     void release(void){
-        completed = false;
+        completed = 0;
         _lut->length = _frame_size; //always reset length
         UHD_ASSERT_THROW(libusb_submit_transfer(_lut) == 0);
     }
@@ -109,7 +116,7 @@ public:
         return managed_recv_buffer::sptr();
     }
 
-    bool completed;
+    int completed;
 
 private:
     libusb_context *_ctx;
@@ -129,7 +136,7 @@ public:
         _lut(lut), _frame_size(frame_size) { completed = true; }
 
     void release(void){
-        completed = false;
+        completed = 0;
         _lut->length = size();
         UHD_ASSERT_THROW(libusb_submit_transfer(_lut) == 0);
     }
@@ -142,7 +149,7 @@ public:
         return managed_send_buffer::sptr();
     }
 
-    bool completed;
+    int completed;
 
 private:
     libusb_context *_ctx;
@@ -249,7 +256,7 @@ public:
         }
 
         //process all transfers until timeout occurs
-        bool completed = false;
+        int completed = 0;
         wait_for_completion(ctx, 0.01, completed);
 
         //free all transfers

@@ -51,6 +51,7 @@ public:
      * \param index        2-byte (wIndex)
      * \param buff         buffer to hold send or receive data
      * \param length       2-byte (wLength)
+     * \param timeout      4-byte (timeout, default is infinite wait)
      * \return             number of bytes submitted or error code
      */
     virtual ssize_t submit(boost::uint8_t request_type,
@@ -58,7 +59,8 @@ public:
                           boost::uint16_t value,
                           boost::uint16_t index, 
                           unsigned char *buff,
-                          boost::uint16_t length) = 0; 
+                          boost::uint16_t length,
+                          boost::int32_t libusb_timeout = 0) = 0;
 };
 
 }} //namespace
