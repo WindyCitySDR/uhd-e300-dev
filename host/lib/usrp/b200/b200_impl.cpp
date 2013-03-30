@@ -542,6 +542,9 @@ void b200_impl::codec_loopback_self_test(void)
         if (test_fail) break; //exit loop on any failure
     }
     UHD_MSG(status) << ((test_fail)? " fail" : "pass") << std::endl;
+
+    /* Zero out the idle data. */
+    _ctrl->poke32(TOREG(SR_CODEC_IDLE), 0);
 }
 
 /***********************************************************************
