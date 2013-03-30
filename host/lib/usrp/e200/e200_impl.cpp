@@ -160,9 +160,9 @@ e200_impl::e200_impl(const uhd::device_addr_t &device_addr)
 
     
     uhd::device_addr_t xport_args;
-    uhd::transport::zero_copy_if::sptr send_xport = _fifo_iface->make_send_xport(0, xport_args);
-    uhd::transport::zero_copy_if::sptr recv_xport = _fifo_iface->make_recv_xport(0, xport_args);
-    _radio_ctrl = e200_ctrl::make(send_xport, recv_xport, 1);
+    uhd::transport::zero_copy_if::sptr send_xport = _fifo_iface->make_send_xport(1, xport_args);
+    uhd::transport::zero_copy_if::sptr recv_xport = _fifo_iface->make_recv_xport(1, xport_args);
+    _radio_ctrl = e200_ctrl::make(send_xport, recv_xport, 1 | (1 << 16));
 
 }
 

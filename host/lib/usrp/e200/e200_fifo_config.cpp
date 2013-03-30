@@ -195,7 +195,8 @@ struct e200_transport : zero_copy_if
     template <typename T>
     UHD_INLINE typename T::sptr get_buff(const double timeout)
     {
-        const time_spec_t exit_time = time_spec_t::get_system_time() + time_spec_t(timeout); 
+        const time_spec_t exit_time = time_spec_t::get_system_time() + time_spec_t(timeout);
+        UHD_VAR(timeout);
         do
         {
             if (zf_peek32(_ctrl_base + ARBITER_RB_STATUS_OCC))
@@ -206,10 +207,12 @@ struct e200_transport : zero_copy_if
                 if (_index == _num_frames) _index = 0;
                 return _buffs[_index++]->get_new<T>();
             }
-            _waiter->wait(timeout);
-            //boost::this_thread::sleep(boost::posix_time::milliseconds(1));
+            //UHD_VAR(exit_time.get_real_secs());
+            //UHD_VAR(time_spec_t::get_system_time().get_real_secs());
+            //_waiter->wait(timeout);
+            boost::this_thread::sleep(boost::posix_time::milliseconds(100));
         }
-        while (time_spec_t::get_system_time() > exit_time);
+        while (time_spec_t::get_system_time() < exit_time);
 
         return typename T::sptr();
     }

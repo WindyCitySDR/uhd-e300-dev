@@ -189,10 +189,10 @@ private:
             catch(const std::exception &ex)
             {
                 UHD_MSG(error) << "B200 ctrl bad VITA packet: " << ex.what() << std::endl;
-                UHD_MSG(status) << std::hex << pkt[0] << std::dec << std::endl;
-                UHD_MSG(status) << std::hex << pkt[1] << std::dec << std::endl;
-                UHD_MSG(status) << std::hex << pkt[2] << std::dec << std::endl;
-                UHD_MSG(status) << std::hex << pkt[3] << std::dec << std::endl;
+                for (size_t i = 0; i < 5; i++)
+                {
+                    UHD_MSG(status) << boost::format("pkt[%u] = 0x%08x\n") % i % pkt[i];
+                }
             }
 
             //check the buffer
