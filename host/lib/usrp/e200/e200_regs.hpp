@@ -1,5 +1,5 @@
 //
-// Copyright 2013 Ettus Research LLC
+// Copyright 2012-2013 Ettus Research LLC
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -15,8 +15,8 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 //
 
-#ifndef INCLUDED_E200_REGS_HPP
-#define INCLUDED_E200_REGS_HPP
+#ifndef INCLUDED_B250_REGS_HPP
+#define INCLUDED_B250_REGS_HPP
 
 #include <boost/cstdint.hpp>
 
@@ -24,5 +24,22 @@
 
 #define localparam static const int
 
-#endif /*INCLUDED_E200_REGS_HPP*/
+localparam SR_TEST      = 7;
+localparam SR_SPI       = 8;
+localparam SR_GPIO      = 16;
+localparam SR_MISC_OUTS = 24;
+localparam SR_READBACK  = 32;
+localparam SR_TX_CTRL   = 64;
+localparam SR_RX_CTRL   = 96;
+localparam SR_TIME      = 128;
+localparam SR_RX_DSP    = 144;
+localparam SR_TX_DSP    = 184;
+localparam SR_LEDS      = 196;
 
+localparam RB32_GPIO            = 0;
+localparam RB32_SPI             = 4;
+localparam RB64_TIME_NOW        = 8;
+localparam RB64_TIME_PPS        = 16;
+localparam RB32_TEST            = 24;
+
+#endif /* INCLUDED_B250_REGS_HPP */

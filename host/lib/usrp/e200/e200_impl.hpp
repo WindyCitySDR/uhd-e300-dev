@@ -22,6 +22,7 @@
 #include <uhd/property_tree.hpp>
 #include <boost/weak_ptr.hpp>
 #include "e200_fifo_config.hpp"
+#include "e200_ctrl.hpp"
 
 static const std::string E200_FPGA_FILE_NAME = "usrp_e200_fpga.bin";
 
@@ -54,6 +55,7 @@ private:
     void load_fpga_image(const std::string &path);
 
     e200_fifo_interface::sptr _fifo_iface;
+    e200_ctrl::sptr _radio_ctrl;
 
 };
 

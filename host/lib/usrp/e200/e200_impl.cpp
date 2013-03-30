@@ -95,9 +95,11 @@ e200_impl::e200_impl(const uhd::device_addr_t &device_addr)
     //create fifo interface
     _fifo_iface = e200_fifo_interface::make(e200_read_sysfs());
 
+    /*
     uhd::device_addr_t xport_args;
     uhd::transport::zero_copy_if::sptr send_xport = _fifo_iface->make_send_xport(0, xport_args);
     uhd::transport::zero_copy_if::sptr recv_xport = _fifo_iface->make_recv_xport(0, xport_args);
+
     time_spec_t t0 = time_spec_t::get_system_time();
     UHD_HERE();
     const size_t n = 100000;
@@ -145,6 +147,22 @@ e200_impl::e200_impl(const uhd::device_addr_t &device_addr)
     UHD_VAR((n*(last_commit_size))/(t1-t0).get_real_secs());
     UHD_HERE();
     sleep(1);
+
+    //try deconstruction in a specific order to see if segfault on munmap goes away
+    UHD_HERE();
+    send_xport.reset();
+    UHD_HERE();
+    recv_xport.reset();
+    UHD_HERE();
+    _fifo_iface.reset();
+    UHD_HERE();
+    */
+
+    
+    uhd::device_addr_t xport_args;
+    uhd::transport::zero_copy_if::sptr send_xport = _fifo_iface->make_send_xport(0, xport_args);
+    uhd::transport::zero_copy_if::sptr recv_xport = _fifo_iface->make_recv_xport(0, xport_args);
+    _radio_ctrl = e200_ctrl::make(send_xport, recv_xport, 1);
 
 }
 
