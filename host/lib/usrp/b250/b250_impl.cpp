@@ -247,7 +247,7 @@ b250_impl::b250_impl(const uhd::device_addr_t &dev_addr)
     //clear router?
     ////////////////////////////////////////////////////////////////////
     for (size_t i = 0; i < 512; i++) _zpu_ctrl->poke32(SR_ADDR(SETXB_BASE, i), 0);
-
+ 
     ////////////////////////////////////////////////////////////////////
     // radio control 0
     ////////////////////////////////////////////////////////////////////
@@ -261,19 +261,19 @@ b250_impl::b250_impl(const uhd::device_addr_t &dev_addr)
     udp_zero_copy::sptr r0_ctrl_xport = this->make_transport(_addr, ctrl0_sid);
     _radio_ctrl0 = b250_ctrl::make(r0_ctrl_xport, ctrl0_sid);
     _radio_ctrl0->poke32(TOREG(SR_MISC_OUTS), (1 << 2)); //reset adc + dac
-    _radio_ctrl0->poke32(TOREG(SR_MISC_OUTS), (1 << 1) | (1 << 0)); //out of reset + dac enable
+    _radio_ctrl0->poke32(TOREG(SR_MISC_OUTS),  (1 << 1) | (1 << 0)); //out of reset + dac enable
 
     this->register_loopback_self_test(_radio_ctrl0);
 
     _radio_spi0 = spi_core_3000::make(_radio_ctrl0, TOREG(SR_SPI), RB32_SPI);
     _adc_ctrl0 = b250_adc_ctrl::make(_radio_spi0, DB_ADC_SEN);
     _dac_ctrl0 = b250_dac_ctrl::make(_radio_spi0, DB_DAC_SEN);
-
+ 
     ////////////////////////////////////////////////////////////////////
     // radio control 1
     ////////////////////////////////////////////////////////////////////
     UHD_HERE();
-    /*
+    
     sid_config_t ctrl1_config;
     ctrl1_config.router_addr_there = B250_DEVICE_THERE;
     ctrl1_config.dst_prefix = B250_RADIO_DEST_PREFIX_CTRL;
@@ -282,8 +282,13 @@ b250_impl::b250_impl(const uhd::device_addr_t &dev_addr)
     const boost::uint32_t ctrl1_sid = this->allocate_sid(ctrl1_config);
     udp_zero_copy::sptr r1_ctrl_xport = this->make_transport(_addr, ctrl1_sid);
     _radio_ctrl1 = b250_ctrl::make(r1_ctrl_xport, ctrl1_sid);
+    _radio_ctrl1->poke32(TOREG(SR_MISC_OUTS),  (1 << 0)); //out of reset + dac enable
+
     this->register_loopback_self_test(_radio_ctrl1);
-    */
+
+    _radio_spi1 = spi_core_3000::make(_radio_ctrl1, TOREG(SR_SPI), RB32_SPI);
+    _adc_ctrl1 = b250_adc_ctrl::make(_radio_spi1, DB_ADC_SEN);
+    _dac_ctrl1 = b250_dac_ctrl::make(_radio_spi1, DB_DAC_SEN);
 
     ////////////////////////////////////////////////////////////////
     // create codec control objects
@@ -503,15 +508,19 @@ boost::uint32_t b250_impl::allocate_sid(const sid_config_t &config)
     UHD_VAR(stream);
 
     const boost::uint32_t sid = 0
-        | (4 << 24)
+      | (B250_DEVICE_HERE << 24) // IJB. DONT UNDERSTAND WHAT 4 represents. B250_DEVICE_HERE = 0
         | (stream << 16)
         | (config.router_addr_there << 8)
         | (stream << 0)
     ;
-
+    // Program the B250 to recognise it's own local address.
     _zpu_ctrl->poke32(SR_ADDR(SET0_BASE, ZPU_SR_XB_LOCAL), config.router_addr_there);
+    // Program CAM entry for outgoing packets matching a B250 resource (for example a Radio)
+    // This type of packet does matches the XB_LOCAL address and is looked up in the upper half of the CAM
     _zpu_ctrl->poke32(SR_ADDR(SETXB_BASE, 256 + (stream)), config.router_dst_there);
-    _zpu_ctrl->poke32(SR_ADDR(SETXB_BASE, 0   + (stream)), config.router_dst_here);
+    // Program CAM entry for returning packets to us (for example GR host via Eth0)
+    // This type of packet does not match the XB_LOCAL address and is looked up in the lower half of the CAM
+    _zpu_ctrl->poke32(SR_ADDR(SETXB_BASE, 0   + (B250_DEVICE_HERE)), config.router_dst_here);
 
     return sid;
 }

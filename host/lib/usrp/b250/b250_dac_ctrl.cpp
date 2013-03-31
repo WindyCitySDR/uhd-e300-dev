@@ -38,32 +38,55 @@ public:
     b250_dac_ctrl_impl(uhd::spi_iface::sptr iface, const size_t slaveno):
         _iface(iface), _slaveno(slaveno)
     {
-        //Device Configuration Register Write Sequence:
+        // //Device Configuration Register Write Sequence:
+        // write_ad9146_reg(0x00, 0x20); //reset
+        // write_ad9146_reg(0x00, 0x80); //config + out of reset
+        // write_ad9146_reg(0x01, 0x00);
+        // write_ad9146_reg(0x02, 0x00);
+        // write_ad9146_reg(0x1e, 0x01); //data path config - set for proper operation
+
+        // /* Start PLL */
+        // write_ad9146_reg(0x0C, 0xD1);
+        // write_ad9146_reg(0x0D, 0xD9);
+        // write_ad9146_reg(0x0A, 0xCF);
+        // write_ad9146_reg(0x0A, 0xA0);
+
         write_ad9146_reg(0x00, 0x20); //reset
         write_ad9146_reg(0x00, 0x80); //config + out of reset
-        write_ad9146_reg(0x01, 0x00);
-        write_ad9146_reg(0x02, 0x00);
-        write_ad9146_reg(0x1e, 0x01); //data path config - set for proper operation
+	write_ad9146_reg(0x1e, 0x01); //data path config - set for proper operation
 
-        /* Start PLL */
+	/* Start PLL */
         write_ad9146_reg(0x0C, 0xD1);
-        write_ad9146_reg(0x0D, 0xD9);
-        write_ad9146_reg(0x0A, 0xCF);
-        write_ad9146_reg(0x0A, 0xA0);
-
+        write_ad9146_reg(0x0D, 0xD9); // N0=4, N1=4, N2=16
+        write_ad9146_reg(0x0A, 0xCF); // Auto init VCO band training
+        write_ad9146_reg(0x0A, 0xA0); // See above.
+	for (size_t loop = 0; loop < 2; loop++)
+	  {
         /* Verify PLL is Locked */
+	UHD_MSG(status) << "READING DAC PLL.... " << std::endl;
         UHD_MSG(status) << std::hex << read_ad9146_reg(0x0E) << std::endl; /* Expect bit 7 = 0, bit 6 = 1 */
         UHD_MSG(status) << std::hex << read_ad9146_reg(0x06) << std::endl; /* Expect 0x5C */
+	sleep(1);
+	  }
+	write_ad9146_reg(0x10, 0x48); // Choose data rate mode
+	write_ad9146_reg(0x17, 0x04); // Issue software FIFO reset
+	write_ad9146_reg(0x18, 0x01); //
+	write_ad9146_reg(0x18, 0x00); //
+for (size_t loop = 0; loop < 2; loop++)
+	  {
+	UHD_MSG(status) << "VERIFY FIFO RESET.... " << std::endl;
+	UHD_MSG(status) << std::hex << read_ad9146_reg(0x18) << std::endl; /* Expect 0x05 */
+        UHD_MSG(status) << std::hex << read_ad9146_reg(0x19) << std::endl; /* Expect 0x07 */
+sleep(1);
+	  }
+	write_ad9146_reg(0x1B, 0xA4); // Enable inverse SINC
 
-        for (size_t i = 0; i < 100; i++)
-        {
-            UHD_MSG(status) << std::hex << read_ad9146_reg(0x0E) << std::endl; /* Expect bit 7 = 0, bit 6 = 1 */
-        UHD_MSG(status) << std::hex << read_ad9146_reg(0x06) << std::endl; /* Expect 0x5C */
-        sleep(1);
-            //UHD_MSG(status) << std::hex << read_ad9146_reg(0x49) << std::endl;
-            //UHD_MSG(status) << std::hex << read_ad9146_reg(0x4A) << std::endl;
-        }
+	/* Configure interpolation filters */
+	write_ad9146_reg(0x1C, 0x04); //
+	write_ad9146_reg(0x1D, 0x24); //
+ 
 
+	
 /*
         write_ad9146_reg(0x1, 0x0); //out of power down
         write_ad9146_reg(0x2, 0x0); //out of power down

@@ -44,7 +44,7 @@ public:
         //load control word
         boost::uint32_t ctrl_word = 0;
         ctrl_word |= ((which_slave & 0xffffff) << 0);
-        ctrl_word |= ((num_bits & 0x3ff) << 24);
+        ctrl_word |= ((num_bits & 0x3f) << 24);
         if (config.mosi_edge == spi_config_t::EDGE_FALL) ctrl_word |= (1 << 31);
         if (config.miso_edge == spi_config_t::EDGE_RISE) ctrl_word |= (1 << 30);
 
