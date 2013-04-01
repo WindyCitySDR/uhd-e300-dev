@@ -41,10 +41,10 @@ struct b250_clock_ctrl_impl : b250_clock_ctrl
 
     ~b250_clock_ctrl_impl(void)
     {
-        _enables = uhd::dict<b250_clock_which_t, bool>(); //clears enables
+        //_enables = uhd::dict<b250_clock_which_t, bool>(); //clears enables
         UHD_SAFE_CALL
         (
-            this->update_enables();
+            //this->update_enables();
         )
     }
 
@@ -94,7 +94,7 @@ struct b250_clock_ctrl_impl : b250_clock_ctrl
         set_divider_foo(_ad9510_regs.bypass_divider_out2, _ad9510_regs.divider_low_cycles_out2, _ad9510_regs.divider_high_cycles_out2, rxdiv);
 
         //3
-        const bool enb_tx = _enables.get(B250_CLOCK_WHICH_DB0_TX, false) or _enables.get(B250_CLOCK_WHICH_DB1_TX, false);
+        const bool enb_tx = true;//_enables.get(B250_CLOCK_WHICH_DB0_TX, false) or _enables.get(B250_CLOCK_WHICH_DB1_TX, false);
         _ad9510_regs.power_down_lvpecl_out3 = enb_tx?
             ad9510_regs_t::POWER_DOWN_LVPECL_OUT3_NORMAL :
             ad9510_regs_t::POWER_DOWN_LVPECL_OUT3_SAFE_PD;
