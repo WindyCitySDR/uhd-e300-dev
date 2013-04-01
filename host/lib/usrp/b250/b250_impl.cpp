@@ -370,9 +370,9 @@ b250_impl::b250_impl(const uhd::device_addr_t &dev_addr)
         .subscribe(boost::bind(&time_core_3000::set_time_next_pps, _time64, _1));
     //setup time source props
     _tree->create<std::string>(mb_path / "time_source" / "value")
-        .subscribe(boost::bind(&time_core_3000::set_time_source, _time64, _1));
-    _tree->create<std::vector<std::string> >(mb_path / "time_source" / "options")
-        .publish(boost::bind(&time_core_3000::get_time_sources, _time64));
+        .subscribe(boost::bind(&b250_impl::update_time_source, this, _1));
+    static const std::vector<std::string> time_sources = boost::assign::list_of("none")("external")("gpsdo");
+    _tree->create<std::vector<std::string> >(mb_path / "time_source" / "options").set(time_sources);
     //setup reference source props
     _tree->create<std::string>(mb_path / "clock_source" / "value")
         .subscribe(boost::bind(&b250_impl::update_clock_source, this, _1));
@@ -455,7 +455,7 @@ b250_impl::b250_impl(const uhd::device_addr_t &dev_addr)
     _tree->access<subdev_spec_t>(mb_path / "rx_subdev_spec").set(subdev_spec_t("A:" + _tree->list(mb_path / "dboards" / "A" / "rx_frontends").at(0)));
     _tree->access<subdev_spec_t>(mb_path / "tx_subdev_spec").set(subdev_spec_t("A:" + _tree->list(mb_path / "dboards" / "A" / "tx_frontends").at(0)));
     _tree->access<std::string>(mb_path / "clock_source" / "value").set("internal");
-    _tree->access<std::string>(mb_path / "time_source" / "value").set("internal");
+    _tree->access<std::string>(mb_path / "time_source" / "value").set("none");
 
 }
 
@@ -550,6 +550,15 @@ void b250_impl::update_clock_source(const std::string &source)
     else if (source == "gpsdo") value |= (0x3 << 1);
     else throw uhd::key_error("update_clock_source: unknown source: " + source);
     _zpu_ctrl->poke32(SR_ADDR(SET0_BASE, ZPU_SR_CLOCK_CTRL), value);
+}
+
+void b250_impl::update_time_source(const std::string &source)
+{
+    if (source == "none"){}
+    else if (source == "external"){}
+    else if (source == "gpsdo"){}
+    else throw uhd::key_error("update_time_source: unknown source: " + source);
+    _time64->set_time_source((source == "external")? "external" : "internal");
 }
 
 sensor_value_t b250_impl::get_ref_locked(void)

@@ -158,6 +158,7 @@ private:
     void update_tx_samp_rate(const size_t, const double);
 
     void update_clock_source(const std::string &);
+    void update_time_source(const std::string &);
     uhd::sensor_value_t get_ref_locked(void);
     void set_db_eeprom(const size_t, const uhd::usrp::dboard_eeprom_t &);
 };
