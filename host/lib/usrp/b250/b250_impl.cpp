@@ -187,6 +187,8 @@ b250_impl::b250_impl(const uhd::device_addr_t &dev_addr)
     const fs_path mb_path = "/mboards/0";
     _tree->create<std::string>(mb_path / "name").set("B250");
     _tree->create<std::string>(mb_path / "codename").set("Yetti");
+    _tree->create<std::string>(mb_path / "fpga_version").set("1.0");
+    _tree->create<std::string>(mb_path / "fw_version").set("1.0");
 
     ////////////////////////////////////////////////////////////////////
     // setup the mboard eeprom
