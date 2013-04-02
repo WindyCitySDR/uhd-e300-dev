@@ -36,8 +36,8 @@ struct tx_vita_core_3000_impl : tx_vita_core_3000
         _ctrl_base(ctrl_base)
     {
         this->set_tick_rate(1); //init to non zero
-        this->clear();
         this->set_underflow_policy("next_packet");
+        this->clear();
     }
 
     ~tx_vita_core_3000_impl(void)
@@ -51,6 +51,7 @@ struct tx_vita_core_3000_impl : tx_vita_core_3000
     void clear(void)
     {
         this->configure_flow_control(0, 0);
+        this->set_underflow_policy(_policy); //clears the seq
     }
 
     void set_tick_rate(const double rate)
@@ -73,6 +74,7 @@ struct tx_vita_core_3000_impl : tx_vita_core_3000
             _iface->poke32(REG_CTRL_ERROR_POLICY, (1 << 0));
         }
         else throw uhd::value_error("USRP TX cannot handle requested underflow policy: " + policy);
+        _policy = policy;
     }
 
     void setup(const uhd::stream_args_t &stream_args)
@@ -96,6 +98,7 @@ struct tx_vita_core_3000_impl : tx_vita_core_3000
     const size_t _deframer_base;
     const size_t _ctrl_base;
     double _tick_rate;
+    std::string _policy;
 };
 
 tx_vita_core_3000::sptr tx_vita_core_3000::make(

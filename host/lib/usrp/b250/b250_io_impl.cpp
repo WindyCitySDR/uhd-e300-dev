@@ -306,6 +306,7 @@ rx_streamer::sptr b250_impl::get_rx_stream(const uhd::stream_args_t &args_)
     id.num_outputs = 1;
     my_streamer->set_converter(id);
 
+    _rx_framer->clear();
     _rx_framer->set_nsamps_per_packet(spp); //seems to be a good place to set this
     _rx_framer->set_sid((data_sid << 16) | (data_sid >> 16));
     _rx_framer->setup(args);
@@ -381,6 +382,7 @@ tx_streamer::sptr b250_impl::get_tx_stream(const uhd::stream_args_t &args_)
     id.num_outputs = 1;
     my_streamer->set_converter(id);
 
+    _tx_deframer->clear();
     _tx_deframer->setup(args);
 
     //flow control setup
