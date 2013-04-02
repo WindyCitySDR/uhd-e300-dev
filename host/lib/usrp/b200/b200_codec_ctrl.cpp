@@ -1457,9 +1457,9 @@ public:
             _req_tx_freq = value;
 
             /* Set band-specific settings. */
-            if(value < 3e9) {
+            if(value < 2.5e9) {
                 reg_inputsel = reg_inputsel | 0x40;
-            } else if((value >= 3e9) && (value <= 6e9)) {
+            } else if((value >= 2.5e9) && (value <= 6e9)) {
                 reg_inputsel = reg_inputsel & 0xBF;
             } else {
                 UHD_THROW_INVALID_CODE_PATH();

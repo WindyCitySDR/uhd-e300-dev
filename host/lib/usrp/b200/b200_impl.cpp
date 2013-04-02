@@ -674,10 +674,10 @@ void b200_impl::update_bandsel(const std::string& which, double freq)
             UHD_THROW_INVALID_CODE_PATH();
         }
     } else if(which[0] == 'T') {
-        if(freq < 3e9) {
+        if(freq < 2.5e9) {
             _gpio_state.tx_bandsel_a = 0;
             _gpio_state.tx_bandsel_b = 1;
-        } else if((freq >= 3e9) && (freq <= 6e9)) {
+        } else if((freq >= 2.5e9) && (freq <= 6e9)) {
             _gpio_state.tx_bandsel_a = 1;
             _gpio_state.tx_bandsel_b = 0;
         } else {
