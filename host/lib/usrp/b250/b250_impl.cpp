@@ -301,6 +301,16 @@ b250_impl::b250_impl(const uhd::device_addr_t &dev_addr)
         _tree->create<int>(mb_path / "tx_codecs" / db_name / "gains"); //phony property so this dir exists
         _tree->create<std::string>(mb_path / "rx_codecs" / db_name / "name").set("ads62p44");
         _tree->create<std::string>(mb_path / "tx_codecs" / db_name / "name").set("ad9146");
+
+        b250_adc_ctrl::sptr adc = (db_name == "A")? _adc_ctrl0 : _adc_ctrl1;
+
+        _tree->create<meta_range_t>(mb_path / "rx_codecs" / db_name / "gains" / "digital" / "range").set(meta_range_t(0, 6.0, 0.5));
+        _tree->create<double>(mb_path / "rx_codecs" / db_name / "gains" / "digital/value")
+            .subscribe(boost::bind(&b250_adc_ctrl::set_rx_digital_gain, adc, _1)).set(0);
+
+        _tree->create<meta_range_t>(mb_path / "rx_codecs" / db_name / "gains" / "fine" / "range").set(meta_range_t(0, 0.5, 0.05));
+        _tree->create<double>(mb_path / "rx_codecs" / db_name / "gains" / "fine" / "value")
+            .subscribe(boost::bind(&b250_adc_ctrl::set_rx_digital_fine_gain, adc, _1)).set(0);
     }
 
     ////////////////////////////////////////////////////////////////////

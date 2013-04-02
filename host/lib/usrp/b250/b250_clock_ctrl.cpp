@@ -83,7 +83,7 @@ struct b250_clock_ctrl_impl : b250_clock_ctrl
         _ad9510_regs.bypass_divider_out1 = 1;
 
         //2
-        const bool enb_rx = _enables.get(B250_CLOCK_WHICH_DB0_RX, false) or _enables.get(B250_CLOCK_WHICH_DB1_RX, false);
+        const bool enb_rx = true;//_enables.get(B250_CLOCK_WHICH_DB0_RX, false) or _enables.get(B250_CLOCK_WHICH_DB1_RX, false);
         _ad9510_regs.power_down_lvpecl_out2 = enb_rx?
             ad9510_regs_t::POWER_DOWN_LVPECL_OUT2_NORMAL :
             ad9510_regs_t::POWER_DOWN_LVPECL_OUT2_SAFE_PD;
