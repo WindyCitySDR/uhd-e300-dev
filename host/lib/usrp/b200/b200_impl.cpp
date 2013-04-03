@@ -594,15 +594,15 @@ double b200_impl::get_tx_sample_rate(void)
 void b200_impl::check_fw_compat(void)
 {
     boost::uint16_t compat_num = _iface->get_compat_num();
-    boost::uint32_t compat_major = (uint32_t) (compat_num >> 8);
-    boost::uint32_t compat_minor = (uint32_t) (compat_num & 0x00FF);
+    boost::uint32_t compat_major = (boost::uint32_t) (compat_num >> 8);
+    boost::uint32_t compat_minor = (boost::uint32_t) (compat_num & 0xFF);
 
     if (compat_major != B200_FW_COMPAT_NUM_MAJOR){
         throw uhd::runtime_error(str(boost::format(
-            "Expected firmware compatibility number %x.x, but got %x.%x:\n"
+            "Expected firmware compatibility number 0x%x, but got 0x%x.%x:\n"
             "The firmware build is not compatible with the host code build.\n"
             "%s"
-        ) % B200_FW_COMPAT_NUM_MAJOR % ((int) compat_major) % ((int) compat_minor) 
+        ) % int(B200_FW_COMPAT_NUM_MAJOR) % compat_major % compat_minor
           % print_images_error()));
     }
     _tree->create<std::string>("/mboards/0/fw_version").set(str(boost::format("%u.%u")
