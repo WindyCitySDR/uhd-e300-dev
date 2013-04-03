@@ -464,6 +464,15 @@ b250_impl::b250_impl(const uhd::device_addr_t &dev_addr)
     _tree->access<std::string>(mb_path / "clock_source" / "value").set("internal");
     _tree->access<std::string>(mb_path / "time_source" / "value").set("none");
 
+    //GPS installed: use external ref, time, and init time spec
+    if (_gps and _gps->gps_detected())
+    {
+        UHD_MSG(status) << "Setting references to the internal GPSDO" << std::endl;
+        _tree->access<std::string>(mb_path / "time_source" / "value").set("gpsdo");
+        _tree->access<std::string>(mb_path / "clock_source" / "value").set("gpsdo");
+        UHD_MSG(status) << "Initializing time to the internal GPSDO" << std::endl;
+        _time64->set_time_next_pps(time_spec_t(time_t(_gps->get_sensor("gps_time").to_int()+1)));
+    }
 }
 
 b250_impl::~b250_impl(void)
@@ -570,7 +579,7 @@ void b250_impl::update_time_source(const std::string &source)
 
 sensor_value_t b250_impl::get_ref_locked(void)
 {
-    const bool lock = (_zpu_ctrl->peek32(SR_ADDR(SET0_BASE, 0)) & (1 << 1)) != 0;
+    const bool lock = (_zpu_ctrl->peek32(SR_ADDR(SET0_BASE, 1)) & (1 << 1)) != 0;
     return sensor_value_t("Ref", lock, "locked", "unlocked");
 }
 
