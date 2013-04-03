@@ -57,9 +57,9 @@ struct b250_clock_ctrl_impl : b250_clock_ctrl
         this->write_reg(0x0B);
         this->write_reg(0x0C);
 
-        //want clock1 only
-        _ad9510_regs.clock_select = ad9510_regs_t::CLOCK_SELECT_CLK1_DRIVES;
-        _ad9510_regs.clk1_power_down = 0;
+        //want clock2 only
+        _ad9510_regs.clock_select = ad9510_regs_t::CLOCK_SELECT_CLK2_DRIVES;
+        _ad9510_regs.clk1_power_down = 1;
         _ad9510_regs.clk2_power_down = 0;
         _ad9510_regs.refin_power_down = 0;
         _ad9510_regs.prescaler_clock_pd = 0;
