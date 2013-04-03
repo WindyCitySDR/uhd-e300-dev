@@ -409,9 +409,6 @@ b250_impl::b250_impl(const uhd::device_addr_t &dev_addr)
 
     BOOST_FOREACH (const std::string &db_name, DB_NAMES)
     {
-        //FIXME need radio1 working, or this will segfault on B
-        if (db_name == "B") continue;
-
         const size_t j = (db_name == "B")? 0x2 : 0x0;
         _tree->create<dboard_eeprom_t>(mb_path / "dboards" / db_name / "rx_eeprom")
             .set(db_eeproms[B250_DB0_RX_EEPROM | j])

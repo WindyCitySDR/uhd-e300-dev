@@ -113,6 +113,27 @@ b250_dboard_iface::b250_dboard_iface(const b250_dboard_iface_config_t &config):
 
     this->set_clock_rate(UNIT_RX, B250_RADIO_CLOCK_RATE);
     this->set_clock_rate(UNIT_TX, B250_RADIO_CLOCK_RATE);
+
+
+    //some test code
+    /*
+    {
+
+        this->write_aux_dac(UNIT_TX, AUX_DAC_A, .1);
+        this->write_aux_dac(UNIT_TX, AUX_DAC_B, 1);
+        this->write_aux_dac(UNIT_RX, AUX_DAC_A, 2);
+        this->write_aux_dac(UNIT_RX, AUX_DAC_B, 3);
+        while (1)
+        {
+            UHD_VAR(this->read_aux_adc(UNIT_TX, AUX_ADC_A));
+            UHD_VAR(this->read_aux_adc(UNIT_TX, AUX_ADC_B));
+            UHD_VAR(this->read_aux_adc(UNIT_RX, AUX_ADC_A));
+            UHD_VAR(this->read_aux_adc(UNIT_RX, AUX_ADC_B));
+            sleep(1);
+        }
+    }
+    */
+
 }
 
 b250_dboard_iface::~b250_dboard_iface(void)
@@ -259,10 +280,10 @@ void b250_dboard_iface::write_aux_dac(unit_t unit, aux_dac_t which, double value
     typedef uhd::dict<aux_dac_t, ad5623_regs_t::addr_t> aux_dac_to_addr;
     static const uhd::dict<unit_t, aux_dac_to_addr> unit_to_which_to_addr = map_list_of
         (UNIT_RX, map_list_of
-            (AUX_DAC_A, ad5623_regs_t::ADDR_DAC_B)
-            (AUX_DAC_B, ad5623_regs_t::ADDR_DAC_A)
-            (AUX_DAC_C, ad5623_regs_t::ADDR_DAC_A)
-            (AUX_DAC_D, ad5623_regs_t::ADDR_DAC_B)
+            (AUX_DAC_A, ad5623_regs_t::ADDR_DAC_A)
+            (AUX_DAC_B, ad5623_regs_t::ADDR_DAC_B)
+            (AUX_DAC_C, ad5623_regs_t::ADDR_DAC_B)
+            (AUX_DAC_D, ad5623_regs_t::ADDR_DAC_A)
         )
         (UNIT_TX, map_list_of
             (AUX_DAC_A, ad5623_regs_t::ADDR_DAC_A)
