@@ -117,15 +117,22 @@ private:
     i2c_core_100_wb32::sptr _zpu_i2c;
 
     //perifs in the radio core
-    b250_ctrl::sptr _radio_ctrl0;
-    b250_ctrl::sptr _radio_ctrl1;
-    spi_core_3000::sptr _radio_spi0;
-    spi_core_3000::sptr _radio_spi1;
-    b250_adc_ctrl::sptr _adc_ctrl0;
-    b250_adc_ctrl::sptr _adc_ctrl1;
-    b250_dac_ctrl::sptr _dac_ctrl0;
-    b250_dac_ctrl::sptr _dac_ctrl1;
-    time_core_3000::sptr _time64;
+    struct radio_perifs_t
+    {
+        b250_ctrl::sptr ctrl;
+        spi_core_3000::sptr spi;
+        b250_adc_ctrl::sptr adc;
+        b250_dac_ctrl::sptr dac;
+        time_core_3000::sptr time64;
+        rx_vita_core_3000::sptr framer;
+        rx_dsp_core_3000::sptr ddc;
+        tx_vita_core_3000::sptr deframer;
+        tx_dsp_core_3000::sptr duc;
+    };
+    radio_perifs_t _radio_perifs[2];
+    uhd::usrp::dboard_eeprom_t _db_eeproms[8];
+    void setup_radio(const size_t which_radio, const std::string &db_name);
+
     b250_clock_ctrl::sptr _clock;
     uhd::gps_ctrl::sptr _gps;
 
@@ -138,11 +145,6 @@ private:
         boost::uint8_t router_dst_here;
     };
     boost::uint32_t allocate_sid(const sid_config_t &config);
-
-    rx_vita_core_3000::sptr _rx_framer;
-    rx_dsp_core_3000::sptr _rx_dsp;
-    tx_vita_core_3000::sptr _tx_deframer;
-    tx_dsp_core_3000::sptr _tx_dsp;
 
     uhd::dict<size_t, boost::weak_ptr<uhd::rx_streamer> > _rx_streamers;
     uhd::dict<size_t, boost::weak_ptr<uhd::tx_streamer> > _tx_streamers;

@@ -82,7 +82,7 @@ void b250_impl::update_rx_subdev_spec(const subdev_spec_t &spec)
     {
         const std::string conn = _tree->access<std::string>(root / spec[i].db_name / "rx_frontends" / spec[i].sd_name / "connection").get();
         if (i == 0 and (conn == "QI" or conn == "Q")) fe_swapped = true;
-        _rx_dsp->set_mux(conn, fe_swapped); //TODO which frontend?
+        _radio_perifs[0].ddc->set_mux(conn, fe_swapped); //TODO which frontend?
     }
     //TODO _rx_fe->set_mux(fe_swapped);
 
@@ -306,21 +306,21 @@ rx_streamer::sptr b250_impl::get_rx_stream(const uhd::stream_args_t &args_)
     id.num_outputs = 1;
     my_streamer->set_converter(id);
 
-    _rx_framer->clear();
-    _rx_framer->set_nsamps_per_packet(spp); //seems to be a good place to set this
-    _rx_framer->set_sid((data_sid << 16) | (data_sid >> 16));
-    _rx_framer->setup(args);
+    _radio_perifs[0].framer->clear();
+    _radio_perifs[0].framer->set_nsamps_per_packet(spp); //seems to be a good place to set this
+    _radio_perifs[0].framer->set_sid((data_sid << 16) | (data_sid >> 16));
+    _radio_perifs[0].framer->setup(args);
     my_streamer->set_xport_chan_get_buff(0, boost::bind(
         &zero_copy_if::get_recv_buff, data_xport, _1
     ), true /*flush*/);
     my_streamer->set_overflow_handler(0, boost::bind(
-        &rx_vita_core_3000::handle_overflow, _rx_framer
+        &rx_vita_core_3000::handle_overflow, _radio_perifs[0].framer
     ));
     my_streamer->set_xport_handle_flowctrl(0, boost::bind(
         &handle_rx_flowctrl, data_sid, data_xport, _1
     ), B250_RX_FC_PKT_WINDOW/8, true/*init*/);
     my_streamer->set_issue_stream_cmd(0, boost::bind(
-        &rx_vita_core_3000::issue_stream_command, _rx_framer, _1
+        &rx_vita_core_3000::issue_stream_command, _radio_perifs[0].framer, _1
     ));
     _rx_streamers[0] = my_streamer; //store weak pointer
 
@@ -382,11 +382,11 @@ tx_streamer::sptr b250_impl::get_tx_stream(const uhd::stream_args_t &args_)
     id.num_outputs = 1;
     my_streamer->set_converter(id);
 
-    _tx_deframer->clear();
-    _tx_deframer->setup(args);
+    _radio_perifs[0].deframer->clear();
+    _radio_perifs[0].deframer->setup(args);
 
     //flow control setup
-    _tx_deframer->configure_flow_control(0/*cycs off*/, B250_TX_FC_PKT_WINDOW/8/*pkts*/);
+    _radio_perifs[0].deframer->configure_flow_control(0/*cycs off*/, B250_TX_FC_PKT_WINDOW/8/*pkts*/);
     boost::shared_ptr<tx_fc_guts_t> guts(new tx_fc_guts_t());
     task::sptr task = task::make(boost::bind(&handle_tx_async_msgs, guts, data_xport));
 
