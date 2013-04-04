@@ -133,6 +133,9 @@ private:
     uhd::usrp::dboard_eeprom_t _db_eeproms[8];
     void setup_radio(const size_t which_radio, const std::string &db_name);
 
+    uhd::usrp::subdev_spec_t _rx_fe_map;
+    uhd::usrp::subdev_spec_t _tx_fe_map;
+
     b250_clock_ctrl::sptr _clock;
     uhd::gps_ctrl::sptr _gps;
 

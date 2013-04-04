@@ -82,7 +82,7 @@ void b250_impl::update_rx_subdev_spec(const subdev_spec_t &spec)
     {
         const std::string conn = _tree->access<std::string>(root / spec[i].db_name / "rx_frontends" / spec[i].sd_name / "connection").get();
         if (i == 0 and (conn == "QI" or conn == "Q")) fe_swapped = true;
-        _radio_perifs[0].ddc->set_mux(conn, fe_swapped); //TODO which frontend?
+        _radio_perifs[(spec[i].db_name == "A")? 0: 1].ddc->set_mux(conn, fe_swapped); //TODO which frontend?
     }
     //TODO _rx_fe->set_mux(fe_swapped);
 
@@ -92,6 +92,7 @@ void b250_impl::update_rx_subdev_spec(const subdev_spec_t &spec)
     size_t nchan = 0;
     BOOST_FOREACH(const std::string &mb, _mbc.keys()) nchan += _mbc[mb].rx_chan_occ;
     */
+    _rx_fe_map = spec;
 }
 
 void b250_impl::update_tx_subdev_spec(const subdev_spec_t &spec)
@@ -111,6 +112,7 @@ void b250_impl::update_tx_subdev_spec(const subdev_spec_t &spec)
     size_t nchan = 0;
     BOOST_FOREACH(const std::string &mb, _mbc.keys()) nchan += _mbc[mb].tx_chan_occ;
     */
+    _tx_fe_map = spec;
 }
 
 /***********************************************************************
@@ -269,12 +271,15 @@ rx_streamer::sptr b250_impl::get_rx_stream(const uhd::stream_args_t &args_)
     }
     args.otw_format = "sc16";
     args.channels = args.channels.empty()? std::vector<size_t>(1, 0) : args.channels;
+    const std::string db_name = _rx_fe_map[args.channels[0]].db_name;
+    const size_t i = (db_name == "A")? 0 : 1;
+    radio_perifs_t &perif = _radio_perifs[i];
 
     //allocate sid and create transport
     sid_config_t data_config;
     data_config.router_addr_there = B250_DEVICE_THERE;
     data_config.dst_prefix = B250_RADIO_DEST_PREFIX_RX;
-    data_config.router_dst_there = B250_XB_DST_R0;
+    data_config.router_dst_there = (i == 0)? B250_XB_DST_R0 : B250_XB_DST_R1;
     data_config.router_dst_here = B250_XB_DST_E0;
     const boost::uint32_t data_sid = this->allocate_sid(data_config);
     udp_zero_copy::sptr data_xport = this->make_transport(_addr, data_sid);
@@ -306,27 +311,27 @@ rx_streamer::sptr b250_impl::get_rx_stream(const uhd::stream_args_t &args_)
     id.num_outputs = 1;
     my_streamer->set_converter(id);
 
-    _radio_perifs[0].framer->clear();
-    _radio_perifs[0].framer->set_nsamps_per_packet(spp); //seems to be a good place to set this
-    _radio_perifs[0].framer->set_sid((data_sid << 16) | (data_sid >> 16));
-    _radio_perifs[0].framer->setup(args);
+    perif.framer->clear();
+    perif.framer->set_nsamps_per_packet(spp); //seems to be a good place to set this
+    perif.framer->set_sid((data_sid << 16) | (data_sid >> 16));
+    perif.framer->setup(args);
     my_streamer->set_xport_chan_get_buff(0, boost::bind(
         &zero_copy_if::get_recv_buff, data_xport, _1
     ), true /*flush*/);
     my_streamer->set_overflow_handler(0, boost::bind(
-        &rx_vita_core_3000::handle_overflow, _radio_perifs[0].framer
+        &rx_vita_core_3000::handle_overflow, perif.framer
     ));
     my_streamer->set_xport_handle_flowctrl(0, boost::bind(
         &handle_rx_flowctrl, data_sid, data_xport, _1
     ), B250_RX_FC_PKT_WINDOW/8, true/*init*/);
     my_streamer->set_issue_stream_cmd(0, boost::bind(
-        &rx_vita_core_3000::issue_stream_command, _radio_perifs[0].framer, _1
+        &rx_vita_core_3000::issue_stream_command, perif.framer, _1
     ));
-    _rx_streamers[0] = my_streamer; //store weak pointer
+    _rx_streamers[i] = my_streamer; //store weak pointer
 
     //sets all tick and samp rates on this streamer
     _tree->access<double>("/mboards/0/tick_rate").update();
-    _tree->access<double>(str(boost::format("/mboards/0/rx_dsps/%u/rate/value") % 0)).update();
+    _tree->access<double>(str(boost::format("/mboards/0/rx_dsps/%u/rate/value") % i)).update();
 
     return my_streamer;
 }
@@ -345,6 +350,9 @@ tx_streamer::sptr b250_impl::get_tx_stream(const uhd::stream_args_t &args_)
     }
     args.otw_format = "sc16";
     args.channels = args.channels.empty()? std::vector<size_t>(1, 0) : args.channels;
+    const std::string db_name = _tx_fe_map[args.channels[0]].db_name;
+    const size_t i = (db_name == "A")? 0 : 1;
+    radio_perifs_t &perif = _radio_perifs[i];
 
     //allocate sid and create transport
     sid_config_t data_config;
@@ -382,11 +390,11 @@ tx_streamer::sptr b250_impl::get_tx_stream(const uhd::stream_args_t &args_)
     id.num_outputs = 1;
     my_streamer->set_converter(id);
 
-    _radio_perifs[0].deframer->clear();
-    _radio_perifs[0].deframer->setup(args);
+    perif.deframer->clear();
+    perif.deframer->setup(args);
 
     //flow control setup
-    _radio_perifs[0].deframer->configure_flow_control(0/*cycs off*/, B250_TX_FC_PKT_WINDOW/8/*pkts*/);
+    perif.deframer->configure_flow_control(0/*cycs off*/, B250_TX_FC_PKT_WINDOW/8/*pkts*/);
     boost::shared_ptr<tx_fc_guts_t> guts(new tx_fc_guts_t());
     task::sptr task = task::make(boost::bind(&handle_tx_async_msgs, guts, data_xport));
 
@@ -398,11 +406,11 @@ tx_streamer::sptr b250_impl::get_tx_stream(const uhd::stream_args_t &args_)
     ));
     my_streamer->set_xport_chan_sid(0, true, data_sid);
     my_streamer->set_enable_trailer(false); //TODO not implemented trailer support yet
-    _tx_streamers[0] = my_streamer; //store weak pointer
+    _tx_streamers[i] = my_streamer; //store weak pointer
 
     //sets all tick and samp rates on this streamer
     _tree->access<double>("/mboards/0/tick_rate").update();
-    _tree->access<double>(str(boost::format("/mboards/0/tx_dsps/%u/rate/value") % 0)).update();
+    _tree->access<double>(str(boost::format("/mboards/0/tx_dsps/%u/rate/value") % i)).update();
 
     return my_streamer;
 }
