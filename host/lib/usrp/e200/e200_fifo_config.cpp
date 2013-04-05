@@ -57,6 +57,7 @@
 #include <boost/format.hpp>
 #include <boost/thread/thread.hpp> //sleep
 #include <uhd/types/time_spec.hpp> //timeout
+#include <uhd/utils/log.hpp>
 
 //locking stuff for shared irq
 #include <boost/thread/mutex.hpp>
@@ -156,6 +157,8 @@ struct e200_fifo_mb : managed_buffer
     const size_t len;
 };
 
+static boost::mutex fuck;
+
 /***********************************************************************
  * transport
  **********************************************************************/
@@ -176,8 +179,6 @@ struct e200_transport : zero_copy_if
         zf_poke32(_ctrl_base + ARBITER_WR_CLEAR, 1);
         for (size_t i = 0; i < num_frames; i++)
         {
-            UHD_MSG(status) << "init e200_transport mb " << i << std::endl;
-
             //create a managed buffer at the given offset
             __mem_addrz_t mb_addrs = addrs;
             mb_addrs.phys += (i*frame_size);
@@ -185,7 +186,7 @@ struct e200_transport : zero_copy_if
             boost::shared_ptr<e200_fifo_mb> mb(new e200_fifo_mb(mb_addrs, frame_size));
 
             //setup the buffers so they are "positioned for use"
-            if (auto_release) mb->release(); //release for read
+            if (auto_release) mb->get_new<managed_recv_buffer>(); //release for read
             else zf_poke32(_ctrl_base + ARBITER_WR_STS, 1 << 7); //poke an ok into the sts fifo
 
             _buffs.push_back(mb);
@@ -196,7 +197,6 @@ struct e200_transport : zero_copy_if
     UHD_INLINE typename T::sptr get_buff(const double timeout)
     {
         const time_spec_t exit_time = time_spec_t::get_system_time() + time_spec_t(timeout);
-        UHD_VAR(timeout);
         do
         {
             if (zf_peek32(_ctrl_base + ARBITER_RB_STATUS_OCC))
@@ -207,10 +207,8 @@ struct e200_transport : zero_copy_if
                 if (_index == _num_frames) _index = 0;
                 return _buffs[_index++]->get_new<T>();
             }
-            //UHD_VAR(exit_time.get_real_secs());
-            //UHD_VAR(time_spec_t::get_system_time().get_real_secs());
-            //_waiter->wait(timeout);
-            boost::this_thread::sleep(boost::posix_time::milliseconds(100));
+            _waiter->wait(timeout);
+            //boost::this_thread::sleep(boost::posix_time::milliseconds(100));
         }
         while (time_spec_t::get_system_time() < exit_time);
 

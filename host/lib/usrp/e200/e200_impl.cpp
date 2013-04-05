@@ -164,6 +164,8 @@ e200_impl::e200_impl(const uhd::device_addr_t &device_addr)
     uhd::transport::zero_copy_if::sptr recv_xport = _fifo_iface->make_recv_xport(1, xport_args);
     _radio_ctrl = e200_ctrl::make(send_xport, recv_xport, 1 | (1 << 16));
 
+    this->register_loopback_self_test(_radio_ctrl);
+
 }
 
 e200_impl::~e200_impl(void)
@@ -206,3 +208,18 @@ void e200_impl::load_fpga_image(const std::string &path)
 //sshfs jblum@blarg:/home/jblum/src src
 //utils/uhd_usrp_probe --tree --args="fpga=/home/root/b200_xport_t0.bin,type=e200"
 //utils/uhd_usrp_probe --tree --args="fpga=/home/root/e200_xport_t1.bin,type=e200"
+
+void e200_impl::register_loopback_self_test(wb_iface::sptr iface)
+{
+    bool test_fail = false;
+    UHD_MSG(status) << "Performing register loopback test... " << std::flush;
+    size_t hash = time(NULL);
+    for (size_t i = 0; i < 100; i++)
+    {
+        boost::hash_combine(hash, i);
+        iface->poke32(TOREG(SR_TEST), boost::uint32_t(hash));
+        test_fail = iface->peek32(RB32_TEST) != boost::uint32_t(hash);
+        if (test_fail) break; //exit loop on any failure
+    }
+    UHD_MSG(status) << ((test_fail)? " fail" : "pass") << std::endl;
+}

@@ -57,6 +57,8 @@ private:
     e200_fifo_interface::sptr _fifo_iface;
     e200_ctrl::sptr _radio_ctrl;
 
+    void register_loopback_self_test(wb_iface::sptr iface);
+
 };
 
 #endif /* INCLUDED_E200_IMPL_HPP */
