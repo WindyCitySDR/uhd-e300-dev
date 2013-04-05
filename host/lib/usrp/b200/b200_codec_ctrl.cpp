@@ -1209,7 +1209,25 @@ public:
          * user-requested antenna selections. */
         int divfactor = 0;
         _tfir_factor = 0;
-        if(rate <= 20e6) {
+        if(rate < 0.33e6) {
+            // RX1 + RX2 enabled, 3, 2, 2, 4
+            reg_rxfilt = BOOST_BINARY( 11101111 ) ;
+
+            // TX1 + TX2 enabled, 3, 2, 2, 4
+            reg_txfilt = BOOST_BINARY( 11101111 ) ;
+
+            divfactor = 48;
+            _tfir_factor = 2;
+        } else if(rate < 0.66e6) {
+            // RX1 + RX2 enabled, 2, 2, 2, 4
+            reg_rxfilt = BOOST_BINARY( 11011111 ) ;
+
+            // TX1 + TX2 enabled, 2, 2, 2, 4
+            reg_txfilt = BOOST_BINARY( 11011111 ) ;
+
+            divfactor = 32;
+            _tfir_factor = 2;
+        } else if(rate <= 20e6) {
             // RX1 + RX2 enabled, 2, 2, 2, 2
             reg_rxfilt = BOOST_BINARY( 11011110 ) ;
 
@@ -1317,7 +1335,7 @@ public:
         const double fref = 40e6;
         const int modulus = 2088960;
         const double vcomax = 1430e6;
-        const double vcomin = 715e6;
+        const double vcomin = 672e6;
         double vcorate;
         int vcodiv;
 
@@ -1326,6 +1344,7 @@ public:
         for(; i <= 6; i++) {
             vcodiv = 1 << i;
             vcorate = rate * vcodiv;
+
             if(vcorate >= vcomin && vcorate <= vcomax) break;
         }
         if(i == 7) throw uhd::runtime_error("BBVCO can't find valid VCO rate!");
