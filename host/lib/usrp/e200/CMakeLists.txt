@@ -31,6 +31,7 @@ IF(ENABLE_E200)
     LIBUHD_APPEND_SOURCES(
         ${CMAKE_CURRENT_SOURCE_DIR}/e200_impl.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/e200_ctrl.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/e200_io_impl.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/e200_fifo_config.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/e200_sysfs_hooks.cpp
     )

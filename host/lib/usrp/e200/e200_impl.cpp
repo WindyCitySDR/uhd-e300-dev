@@ -21,6 +21,8 @@
 #include <uhd/utils/static.hpp>
 #include <uhd/utils/images.hpp>
 #include <boost/filesystem.hpp>
+#include <boost/bind.hpp>
+#include <boost/assign/list_of.hpp>
 #include <fstream>
 
 using namespace uhd;
@@ -82,8 +84,20 @@ UHD_STATIC_BLOCK(register_e200_device)
  **********************************************************************/
 e200_impl::e200_impl(const uhd::device_addr_t &device_addr)
 {
-    _tree = property_tree::make();
+    const size_t dspno = 0; //FIXME just one for now
 
+    ////////////////////////////////////////////////////////////////////
+    // Initialize the properties tree
+    ////////////////////////////////////////////////////////////////////
+    _tree = property_tree::make();
+    _tree->create<std::string>("/name").set("E-Series Device");
+    const fs_path mb_path = "/mboards/0";
+    _tree->create<std::string>(mb_path / "name").set("uSerp");
+    _tree->create<std::string>(mb_path / "codename").set("");
+
+    ////////////////////////////////////////////////////////////////////
+    // load the fpga image
+    ////////////////////////////////////////////////////////////////////
     //extract the FPGA path for the E200
     const std::string e200_fpga_image = find_image_path(
         device_addr.get("fpga", E200_FPGA_FILE_NAME)
@@ -92,79 +106,97 @@ e200_impl::e200_impl(const uhd::device_addr_t &device_addr)
     //load fpga image - its super fast
     this->load_fpga_image(e200_fpga_image);
 
-    //create fifo interface
+    ////////////////////////////////////////////////////////////////////
+    // create fifo interface
+    ////////////////////////////////////////////////////////////////////
     _fifo_iface = e200_fifo_interface::make(e200_read_sysfs());
 
-    /*
+    ////////////////////////////////////////////////////////////////////
+    // radio control
+    ////////////////////////////////////////////////////////////////////
     uhd::device_addr_t xport_args;
-    uhd::transport::zero_copy_if::sptr send_xport = _fifo_iface->make_send_xport(0, xport_args);
-    uhd::transport::zero_copy_if::sptr recv_xport = _fifo_iface->make_recv_xport(0, xport_args);
-
-    time_spec_t t0 = time_spec_t::get_system_time();
-    UHD_HERE();
-    const size_t n = 100000;
-    size_t last_commit_size = 0;
-    for (size_t j = 0; j < send_xport->get_num_send_frames(); j++)
-    {
-        uhd::transport::managed_send_buffer::sptr buff = send_xport->get_send_buff();
-        UHD_ASSERT_THROW(bool(buff));
-        boost::uint64_t *p = buff->cast<boost::uint64_t *>();
-        p[0] = 0x4000000000000000;
-        p[1] = 0x1234567890ABCDEF;
-        p[2] = 0x1122334455667788;
-        last_commit_size = buff->size()-16;
-        buff->commit(last_commit_size);
-        buff.reset();
-    }
-    for (size_t i = 0; i < n; i++)
-    {
-        {
-            //recv
-            uhd::transport::managed_recv_buffer::sptr buff = recv_xport->get_recv_buff();
-            UHD_ASSERT_THROW(bool(buff));
-            const boost::uint64_t *p = buff->cast<const boost::uint64_t *>();
-            UHD_ASSERT_THROW(p[0] == 0x4000000000000000);
-            UHD_ASSERT_THROW(p[1] == 0x1234567890ABCDEF);
-            UHD_ASSERT_THROW(p[2] == 0x1122334455667788);
-            buff.reset();
-        }
-        {
-            //new buff to send
-            uhd::transport::managed_send_buffer::sptr buff = send_xport->get_send_buff();
-            UHD_ASSERT_THROW(bool(buff));
-            boost::uint64_t *p = buff->cast<boost::uint64_t *>();
-            p[0] = 0x4000000000000000;
-            p[1] = 0x1234567890ABCDEF;
-            p[2] = 0x1122334455667788;
-            last_commit_size = buff->size()-16;
-            buff->commit(last_commit_size);
-            buff.reset();
-        }
-    }
-    UHD_HERE();
-    time_spec_t t1 = time_spec_t::get_system_time();
-    UHD_VAR((t1-t0).get_real_secs());
-    UHD_VAR((n*(last_commit_size))/(t1-t0).get_real_secs());
-    UHD_HERE();
-    sleep(1);
-
-    //try deconstruction in a specific order to see if segfault on munmap goes away
-    UHD_HERE();
-    send_xport.reset();
-    UHD_HERE();
-    recv_xport.reset();
-    UHD_HERE();
-    _fifo_iface.reset();
-    UHD_HERE();
-    */
-
-    
-    uhd::device_addr_t xport_args;
-    uhd::transport::zero_copy_if::sptr send_xport = _fifo_iface->make_send_xport(1, xport_args);
-    uhd::transport::zero_copy_if::sptr recv_xport = _fifo_iface->make_recv_xport(1, xport_args);
-    _radio_ctrl = e200_ctrl::make(send_xport, recv_xport, 1 | (1 << 16));
-
+    uhd::transport::zero_copy_if::sptr send_ctrl_xport = _fifo_iface->make_send_xport(1, xport_args);
+    uhd::transport::zero_copy_if::sptr recv_ctrl_xport = _fifo_iface->make_recv_xport(1, xport_args);
+    _radio_ctrl = e200_ctrl::make(send_ctrl_xport, recv_ctrl_xport, 1 | (1 << 16));
     this->register_loopback_self_test(_radio_ctrl);
+
+    ////////////////////////////////////////////////////////////////////
+    // radio data xports
+    ////////////////////////////////////////////////////////////////////
+    _tx_data_xport = _fifo_iface->make_send_xport(0, xport_args);
+    _tx_flow_xport = _fifo_iface->make_recv_xport(0, xport_args);
+    _rx_data_xport = _fifo_iface->make_recv_xport(2, xport_args);
+    _rx_flow_xport = _fifo_iface->make_send_xport(2, xport_args);
+
+    ////////////////////////////////////////////////////////////////////
+    // create rx dsp control objects
+    ////////////////////////////////////////////////////////////////////
+    _rx_framer = rx_vita_core_3000::make(_radio_ctrl, TOREG(SR_RX_CTRL+4), TOREG(SR_RX_CTRL));
+    _rx_framer->set_tick_rate(E200_RADIO_CLOCK_RATE);
+    _rx_dsp = rx_dsp_core_3000::make(_radio_ctrl, TOREG(SR_RX_DSP));
+    _rx_dsp->set_link_rate(10e9/8); //whatever
+    _rx_dsp->set_tick_rate(E200_RADIO_CLOCK_RATE);
+    const fs_path rx_dsp_path = mb_path / "rx_dsps" / str(boost::format("%u") % dspno);
+    _tree->create<meta_range_t>(rx_dsp_path / "rate" / "range")
+        .publish(boost::bind(&rx_dsp_core_3000::get_host_rates, _rx_dsp));
+    _tree->create<double>(rx_dsp_path / "rate" / "value")
+        .coerce(boost::bind(&rx_dsp_core_3000::set_host_rate, _rx_dsp, _1))
+        //.subscribe(boost::bind(&e200_impl::update_rx_samp_rate, this, dspno, _1))
+        .set(1e6);
+    _tree->create<double>(rx_dsp_path / "freq" / "value")
+        .coerce(boost::bind(&rx_dsp_core_3000::set_freq, _rx_dsp, _1))
+        .set(0.0);
+    _tree->create<meta_range_t>(rx_dsp_path / "freq" / "range")
+        .publish(boost::bind(&rx_dsp_core_3000::get_freq_range, _rx_dsp));
+    _tree->create<stream_cmd_t>(rx_dsp_path / "stream_cmd")
+        .subscribe(boost::bind(&rx_vita_core_3000::issue_stream_command, _rx_framer, _1));
+
+    ////////////////////////////////////////////////////////////////////
+    // create tx dsp control objects
+    ////////////////////////////////////////////////////////////////////
+    _tx_deframer = tx_vita_core_3000::make(_radio_ctrl, TOREG(SR_TX_CTRL+2), TOREG(SR_TX_CTRL));
+    _tx_deframer->set_tick_rate(E200_RADIO_CLOCK_RATE);
+    _tx_dsp = tx_dsp_core_3000::make(_radio_ctrl, TOREG(SR_TX_DSP));
+    _tx_dsp->set_link_rate(10e9/8); //whatever
+    _tx_dsp->set_tick_rate(E200_RADIO_CLOCK_RATE);
+    const fs_path tx_dsp_path = mb_path / "tx_dsps" / str(boost::format("%u") % dspno);
+    _tree->create<meta_range_t>(tx_dsp_path / "rate" / "range")
+        .publish(boost::bind(&tx_dsp_core_3000::get_host_rates, _tx_dsp));
+    _tree->create<double>(tx_dsp_path / "rate" / "value")
+        .coerce(boost::bind(&tx_dsp_core_3000::set_host_rate, _tx_dsp, _1))
+        //.subscribe(boost::bind(&e200_impl::update_tx_samp_rate, this, dspno, _1))
+        .set(1e6);
+    _tree->create<double>(tx_dsp_path / "freq" / "value")
+        .coerce(boost::bind(&tx_dsp_core_3000::set_freq, _tx_dsp, _1))
+        .set(0.0);
+    _tree->create<meta_range_t>(tx_dsp_path / "freq" / "range")
+        .publish(boost::bind(&tx_dsp_core_3000::get_freq_range, _tx_dsp));
+
+    ////////////////////////////////////////////////////////////////////
+    // create time control objects
+    ////////////////////////////////////////////////////////////////////
+    time_core_3000::readback_bases_type time64_rb_bases;
+    time64_rb_bases.rb_now = RB64_TIME_NOW;
+    time64_rb_bases.rb_pps = RB64_TIME_PPS;
+    _time64 = time_core_3000::make(_radio_ctrl, TOREG(SR_TIME), time64_rb_bases);
+    _time64->set_tick_rate(E200_RADIO_CLOCK_RATE);
+    _time64->self_test();
+    _tree->create<time_spec_t>(mb_path / "time" / "now")
+        .publish(boost::bind(&time_core_3000::get_time_now, _time64))
+        .subscribe(boost::bind(&time_core_3000::set_time_now, _time64, _1));
+    _tree->create<time_spec_t>(mb_path / "time" / "pps")
+        .publish(boost::bind(&time_core_3000::get_time_last_pps, _time64))
+        .subscribe(boost::bind(&time_core_3000::set_time_next_pps, _time64, _1));
+    //setup time source props
+    _tree->create<std::string>(mb_path / "time_source" / "value")
+        .subscribe(boost::bind(&time_core_3000::set_time_source, _time64, _1));
+    _tree->create<std::vector<std::string> >(mb_path / "time_source" / "options")
+        .publish(boost::bind(&time_core_3000::get_time_sources, _time64));
+    //setup reference source props
+    _tree->create<std::string>(mb_path / "clock_source" / "value")
+        .subscribe(boost::bind(&e200_impl::update_clock_source, this, _1));
+    static const std::vector<std::string> clock_sources = boost::assign::list_of("internal")("external")("gpsdo");
+    _tree->create<std::vector<std::string> >(mb_path / "clock_source" / "options").set(clock_sources);
 
 }
 
@@ -222,4 +254,14 @@ void e200_impl::register_loopback_self_test(wb_iface::sptr iface)
         if (test_fail) break; //exit loop on any failure
     }
     UHD_MSG(status) << ((test_fail)? " fail" : "pass") << std::endl;
+}
+
+void e200_impl::update_time_source(const std::string &)
+{
+    
+}
+
+void e200_impl::update_clock_source(const std::string &)
+{
+    
 }

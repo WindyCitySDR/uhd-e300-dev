@@ -23,8 +23,14 @@
 #include <boost/weak_ptr.hpp>
 #include "e200_fifo_config.hpp"
 #include "e200_ctrl.hpp"
+#include "rx_vita_core_3000.hpp"
+#include "tx_vita_core_3000.hpp"
+#include "time_core_3000.hpp"
+#include "rx_dsp_core_3000.hpp"
+#include "tx_dsp_core_3000.hpp"
 
 static const std::string E200_FPGA_FILE_NAME = "usrp_e200_fpga.bin";
+static const double E200_RADIO_CLOCK_RATE = 50e6; //FIXME fixed for now
 
 /*!
  * USRP-E200 implementation guts:
@@ -39,9 +45,9 @@ public:
     ~e200_impl(void);
 
     //the io interface
-    uhd::rx_streamer::sptr get_rx_stream(const uhd::stream_args_t &args){}
-    uhd::tx_streamer::sptr get_tx_stream(const uhd::stream_args_t &args){}
-    bool recv_async_msg(uhd::async_metadata_t &, double){}
+    uhd::rx_streamer::sptr get_rx_stream(const uhd::stream_args_t &);
+    uhd::tx_streamer::sptr get_tx_stream(const uhd::stream_args_t &);
+    bool recv_async_msg(uhd::async_metadata_t &, double);
 
 private:
 
@@ -58,6 +64,21 @@ private:
     e200_ctrl::sptr _radio_ctrl;
 
     void register_loopback_self_test(wb_iface::sptr iface);
+
+    rx_vita_core_3000::sptr _rx_framer;
+    rx_dsp_core_3000::sptr _rx_dsp;
+    tx_vita_core_3000::sptr _tx_deframer;
+    tx_dsp_core_3000::sptr _tx_dsp;
+    uhd::dict<size_t, boost::weak_ptr<uhd::rx_streamer> > _rx_streamers;
+    uhd::dict<size_t, boost::weak_ptr<uhd::tx_streamer> > _tx_streamers;
+
+    uhd::transport::zero_copy_if::sptr _tx_data_xport, _tx_flow_xport;
+    uhd::transport::zero_copy_if::sptr _rx_data_xport, _rx_flow_xport;
+
+    time_core_3000::sptr _time64;
+    
+    void update_time_source(const std::string &);
+    void update_clock_source(const std::string &);
 
 };
 
