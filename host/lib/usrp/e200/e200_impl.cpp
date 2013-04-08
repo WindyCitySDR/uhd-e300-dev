@@ -21,6 +21,7 @@
 #include <uhd/utils/static.hpp>
 #include <uhd/utils/images.hpp>
 #include <boost/filesystem.hpp>
+#include <boost/functional/hash.hpp>
 #include <boost/bind.hpp>
 #include <boost/assign/list_of.hpp>
 #include <fstream>
