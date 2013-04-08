@@ -109,7 +109,7 @@ using namespace uhd::transport;
 
 struct __mem_addrz_t
 {
-    size_t phys, data, ctrl;
+    size_t which, phys, data, ctrl;
 };
 
 /***********************************************************************
@@ -191,6 +191,11 @@ struct e200_transport : zero_copy_if
 
             _buffs.push_back(mb);
         }
+    }
+
+    ~e200_transport(void)
+    {
+        //NOP
     }
 
     template <typename T>
@@ -313,6 +318,7 @@ struct e200_fifo_interface_impl : e200_fifo_interface
         size_t &entries_in_use = (is_recv)? recv_entries_in_use : send_entries_in_use;
 
         __mem_addrz_t addrs;
+        addrs.which = which_stream;
         addrs.phys = config.phys_addr + bytes_in_use;
         addrs.data = data_space + bytes_in_use;
         addrs.ctrl = ((is_recv)? S2H_BASE(ctrl_space) : H2S_BASE(ctrl_space)) + ZF_STREAM_OFF(which_stream);
