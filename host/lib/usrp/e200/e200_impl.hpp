@@ -20,6 +20,7 @@
 
 #include <uhd/device.hpp>
 #include <uhd/property_tree.hpp>
+#include <uhd/usrp/subdev_spec.hpp>
 #include <boost/weak_ptr.hpp>
 #include "e200_fifo_config.hpp"
 #include "e200_ctrl.hpp"
@@ -79,6 +80,9 @@ private:
     
     void update_time_source(const std::string &);
     void update_clock_source(const std::string &);
+
+    void update_rx_subdev_spec(const uhd::usrp::subdev_spec_t &spec);
+    void update_tx_subdev_spec(const uhd::usrp::subdev_spec_t &spec);
 
 };
 

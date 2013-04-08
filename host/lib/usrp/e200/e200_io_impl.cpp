@@ -32,6 +32,23 @@ using namespace uhd::usrp;
 using namespace uhd::transport;
 
 /***********************************************************************
+ * frontend selection
+ **********************************************************************/
+void e200_impl::update_rx_subdev_spec(const uhd::usrp::subdev_spec_t &spec)
+{
+    //sanity checking
+    if (spec.size()) validate_subdev_spec(_tree, spec, "rx");
+    UHD_ASSERT_THROW(spec.size() <= 2);
+}
+
+void e200_impl::update_tx_subdev_spec(const uhd::usrp::subdev_spec_t &spec)
+{
+    //sanity checking
+    if (spec.size()) validate_subdev_spec(_tree, spec, "tx");
+    UHD_ASSERT_THROW(spec.size() <= 2);
+}
+
+/***********************************************************************
  * VITA stuff
  **********************************************************************/
 static void e200_if_hdr_unpack_le(
@@ -232,6 +249,10 @@ rx_streamer::sptr e200_impl::get_rx_stream(const uhd::stream_args_t &args_)
     ));
     _rx_streamers[0] = my_streamer; //store weak pointer
 
+    //lazyness
+    my_streamer->set_tick_rate(E200_RADIO_CLOCK_RATE);
+    my_streamer->set_samp_rate(E200_RADIO_CLOCK_RATE/8);
+
     //sets all tick and samp rates on this streamer
     _tree->access<double>("/mboards/0/tick_rate").update();
     _tree->access<double>(str(boost::format("/mboards/0/rx_dsps/%u/rate/value") % 0)).update();
@@ -297,6 +318,10 @@ tx_streamer::sptr e200_impl::get_tx_stream(const uhd::stream_args_t &args_)
     my_streamer->set_xport_chan_sid(0, true, data_sid);
     my_streamer->set_enable_trailer(false); //TODO not implemented trailer support yet
     _tx_streamers[0] = my_streamer; //store weak pointer
+
+    //lazyness
+    my_streamer->set_tick_rate(E200_RADIO_CLOCK_RATE);
+    my_streamer->set_samp_rate(E200_RADIO_CLOCK_RATE/8);
 
     //sets all tick and samp rates on this streamer
     _tree->access<double>("/mboards/0/tick_rate").update();

@@ -20,6 +20,8 @@
 #include <uhd/utils/msg.hpp>
 #include <uhd/utils/static.hpp>
 #include <uhd/utils/images.hpp>
+#include <uhd/usrp/dboard_eeprom.hpp>
+#include <uhd/types/sensors.hpp>
 #include <boost/filesystem.hpp>
 #include <boost/functional/hash.hpp>
 #include <boost/bind.hpp>
@@ -27,6 +29,7 @@
 #include <fstream>
 
 using namespace uhd;
+using namespace uhd::usrp;
 namespace fs = boost::filesystem;
 
 /***********************************************************************
@@ -97,6 +100,11 @@ e200_impl::e200_impl(const uhd::device_addr_t &device_addr)
     _tree->create<std::string>(mb_path / "codename").set("");
 
     ////////////////////////////////////////////////////////////////////
+    // clocking
+    ////////////////////////////////////////////////////////////////////
+    _tree->create<double>(mb_path / "tick_rate").set(E200_RADIO_CLOCK_RATE);
+
+    ////////////////////////////////////////////////////////////////////
     // load the fpga image
     ////////////////////////////////////////////////////////////////////
     //extract the FPGA path for the E200
@@ -124,8 +132,8 @@ e200_impl::e200_impl(const uhd::device_addr_t &device_addr)
     ////////////////////////////////////////////////////////////////////
     // radio data xports
     ////////////////////////////////////////////////////////////////////
-    _tx_data_xport = _fifo_iface->make_send_xport(0, xport_args);
-    _tx_flow_xport = _fifo_iface->make_recv_xport(0, xport_args);
+    //_tx_data_xport = _fifo_iface->make_send_xport(0, xport_args);
+    //_tx_flow_xport = _fifo_iface->make_recv_xport(0, xport_args);
     _rx_data_xport = _fifo_iface->make_recv_xport(2, xport_args);
     _rx_flow_xport = _fifo_iface->make_send_xport(2, xport_args);
 
@@ -190,14 +198,95 @@ e200_impl::e200_impl(const uhd::device_addr_t &device_addr)
         .subscribe(boost::bind(&time_core_3000::set_time_next_pps, _time64, _1));
     //setup time source props
     _tree->create<std::string>(mb_path / "time_source" / "value")
-        .subscribe(boost::bind(&time_core_3000::set_time_source, _time64, _1));
-    _tree->create<std::vector<std::string> >(mb_path / "time_source" / "options")
-        .publish(boost::bind(&time_core_3000::get_time_sources, _time64));
+        .subscribe(boost::bind(&e200_impl::update_time_source, this, _1));
+    static const std::vector<std::string> time_sources = boost::assign::list_of("none")("external")("gpsdo");
+    _tree->create<std::vector<std::string> >(mb_path / "time_source" / "options").set(time_sources);
     //setup reference source props
     _tree->create<std::string>(mb_path / "clock_source" / "value")
         .subscribe(boost::bind(&e200_impl::update_clock_source, this, _1));
     static const std::vector<std::string> clock_sources = boost::assign::list_of("internal")("external")("gpsdo");
     _tree->create<std::vector<std::string> >(mb_path / "clock_source" / "options").set(clock_sources);
+
+    ////////////////////////////////////////////////////////////////////
+    // dboard eeproms but not really
+    ////////////////////////////////////////////////////////////////////
+    dboard_eeprom_t db_eeprom;
+    _tree->create<dboard_eeprom_t>(mb_path / "dboards" / "A" / "rx_eeprom").set(db_eeprom);
+    _tree->create<dboard_eeprom_t>(mb_path / "dboards" / "A" / "tx_eeprom").set(db_eeprom);
+    _tree->create<dboard_eeprom_t>(mb_path / "dboards" / "A" / "gdb_eeprom").set(db_eeprom);
+
+    ////////////////////////////////////////////////////////////////////
+    // create RF frontend interfacing
+    ////////////////////////////////////////////////////////////////////
+    static const std::vector<std::string> frontends = boost::assign::list_of
+        ("TX1")("TX2")("RX1")("RX2");
+    BOOST_FOREACH(const std::string &fe_name, frontends)
+    {
+        const std::string x = std::string(1, tolower(fe_name[0]));
+        const fs_path rf_fe_path = mb_path / "dboards" / "A" / (x+"x_frontends") / fe_name;
+
+        _tree->create<std::string>(rf_fe_path / "name").set(fe_name);
+        _tree->create<int>(rf_fe_path / "sensors"); //empty TODO
+        _tree->create<sensor_value_t>(rf_fe_path / "sensors" / "lo_locked");
+        /*empty for temps*/ _tree->create<int>(rf_fe_path / "gains");
+        /*
+        BOOST_FOREACH(const std::string &name, _codec_ctrl->get_gain_names(fe_name))
+        {
+            _tree->create<meta_range_t>(rf_fe_path / "gains" / name / "range")
+                    ;//.set(_codec_ctrl->get_gain_range(fe_name));
+
+            _tree->create<double>(rf_fe_path / "gains" / name / "value")
+                //.coerce(boost::bind(&b200_codec_ctrl::set_gain, _codec_ctrl, fe_name, _1))
+                .set(0.0);
+        }
+        */
+        _tree->create<std::string>(rf_fe_path / "connection").set("IQ");
+        _tree->create<bool>(rf_fe_path / "enabled").set(true);
+        _tree->create<bool>(rf_fe_path / "use_lo_offset").set(false);
+        _tree->create<double>(rf_fe_path / "bandwidth" / "value")
+            //.coerce(boost::bind(&b200_codec_ctrl::set_bw_filter, _codec_ctrl, fe_name, _1))
+            .set(40e6);
+        _tree->create<meta_range_t>(rf_fe_path / "bandwidth" / "range")
+            ;//.publish(boost::bind(&b200_codec_ctrl::get_bw_filter_range, _codec_ctrl, fe_name));
+        _tree->create<double>(rf_fe_path / "freq" / "value")
+            //.coerce(boost::bind(&b200_codec_ctrl::tune, _codec_ctrl, fe_name, _1))
+            ;//.subscribe(boost::bind(&b200_impl::update_bandsel, this, fe_name, _1));
+        _tree->create<meta_range_t>(rf_fe_path / "freq" / "range")
+            ;//.publish(boost::bind(&b200_codec_ctrl::get_rf_freq_range, _codec_ctrl, fe_name));
+
+        //setup antenna stuff
+        if (fe_name[0] == 'R')
+        {
+            static const std::vector<std::string> ants = boost::assign::list_of("TX/RX")("RX2");
+            _tree->create<std::vector<std::string> >(rf_fe_path / "antenna" / "options").set(ants);
+            _tree->create<std::string>(rf_fe_path / "antenna" / "value")
+                //.subscribe(boost::bind(&b200_impl::update_antenna_sel, this, fe_name, _1))
+                .set("RX2");
+        }
+        if (fe_name[0] == 'T')
+        {
+            static const std::vector<std::string> ants(1, "TX/RX");
+            _tree->create<std::vector<std::string> >(rf_fe_path / "antenna" / "options").set(ants);
+            _tree->create<std::string>(rf_fe_path / "antenna" / "value").set("TX/RX");
+        }
+
+    }
+
+    ////////////////////////////////////////////////////////////////////
+    // create frontend mapping
+    ////////////////////////////////////////////////////////////////////
+    _tree->create<subdev_spec_t>(mb_path / "rx_subdev_spec")
+        .set(subdev_spec_t())
+        .subscribe(boost::bind(&e200_impl::update_rx_subdev_spec, this, _1));
+    _tree->create<subdev_spec_t>(mb_path / "tx_subdev_spec")
+        .set(subdev_spec_t())
+        .subscribe(boost::bind(&e200_impl::update_tx_subdev_spec, this, _1));
+
+    ////////////////////////////////////////////////////////////////////
+    // do some post-init tasks
+    ////////////////////////////////////////////////////////////////////
+    _tree->access<std::string>(mb_path / "clock_source" / "value").set("internal");
+    _tree->access<std::string>(mb_path / "time_source" / "value").set("none");
 
 }
 

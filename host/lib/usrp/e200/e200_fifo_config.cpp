@@ -212,8 +212,8 @@ struct e200_transport : zero_copy_if
                 if (_index == _num_frames) _index = 0;
                 return _buffs[_index++]->get_new<T>();
             }
-            _waiter->wait(timeout);
-            //boost::this_thread::sleep(boost::posix_time::milliseconds(100));
+            //_waiter->wait(timeout);
+            boost::this_thread::sleep(boost::posix_time::milliseconds(1));
         }
         while (time_spec_t::get_system_time() < exit_time);
 
