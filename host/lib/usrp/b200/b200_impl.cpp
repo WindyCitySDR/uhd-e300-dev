@@ -550,8 +550,11 @@ void b200_impl::codec_loopback_self_test(void)
 /***********************************************************************
  * Sample and tick rate comprehension below
  **********************************************************************/
-void b200_impl::set_tick_rate(const double rate)
+void b200_impl::set_tick_rate(const double rate_)
 {
+    //clip rate (which can be doubled by factor) to possible bounds
+    const double rate = b200_samp_range.clip(rate_);
+
     const size_t factor = ((_fe_enb_map["RX1"] and _fe_enb_map["RX2"]) or (_fe_enb_map["TX1"] and _fe_enb_map["TX2"]))? 2:1;
     //UHD_MSG(status) << "asking for clock rate " << rate/1e6 << " MHz\n";
     _tick_rate = _codec_ctrl->set_clock_rate(rate/factor)*factor;
