@@ -62,7 +62,7 @@ static const size_t          B200_NUM_TX_FE = 2;
 /***********************************************************************
  * The B200 Capability Constants
  **********************************************************************/
-static const uhd::meta_range_t b200_samp_range(200e3, 56e6);
+static const uhd::meta_range_t b200_samp_range(200e3, 61.44e6);
 
 
 //! Implementation guts
