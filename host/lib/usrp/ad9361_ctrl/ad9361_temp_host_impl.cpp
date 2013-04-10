@@ -36,14 +36,9 @@ public:
         this->write_reg(0x3FE, 0x3F);
     }
 
-    /* Turn on Catalina's TX port --> RX port loopback. */
-    void data_port_loopback_on(void) {
-        this->write_reg(0x3F5, 0x01);
-    }
-
-    /* Turn off Catalina's TX port --> RX port loopback. */
-    void data_port_loopback_off(void) {
-        this->write_reg(0x3F5, 0x00);
+    /* Turn on/oof Catalina's TX port --> RX port loopback. */
+    void data_port_loopback(const bool on) {
+        this->write_reg(0x3F5, on? 0x01 : 0x00);
     }
 
     /* Read and print the currently-programed gain table. */
@@ -989,6 +984,11 @@ public:
     ad9361_ctrl_iface_impl(ad9361_ctrl_cb_type callback):
         _callback(callback)
     {
+        //NOP
+    }
+
+    void init(void)
+    {
         ////////////////////////////////////////////////////////////////////
         // Reset Catalina
         ////////////////////////////////////////////////////////////////////
@@ -1782,7 +1782,71 @@ public:
 
     void transact(const char in_buff[64], char out_buff[64])
     {
-        
+        const ad9361_transaction_t *request = (const ad9361_transaction_t *)in_buff;
+        ad9361_transaction_t *reply = (ad9361_transaction_t *)out_buff;
+
+        reply->version = AD9361_TRANSACTION_VERSION;
+        reply->sequence = request->sequence;
+        reply->action = request->action;
+        reply->error_msg[0] = '\0';
+
+        try
+        {
+            if (request->action == AD9361_ACTION_ECHO)
+            {
+                //NOP
+            }
+            if (request->action == AD9361_ACTION_INIT)
+            {
+                this->init();
+            }
+            if (request->action == AD9361_ACTION_SET_RX1_GAIN)
+            {
+                ad9361_trans_double_pack(this->set_gain("RX1", ad9361_trans_double_unpack(request->value.gain)), reply->value.gain);
+            }
+            if (request->action == AD9361_ACTION_SET_TX1_GAIN)
+            {
+                ad9361_trans_double_pack(this->set_gain("TX1", ad9361_trans_double_unpack(request->value.gain)), reply->value.gain);
+            }
+            if (request->action == AD9361_ACTION_SET_RX2_GAIN)
+            {
+                ad9361_trans_double_pack(this->set_gain("RX2", ad9361_trans_double_unpack(request->value.gain)), reply->value.gain);
+            }
+            if (request->action == AD9361_ACTION_SET_TX2_GAIN)
+            {
+                ad9361_trans_double_pack(this->set_gain("TX2", ad9361_trans_double_unpack(request->value.gain)), reply->value.gain);
+            }
+            if (request->action == AD9361_ACTION_SET_RX_FREQ)
+            {
+                ad9361_trans_double_pack(this->tune("RX*", ad9361_trans_double_unpack(request->value.freq)), reply->value.freq);
+            }
+            if (request->action == AD9361_ACTION_SET_TX_FREQ)
+            {
+                ad9361_trans_double_pack(this->tune("TX*", ad9361_trans_double_unpack(request->value.freq)), reply->value.freq);
+            }
+            if (request->action == AD9361_ACTION_SET_CODEC_LOOP)
+            {
+                this->data_port_loopback(request->value.codec_loop != 0);
+            }
+            if (request->action == AD9361_ACTION_SET_CLOCK_RATE)
+            {
+                ad9361_trans_double_pack(this->set_clock_rate(ad9361_trans_double_unpack(request->value.rate)), reply->value.rate);
+            }
+            if (request->action == AD9361_ACTION_SET_ACTIVE_CHAINS)
+            {
+                const bool tx1 = (request->value.enable_mask & (1 << 0)) != 0;
+                const bool tx2 = (request->value.enable_mask & (1 << 1)) != 0;
+                const bool rx1 = (request->value.enable_mask & (1 << 2)) != 0;
+                const bool rx2 = (request->value.enable_mask & (1 << 3)) != 0;
+                this->set_active_chains(tx1, tx2, rx1, rx2);
+            }
+        }
+        catch(const std::exception &e)
+        {
+            //save the error message into the reply
+            std::strncpy(reply->error_msg, e.what(), AD9361_TRANSACTION_MAX_ERROR_MSG);
+        }
+
     }
 
 private:
@@ -1813,6 +1877,5 @@ private:
  **********************************************************************/
 ad9361_ctrl_iface_sptr ad9361_ctrl_iface_make(ad9361_ctrl_cb_type callback)
 {
-    UHD_ASSERT_THROW(sizeof(ad9361_transaction_t) <= 64);
     return ad9361_ctrl_iface_sptr(new ad9361_ctrl_iface_impl(callback));
 }

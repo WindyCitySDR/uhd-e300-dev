@@ -24,35 +24,37 @@
 extern "C" {
 #endif
 
+//various constants
 #define AD9361_TRANSACTION_VERSION 0x1
+#define AD9361_TRANSACTION_MAX_ERROR_MSG 40
 
+//action types
 #define AD9361_ACTION_ECHO 0
 #define AD9361_ACTION_INIT 1
-#define AD9361_ACTION_SET_RX_GAIN 2
-#define AD9361_ACTION_SET_TX_GAIN 3
-#define AD9361_ACTION_SET_RX_FREQ 4
-#define AD9361_ACTION_SET_TX_FREQ 5
-#define AD9361_ACTION_SET_CODEC_LOOP 6
-#define AD9361_ACTION_SET_CLOCK_RATE 7
-#define AD9361_ACTION_SET_ACTIVE_CHAINS 9
-
-//! do the endianess conversion, define for your platform
-#ifndef AD9361_TRANS_END32
-    #define AD9361_TRANS_END32(x) (x)
-#endif
+#define AD9361_ACTION_SET_RX1_GAIN 2
+#define AD9361_ACTION_SET_TX1_GAIN 3
+#define AD9361_ACTION_SET_RX2_GAIN 4
+#define AD9361_ACTION_SET_TX2_GAIN 5
+#define AD9361_ACTION_SET_RX_FREQ 6
+#define AD9361_ACTION_SET_TX_FREQ 7
+#define AD9361_ACTION_SET_CODEC_LOOP 8
+#define AD9361_ACTION_SET_CLOCK_RATE 9
+#define AD9361_ACTION_SET_ACTIVE_CHAINS 10
 
 inline void ad9361_trans_double_pack(const double input, uint32_t *output)
 {
     const uint32_t *p = (const uint32_t *)&input;
-    output[0] = AD9361_TRANS_END32(p[0]);
-    output[1] = AD9361_TRANS_END32(p[1]);
+    output[0] = p[0];
+    output[1] = p[1];
 }
 
-inline void ad9361_trans_double_unpack(const uint32_t *input, double *output)
+inline double ad9361_trans_double_unpack(const uint32_t *input)
 {
+    double output = 0.0;
     uint32_t *p = (uint32_t *)&output;
-    p[0] = AD9361_TRANS_END32(input[0]);
-    p[1] = AD9361_TRANS_END32(input[1]);
+    p[0] = input[0];
+    p[1] = input[1];
+    return output;
 }
 
 typedef struct

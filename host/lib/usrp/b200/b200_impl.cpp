@@ -196,7 +196,8 @@ b200_impl::b200_impl(const device_addr_t &device_addr):
     ////////////////////////////////////////////////////////////////////
     // Init codec - turns on clocks
     ////////////////////////////////////////////////////////////////////
-    _codec_ctrl = ad9361_ctrl::make(boost::bind(&b200_iface::transact_spi, _iface, _1, _2, _3, _4));
+    _codec_ctrl_iface = ad9361_ctrl_iface_make(boost::bind(&b200_iface::transact_spi, _iface, _1, _2, _3, _4));
+    _codec_ctrl = ad9361_ctrl::make(_codec_ctrl_iface);
 
     ////////////////////////////////////////////////////////////////////
     // Create control transport
@@ -297,9 +298,9 @@ b200_impl::b200_impl(const device_addr_t &device_addr):
     }
     {
         _codec_ctrl->set_active_chains(true, false, true, false);
-        _codec_ctrl->data_port_loopback_on();
+        _codec_ctrl->data_port_loopback(true);
         this->codec_loopback_self_test();
-        _codec_ctrl->data_port_loopback_off();
+        _codec_ctrl->data_port_loopback(false);
         _codec_ctrl->set_active_chains(false, false, false, false);
     }
     {
