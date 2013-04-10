@@ -981,8 +981,8 @@ public:
      ***********************************************************************/
 
     /* Catalina initialization routine. */
-    ad9361_ctrl_iface_impl(ad9361_ctrl_cb_type callback):
-        _callback(callback)
+    ad9361_ctrl_iface_impl(ad9361_ctrl_cb_type callback, ad9361_ctrl_iface_sptr iface):
+        _callback(callback), _usb_iface(iface)
     {
         //NOP
     }
@@ -1790,9 +1790,14 @@ public:
 
         try
         {
+            //NOTE TO TINO
+            //The echo request is simply forwarded to _usb_iface->transact.
+            //Eventually, the rest of these if (action) statements will
+            //just forward to _usb_iface->transact as the FW becomes filled.
+            //At that point, transact is nothing more than a pass-through.
             if (request->action == AD9361_ACTION_ECHO)
             {
-                //NOP
+                _usb_iface->transact(in_buff, out_buff);
             }
             if (request->action == AD9361_ACTION_INIT)
             {
@@ -1849,6 +1854,7 @@ public:
 
 private:
     ad9361_ctrl_cb_type _callback;
+    ad9361_ctrl_iface_sptr _usb_iface;
     double _rx_freq, _tx_freq, _req_rx_freq, _req_tx_freq;
     double _baseband_bw, _bbpll_freq, _adcclock_freq;
     double _req_clock_rate, _req_coreclk;
@@ -1873,7 +1879,7 @@ private:
 /***********************************************************************
  * Make an instance of the implementation
  **********************************************************************/
-ad9361_ctrl_iface_sptr ad9361_ctrl_iface_make(ad9361_ctrl_cb_type callback)
+ad9361_ctrl_iface_sptr ad9361_ctrl_iface_make(ad9361_ctrl_cb_type callback, ad9361_ctrl_iface_sptr iface)
 {
-    return ad9361_ctrl_iface_sptr(new ad9361_ctrl_iface_impl(callback));
+    return ad9361_ctrl_iface_sptr(new ad9361_ctrl_iface_impl(callback, iface));
 }

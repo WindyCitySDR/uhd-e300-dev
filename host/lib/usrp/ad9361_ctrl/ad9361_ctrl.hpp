@@ -37,7 +37,7 @@ struct ad9361_ctrl_iface_type
 };
 typedef boost::shared_ptr<ad9361_ctrl_iface_type> ad9361_ctrl_iface_sptr;
 
-ad9361_ctrl_iface_sptr ad9361_ctrl_iface_make(ad9361_ctrl_cb_type callback);
+ad9361_ctrl_iface_sptr ad9361_ctrl_iface_make(ad9361_ctrl_cb_type callback, ad9361_ctrl_iface_sptr iface);
 
 
 //-------- END super temp stuff to make this work on the host --------//

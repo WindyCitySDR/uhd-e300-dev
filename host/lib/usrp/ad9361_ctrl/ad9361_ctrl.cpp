@@ -18,6 +18,7 @@
 #include "ad9361_ctrl.hpp"
 #include "ad9361_transaction.h"
 #include <uhd/exception.hpp>
+#include <uhd/utils/msg.hpp>
 #include <cstring>
 
 using namespace uhd;
