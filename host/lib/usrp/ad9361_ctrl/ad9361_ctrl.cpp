@@ -4,7 +4,7 @@
 // NOT FOR DISTRIBUTION
 
 #include "b200_regs.hpp"
-#include "b200_codec_ctrl.hpp"
+#include "ad9361_ctrl.hpp"
 #include "ad9361_synth_lut.hpp"
 #include "ad9361_gain_tables.hpp"
 #include "ad9361_filter_taps.hpp"
@@ -22,7 +22,7 @@
 using namespace uhd;
 using namespace uhd::transport; 
 
-class b200_codec_ctrl_impl : public b200_codec_ctrl {
+class ad9361_ctrl_impl : public ad9361_ctrl {
 public:
 
     /***********************************************************************
@@ -1016,7 +1016,7 @@ public:
      ***********************************************************************/
 
     /* Catalina initialization routine. */
-    b200_codec_ctrl_impl(b200_iface::sptr iface) {
+    ad9361_ctrl_impl(b200_iface::sptr iface) {
         /* Initialize shadow registers. */
         reg_vcodivs = 0x00;
         reg_inputsel = 0x30;
@@ -1801,7 +1801,7 @@ private:
 /***********************************************************************
  * Make an instance of the implementation
  **********************************************************************/
-b200_codec_ctrl::sptr b200_codec_ctrl::make(b200_iface::sptr iface)
+ad9361_ctrl::sptr ad9361_ctrl::make(b200_iface::sptr iface)
 {
-    return sptr(new b200_codec_ctrl_impl(iface));
+    return sptr(new ad9361_ctrl_impl(iface));
 }

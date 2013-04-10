@@ -15,8 +15,8 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 //
 
-#ifndef INCLUDED_B200_CODEC_CTRL_HPP
-#define INCLUDED_B200_CODEC_CTRL_HPP
+#ifndef INCLUDED_AD9361_CTRL_HPP
+#define INCLUDED_AD9361_CTRL_HPP
 
 #include "b200_iface.hpp"
 #include "wb_iface.hpp"
@@ -29,9 +29,9 @@
 #include <vector>
 #include <string>
 
-class b200_codec_ctrl : boost::noncopyable{
+class ad9361_ctrl : boost::noncopyable{
 public:
-    typedef boost::shared_ptr<b200_codec_ctrl> sptr;
+    typedef boost::shared_ptr<ad9361_ctrl> sptr;
 
     //! make a new codec control object
     static sptr make(b200_iface::sptr);
@@ -71,4 +71,4 @@ public:
     virtual void data_port_loopback_off(void) = 0;
 };
 
-#endif /* INCLUDED_B200_CODEC_CTRL_HPP */
+#endif /* INCLUDED_AD9361_CTRL_HPP */
