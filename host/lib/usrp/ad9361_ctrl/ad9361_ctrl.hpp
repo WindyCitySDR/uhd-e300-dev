@@ -36,22 +36,47 @@ public:
     static sptr make(ad9361_ctrl_cb_type callback);
 
     //! Get a list of gain names for RX or TX
-    virtual std::vector<std::string> get_gain_names(const std::string &which) = 0;
+    static std::vector<std::string> get_gain_names(const std::string &/*which*/)
+    {
+        return std::vector<std::string>(1, "PGA");
+    }
+
+    //! get the gain range for a particular gain element
+    static uhd::meta_range_t get_gain_range(const std::string &which)
+    {
+        if(which[0] == 'R') {
+            return uhd::meta_range_t(0.0, 73.0, 1.0);
+        } else {
+            return uhd::meta_range_t(0.0, 89.75, 0.25);
+        }
+    }
+
+    //! get the freq range for the frontend which
+    static uhd::meta_range_t get_rf_freq_range(void)
+    {
+        return uhd::meta_range_t(30e6, 6e9);
+    }
+
+    //! get the filter range for the frontend which
+    static uhd::meta_range_t get_bw_filter_range(const std::string &/*which*/)
+    {
+        return uhd::meta_range_t(200e3, 56e6);
+    }
+
+    //! get the filter range for the frontend which
+    static uhd::meta_range_t get_samp_rate_range(void)
+    {
+        return uhd::meta_range_t(220e3, 61.44e6);
+    }
+
+    //! set the filter bandwidth for the frontend
+    double set_bw_filter(const std::string &/*which*/, const double /*bw*/)
+    {
+        return 0.0; //TODO
+    }
 
     //! set the gain for a particular gain element
     virtual double set_gain(const std::string &which, const double value) = 0;
-
-    //! get the gain range for a particular gain element
-    virtual uhd::meta_range_t get_gain_range(const std::string &which) = 0;
-
-    //! get the freq range for the frontend which
-    virtual uhd::meta_range_t get_rf_freq_range(void) = 0;
-
-    //! get the filter range for the frontend which
-    virtual uhd::meta_range_t get_bw_filter_range(const std::string &which) = 0;
-
-    //! set the filter bandwidth for the frontend
-    virtual double set_bw_filter(const std::string &which, const double bw) = 0;
 
     //! set a new clock rate, return the exact value
     virtual double set_clock_rate(const double rate) = 0;

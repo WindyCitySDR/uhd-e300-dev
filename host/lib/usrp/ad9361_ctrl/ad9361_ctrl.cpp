@@ -23,34 +23,6 @@ class ad9361_ctrl_impl : public ad9361_ctrl {
 public:
 
     /***********************************************************************
-     * Information retrieval functions
-     **********************************************************************/
-    uhd::meta_range_t get_gain_range(const std::string &which) {
-        if(which[0] == 'R') {
-            return uhd::meta_range_t(0.0, 73.0, 1.0);
-        } else {
-            return uhd::meta_range_t(0.0, 89.75, 0.25);
-        }
-    }
-
-    uhd::meta_range_t get_rf_freq_range(void) {
-        return uhd::meta_range_t(30e6, 6e9);
-    }
-
-    uhd::meta_range_t get_bw_filter_range(const std::string &which) {
-        return uhd::meta_range_t(0.0, 60e6); //TODO
-    }
-
-    double set_bw_filter(const std::string &which, const double bw) {
-        return 0.0; //TODO
-    }
-
-    std::vector<std::string> get_gain_names(const std::string &which) {
-        return std::vector<std::string>(1, "PGA");
-    }
-
-
-    /***********************************************************************
      * Placeholders, unused, or test functions
      **********************************************************************/
 
@@ -1678,7 +1650,7 @@ public:
      * After tuning, it runs any appropriate calibrations. */
     double tune(const std::string &which, const double raw_value) {
 
-        const double value = this->get_rf_freq_range().clip(raw_value);
+        const double value = ad9361_ctrl::get_rf_freq_range().clip(raw_value);
 
         if(which[0] == 'R') {
             if(freq_is_nearly_equal(value, _req_rx_freq)) {

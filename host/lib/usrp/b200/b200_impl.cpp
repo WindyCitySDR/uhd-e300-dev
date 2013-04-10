@@ -344,7 +344,7 @@ b200_impl::b200_impl(const device_addr_t &device_addr):
     {
         const fs_path rx_dsp_path = mb_path / "rx_dsps" / str(boost::format("%u") % dspno);
         _tree->create<meta_range_t>(rx_dsp_path / "rate" / "range")
-            .publish(boost::bind(&b200_impl::get_possible_rates, this));
+            .publish(boost::bind(&ad9361_ctrl::get_samp_rate_range));
         _tree->create<double>(rx_dsp_path / "rate" / "value")
             .publish(boost::bind(&b200_impl::get_rx_sample_rate, this))
             .subscribe(boost::bind(&b200_impl::set_rx_sample_rate, this, _1));
@@ -364,7 +364,7 @@ b200_impl::b200_impl(const device_addr_t &device_addr):
     {
         const fs_path tx_dsp_path = mb_path / "tx_dsps" / str(boost::format("%u") % dspno);
         _tree->create<meta_range_t>(tx_dsp_path / "rate" / "range")
-            .publish(boost::bind(&b200_impl::get_possible_rates, this));
+            .publish(boost::bind(&ad9361_ctrl::get_samp_rate_range));
         _tree->create<double>(tx_dsp_path / "rate" / "value")
             .publish(boost::bind(&b200_impl::get_tx_sample_rate, this))
             .subscribe(boost::bind(&b200_impl::set_tx_sample_rate, this, _1));
@@ -417,10 +417,10 @@ b200_impl::b200_impl(const device_addr_t &device_addr):
         _tree->create<std::string>(rf_fe_path / "name").set(fe_name);
         _tree->create<int>(rf_fe_path / "sensors"); //empty TODO
         _tree->create<sensor_value_t>(rf_fe_path / "sensors" / "lo_locked");
-        BOOST_FOREACH(const std::string &name, _codec_ctrl->get_gain_names(fe_name))
+        BOOST_FOREACH(const std::string &name, ad9361_ctrl::get_gain_names(fe_name))
         {
             _tree->create<meta_range_t>(rf_fe_path / "gains" / name / "range")
-                    .set(_codec_ctrl->get_gain_range(fe_name));
+                    .set(ad9361_ctrl::get_gain_range(fe_name));
 
             _tree->create<double>(rf_fe_path / "gains" / name / "value")
                 .coerce(boost::bind(&ad9361_ctrl::set_gain, _codec_ctrl, fe_name, _1))
@@ -433,12 +433,12 @@ b200_impl::b200_impl(const device_addr_t &device_addr):
             .coerce(boost::bind(&ad9361_ctrl::set_bw_filter, _codec_ctrl, fe_name, _1))
             .set(40e6);
         _tree->create<meta_range_t>(rf_fe_path / "bandwidth" / "range")
-            .publish(boost::bind(&ad9361_ctrl::get_bw_filter_range, _codec_ctrl, fe_name));
+            .publish(boost::bind(&ad9361_ctrl::get_bw_filter_range, fe_name));
         _tree->create<double>(rf_fe_path / "freq" / "value")
             .coerce(boost::bind(&ad9361_ctrl::tune, _codec_ctrl, fe_name, _1))
             .subscribe(boost::bind(&b200_impl::update_bandsel, this, fe_name, _1));
         _tree->create<meta_range_t>(rf_fe_path / "freq" / "range")
-            .publish(boost::bind(&ad9361_ctrl::get_rf_freq_range, _codec_ctrl));
+            .publish(boost::bind(&ad9361_ctrl::get_rf_freq_range));
 
         //setup antenna stuff
         if (fe_name[0] == 'R')
@@ -539,7 +539,7 @@ void b200_impl::codec_loopback_self_test(void)
 void b200_impl::set_tick_rate(const double rate_)
 {
     //clip rate (which can be doubled by factor) to possible bounds
-    const double rate = b200_samp_range.clip(rate_);
+    const double rate = ad9361_ctrl::get_samp_rate_range().clip(rate_);
 
     const size_t factor = ((_fe_enb_map["RX1"] and _fe_enb_map["RX2"]) or (_fe_enb_map["TX1"] and _fe_enb_map["TX2"]))? 2:1;
     //UHD_MSG(status) << "asking for clock rate " << rate/1e6 << " MHz\n";
