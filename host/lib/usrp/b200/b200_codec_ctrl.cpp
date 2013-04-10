@@ -1662,7 +1662,9 @@ public:
      * internal tune function.
      *
      * After tuning, it runs any appropriate calibrations. */
-    double tune(const std::string &which, const double value) {
+    double tune(const std::string &which, const double raw_value) {
+
+        const double value = this->get_rf_freq_range().clip(raw_value);
 
         if(which[0] == 'R') {
             if(freq_is_nearly_equal(value, _req_rx_freq)) {
