@@ -18,6 +18,9 @@
 ########################################################################
 # This file included, use CMake directory variables
 ########################################################################
+
+INCLUDE_DIRECTORIES(${CMAKE_CURRENT_SOURCE_DIR})
+
 LIBUHD_APPEND_SOURCES(
     ${CMAKE_CURRENT_SOURCE_DIR}/ad9361_ctrl.cpp
 )

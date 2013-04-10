@@ -1,5 +1,5 @@
 //
-// Copyright 2012 Ettus Research LLC
+// Copyright 2012-2013 Ettus Research LLC
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -18,23 +18,22 @@
 #ifndef INCLUDED_AD9361_CTRL_HPP
 #define INCLUDED_AD9361_CTRL_HPP
 
-#include "b200_iface.hpp"
-#include "wb_iface.hpp"
-
-#include <uhd/transport/usb_control.hpp>
 #include <uhd/types/serial.hpp>
 #include <uhd/types/ranges.hpp>
 #include <boost/shared_ptr.hpp>
 #include <boost/utility.hpp>
+#include <boost/function.hpp>
 #include <vector>
 #include <string>
+
+typedef boost::function<void(unsigned char *, size_t, unsigned char *, size_t)> ad9361_ctrl_cb_type;
 
 class ad9361_ctrl : boost::noncopyable{
 public:
     typedef boost::shared_ptr<ad9361_ctrl> sptr;
 
     //! make a new codec control object
-    static sptr make(b200_iface::sptr);
+    static sptr make(ad9361_ctrl_cb_type callback);
 
     //! Get a list of gain names for RX or TX
     virtual std::vector<std::string> get_gain_names(const std::string &which) = 0;
@@ -46,7 +45,7 @@ public:
     virtual uhd::meta_range_t get_gain_range(const std::string &which) = 0;
 
     //! get the freq range for the frontend which
-    virtual uhd::meta_range_t get_rf_freq_range(const std::string &which) = 0;
+    virtual uhd::meta_range_t get_rf_freq_range(void) = 0;
 
     //! get the filter range for the frontend which
     virtual uhd::meta_range_t get_bw_filter_range(const std::string &which) = 0;

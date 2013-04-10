@@ -3,7 +3,6 @@
 //
 // NOT FOR DISTRIBUTION
 
-#include "b200_regs.hpp"
 #include "ad9361_ctrl.hpp"
 #include "ad9361_synth_lut.hpp"
 #include "ad9361_gain_tables.hpp"
@@ -17,10 +16,8 @@
 #include <cmath>
 #include <limits>
 #include <vector>
-#include <stdint.h>
 
 using namespace uhd;
-using namespace uhd::transport; 
 
 class ad9361_ctrl_impl : public ad9361_ctrl {
 public:
@@ -36,7 +33,7 @@ public:
         }
     }
 
-    uhd::meta_range_t get_rf_freq_range(const std::string &which) {
+    uhd::meta_range_t get_rf_freq_range(void) {
         return uhd::meta_range_t(30e6, 6e9);
     }
 
@@ -60,32 +57,32 @@ public:
     /* Make Catalina output its test tone. */
     void output_test_tone(void) {
         /* Output a 480 kHz tone at 800 MHz */
-        _b200_iface->write_reg(0x3F4, 0x0B);
-        _b200_iface->write_reg(0x3FC, 0xFF);
-        _b200_iface->write_reg(0x3FD, 0xFF);
-        _b200_iface->write_reg(0x3FE, 0x3F);
+        this->write_reg(0x3F4, 0x0B);
+        this->write_reg(0x3FC, 0xFF);
+        this->write_reg(0x3FD, 0xFF);
+        this->write_reg(0x3FE, 0x3F);
     }
 
     /* Turn on Catalina's TX port --> RX port loopback. */
     void data_port_loopback_on(void) {
-        _b200_iface->write_reg(0x3F5, 0x01);
+        this->write_reg(0x3F5, 0x01);
     }
 
     /* Turn off Catalina's TX port --> RX port loopback. */
     void data_port_loopback_off(void) {
-        _b200_iface->write_reg(0x3F5, 0x00);
+        this->write_reg(0x3F5, 0x00);
     }
 
     /* Read and print the currently-programed gain table. */
     void read_gain_table(void) {
         uint8_t index, word1, word2, word3;
         for(index = 0; index < 77; index++) {
-            _b200_iface->write_reg(0x130, index);
-            word1 = _b200_iface->read_reg(0x134);
-            word2 = _b200_iface->read_reg(0x135);
-            word3 = _b200_iface->read_reg(0x136);
-            _b200_iface->write_reg(0x134, 0x00);
-            _b200_iface->write_reg(0x134, 0x00);
+            this->write_reg(0x130, index);
+            word1 = this->read_reg(0x134);
+            word2 = this->read_reg(0x135);
+            word3 = this->read_reg(0x136);
+            this->write_reg(0x134, 0x00);
+            this->write_reg(0x134, 0x00);
 
             std::cout.unsetf(std::ios::hex);
             std::cout << "Index: " << (int) index << std::endl;
@@ -137,7 +134,7 @@ public:
         uint16_t base;
         if(which == "RX") {
             base = 0x0f0;
-            _b200_iface->write_reg(base+6, 0x02); //filter gain
+            this->write_reg(base+6, 0x02); //filter gain
         } else {
             base = 0x060;
         }
@@ -146,7 +143,7 @@ public:
         uint8_t reg_numtaps = (((num_taps / 16) - 1) & 0x07) << 5;
 
         /* Turn on the filter clock. */
-        _b200_iface->write_reg(base+5, reg_numtaps | 0x1a);
+        this->write_reg(base+5, reg_numtaps | 0x1a);
         boost::this_thread::sleep(boost::posix_time::milliseconds(1));
 
         int num_unique_coeffs = (num_taps / 2);
@@ -155,25 +152,25 @@ public:
          * programming each index, and then iterate backwards, repeating the
          * process. */
         for(int addr=0; addr < num_unique_coeffs; addr++) {
-            _b200_iface->write_reg(base+0, addr);
-            _b200_iface->write_reg(base+1, (coeffs[addr]) & 0xff);
-            _b200_iface->write_reg(base+2, (coeffs[addr] >> 8) & 0xff);
-            _b200_iface->write_reg(base+5, 0xfe);
-            _b200_iface->write_reg(base+4, 0x00);
-            _b200_iface->write_reg(base+4, 0x00);
+            this->write_reg(base+0, addr);
+            this->write_reg(base+1, (coeffs[addr]) & 0xff);
+            this->write_reg(base+2, (coeffs[addr] >> 8) & 0xff);
+            this->write_reg(base+5, 0xfe);
+            this->write_reg(base+4, 0x00);
+            this->write_reg(base+4, 0x00);
         }
 
         for(int addr=0; addr < num_unique_coeffs; addr++) {
-            _b200_iface->write_reg(base+0, addr+num_unique_coeffs);
-            _b200_iface->write_reg(base+1, (coeffs[num_unique_coeffs-1-addr]) & 0xff);
-            _b200_iface->write_reg(base+2, (coeffs[num_unique_coeffs-1-addr] >> 8) & 0xff);
-            _b200_iface->write_reg(base+5, 0xfe);
-            _b200_iface->write_reg(base+4, 0x00);
-            _b200_iface->write_reg(base+4, 0x00);
+            this->write_reg(base+0, addr+num_unique_coeffs);
+            this->write_reg(base+1, (coeffs[num_unique_coeffs-1-addr]) & 0xff);
+            this->write_reg(base+2, (coeffs[num_unique_coeffs-1-addr] >> 8) & 0xff);
+            this->write_reg(base+5, 0xfe);
+            this->write_reg(base+4, 0x00);
+            this->write_reg(base+4, 0x00);
         }
 
         /* Disable the filter clock. */
-        _b200_iface->write_reg(base+5, 0xf8);
+        this->write_reg(base+5, 0xf8);
     }
 
     /* Program the RX FIR Filter. */
@@ -207,17 +204,17 @@ public:
      *
      * This function should be called anytime the BBPLL is tuned. */
     void calibrate_lock_bbpll() {
-        _b200_iface->write_reg(0x03F, 0x05); // Start the BBPLL calibration
-        _b200_iface->write_reg(0x03F, 0x01); // Clear the 'start' bit
+        this->write_reg(0x03F, 0x05); // Start the BBPLL calibration
+        this->write_reg(0x03F, 0x01); // Clear the 'start' bit
 
         /* Increase BBPLL KV and phase margin. */
-        _b200_iface->write_reg(0x04c, 0x86);
-        _b200_iface->write_reg(0x04d, 0x01);
-        _b200_iface->write_reg(0x04d, 0x05);
+        this->write_reg(0x04c, 0x86);
+        this->write_reg(0x04d, 0x01);
+        this->write_reg(0x04d, 0x05);
 
         /* Wait for BBPLL lock. */
         int count = 0;
-        while(!(_b200_iface->read_reg(0x05e) & 0x80)) {
+        while(!(this->read_reg(0x05e) & 0x80)) {
             if(count > 1000) {
                 uhd::runtime_error("BBPLL not locked");
             }
@@ -234,14 +231,14 @@ public:
     void calibrate_synth_charge_pumps() {
         /* If this function ever gets called, and the ENSM isn't already in the
          * ALERT state, then something has gone horribly wrong. */
-        if((_b200_iface->read_reg(0x017) & 0x0F) != 5) {
+        if((this->read_reg(0x017) & 0x0F) != 5) {
             std::cout << "ERROR! Catalina not in ALERT during cal!" << std::endl;
         }
 
         /* Calibrate the RX synthesizer charge pump. */
         int count = 0;
-        _b200_iface->write_reg(0x23d, 0x04);
-        while(!(_b200_iface->read_reg(0x244) & 0x80)) {
+        this->write_reg(0x23d, 0x04);
+        while(!(this->read_reg(0x244) & 0x80)) {
             if(count > 5) {
                 std::cout << "RX charge pump cal failure!" << std::endl;
                 break;
@@ -250,12 +247,12 @@ public:
             count++;
             boost::this_thread::sleep(boost::posix_time::milliseconds(1));
         }
-        _b200_iface->write_reg(0x23d, 0x00);
+        this->write_reg(0x23d, 0x00);
 
         /* Calibrate the TX synthesizer charge pump. */
         count = 0;
-        _b200_iface->write_reg(0x27d, 0x04);
-        while(!(_b200_iface->read_reg(0x284) & 0x80)) {
+        this->write_reg(0x27d, 0x04);
+        while(!(this->read_reg(0x284) & 0x80)) {
             if(count > 5) {
                 std::cout << "TX charge pump cal failure" << std::endl;
                 break;
@@ -264,7 +261,7 @@ public:
             count++;
             boost::this_thread::sleep(boost::posix_time::milliseconds(1));
         }
-        _b200_iface->write_reg(0x27d, 0x00);
+        this->write_reg(0x27d, 0x00);
     }
 
     /* Calibrate the analog BB RX filter.
@@ -296,23 +293,23 @@ public:
         uint8_t bbbw_khz = std::min(127, int(std::floor(temp + 0.5)));
 
         /* Set corner frequencies and dividers. */
-        _b200_iface->write_reg(0x1fb, uint8_t(bbbw_mhz));
-        _b200_iface->write_reg(0x1fc, bbbw_khz);
-        _b200_iface->write_reg(0x1f8, (_rx_bbf_tunediv & 0x00FF));
-        _b200_iface->write_reg(0x1f9, reg_bbftune_config);
+        this->write_reg(0x1fb, uint8_t(bbbw_mhz));
+        this->write_reg(0x1fc, bbbw_khz);
+        this->write_reg(0x1f8, (_rx_bbf_tunediv & 0x00FF));
+        this->write_reg(0x1f9, reg_bbftune_config);
 
         /* RX Mix Voltage settings - only change with apps engineer help. */
-        _b200_iface->write_reg(0x1d5, 0x3f);
-        _b200_iface->write_reg(0x1c0, 0x03);
+        this->write_reg(0x1d5, 0x3f);
+        this->write_reg(0x1c0, 0x03);
 
         /* Enable RX1 & RX2 filter tuners. */
-        _b200_iface->write_reg(0x1e2, 0x02);
-        _b200_iface->write_reg(0x1e3, 0x02);
+        this->write_reg(0x1e2, 0x02);
+        this->write_reg(0x1e3, 0x02);
 
         /* Run the calibration! */
         int count = 0;
-        _b200_iface->write_reg(0x016, 0x80);
-        while(_b200_iface->read_reg(0x016) & 0x80) {
+        this->write_reg(0x016, 0x80);
+        while(this->read_reg(0x016) & 0x80) {
             if(count > 100) {
                 std::cout << "RX baseband filter cal FAILURE!" << std::endl;
                 break;
@@ -323,8 +320,8 @@ public:
         }
 
         /* Disable RX1 & RX2 filter tuners. */
-        _b200_iface->write_reg(0x1e2, 0x03);
-        _b200_iface->write_reg(0x1e3, 0x03);
+        this->write_reg(0x1e2, 0x03);
+        this->write_reg(0x1e3, 0x03);
 
         return bbbw;
     }
@@ -353,16 +350,16 @@ public:
                              | ((txbbfdiv >> 8) & 0x0001);
 
         /* Program the divider values. */
-        _b200_iface->write_reg(0x0d6, (txbbfdiv & 0x00FF));
-        _b200_iface->write_reg(0x0d7, reg_bbftune_mode);
+        this->write_reg(0x0d6, (txbbfdiv & 0x00FF));
+        this->write_reg(0x0d7, reg_bbftune_mode);
 
         /* Enable the filter tuner. */
-        _b200_iface->write_reg(0x0ca, 0x22);
+        this->write_reg(0x0ca, 0x22);
 
         /* Calibrate! */
         int count = 0;
-        _b200_iface->write_reg(0x016, 0x40);
-        while(_b200_iface->read_reg(0x016) & 0x40) {
+        this->write_reg(0x016, 0x40);
+        while(this->read_reg(0x016) & 0x40) {
             if(count > 100) {
                 std::cout << "TX baseband filter cal FAILURE!" << std::endl;
                 break;
@@ -373,7 +370,7 @@ public:
         }
 
         /* Disable the filter tuner. */
-        _b200_iface->write_reg(0x0ca, 0x26);
+        this->write_reg(0x0ca, 0x26);
 
         return bbbw;
     }
@@ -444,9 +441,9 @@ public:
         reg0d2 = cap;
 
         /* Program the above-calculated values. Sweet. */
-        _b200_iface->write_reg(0x0d2, reg0d2);
-        _b200_iface->write_reg(0x0d1, reg0d1);
-        _b200_iface->write_reg(0x0d0, reg0d0);
+        this->write_reg(0x0d2, reg0d2);
+        this->write_reg(0x0d1, reg0d1);
+        this->write_reg(0x0d0, reg0d0);
     }
 
     /* Calibrate the RX TIAs.
@@ -455,9 +452,9 @@ public:
      * the RX gain settings. */
     void calibrate_rx_TIAs() {
 
-        uint8_t reg1eb = _b200_iface->read_reg(0x1eb) & 0x3F;
-        uint8_t reg1ec = _b200_iface->read_reg(0x1ec) & 0x7F;
-        uint8_t reg1e6 = _b200_iface->read_reg(0x1e6) & 0x07;
+        uint8_t reg1eb = this->read_reg(0x1eb) & 0x3F;
+        uint8_t reg1ec = this->read_reg(0x1ec) & 0x7F;
+        uint8_t reg1e6 = this->read_reg(0x1e6) & 0x07;
         uint8_t reg1db = 0x00;
         uint8_t reg1dc = 0x00;
         uint8_t reg1dd = 0x00;
@@ -506,11 +503,11 @@ public:
         }
 
         /* w00t. Settings calculated. Program them and roll out. */
-        _b200_iface->write_reg(0x1db, reg1db);
-        _b200_iface->write_reg(0x1dd, reg1dd);
-        _b200_iface->write_reg(0x1df, reg1df);
-        _b200_iface->write_reg(0x1dc, reg1dc);
-        _b200_iface->write_reg(0x1de, reg1de);
+        this->write_reg(0x1db, reg1db);
+        this->write_reg(0x1dd, reg1dd);
+        this->write_reg(0x1df, reg1df);
+        this->write_reg(0x1dc, reg1dc);
+        this->write_reg(0x1de, reg1de);
     }
 
     /* Setup the Catalina ADC.
@@ -531,9 +528,9 @@ public:
             bbbw_mhz = 0.20;
         }
 
-        uint8_t rxbbf_c3_msb = _b200_iface->read_reg(0x1eb) & 0x3F;
-        uint8_t rxbbf_c3_lsb = _b200_iface->read_reg(0x1ec) & 0x7F;
-        uint8_t rxbbf_r2346 = _b200_iface->read_reg(0x1e6) & 0x07;
+        uint8_t rxbbf_c3_msb = this->read_reg(0x1eb) & 0x3F;
+        uint8_t rxbbf_c3_lsb = this->read_reg(0x1ec) & 0x7F;
+        uint8_t rxbbf_r2346 = this->read_reg(0x1e6) & 0x07;
 
         double scale_snr_dB = (_adcclock_freq < 80e6) ? 0 : 2;
 
@@ -637,7 +634,7 @@ public:
 
         /* Program the registers! */
         for(int i=0; i<40; i++) {
-            _b200_iface->write_reg(0x200+i, data[i]);
+            this->write_reg(0x200+i, data[i]);
         }
     }
 
@@ -646,14 +643,14 @@ public:
      * Note that this function is called from within the TX quadrature
      * calibration function! */
     void calibrate_baseband_dc_offset() {
-        _b200_iface->write_reg(0x193, 0x3f); // Calibration settings
-        _b200_iface->write_reg(0x190, 0x0f); // Set tracking coefficient
-        _b200_iface->write_reg(0x194, 0x01); // More calibration settings
+        this->write_reg(0x193, 0x3f); // Calibration settings
+        this->write_reg(0x190, 0x0f); // Set tracking coefficient
+        this->write_reg(0x194, 0x01); // More calibration settings
 
         /* Start that calibration, baby. */
         int count = 0;
-        _b200_iface->write_reg(0x016, 0x01);
-        while(_b200_iface->read_reg(0x016) & 0x01) {
+        this->write_reg(0x016, 0x01);
+        while(this->read_reg(0x016) & 0x01) {
             if(count > 100) {
                 std::cout << "Baseband DC Offset Calibration Failure!" << std::endl;
                 break;
@@ -671,23 +668,23 @@ public:
     void calibrate_rf_dc_offset() {
         /* Some settings are frequency-dependent. */
         if(_rx_freq < 4e9) {
-            _b200_iface->write_reg(0x186, 0x32); // RF DC Offset count
-            _b200_iface->write_reg(0x187, 0x24);
-            _b200_iface->write_reg(0x188, 0x05);
+            this->write_reg(0x186, 0x32); // RF DC Offset count
+            this->write_reg(0x187, 0x24);
+            this->write_reg(0x188, 0x05);
         } else {
-            _b200_iface->write_reg(0x186, 0x28); // RF DC Offset count
-            _b200_iface->write_reg(0x187, 0x34);
-            _b200_iface->write_reg(0x188, 0x06);
+            this->write_reg(0x186, 0x28); // RF DC Offset count
+            this->write_reg(0x187, 0x34);
+            this->write_reg(0x188, 0x06);
         }
 
-        _b200_iface->write_reg(0x185, 0x20); // RF DC Offset wait count
-        _b200_iface->write_reg(0x18b, 0x83);
-        _b200_iface->write_reg(0x189, 0x30);
+        this->write_reg(0x185, 0x20); // RF DC Offset wait count
+        this->write_reg(0x18b, 0x83);
+        this->write_reg(0x189, 0x30);
 
         /* Run the calibration! */
         int count = 0;
-        _b200_iface->write_reg(0x016, 0x02);
-        while(_b200_iface->read_reg(0x016) & 0x02) {
+        this->write_reg(0x016, 0x02);
+        while(this->read_reg(0x016) & 0x02) {
             if(count > 100) {
                 std::cout << "RF DC Offset Calibration Failure!" << std::endl;
                 break;
@@ -705,12 +702,12 @@ public:
      * It should be re-run for large frequency changes. */
     void calibrate_rx_quadrature(void) {
         /* Configure RX Quadrature calibration settings. */
-        _b200_iface->write_reg(0x168, 0x03); // Set tone level for cal
-        _b200_iface->write_reg(0x16e, 0x25); // RX Gain index to use for cal
-        _b200_iface->write_reg(0x16a, 0x75); // Set Kexp phase
-        _b200_iface->write_reg(0x16b, 0x15); // Set Kexp amplitude
-        _b200_iface->write_reg(0x169, 0xcf); // Continuous tracking mode
-        _b200_iface->write_reg(0x18b, 0xad);
+        this->write_reg(0x168, 0x03); // Set tone level for cal
+        this->write_reg(0x16e, 0x25); // RX Gain index to use for cal
+        this->write_reg(0x16a, 0x75); // Set Kexp phase
+        this->write_reg(0x16b, 0x15); // Set Kexp amplitude
+        this->write_reg(0x169, 0xcf); // Continuous tracking mode
+        this->write_reg(0x18b, 0xad);
     }
 
     /* TX quadtrature calibration routine.
@@ -726,11 +723,11 @@ public:
          * 3) Re-read 0A3 to get bits [5:0] because maybe they changed?
          * 4) Update only the TX NCO freq bits in 0A3.
          * 5) Profit (I hope). */
-        uint8_t reg0a3 = _b200_iface->read_reg(0x0a3);
+        uint8_t reg0a3 = this->read_reg(0x0a3);
         uint8_t nco_freq = (reg0a3 & 0xC0);
-        _b200_iface->write_reg(0x0a0, 0x15 | (nco_freq >> 1));
-        reg0a3 = _b200_iface->read_reg(0x0a3);
-        _b200_iface->write_reg(0x0a3, (reg0a3 & 0x3F) | nco_freq);
+        this->write_reg(0x0a0, 0x15 | (nco_freq >> 1));
+        reg0a3 = this->read_reg(0x0a3);
+        this->write_reg(0x0a3, (reg0a3 & 0x3F) | nco_freq);
 
         /* It is possible to reach a configuration that won't operate correctly,
          * where the two test tones used for quadrature calibration are outside
@@ -745,22 +742,22 @@ public:
         }
         UHD_ASSERT_THROW(max_cal_freq < bbbw);
 
-        _b200_iface->write_reg(0x0a1, 0x7B); // Set tracking coefficient
-        _b200_iface->write_reg(0x0a9, 0xff); // Cal count
-        _b200_iface->write_reg(0x0a2, 0x7f); // Cal Kexp
-        _b200_iface->write_reg(0x0a5, 0x01); // Cal magnitude threshold VVVV
-        _b200_iface->write_reg(0x0a6, 0x01);
+        this->write_reg(0x0a1, 0x7B); // Set tracking coefficient
+        this->write_reg(0x0a9, 0xff); // Cal count
+        this->write_reg(0x0a2, 0x7f); // Cal Kexp
+        this->write_reg(0x0a5, 0x01); // Cal magnitude threshold VVVV
+        this->write_reg(0x0a6, 0x01);
 
         /* The gain table index used for calibration must be adjusted for the
          * mid-table to get a TIA index = 1 and LPF index = 0. */
         if((_rx_freq >= 1300e6) && (_rx_freq < 4000e6)) {
-            _b200_iface->write_reg(0x0aa, 0x22); // Cal gain table index
+            this->write_reg(0x0aa, 0x22); // Cal gain table index
         } else {
-            _b200_iface->write_reg(0x0aa, 0x25); // Cal gain table index
+            this->write_reg(0x0aa, 0x25); // Cal gain table index
         }
 
-        _b200_iface->write_reg(0x0a4, 0xf0); // Cal setting conut
-        _b200_iface->write_reg(0x0ae, 0x00); // Cal LPF gain index (split mode)
+        this->write_reg(0x0a4, 0xf0); // Cal setting conut
+        this->write_reg(0x0ae, 0x00); // Cal LPF gain index (split mode)
 
         /* First, calibrate the baseband DC offset. */
         calibrate_baseband_dc_offset();
@@ -770,8 +767,8 @@ public:
 
         /* Now, calibrate the TX quadrature! */
         int count = 0;
-        _b200_iface->write_reg(0x016, 0x10);
-        while(_b200_iface->read_reg(0x016) & 0x10) {
+        this->write_reg(0x016, 0x10);
+        while(this->read_reg(0x016) & 0x10) {
             if(count > 100) {
                 std::cout << "TX Quadrature Calibration Failure!" << std::endl;
                 break;
@@ -789,13 +786,13 @@ public:
     void calibrate_tx_quadrature(void) {
         /* Make sure we are, in fact, in the ALERT state. If not, something is
          * terribly wrong in the driver execution flow. */
-        if((_b200_iface->read_reg(0x017) & 0x0F) != 5) {
+        if((this->read_reg(0x017) & 0x0F) != 5) {
             throw uhd::runtime_error("TX Quad Cal started, but not in ALERT!");
         }
 
         /* Turn off free-running and continuous calibrations. Note that this
          * will get turned back on at the end of the RX calibratioun routine. */
-        _b200_iface->write_reg(0x169, 0xc0);
+        this->write_reg(0x169, 0xc0);
 
         /* This calibration must be done in a certain order, and for both TX_A
          * and TX_B, separately. Store the original setting so that we can
@@ -806,7 +803,7 @@ public:
          * TX1/2-A Calibration
          **********************************************************************/
         reg_inputsel = reg_inputsel & 0xBF;
-        _b200_iface->write_reg(0x004, reg_inputsel);
+        this->write_reg(0x004, reg_inputsel);
 
         tx_quadrature_cal_routine();
 
@@ -814,14 +811,14 @@ public:
          * TX1/2-B Calibration
          **********************************************************************/
         reg_inputsel = reg_inputsel | 0x40;
-        _b200_iface->write_reg(0x004, reg_inputsel);
+        this->write_reg(0x004, reg_inputsel);
 
         tx_quadrature_cal_routine();
 
         /***********************************************************************
          * fin
          **********************************************************************/
-        _b200_iface->write_reg(0x004, orig_reg_inputsel);
+        this->write_reg(0x004, orig_reg_inputsel);
     }
 
 
@@ -839,24 +836,24 @@ public:
                         0x31, 0x33, 0x34, 0x35, 0x3A, 0x3D, 0x3E};
 
         /* Start the clock. */
-        _b200_iface->write_reg(0x13f, 0x02);
+        this->write_reg(0x13f, 0x02);
 
         /* Program the GM Sub-table. */
         for(int i = 15; i >= 0; i--) {
-            _b200_iface->write_reg(0x138, i);
-            _b200_iface->write_reg(0x139, gain[(15 - i)]);
-            _b200_iface->write_reg(0x13A, 0x00);
-            _b200_iface->write_reg(0x13B, gm[(15 - i)]);
-            _b200_iface->write_reg(0x13F, 0x06);
-            _b200_iface->write_reg(0x13C, 0x00);
-            _b200_iface->write_reg(0x13C, 0x00);
+            this->write_reg(0x138, i);
+            this->write_reg(0x139, gain[(15 - i)]);
+            this->write_reg(0x13A, 0x00);
+            this->write_reg(0x13B, gm[(15 - i)]);
+            this->write_reg(0x13F, 0x06);
+            this->write_reg(0x13C, 0x00);
+            this->write_reg(0x13C, 0x00);
         }
 
         /* Clear write bit and stop clock. */
-        _b200_iface->write_reg(0x13f, 0x02);
-        _b200_iface->write_reg(0x13C, 0x00);
-        _b200_iface->write_reg(0x13C, 0x00);
-        _b200_iface->write_reg(0x13f, 0x00);
+        this->write_reg(0x13f, 0x02);
+        this->write_reg(0x13C, 0x00);
+        this->write_reg(0x13C, 0x00);
+        this->write_reg(0x13f, 0x00);
     }
 
     /* Program the gain table.
@@ -890,61 +887,61 @@ public:
 
         /* Okay, we have to program a new gain table. Sucks, brah. Start the
          * gain table clock. */
-        _b200_iface->write_reg(0x137, 0x1A);
+        this->write_reg(0x137, 0x1A);
 
         /* IT'S PROGRAMMING TIME. */
         uint8_t index = 0;
         for(; index < 77; index++) {
-            _b200_iface->write_reg(0x130, index);
-            _b200_iface->write_reg(0x131, gain_table[index][1]);
-            _b200_iface->write_reg(0x132, gain_table[index][2]);
-            _b200_iface->write_reg(0x133, gain_table[index][3]);
-            _b200_iface->write_reg(0x137, 0x1E);
-            _b200_iface->write_reg(0x134, 0x00);
-            _b200_iface->write_reg(0x134, 0x00);
+            this->write_reg(0x130, index);
+            this->write_reg(0x131, gain_table[index][1]);
+            this->write_reg(0x132, gain_table[index][2]);
+            this->write_reg(0x133, gain_table[index][3]);
+            this->write_reg(0x137, 0x1E);
+            this->write_reg(0x134, 0x00);
+            this->write_reg(0x134, 0x00);
         }
 
         /* Everything above the 77th index is zero. */
         for(; index < 91; index++) {
-            _b200_iface->write_reg(0x130, index);
-            _b200_iface->write_reg(0x131, 0x00);
-            _b200_iface->write_reg(0x132, 0x00);
-            _b200_iface->write_reg(0x133, 0x00);
-            _b200_iface->write_reg(0x137, 0x1E);
-            _b200_iface->write_reg(0x134, 0x00);
-            _b200_iface->write_reg(0x134, 0x00);
+            this->write_reg(0x130, index);
+            this->write_reg(0x131, 0x00);
+            this->write_reg(0x132, 0x00);
+            this->write_reg(0x133, 0x00);
+            this->write_reg(0x137, 0x1E);
+            this->write_reg(0x134, 0x00);
+            this->write_reg(0x134, 0x00);
         }
 
         /* Clear the write bit and stop the gain clock. */
-        _b200_iface->write_reg(0x137, 0x1A);
-        _b200_iface->write_reg(0x134, 0x00);
-        _b200_iface->write_reg(0x134, 0x00);
-        _b200_iface->write_reg(0x137, 0x00);
+        this->write_reg(0x137, 0x1A);
+        this->write_reg(0x134, 0x00);
+        this->write_reg(0x134, 0x00);
+        this->write_reg(0x137, 0x00);
     }
 
     /* Setup gain control registers.
      *
      * This really only needs to be done once, at initialization. */
     void setup_gain_control() {
-        _b200_iface->write_reg(0x0FA, 0xE0); // Gain Control Mode Select
-        _b200_iface->write_reg(0x0FB, 0x08); // Table, Digital Gain, Man Gain Ctrl
-        _b200_iface->write_reg(0x0FC, 0x23); // Incr Step Size, ADC Overrange Size
-        _b200_iface->write_reg(0x0FD, 0x4C); // Max Full/LMT Gain Table Index
-        _b200_iface->write_reg(0x0FE, 0x44); // Decr Step Size, Peak Overload Time
-        _b200_iface->write_reg(0x100, 0x6F); // Max Digital Gain
-        _b200_iface->write_reg(0x104, 0x2F); // ADC Small Overload Threshold
-        _b200_iface->write_reg(0x105, 0x3A); // ADC Large Overload Threshold
-        _b200_iface->write_reg(0x107, 0x31); // Large LMT Overload Threshold
-        _b200_iface->write_reg(0x108, 0x39); // Small LMT Overload Threshold
-        _b200_iface->write_reg(0x109, 0x23); // Rx1 Full/LMT Gain Index
-        _b200_iface->write_reg(0x10A, 0x58); // Rx1 LPF Gain Index
-        _b200_iface->write_reg(0x10B, 0x00); // Rx1 Digital Gain Index
-        _b200_iface->write_reg(0x10C, 0x23); // Rx2 Full/LMT Gain Index
-        _b200_iface->write_reg(0x10D, 0x18); // Rx2 LPF Gain Index
-        _b200_iface->write_reg(0x10E, 0x00); // Rx2 Digital Gain Index
-        _b200_iface->write_reg(0x114, 0x30); // Low Power Threshold
-        _b200_iface->write_reg(0x11A, 0x27); // Initial LMT Gain Limit
-        _b200_iface->write_reg(0x081, 0x00); // Tx Symbol Gain Control
+        this->write_reg(0x0FA, 0xE0); // Gain Control Mode Select
+        this->write_reg(0x0FB, 0x08); // Table, Digital Gain, Man Gain Ctrl
+        this->write_reg(0x0FC, 0x23); // Incr Step Size, ADC Overrange Size
+        this->write_reg(0x0FD, 0x4C); // Max Full/LMT Gain Table Index
+        this->write_reg(0x0FE, 0x44); // Decr Step Size, Peak Overload Time
+        this->write_reg(0x100, 0x6F); // Max Digital Gain
+        this->write_reg(0x104, 0x2F); // ADC Small Overload Threshold
+        this->write_reg(0x105, 0x3A); // ADC Large Overload Threshold
+        this->write_reg(0x107, 0x31); // Large LMT Overload Threshold
+        this->write_reg(0x108, 0x39); // Small LMT Overload Threshold
+        this->write_reg(0x109, 0x23); // Rx1 Full/LMT Gain Index
+        this->write_reg(0x10A, 0x58); // Rx1 LPF Gain Index
+        this->write_reg(0x10B, 0x00); // Rx1 Digital Gain Index
+        this->write_reg(0x10C, 0x23); // Rx2 Full/LMT Gain Index
+        this->write_reg(0x10D, 0x18); // Rx2 LPF Gain Index
+        this->write_reg(0x10E, 0x00); // Rx2 Digital Gain Index
+        this->write_reg(0x114, 0x30); // Low Power Threshold
+        this->write_reg(0x11A, 0x27); // Initial LMT Gain Limit
+        this->write_reg(0x081, 0x00); // Tx Symbol Gain Control
     }
 
     /* Setup the RX or TX synthesizers.
@@ -982,29 +979,29 @@ public:
 
         /* ... annnd program! */
         if(which == "RX") {
-            _b200_iface->write_reg(0x23a, 0x40 | vco_output_level);
-            _b200_iface->write_reg(0x239, 0xC0 | vco_varactor);
-            _b200_iface->write_reg(0x242, vco_bias_ref | (vco_bias_tcf << 3));
-            _b200_iface->write_reg(0x238, (vco_cal_offset << 3));
-            _b200_iface->write_reg(0x245, 0x00);
-            _b200_iface->write_reg(0x251, vco_varactor_ref);
-            _b200_iface->write_reg(0x250, 0x70);
-            _b200_iface->write_reg(0x23b, 0x80 | charge_pump_curr);
-            _b200_iface->write_reg(0x23e, loop_filter_c1 | (loop_filter_c2 << 4));
-            _b200_iface->write_reg(0x23f, loop_filter_c3 | (loop_filter_r1 << 4));
-            _b200_iface->write_reg(0x240, loop_filter_r3);
+            this->write_reg(0x23a, 0x40 | vco_output_level);
+            this->write_reg(0x239, 0xC0 | vco_varactor);
+            this->write_reg(0x242, vco_bias_ref | (vco_bias_tcf << 3));
+            this->write_reg(0x238, (vco_cal_offset << 3));
+            this->write_reg(0x245, 0x00);
+            this->write_reg(0x251, vco_varactor_ref);
+            this->write_reg(0x250, 0x70);
+            this->write_reg(0x23b, 0x80 | charge_pump_curr);
+            this->write_reg(0x23e, loop_filter_c1 | (loop_filter_c2 << 4));
+            this->write_reg(0x23f, loop_filter_c3 | (loop_filter_r1 << 4));
+            this->write_reg(0x240, loop_filter_r3);
         } else if(which == "TX") {
-            _b200_iface->write_reg(0x27a, 0x40 | vco_output_level);
-            _b200_iface->write_reg(0x279, 0xC0 | vco_varactor);
-            _b200_iface->write_reg(0x282, vco_bias_ref | (vco_bias_tcf << 3));
-            _b200_iface->write_reg(0x278, (vco_cal_offset << 3));
-            _b200_iface->write_reg(0x285, 0x00);
-            _b200_iface->write_reg(0x291, vco_varactor_ref);
-            _b200_iface->write_reg(0x290, 0x70);
-            _b200_iface->write_reg(0x27b, 0x80 | charge_pump_curr);
-            _b200_iface->write_reg(0x27e, loop_filter_c1 | (loop_filter_c2 << 4));
-            _b200_iface->write_reg(0x27f, loop_filter_c3 | (loop_filter_r1 << 4));
-            _b200_iface->write_reg(0x280, loop_filter_r3);
+            this->write_reg(0x27a, 0x40 | vco_output_level);
+            this->write_reg(0x279, 0xC0 | vco_varactor);
+            this->write_reg(0x282, vco_bias_ref | (vco_bias_tcf << 3));
+            this->write_reg(0x278, (vco_cal_offset << 3));
+            this->write_reg(0x285, 0x00);
+            this->write_reg(0x291, vco_varactor_ref);
+            this->write_reg(0x290, 0x70);
+            this->write_reg(0x27b, 0x80 | charge_pump_curr);
+            this->write_reg(0x27e, loop_filter_c1 | (loop_filter_c2 << 4));
+            this->write_reg(0x27f, loop_filter_c3 | (loop_filter_r1 << 4));
+            this->write_reg(0x280, loop_filter_r3);
         } else {
             UHD_THROW_INVALID_CODE_PATH();
         }
@@ -1016,7 +1013,27 @@ public:
      ***********************************************************************/
 
     /* Catalina initialization routine. */
-    ad9361_ctrl_impl(b200_iface::sptr iface) {
+    ad9361_ctrl_impl(ad9361_ctrl_cb_type callback):
+        _callback(callback)
+    {
+        ////////////////////////////////////////////////////////////////////
+        // Reset Catalina
+        ////////////////////////////////////////////////////////////////////
+        this->write_reg(0x000, 0x01);
+        boost::this_thread::sleep(boost::posix_time::milliseconds(5));
+        this->write_reg(0x000, 0x00);
+        boost::this_thread::sleep(boost::posix_time::milliseconds(20));
+
+        ////////////////////////////////////////////////////////////////////
+        // Get the FPGA a clock from Catalina
+        ////////////////////////////////////////////////////////////////////
+        boost::this_thread::sleep(boost::posix_time::milliseconds(100));
+
+        this->write_reg(0x00A, BOOST_BINARY( 00000010 ));
+        this->write_reg(0x009, BOOST_BINARY( 00010111 ));
+
+        boost::this_thread::sleep(boost::posix_time::milliseconds(100));
+
         /* Initialize shadow registers. */
         reg_vcodivs = 0x00;
         reg_inputsel = 0x30;
@@ -1043,26 +1060,23 @@ public:
         _tx1_gain = 0;
         _tx2_gain = 0;
 
-        /* Initialize control interfaces. */
-        _b200_iface = iface;
-
         /* Reset the device. */
-        _b200_iface->write_reg(0x000,0x01);
-        _b200_iface->write_reg(0x000,0x00);
+        this->write_reg(0x000,0x01);
+        this->write_reg(0x000,0x00);
         boost::this_thread::sleep(boost::posix_time::milliseconds(20));
 
         /* There is not a WAT big enough for this. */
-        _b200_iface->write_reg(0x3df, 0x01);
+        this->write_reg(0x3df, 0x01);
 
-        _b200_iface->write_reg(0x2a6, 0x0e); // Enable master bias
-        _b200_iface->write_reg(0x2a8, 0x0e); // Set bandgap trim
+        this->write_reg(0x2a6, 0x0e); // Enable master bias
+        this->write_reg(0x2a8, 0x0e); // Set bandgap trim
 
         /* Set RFPLL ref clock scale to REFCLK * 2 */
-        _b200_iface->write_reg(0x2ab, 0x07);
-        _b200_iface->write_reg(0x2ac, 0xff);
+        this->write_reg(0x2ab, 0x07);
+        this->write_reg(0x2ac, 0xff);
 
         /* Enable clocks. */
-        _b200_iface->write_reg(0x009, 0x17);
+        this->write_reg(0x009, 0x17);
         boost::this_thread::sleep(boost::posix_time::milliseconds(20));
 
         /* Tune the BBPLL, write TX and RX FIRS. */
@@ -1071,74 +1085,74 @@ public:
         /* Setup data ports (FDD dual port DDR CMOS):
          *      FDD dual port DDR CMOS no swap.
          *      Force TX on one port, RX on the other. */
-        _b200_iface->write_reg(0x010, 0xc8);
-        _b200_iface->write_reg(0x011, 0x00);
-        _b200_iface->write_reg(0x012, 0x02);
+        this->write_reg(0x010, 0xc8);
+        this->write_reg(0x011, 0x00);
+        this->write_reg(0x012, 0x02);
 
         /* Data delay for TX and RX data clocks */
-        _b200_iface->write_reg(0x006, 0x0F);
-        _b200_iface->write_reg(0x007, 0x00);
+        this->write_reg(0x006, 0x0F);
+        this->write_reg(0x007, 0x00);
 
         /* Setup AuxDAC */
-        _b200_iface->write_reg(0x018, 0x00); // AuxDAC1 Word[9:2]
-        _b200_iface->write_reg(0x019, 0x00); // AuxDAC2 Word[9:2]
-        _b200_iface->write_reg(0x01A, 0x00); // AuxDAC1 Config and Word[1:0]
-        _b200_iface->write_reg(0x01B, 0x00); // AuxDAC2 Config and Word[1:0]
-        _b200_iface->write_reg(0x023, 0xFF); // AuxDAC Manaul/Auto Control
-        _b200_iface->write_reg(0x026, 0x00); // AuxDAC Manual Select Bit/GPO Manual Select
-        _b200_iface->write_reg(0x030, 0x00); // AuxDAC1 Rx Delay
-        _b200_iface->write_reg(0x031, 0x00); // AuxDAC1 Tx Delay
-        _b200_iface->write_reg(0x032, 0x00); // AuxDAC2 Rx Delay
-        _b200_iface->write_reg(0x033, 0x00); // AuxDAC2 Tx Delay
+        this->write_reg(0x018, 0x00); // AuxDAC1 Word[9:2]
+        this->write_reg(0x019, 0x00); // AuxDAC2 Word[9:2]
+        this->write_reg(0x01A, 0x00); // AuxDAC1 Config and Word[1:0]
+        this->write_reg(0x01B, 0x00); // AuxDAC2 Config and Word[1:0]
+        this->write_reg(0x023, 0xFF); // AuxDAC Manaul/Auto Control
+        this->write_reg(0x026, 0x00); // AuxDAC Manual Select Bit/GPO Manual Select
+        this->write_reg(0x030, 0x00); // AuxDAC1 Rx Delay
+        this->write_reg(0x031, 0x00); // AuxDAC1 Tx Delay
+        this->write_reg(0x032, 0x00); // AuxDAC2 Rx Delay
+        this->write_reg(0x033, 0x00); // AuxDAC2 Tx Delay
 
         /* Setup AuxADC */
-        _b200_iface->write_reg(0x00B, 0x00); // Temp Sensor Setup (Offset)
-        _b200_iface->write_reg(0x00C, 0x00); // Temp Sensor Setup (Temp Window)
-        _b200_iface->write_reg(0x00D, 0x03); // Temp Sensor Setup (Periodic Measure)
-        _b200_iface->write_reg(0x00F, 0x04); // Temp Sensor Setup (Decimation)
-        _b200_iface->write_reg(0x01C, 0x10); // AuxADC Setup (Clock Div)
-        _b200_iface->write_reg(0x01D, 0x01); // AuxADC Setup (Decimation/Enable)
+        this->write_reg(0x00B, 0x00); // Temp Sensor Setup (Offset)
+        this->write_reg(0x00C, 0x00); // Temp Sensor Setup (Temp Window)
+        this->write_reg(0x00D, 0x03); // Temp Sensor Setup (Periodic Measure)
+        this->write_reg(0x00F, 0x04); // Temp Sensor Setup (Decimation)
+        this->write_reg(0x01C, 0x10); // AuxADC Setup (Clock Div)
+        this->write_reg(0x01D, 0x01); // AuxADC Setup (Decimation/Enable)
 
         /* Setup control outputs. */
-        _b200_iface->write_reg(0x035, 0x07);
-        _b200_iface->write_reg(0x036, 0xFF);
+        this->write_reg(0x035, 0x07);
+        this->write_reg(0x036, 0xFF);
 
         /* Setup GPO */
-        _b200_iface->write_reg(0x03a, 0x27); //set delay register
-        _b200_iface->write_reg(0x020, 0x00); // GPO Auto Enable Setup in RX and TX
-        _b200_iface->write_reg(0x027, 0x03); // GPO Manual and GPO auto value in ALERT
-        _b200_iface->write_reg(0x028, 0x00); // GPO_0 RX Delay
-        _b200_iface->write_reg(0x029, 0x00); // GPO_1 RX Delay
-        _b200_iface->write_reg(0x02A, 0x00); // GPO_2 RX Delay
-        _b200_iface->write_reg(0x02B, 0x00); // GPO_3 RX Delay
-        _b200_iface->write_reg(0x02C, 0x00); // GPO_0 TX Delay
-        _b200_iface->write_reg(0x02D, 0x00); // GPO_1 TX Delay
-        _b200_iface->write_reg(0x02E, 0x00); // GPO_2 TX Delay
-        _b200_iface->write_reg(0x02F, 0x00); // GPO_3 TX Delay
+        this->write_reg(0x03a, 0x27); //set delay register
+        this->write_reg(0x020, 0x00); // GPO Auto Enable Setup in RX and TX
+        this->write_reg(0x027, 0x03); // GPO Manual and GPO auto value in ALERT
+        this->write_reg(0x028, 0x00); // GPO_0 RX Delay
+        this->write_reg(0x029, 0x00); // GPO_1 RX Delay
+        this->write_reg(0x02A, 0x00); // GPO_2 RX Delay
+        this->write_reg(0x02B, 0x00); // GPO_3 RX Delay
+        this->write_reg(0x02C, 0x00); // GPO_0 TX Delay
+        this->write_reg(0x02D, 0x00); // GPO_1 TX Delay
+        this->write_reg(0x02E, 0x00); // GPO_2 TX Delay
+        this->write_reg(0x02F, 0x00); // GPO_3 TX Delay
 
-        _b200_iface->write_reg(0x261, 0x00); // RX LO power
-        _b200_iface->write_reg(0x2a1, 0x00); // TX LO power
-        _b200_iface->write_reg(0x248, 0x0b); // en RX VCO LDO
-        _b200_iface->write_reg(0x288, 0x0b); // en TX VCO LDO
-        _b200_iface->write_reg(0x246, 0x02); // pd RX cal Tcf
-        _b200_iface->write_reg(0x286, 0x02); // pd TX cal Tcf
-        _b200_iface->write_reg(0x249, 0x8e); // rx vco cal length
-        _b200_iface->write_reg(0x289, 0x8e); // rx vco cal length
-        _b200_iface->write_reg(0x23b, 0x80); // set RX MSB?, FIXME 0x89 magic cp
-        _b200_iface->write_reg(0x27b, 0x80); // "" TX //FIXME 0x88 see above
-        _b200_iface->write_reg(0x243, 0x0d); // set rx prescaler bias
-        _b200_iface->write_reg(0x283, 0x0d); // "" TX
+        this->write_reg(0x261, 0x00); // RX LO power
+        this->write_reg(0x2a1, 0x00); // TX LO power
+        this->write_reg(0x248, 0x0b); // en RX VCO LDO
+        this->write_reg(0x288, 0x0b); // en TX VCO LDO
+        this->write_reg(0x246, 0x02); // pd RX cal Tcf
+        this->write_reg(0x286, 0x02); // pd TX cal Tcf
+        this->write_reg(0x249, 0x8e); // rx vco cal length
+        this->write_reg(0x289, 0x8e); // rx vco cal length
+        this->write_reg(0x23b, 0x80); // set RX MSB?, FIXME 0x89 magic cp
+        this->write_reg(0x27b, 0x80); // "" TX //FIXME 0x88 see above
+        this->write_reg(0x243, 0x0d); // set rx prescaler bias
+        this->write_reg(0x283, 0x0d); // "" TX
 
-        _b200_iface->write_reg(0x23d, 0x00); // Clear half VCO cal clock setting
-        _b200_iface->write_reg(0x27d, 0x00); // Clear half VCO cal clock setting
+        this->write_reg(0x23d, 0x00); // Clear half VCO cal clock setting
+        this->write_reg(0x27d, 0x00); // Clear half VCO cal clock setting
 
         /* The order of the following process is EXTREMELY important. If the
          * below functions are modified at all, device initialization and
          * calibration might be broken in the process! */
 
-        _b200_iface->write_reg(0x015, 0x04); // dual synth mode, synth en ctrl en
-        _b200_iface->write_reg(0x014, 0x05); // use SPI for TXNRX ctrl, to ALERT, TX on
-        _b200_iface->write_reg(0x013, 0x01); // enable ENSM
+        this->write_reg(0x015, 0x04); // dual synth mode, synth en ctrl en
+        this->write_reg(0x014, 0x05); // use SPI for TXNRX ctrl, to ALERT, TX on
+        this->write_reg(0x013, 0x01); // enable ENSM
         boost::this_thread::sleep(boost::posix_time::milliseconds(1));
 
         calibrate_synth_charge_pumps();
@@ -1160,33 +1174,33 @@ public:
         calibrate_tx_quadrature();
         calibrate_rx_quadrature();
 
-        _b200_iface->write_reg(0x012, 0x02); // cals done, set PPORT config
-        _b200_iface->write_reg(0x013, 0x01); // Set ENSM FDD bit
-        _b200_iface->write_reg(0x015, 0x04); // dual synth mode, synth en ctrl en
+        this->write_reg(0x012, 0x02); // cals done, set PPORT config
+        this->write_reg(0x013, 0x01); // Set ENSM FDD bit
+        this->write_reg(0x015, 0x04); // dual synth mode, synth en ctrl en
 
         /* Default TX attentuation to 10dB on both TX1 and TX2 */
-        _b200_iface->write_reg(0x073, 0x00);
-        _b200_iface->write_reg(0x074, 0x00);
-        _b200_iface->write_reg(0x075, 0x00);
-        _b200_iface->write_reg(0x076, 0x00);
+        this->write_reg(0x073, 0x00);
+        this->write_reg(0x074, 0x00);
+        this->write_reg(0x075, 0x00);
+        this->write_reg(0x076, 0x00);
 
         /* Setup RSSI Measurements */
-        _b200_iface->write_reg(0x150, 0x0E); // RSSI Measurement Duration 0, 1
-        _b200_iface->write_reg(0x151, 0x00); // RSSI Measurement Duration 2, 3
-        _b200_iface->write_reg(0x152, 0xFF); // RSSI Weighted Multiplier 0
-        _b200_iface->write_reg(0x153, 0x00); // RSSI Weighted Multiplier 1
-        _b200_iface->write_reg(0x154, 0x00); // RSSI Weighted Multiplier 2
-        _b200_iface->write_reg(0x155, 0x00); // RSSI Weighted Multiplier 3
-        _b200_iface->write_reg(0x156, 0x00); // RSSI Delay
-        _b200_iface->write_reg(0x157, 0x00); // RSSI Wait
-        _b200_iface->write_reg(0x158, 0x0D); // RSSI Mode Select
-        _b200_iface->write_reg(0x15C, 0x67); // Power Measurement Duration
+        this->write_reg(0x150, 0x0E); // RSSI Measurement Duration 0, 1
+        this->write_reg(0x151, 0x00); // RSSI Measurement Duration 2, 3
+        this->write_reg(0x152, 0xFF); // RSSI Weighted Multiplier 0
+        this->write_reg(0x153, 0x00); // RSSI Weighted Multiplier 1
+        this->write_reg(0x154, 0x00); // RSSI Weighted Multiplier 2
+        this->write_reg(0x155, 0x00); // RSSI Weighted Multiplier 3
+        this->write_reg(0x156, 0x00); // RSSI Delay
+        this->write_reg(0x157, 0x00); // RSSI Wait
+        this->write_reg(0x158, 0x0D); // RSSI Mode Select
+        this->write_reg(0x15C, 0x67); // Power Measurement Duration
 
         /* Turn on the default RX & TX chains. */
         //set_active_chains(true, false, true, false);
 
         /* Set TXers & RXers on (only works in FDD mode) */
-        _b200_iface->write_reg(0x014, 0x21);
+        this->write_reg(0x014, 0x21);
     }
 
     /* Configure the various clock / sample rates in the RX and TX chains.
@@ -1296,10 +1310,10 @@ public:
         }
 
         /* Set the dividers / interpolators in Catalina. */
-        _b200_iface->write_reg(0x002, reg_txfilt);
-        _b200_iface->write_reg(0x003, reg_rxfilt);
-        _b200_iface->write_reg(0x004, reg_inputsel);
-        _b200_iface->write_reg(0x00A, reg_bbpll);
+        this->write_reg(0x002, reg_txfilt);
+        this->write_reg(0x003, reg_rxfilt);
+        this->write_reg(0x004, reg_inputsel);
+        this->write_reg(0x00A, reg_bbpll);
 
         _baseband_bw = (adcclk / divfactor);
 
@@ -1361,19 +1375,19 @@ public:
         double icp = icp_baseline * (actual_vcorate / freq_baseline);
         int icp_reg = (icp / 25e-6) - 1;
 
-        _b200_iface->write_reg(0x045, 0x00);            // REFCLK / 1 to BBPLL
-        _b200_iface->write_reg(0x046, icp_reg & 0x3F);  // CP current
-        _b200_iface->write_reg(0x048, 0xe8);            // BBPLL loop filters
-        _b200_iface->write_reg(0x049, 0x5b);            // BBPLL loop filters
-        _b200_iface->write_reg(0x04a, 0x35);            // BBPLL loop filters
+        this->write_reg(0x045, 0x00);            // REFCLK / 1 to BBPLL
+        this->write_reg(0x046, icp_reg & 0x3F);  // CP current
+        this->write_reg(0x048, 0xe8);            // BBPLL loop filters
+        this->write_reg(0x049, 0x5b);            // BBPLL loop filters
+        this->write_reg(0x04a, 0x35);            // BBPLL loop filters
 
-        _b200_iface->write_reg(0x04b, 0xe0);
-        _b200_iface->write_reg(0x04e, 0x10);            // Max accuracy
+        this->write_reg(0x04b, 0xe0);
+        this->write_reg(0x04e, 0x10);            // Max accuracy
 
-        _b200_iface->write_reg(0x043, nfrac & 0xFF);         // Nfrac[7:0]
-        _b200_iface->write_reg(0x042, (nfrac >> 8) & 0xFF);  // Nfrac[15:8]
-        _b200_iface->write_reg(0x041, (nfrac >> 16) & 0xFF); // Nfrac[23:16]
-        _b200_iface->write_reg(0x044, nint);                 // Nint
+        this->write_reg(0x043, nfrac & 0xFF);         // Nfrac[7:0]
+        this->write_reg(0x042, (nfrac >> 8) & 0xFF);  // Nfrac[15:8]
+        this->write_reg(0x041, (nfrac >> 16) & 0xFF); // Nfrac[23:16]
+        this->write_reg(0x044, nint);                 // Nint
 
         calibrate_lock_bbpll();
 
@@ -1445,7 +1459,7 @@ public:
                 UHD_THROW_INVALID_CODE_PATH();
             }
 
-            _b200_iface->write_reg(0x004, reg_inputsel);
+            this->write_reg(0x004, reg_inputsel);
 
             /* Store vcodiv setting. */
             reg_vcodivs = (reg_vcodivs & 0xF0) | (i & 0x0F);
@@ -1454,16 +1468,16 @@ public:
             setup_synth("RX", actual_vcorate);
 
             /* Tune!!!! */
-            _b200_iface->write_reg(0x233, nfrac & 0xFF);
-            _b200_iface->write_reg(0x234, (nfrac >> 8) & 0xFF);
-            _b200_iface->write_reg(0x235, (nfrac >> 16) & 0xFF);
-            _b200_iface->write_reg(0x232, (nint >> 8) & 0xFF);
-            _b200_iface->write_reg(0x231, nint & 0xFF);
-            _b200_iface->write_reg(0x005, reg_vcodivs);
+            this->write_reg(0x233, nfrac & 0xFF);
+            this->write_reg(0x234, (nfrac >> 8) & 0xFF);
+            this->write_reg(0x235, (nfrac >> 16) & 0xFF);
+            this->write_reg(0x232, (nint >> 8) & 0xFF);
+            this->write_reg(0x231, nint & 0xFF);
+            this->write_reg(0x005, reg_vcodivs);
 
             /* Lock the PLL! */
             boost::this_thread::sleep(boost::posix_time::milliseconds(2));
-            if((_b200_iface->read_reg(0x247) & 0x02) == 0) {
+            if((this->read_reg(0x247) & 0x02) == 0) {
                 std::cout << "RX PLL NOT LOCKED" << std::endl;
             }
 
@@ -1484,7 +1498,7 @@ public:
                 UHD_THROW_INVALID_CODE_PATH();
             }
 
-            _b200_iface->write_reg(0x004, reg_inputsel);
+            this->write_reg(0x004, reg_inputsel);
 
             /* Store vcodiv setting. */
             reg_vcodivs = (reg_vcodivs & 0x0F) | ((i & 0x0F) << 4);
@@ -1493,16 +1507,16 @@ public:
             setup_synth("TX", actual_vcorate);
 
             /* Tune it, homey. */
-            _b200_iface->write_reg(0x273, nfrac & 0xFF);
-            _b200_iface->write_reg(0x274, (nfrac >> 8) & 0xFF);
-            _b200_iface->write_reg(0x275, (nfrac >> 16) & 0xFF);
-            _b200_iface->write_reg(0x272, (nint >> 8) & 0xFF);
-            _b200_iface->write_reg(0x271, nint & 0xFF);
-            _b200_iface->write_reg(0x005, reg_vcodivs);
+            this->write_reg(0x273, nfrac & 0xFF);
+            this->write_reg(0x274, (nfrac >> 8) & 0xFF);
+            this->write_reg(0x275, (nfrac >> 16) & 0xFF);
+            this->write_reg(0x272, (nint >> 8) & 0xFF);
+            this->write_reg(0x271, nint & 0xFF);
+            this->write_reg(0x005, reg_vcodivs);
 
             /* Lock the PLL! */
             boost::this_thread::sleep(boost::posix_time::milliseconds(2));
-            if((_b200_iface->read_reg(0x287) & 0x02) == 0) {
+            if((this->read_reg(0x287) & 0x02) == 0) {
                 std::cout << "TX PLL NOT LOCKED" << std::endl;
             }
 
@@ -1536,18 +1550,18 @@ public:
 
         /* We must be in the SLEEP / WAIT state to do this. If we aren't already
          * there, transition the ENSM to State 0. */
-        uint8_t current_state = _b200_iface->read_reg(0x017) & 0x0F;
+        uint8_t current_state = this->read_reg(0x017) & 0x0F;
         switch(current_state) {
             case 0x05:
                 /* We are in the ALERT state. */
-                _b200_iface->write_reg(0x014, 0x21);
+                this->write_reg(0x014, 0x21);
                 boost::this_thread::sleep(boost::posix_time::milliseconds(5));
-                _b200_iface->write_reg(0x014, 0x00);
+                this->write_reg(0x014, 0x00);
                 break;
 
             case 0x0A:
                 /* We are in the FDD state. */
-                _b200_iface->write_reg(0x014, 0x00);
+                this->write_reg(0x014, 0x00);
                 break;
 
             default:
@@ -1566,9 +1580,9 @@ public:
         double rate = setup_rates(req_rate);
 
         /* Transition to the ALERT state and calibrate everything. */
-        _b200_iface->write_reg(0x015, 0x04); //dual synth mode, synth en ctrl en
-        _b200_iface->write_reg(0x014, 0x05); //use SPI for TXNRX ctrl, to ALERT, TX on
-        _b200_iface->write_reg(0x013, 0x01); //enable ENSM
+        this->write_reg(0x015, 0x04); //dual synth mode, synth en ctrl en
+        this->write_reg(0x014, 0x05); //use SPI for TXNRX ctrl, to ALERT, TX on
+        this->write_reg(0x013, 0x01); //enable ENSM
         boost::this_thread::sleep(boost::posix_time::milliseconds(1));
 
         calibrate_synth_charge_pumps();
@@ -1591,9 +1605,9 @@ public:
         calibrate_tx_quadrature();
         calibrate_rx_quadrature();
 
-        _b200_iface->write_reg(0x012, 0x02); // cals done, set PPORT config
-        _b200_iface->write_reg(0x013, 0x01); // Set ENSM FDD bit
-        _b200_iface->write_reg(0x015, 0x04); // dual synth mode, synth en ctrl en
+        this->write_reg(0x012, 0x02); // cals done, set PPORT config
+        this->write_reg(0x013, 0x01); // Set ENSM FDD bit
+        this->write_reg(0x015, 0x04); // dual synth mode, synth en ctrl en
 
         /* End the function in the same state as the entry state. */
         switch(current_state) {
@@ -1607,9 +1621,9 @@ public:
                 reg_txfilt = (reg_txfilt & 0x3F) | orig_tx_chains;
                 reg_rxfilt = (reg_rxfilt & 0x3F) | orig_rx_chains;
 
-                _b200_iface->write_reg(0x002, reg_txfilt);
-                _b200_iface->write_reg(0x003, reg_rxfilt);
-                _b200_iface->write_reg(0x014, 0x21);
+                this->write_reg(0x002, reg_txfilt);
+                this->write_reg(0x003, reg_rxfilt);
+                this->write_reg(0x014, 0x21);
                 break;
 
             default:
@@ -1651,8 +1665,8 @@ public:
         if(rx2) { reg_rxfilt = reg_rxfilt | 0x80; }
 
         /* Turn on / off the chains. */
-        _b200_iface->write_reg(0x002, reg_txfilt);
-        _b200_iface->write_reg(0x003, reg_rxfilt);
+        this->write_reg(0x002, reg_txfilt);
+        this->write_reg(0x003, reg_rxfilt);
     }
 
     /* Tune the RX or TX frequency.
@@ -1683,10 +1697,10 @@ public:
         /* If we aren't already in the ALERT state, we will need to return to
          * the FDD state after tuning. */
         bool not_in_alert = false;
-        if((_b200_iface->read_reg(0x017) & 0x0F) != 5) {
+        if((this->read_reg(0x017) & 0x0F) != 5) {
             /* Force the device into the ALERT state. */
             not_in_alert = true;
-            _b200_iface->write_reg(0x014, 0x01);
+            this->write_reg(0x014, 0x01);
         }
 
         /* Tune the RF VCO! */
@@ -1706,7 +1720,7 @@ public:
 
         /* If we were in the FDD state, return it now. */
         if(not_in_alert) {
-            _b200_iface->write_reg(0x014, 0x21);
+            this->write_reg(0x014, 0x21);
         }
 
         return tune_freq;
@@ -1744,18 +1758,18 @@ public:
 
             if(which[2] == '1') {
                 _rx1_gain = value;
-                _b200_iface->write_reg(0x109, gain_index);
+                this->write_reg(0x109, gain_index);
             } else {
                 _rx2_gain = value;
-                _b200_iface->write_reg(0x10c, gain_index);
+                this->write_reg(0x10c, gain_index);
             }
 
             return gain_index - gain_offset;
         } else {
             /* Setting the below bits causes a change in the TX attenuation word
              * to immediately take effect. */
-            _b200_iface->write_reg(0x077, 0x40);
-            _b200_iface->write_reg(0x07c, 0x40);
+            this->write_reg(0x077, 0x40);
+            this->write_reg(0x07c, 0x40);
 
             /* Each gain step is -0.25dB. Calculate the attenuation necessary
              * for the requested gain, convert it into gain steps, then write
@@ -1764,19 +1778,37 @@ public:
             int attenreg = atten * 4;
             if(which[2] == '1') {
                 _tx1_gain = value;
-                _b200_iface->write_reg(0x073, attenreg & 0xFF);
-                _b200_iface->write_reg(0x074, (attenreg >> 8) & 0x01);
+                this->write_reg(0x073, attenreg & 0xFF);
+                this->write_reg(0x074, (attenreg >> 8) & 0x01);
             } else {
                 _tx2_gain = value;
-                _b200_iface->write_reg(0x075, attenreg & 0xFF);
-                _b200_iface->write_reg(0x076, (attenreg >> 8) & 0x01);
+                this->write_reg(0x075, attenreg & 0xFF);
+                this->write_reg(0x076, (attenreg >> 8) & 0x01);
             }
             return get_gain_range("TX1").stop() - (double(attenreg)/ 4);
         }
     }
 
+    void write_reg(boost::uint16_t reg, boost::uint8_t val)
+    {
+        //std::cout << "SPIWrite\t" << std::hex << std::setw(3) << std::setfill('0') << (int) reg << "," << std::setw(2) << (int) val << std::endl;
+        boost::uint8_t buf[3];
+        buf[0] = (0x80 | ((reg >> 8) & 0x3F));
+        buf[1] = (reg & 0x00FF);
+        buf[2] = val;
+        _callback(buf, 24, NULL, 0);
+    }
+
+    uint8_t read_reg(uint16_t reg) {
+        boost::uint8_t buf[3];
+        buf[0] = (reg >> 8) & 0x3F;
+        buf[1] = (reg & 0x00FF);
+        _callback(buf, 16, buf, 24);
+        return buf[2];
+    }
+
 private:
-    b200_iface::sptr _b200_iface;
+    ad9361_ctrl_cb_type _callback;
     double _rx_freq, _tx_freq, _req_rx_freq, _req_tx_freq;
     double _baseband_bw, _bbpll_freq, _adcclock_freq;
     double _req_clock_rate, _req_coreclk;
@@ -1801,7 +1833,7 @@ private:
 /***********************************************************************
  * Make an instance of the implementation
  **********************************************************************/
-ad9361_ctrl::sptr ad9361_ctrl::make(b200_iface::sptr iface)
+ad9361_ctrl::sptr ad9361_ctrl::make(ad9361_ctrl_cb_type callback)
 {
-    return sptr(new ad9361_ctrl_impl(iface));
+    return sptr(new ad9361_ctrl_impl(callback));
 }

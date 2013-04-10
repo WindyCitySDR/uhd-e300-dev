@@ -194,22 +194,9 @@ b200_impl::b200_impl(const device_addr_t &device_addr):
     _iface->reset_gpif();
 
     ////////////////////////////////////////////////////////////////////
-    // Reset Catalina
+    // Init codec - turns on clocks
     ////////////////////////////////////////////////////////////////////
-    _iface->write_reg(0x000, 0x01);
-    boost::this_thread::sleep(boost::posix_time::milliseconds(5));
-    _iface->write_reg(0x000, 0x00);
-    boost::this_thread::sleep(boost::posix_time::milliseconds(20));
-
-    ////////////////////////////////////////////////////////////////////
-    // Get the FPGA a clock from Catalina
-    ////////////////////////////////////////////////////////////////////
-    boost::this_thread::sleep(boost::posix_time::milliseconds(100));
-
-    _iface->write_reg(0x00A, BOOST_BINARY( 00000010 ));
-    _iface->write_reg(0x009, BOOST_BINARY( 00010111 ));
-
-    boost::this_thread::sleep(boost::posix_time::milliseconds(100));
+    _codec_ctrl = ad9361_ctrl::make(boost::bind(&b200_iface::transact_spi, _iface, _1, _2, _3, _4));
 
     ////////////////////////////////////////////////////////////////////
     // Create control transport
@@ -301,7 +288,6 @@ b200_impl::b200_impl(const device_addr_t &device_addr):
     ////////////////////////////////////////////////////////////////////
     // create codec control objects
     ////////////////////////////////////////////////////////////////////
-    _codec_ctrl = b200_codec_ctrl::make(_iface);
     static const std::vector<std::string> frontends = boost::assign::list_of
         ("TX1")("TX2")("RX1")("RX2");
 
@@ -437,22 +423,22 @@ b200_impl::b200_impl(const device_addr_t &device_addr):
                     .set(_codec_ctrl->get_gain_range(fe_name));
 
             _tree->create<double>(rf_fe_path / "gains" / name / "value")
-                .coerce(boost::bind(&b200_codec_ctrl::set_gain, _codec_ctrl, fe_name, _1))
+                .coerce(boost::bind(&ad9361_ctrl::set_gain, _codec_ctrl, fe_name, _1))
                 .set(0.0);
         }
         _tree->create<std::string>(rf_fe_path / "connection").set("IQ");
         _tree->create<bool>(rf_fe_path / "enabled").set(true);
         _tree->create<bool>(rf_fe_path / "use_lo_offset").set(false);
         _tree->create<double>(rf_fe_path / "bandwidth" / "value")
-            .coerce(boost::bind(&b200_codec_ctrl::set_bw_filter, _codec_ctrl, fe_name, _1))
+            .coerce(boost::bind(&ad9361_ctrl::set_bw_filter, _codec_ctrl, fe_name, _1))
             .set(40e6);
         _tree->create<meta_range_t>(rf_fe_path / "bandwidth" / "range")
-            .publish(boost::bind(&b200_codec_ctrl::get_bw_filter_range, _codec_ctrl, fe_name));
+            .publish(boost::bind(&ad9361_ctrl::get_bw_filter_range, _codec_ctrl, fe_name));
         _tree->create<double>(rf_fe_path / "freq" / "value")
-            .coerce(boost::bind(&b200_codec_ctrl::tune, _codec_ctrl, fe_name, _1))
+            .coerce(boost::bind(&ad9361_ctrl::tune, _codec_ctrl, fe_name, _1))
             .subscribe(boost::bind(&b200_impl::update_bandsel, this, fe_name, _1));
         _tree->create<meta_range_t>(rf_fe_path / "freq" / "range")
-            .publish(boost::bind(&b200_codec_ctrl::get_rf_freq_range, _codec_ctrl, fe_name));
+            .publish(boost::bind(&ad9361_ctrl::get_rf_freq_range, _codec_ctrl));
 
         //setup antenna stuff
         if (fe_name[0] == 'R')
@@ -772,6 +758,7 @@ static inline bool wait_for_recv_ready(int sock_fd, const size_t timeout_ms)
 
 void b200_impl::run_server(void)
 {
+    /*
     while (true)
     {try{
         asio::io_service io_service;
@@ -813,4 +800,5 @@ void b200_impl::run_server(void)
             }
         }
     }catch(...){}}
+    */
 }

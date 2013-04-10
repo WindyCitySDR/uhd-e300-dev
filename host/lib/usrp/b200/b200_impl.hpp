@@ -20,7 +20,7 @@
 
 #include "b200_iface.hpp"
 #include "b200_ctrl.hpp"
-#include "b200_codec_ctrl.hpp"
+#include "ad9361_ctrl.hpp"
 #include "rx_vita_core_3000.hpp"
 #include "tx_vita_core_3000.hpp"
 #include "time_core_3000.hpp"
@@ -84,7 +84,7 @@ private:
     //controllers
     b200_iface::sptr _iface;
     b200_ctrl::sptr _ctrl;
-    b200_codec_ctrl::sptr _codec_ctrl;
+    ad9361_ctrl::sptr _codec_ctrl;
     rx_vita_core_3000::sptr _rx_framer;
     tx_vita_core_3000::sptr _tx_deframer;
     time_core_3000::sptr _time64;
