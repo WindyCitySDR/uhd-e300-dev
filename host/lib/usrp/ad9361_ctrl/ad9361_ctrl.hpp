@@ -26,14 +26,29 @@
 #include <vector>
 #include <string>
 
+
+//-------- BEGIN super temp stuff to make this work on the host ------//
+
 typedef boost::function<void(unsigned char *, size_t, unsigned char *, size_t)> ad9361_ctrl_cb_type;
+
+struct ad9361_ctrl_iface_type
+{
+    virtual void transact(const char in_buff[64], char out_buff[64]) = 0;
+};
+typedef boost::shared_ptr<ad9361_ctrl_iface_type> ad9361_ctrl_iface_sptr;
+
+ad9361_ctrl_iface_sptr ad9361_ctrl_iface_make(ad9361_ctrl_cb_type callback);
+
+
+//-------- END super temp stuff to make this work on the host --------//
+
 
 class ad9361_ctrl : boost::noncopyable{
 public:
     typedef boost::shared_ptr<ad9361_ctrl> sptr;
 
     //! make a new codec control object
-    static sptr make(ad9361_ctrl_cb_type callback);
+    static sptr make(ad9361_ctrl_iface_sptr iface);
 
     //! Get a list of gain names for RX or TX
     static std::vector<std::string> get_gain_names(const std::string &/*which*/)
@@ -88,11 +103,10 @@ public:
     virtual double tune(const std::string &which, const double value) = 0;
 
     //! output a ~480 kHz test tone at 800 MHz
-    virtual void output_test_tone(void) = 0;
+    //virtual void output_test_tone(void) = 0;
 
     //! turn on/off Catalina's data port loopback
-    virtual void data_port_loopback_on(void) = 0;
-    virtual void data_port_loopback_off(void) = 0;
+    virtual void data_port_loopback(const bool on) = 0;
 };
 
 #endif /* INCLUDED_AD9361_CTRL_HPP */
