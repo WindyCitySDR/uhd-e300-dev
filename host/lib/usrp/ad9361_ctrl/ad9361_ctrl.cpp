@@ -60,10 +60,10 @@ struct ad9361_ctrl_impl : public ad9361_ctrl
     void set_active_chains(bool tx1, bool tx2, bool rx1, bool rx2)
     {
         boost::uint32_t mask = 0;
-        if (tx1) mask &= (1 << 0);
-        if (tx2) mask &= (1 << 1);
-        if (rx1) mask &= (1 << 2);
-        if (rx2) mask &= (1 << 3);
+        if (tx1) mask |= (1 << 0);
+        if (tx2) mask |= (1 << 1);
+        if (rx1) mask |= (1 << 2);
+        if (rx2) mask |= (1 << 3);
 
         ad9361_transaction_t request;
         request.action = AD9361_ACTION_SET_ACTIVE_CHAINS;
