@@ -4,6 +4,7 @@
 // NOT FOR DISTRIBUTION
 
 #include "ad9361_ctrl.hpp"
+#include "ad9361_transaction.h"
 #include "ad9361_synth_lut.hpp"
 #include "ad9361_gain_tables.hpp"
 #include "ad9361_filter_taps.hpp"
@@ -1807,5 +1808,6 @@ private:
  **********************************************************************/
 ad9361_ctrl::sptr ad9361_ctrl::make(ad9361_ctrl_cb_type callback)
 {
+    UHD_ASSERT_THROW(sizeof(ad9361_transaction_t) <= 64);
     return sptr(new ad9361_ctrl_impl(callback));
 }
