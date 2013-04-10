@@ -101,8 +101,8 @@ struct ad9361_ctrl_impl : public ad9361_ctrl
     ad9361_transaction_t do_transaction(const ad9361_transaction_t &request)
     {
         //declare in/out buffers
-        char in_buff[64];
-        char out_buff[64];
+        unsigned char in_buff[64];
+        unsigned char out_buff[64];
 
         //copy the input transaction
         std::memcpy(in_buff, &request, sizeof(request));

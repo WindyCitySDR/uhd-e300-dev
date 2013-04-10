@@ -1778,7 +1778,7 @@ public:
         return buf[2];
     }
 
-    void transact(const char in_buff[64], char out_buff[64])
+    void transact(const unsigned char in_buff[64], unsigned char out_buff[64])
     {
         const ad9361_transaction_t *request = (const ad9361_transaction_t *)in_buff;
         ad9361_transaction_t *reply = (ad9361_transaction_t *)out_buff;

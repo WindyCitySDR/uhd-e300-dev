@@ -55,6 +55,8 @@ const static boost::uint8_t B200_VREQ_FPGA_RESET = 0x62;
 const static boost::uint8_t B200_VREQ_GPIF_RESET = 0x72;
 const static boost::uint8_t B200_VREQ_GET_USB = 0x80;
 const static boost::uint8_t B200_VREQ_GET_STATUS = 0x83;
+const static boost::uint8_t B200_VREQ_AD9361_CTRL_WRITE = 0x90;
+const static boost::uint8_t B200_VREQ_AD9361_CTRL_READ = 0x91;
 const static boost::uint8_t B200_VREQ_FX3_RESET = 0x99;
 
 const static boost::uint8_t FX3_STATE_FPGA_READY = 0x00;
@@ -239,6 +241,11 @@ public:
                 throw uhd::io_error("transact_spi: readback failed!");
             }
         }
+    }
+
+    void transact(const unsigned char in_buff[64], unsigned char out_buff[64]) {
+        fx3_control_write(B200_VREQ_AD9361_CTRL_WRITE, 0x00, 0x00, (unsigned char *)in_buff, 64);
+        fx3_control_read(B200_VREQ_AD9361_CTRL_READ, 0x00, 0x00, out_buff, 64);
     }
 
     byte_vector_t read_i2c(boost::uint8_t addr, size_t num_bytes)

@@ -33,7 +33,7 @@ typedef boost::function<void(unsigned char *, size_t, unsigned char *, size_t)> 
 
 struct ad9361_ctrl_iface_type
 {
-    virtual void transact(const char in_buff[64], char out_buff[64]) = 0;
+    virtual void transact(const unsigned char in_buff[64], unsigned char out_buff[64]) = 0;
 };
 typedef boost::shared_ptr<ad9361_ctrl_iface_type> ad9361_ctrl_iface_sptr;
 

@@ -23,8 +23,10 @@
 #include <uhd/types/serial.hpp> //i2c iface
 #include <boost/shared_ptr.hpp>
 #include <boost/utility.hpp>
+#include "ad9361_ctrl.hpp"
 
-class b200_iface: boost::noncopyable, public uhd::i2c_iface {
+class b200_iface: boost::noncopyable, public uhd::i2c_iface,
+                  public ad9361_ctrl_iface_type {
 public:
     typedef boost::shared_ptr<b200_iface> sptr;
 
