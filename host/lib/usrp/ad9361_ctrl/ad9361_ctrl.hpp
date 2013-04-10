@@ -102,9 +102,6 @@ public:
     //! tune the given frontend, return the exact value
     virtual double tune(const std::string &which, const double value) = 0;
 
-    //! output a ~480 kHz test tone at 800 MHz
-    //virtual void output_test_tone(void) = 0;
-
     //! turn on/off Catalina's data port loopback
     virtual void data_port_loopback(const bool on) = 0;
 };

@@ -28,6 +28,10 @@ struct ad9361_ctrl_impl : public ad9361_ctrl
         _iface(iface), _seq(0)
     {
         ad9361_transaction_t request;
+
+        request.action = AD9361_ACTION_ECHO;
+        this->do_transaction(request);
+
         request.action = AD9361_ACTION_INIT;
         this->do_transaction(request);
     }
@@ -72,15 +76,14 @@ struct ad9361_ctrl_impl : public ad9361_ctrl
     }
 
     //! tune the given frontend, return the exact value
-    double tune(const std::string &which, const double value)
+    double tune(const std::string &which, const double raw_value)
     {
         ad9361_transaction_t request;
 
-        if (which == "RX1") request.action = AD9361_ACTION_SET_RX_FREQ;
-        if (which == "RX2") request.action = AD9361_ACTION_SET_RX_FREQ;
-        if (which == "TX1") request.action = AD9361_ACTION_SET_TX_FREQ;
-        if (which == "TX2") request.action = AD9361_ACTION_SET_TX_FREQ;
+        if (which[0] == 'R') request.action = AD9361_ACTION_SET_RX_FREQ;
+        if (which[0] == 'T') request.action = AD9361_ACTION_SET_TX_FREQ;
 
+        const double value = ad9361_ctrl::get_rf_freq_range().clip(raw_value);
         ad9361_trans_double_pack(value, request.value.freq);
         const ad9361_transaction_t reply = this->do_transaction(request);
         return ad9361_trans_double_unpack(reply.value.freq);
