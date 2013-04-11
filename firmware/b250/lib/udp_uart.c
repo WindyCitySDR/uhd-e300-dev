@@ -123,7 +123,6 @@ void udp_uart_poll(void)
             int ret = wb_uart_getc(state->uart_base);
             if (ret == -1) break;
             char ch = (char) ret;
-	    if (ch == '\r') break;
             if (ch == '\n' || ch == '\r') newline = true;
             state->buf[j] = ch;
             state->len++;
