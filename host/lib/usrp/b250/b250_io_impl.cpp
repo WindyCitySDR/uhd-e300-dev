@@ -137,7 +137,7 @@ static void b250_if_hdr_pack_be(
 /***********************************************************************
  * RX flow control handler
  **********************************************************************/
-static void handle_rx_flowctrl(const boost::uint32_t sid, udp_zero_copy::sptr xport, const size_t last_seq)
+static void handle_rx_flowctrl(const boost::uint32_t sid, zero_copy_if::sptr xport, const size_t last_seq)
 {
     managed_send_buffer::sptr buff = xport->get_send_buff(0.0);
     if (not buff)
@@ -189,7 +189,7 @@ struct tx_fc_guts_t
     bounded_buffer<async_metadata_t> async_queue;
 };
 
-static void handle_tx_async_msgs(boost::shared_ptr<tx_fc_guts_t> guts, udp_zero_copy::sptr xport)
+static void handle_tx_async_msgs(boost::shared_ptr<tx_fc_guts_t> guts, zero_copy_if::sptr xport)
 {
     managed_recv_buffer::sptr buff = xport->get_recv_buff();
     if (not buff) return;
@@ -228,7 +228,7 @@ static void handle_tx_async_msgs(boost::shared_ptr<tx_fc_guts_t> guts, udp_zero_
 static managed_send_buffer::sptr get_tx_buff_with_flowctrl(
     task::sptr /*holds ref*/,
     boost::shared_ptr<tx_fc_guts_t> guts,
-    udp_zero_copy::sptr xport,
+    zero_copy_if::sptr xport,
     const double timeout
 ){
     while (true)
@@ -282,7 +282,7 @@ rx_streamer::sptr b250_impl::get_rx_stream(const uhd::stream_args_t &args_)
     data_config.router_dst_there = (i == 0)? B250_XB_DST_R0 : B250_XB_DST_R1;
     data_config.router_dst_here = B250_XB_DST_E0;
     const boost::uint32_t data_sid = this->allocate_sid(data_config);
-    udp_zero_copy::sptr data_xport = this->make_transport(_addr, data_sid);
+    zero_copy_if::sptr data_xport = this->make_transport(_addr, data_sid);
     UHD_MSG(status) << boost::format("data_sid = 0x%08x\n") % data_sid << std::endl;
 
     //calculate packet size
@@ -361,7 +361,7 @@ tx_streamer::sptr b250_impl::get_tx_stream(const uhd::stream_args_t &args_)
     data_config.router_dst_there = B250_XB_DST_R0;
     data_config.router_dst_here = B250_XB_DST_E0;
     const boost::uint32_t data_sid = this->allocate_sid(data_config);
-    udp_zero_copy::sptr data_xport = this->make_transport(_addr, data_sid);
+    zero_copy_if::sptr data_xport = this->make_transport(_addr, data_sid);
     UHD_MSG(status) << boost::format("data_sid = 0x%08x\n") % data_sid << std::endl;
 
     //calculate packet size
