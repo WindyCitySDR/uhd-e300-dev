@@ -55,6 +55,8 @@ const static boost::uint8_t B200_VREQ_FPGA_RESET = 0x62;
 const static boost::uint8_t B200_VREQ_GPIF_RESET = 0x72;
 const static boost::uint8_t B200_VREQ_GET_USB = 0x80;
 const static boost::uint8_t B200_VREQ_GET_STATUS = 0x83;
+const static boost::uint8_t B200_VREQ_AD9361_CTRL_WRITE = 0x90;
+const static boost::uint8_t B200_VREQ_AD9361_CTRL_READ = 0x91;
 const static boost::uint8_t B200_VREQ_FX3_RESET = 0x99;
 
 const static boost::uint8_t FX3_STATE_FPGA_READY = 0x00;
@@ -241,25 +243,10 @@ public:
         }
     }
 
-
-    void write_reg(boost::uint16_t reg, boost::uint8_t val)
-    {
-        //std::cout << "SPIWrite\t" << std::hex << std::setw(3) << std::setfill('0') << (int) reg << "," << std::setw(2) << (int) val << std::endl;
-        boost::uint8_t buf[3];
-        buf[0] = (0x80 | ((reg >> 8) & 0x3F));
-        buf[1] = (reg & 0x00FF);
-        buf[2] = val;
-        transact_spi(buf, 24, NULL, 0);
+    void transact(const unsigned char in_buff[64], unsigned char out_buff[64]) {
+        fx3_control_write(B200_VREQ_AD9361_CTRL_WRITE, 0x00, 0x00, (unsigned char *)in_buff, 64);
+        fx3_control_read(B200_VREQ_AD9361_CTRL_READ, 0x00, 0x00, out_buff, 64);
     }
-
-    uint8_t read_reg(uint16_t reg) {
-        boost::uint8_t buf[3];
-        buf[0] = (reg >> 8) & 0x3F;
-        buf[1] = (reg & 0x00FF);
-        transact_spi(buf, 16, buf, 24);
-        return buf[2];
-    }
-
 
     byte_vector_t read_i2c(boost::uint8_t addr, size_t num_bytes)
     {

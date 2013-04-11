@@ -20,7 +20,7 @@
 
 #include "b200_iface.hpp"
 #include "b200_ctrl.hpp"
-#include "b200_codec_ctrl.hpp"
+#include "ad9361_ctrl.hpp"
 #include "rx_vita_core_3000.hpp"
 #include "tx_vita_core_3000.hpp"
 #include "time_core_3000.hpp"
@@ -45,7 +45,7 @@ namespace asio = boost::asio;
 
 static const std::string     B200_FW_FILE_NAME = "usrp_b200_fw.hex";
 static const std::string     B200_FPGA_FILE_NAME = "usrp_b200_fpga.bin";
-static const boost::uint8_t  B200_FW_COMPAT_NUM_MAJOR = 0x01;
+static const boost::uint8_t  B200_FW_COMPAT_NUM_MAJOR = 0x02;
 static const boost::uint8_t  B200_FW_COMPAT_NUM_MINOR = 0x00;
 static const boost::uint16_t B200_FPGA_COMPAT_NUM = 0x09;
 static const size_t          B200_MAX_PKT_BYTE_LIMIT = 2048*4;
@@ -62,8 +62,6 @@ static const size_t          B200_NUM_TX_FE = 2;
 /***********************************************************************
  * The B200 Capability Constants
  **********************************************************************/
-static const uhd::meta_range_t b200_samp_range(200e3, 61.44e6);
-
 
 //! Implementation guts
 class b200_impl : public uhd::device
@@ -84,7 +82,8 @@ private:
     //controllers
     b200_iface::sptr _iface;
     b200_ctrl::sptr _ctrl;
-    b200_codec_ctrl::sptr _codec_ctrl;
+    ad9361_ctrl::sptr _codec_ctrl;
+    ad9361_ctrl_iface_sptr _codec_ctrl_iface;
     rx_vita_core_3000::sptr _rx_framer;
     tx_vita_core_3000::sptr _tx_deframer;
     time_core_3000::sptr _time64;
@@ -152,7 +151,6 @@ private:
     double get_dsp_freq(void){return 0.0;}
 
     uhd::meta_range_t get_dsp_freq_range(void){return uhd::meta_range_t(0.0, 0.0);};
-    uhd::meta_range_t get_possible_rates(void){return b200_samp_range;};
 
     double _tick_rate;
     double get_tick_rate(void){return _tick_rate;}
