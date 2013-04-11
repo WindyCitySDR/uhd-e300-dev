@@ -38,10 +38,6 @@
 #include <uhd/transport/usb_zero_copy.hpp>
 #include <uhd/transport/bounded_buffer.hpp>
 #include <boost/weak_ptr.hpp>
-#include <boost/asio.hpp>
-#include <uhd/utils/tasks.hpp>
-
-namespace asio = boost::asio;
 
 static const std::string     B200_FW_FILE_NAME = "usrp_b200_fw.hex";
 static const std::string     B200_FPGA_FILE_NAME = "usrp_b200_fpga.bin";
@@ -159,9 +155,6 @@ private:
     void set_tx_sample_rate(const double rate);
     double get_rx_sample_rate(void);
     double get_tx_sample_rate(void);
-
-    uhd::task::sptr _server;
-    void run_server(void);
 };
 
 #endif /* INCLUDED_B200_IMPL_HPP */

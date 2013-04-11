@@ -19,6 +19,7 @@
 #include "ad9361_transaction.h"
 #include <uhd/exception.hpp>
 #include <uhd/utils/msg.hpp>
+#include <boost/thread/mutex.hpp>
 #include <cstring>
 
 using namespace uhd;
@@ -101,6 +102,8 @@ struct ad9361_ctrl_impl : public ad9361_ctrl
 
     ad9361_transaction_t do_transaction(const ad9361_transaction_t &request)
     {
+        boost::mutex::scoped_lock lock(_mutex);
+
         //declare in/out buffers
         unsigned char in_buff[64];
         unsigned char out_buff[64];
@@ -132,6 +135,7 @@ struct ad9361_ctrl_impl : public ad9361_ctrl
 
     ad9361_ctrl_iface_sptr _iface;
     size_t _seq;
+    boost::mutex _mutex;
 
 };
 

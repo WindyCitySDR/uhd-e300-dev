@@ -87,7 +87,7 @@ public:
     //! set the filter bandwidth for the frontend
     double set_bw_filter(const std::string &/*which*/, const double /*bw*/)
     {
-        return 0.0; //TODO
+        return 56e6; //TODO
     }
 
     //! set the gain for a particular gain element

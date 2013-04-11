@@ -295,16 +295,17 @@ b200_impl::b200_impl(const device_addr_t &device_addr):
     static const std::vector<std::string> frontends = boost::assign::list_of
         ("TX1")("TX2")("RX1")("RX2");
 
+    //default some chains on -- needed for setup purposes
+    _codec_ctrl->set_active_chains(true, false, true, false);
+
     BOOST_FOREACH(const std::string &fe_name, frontends)
     {
         _fe_enb_map[fe_name] = false;
     }
     {
-        _codec_ctrl->set_active_chains(true, false, true, false);
         _codec_ctrl->data_port_loopback(true);
         this->codec_loopback_self_test();
         _codec_ctrl->data_port_loopback(false);
-        _codec_ctrl->set_active_chains(false, false, false, false);
     }
     {
         const fs_path codec_path = mb_path / ("rx_codecs") / "A";
@@ -424,7 +425,7 @@ b200_impl::b200_impl(const device_addr_t &device_addr):
         BOOST_FOREACH(const std::string &name, ad9361_ctrl::get_gain_names(fe_name))
         {
             _tree->create<meta_range_t>(rf_fe_path / "gains" / name / "range")
-                    .set(ad9361_ctrl::get_gain_range(fe_name));
+                .set(ad9361_ctrl::get_gain_range(fe_name));
 
             _tree->create<double>(rf_fe_path / "gains" / name / "value")
                 .coerce(boost::bind(&ad9361_ctrl::set_gain, _codec_ctrl, fe_name, _1))
@@ -439,6 +440,7 @@ b200_impl::b200_impl(const device_addr_t &device_addr):
         _tree->create<meta_range_t>(rf_fe_path / "bandwidth" / "range")
             .publish(boost::bind(&ad9361_ctrl::get_bw_filter_range, fe_name));
         _tree->create<double>(rf_fe_path / "freq" / "value")
+            .set(0.0)
             .coerce(boost::bind(&ad9361_ctrl::tune, _codec_ctrl, fe_name, _1))
             .subscribe(boost::bind(&b200_impl::update_bandsel, this, fe_name, _1));
         _tree->create<meta_range_t>(rf_fe_path / "freq" / "range")
@@ -466,22 +468,17 @@ b200_impl::b200_impl(const device_addr_t &device_addr):
     // do some post-init tasks
     ////////////////////////////////////////////////////////////////////
 
+    //init the clock rate to something, but only when we have active chains
+    _tree->access<double>(mb_path / "tick_rate").set(61.44e6/8);
+    _codec_ctrl->set_active_chains(false, false, false, false);
+
+    //-- this block commented out because we want all chains off by default --//
     //_tree->access<subdev_spec_t>(mb_path / "rx_subdev_spec").set(subdev_spec_t("A:RX2"));
     //_tree->access<subdev_spec_t>(mb_path / "tx_subdev_spec").set(subdev_spec_t("A:TX2"));
+    //-- this block commented out because we want all chains off by default --//
+
     _tree->access<std::string>(mb_path / "clock_source/value").set("internal");
     _tree->access<std::string>(mb_path / "time_source/value").set("none");
-
-    //init the tick rate to something
-    //_tree->access<double>(mb_path / "tick_rate").set(3.84e6);
-
-    _server = task::make(boost::bind(&b200_impl::run_server, this));
-
-    /* Attempting to lock to external reference. */
-    /* TODO lock to ext ref
-    _ctrl->transact_spi(1<<1, spi_config_t::EDGE_RISE, 0x1F8083, 24, false);
-    _ctrl->transact_spi(1<<1, spi_config_t::EDGE_RISE, 0x4, 24, false);
-    _ctrl->transact_spi(1<<1, spi_config_t::EDGE_RISE, 0x401, 24, false);
-    */
 }
 
 b200_impl::~b200_impl(void)
@@ -540,10 +537,10 @@ void b200_impl::codec_loopback_self_test(void)
 /***********************************************************************
  * Sample and tick rate comprehension below
  **********************************************************************/
-void b200_impl::set_tick_rate(const double rate_)
+void b200_impl::set_tick_rate(const double raw_rate)
 {
     //clip rate (which can be doubled by factor) to possible bounds
-    const double rate = ad9361_ctrl::get_samp_rate_range().clip(rate_);
+    const double rate = ad9361_ctrl::get_samp_rate_range().clip(raw_rate);
 
     const size_t factor = ((_fe_enb_map["RX1"] and _fe_enb_map["RX2"]) or (_fe_enb_map["TX1"] and _fe_enb_map["TX2"]))? 2:1;
     //UHD_MSG(status) << "asking for clock rate " << rate/1e6 << " MHz\n";
@@ -758,51 +755,4 @@ static inline bool wait_for_recv_ready(int sock_fd, const size_t timeout_ms)
 
     //call select with timeout on receive socket
     return ::select(sock_fd+1, &rset, NULL, NULL, &tv) > 0;
-}
-
-void b200_impl::run_server(void)
-{
-    /*
-    while (true)
-    {try{
-        asio::io_service io_service;
-        asio::ip::tcp::resolver resolver(io_service);
-        asio::ip::tcp::resolver::query query(asio::ip::tcp::v4(), "0.0.0.0", "56789");
-        asio::ip::tcp::endpoint endpoint = *resolver.resolve(query);
-
-        boost::shared_ptr<asio::ip::tcp::acceptor> acceptor(new asio::ip::tcp::acceptor(io_service, endpoint));
-        {
-            boost::shared_ptr<asio::ip::tcp::socket> socket(new asio::ip::tcp::socket(io_service));
-            while (not wait_for_recv_ready(acceptor->native(), 100)){
-                if (boost::this_thread::interruption_requested()) return;
-            }
-            acceptor->accept(*socket);
-            boost::uint32_t buff[512];
-            while (true)
-            {
-                while (not wait_for_recv_ready(socket->native(), 100)){
-                    if (boost::this_thread::interruption_requested()) return;
-                }
-                socket->receive(asio::buffer(buff, sizeof(buff)));
-                const boost::uint32_t action = buff[0];
-                const boost::uint32_t reg = buff[1];
-                const boost::uint32_t val = buff[2];
-                boost::uint32_t result = 0;
-                if (action == 0){ //read spi
-                    result = _iface->read_reg(reg);
-                }
-                if (action == 1){ //write spi
-                    _iface->write_reg(reg, val);
-                }
-                if (action == 2){ //peek32
-                    result = _ctrl->peek32(reg);
-                }
-                if (action == 3){ //poke32
-                    _ctrl->poke32(reg, val);
-                }
-                socket->send(asio::buffer(&result, 4));
-            }
-        }
-    }catch(...){}}
-    */
 }
