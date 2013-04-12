@@ -72,11 +72,56 @@ static int get_params_from_sysfs(unsigned long *buffer_length, unsigned long *co
 	return 0;
 }
 
+static bool e200_fpga_loaded_successfully(void)
+{
+	struct udev *udev;
+	struct udev_enumerate *enumerate;
+	struct udev_list_entry *devices, *dev_list_entry;
+	struct udev_device *dev;
+
+	udev = udev_new();
+	if (!udev) {
+		printf("Fail\n");
+		return 1;
+	}
+    long result = 0;
+
+     enumerate = udev_enumerate_new(udev);
+     udev_enumerate_add_match_sysname(enumerate, "f8007000.devcfg");
+     udev_enumerate_scan_devices(enumerate);
+     devices = udev_enumerate_get_list_entry(enumerate);
+
+     udev_list_entry_foreach(dev_list_entry, devices) {
+          const char *path;
+
+          path = udev_list_entry_get_name(dev_list_entry);
+          dev = udev_device_new_from_syspath(udev, path);
+
+          printf("Sys Path: %s\n", udev_device_get_syspath(dev));
+
+          result = atol(udev_device_get_sysattr_value(dev, "prog_done"));
+    }
+
+	udev_enumerate_unref(enumerate);
+	udev_unref(udev);
+
+    if (result == 1) 
+        return true;
+    else
+        return false;
+}
+
 #include "e200_fifo_config.hpp"
 #include <uhd/exception.hpp>
 
 e200_fifo_config_t e200_read_sysfs(void)
 {
+
+    if (not e200_fpga_loaded_successfully())
+    {
+        throw uhd::runtime_error("E200 FPGA load failed!");
+    }
+
     e200_fifo_config_t config;
 
     unsigned long control_length = 0;

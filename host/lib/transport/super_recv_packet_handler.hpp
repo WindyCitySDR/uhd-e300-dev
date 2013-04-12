@@ -321,6 +321,14 @@ private:
         managed_recv_buffer::sptr &buff = curr_buffer_info[index].buff;
         buff = _props[index].get_buff(timeout);
         if (buff.get() == NULL) return PACKET_TIMEOUT_ERROR;
+        const boost::uint32_t *pkt = buff->cast<const boost::uint32_t *>() + _header_offset_words32;
+
+        UHD_VAR(buff->size());
+            for (size_t i = 0; i < 5; i++)
+            {
+                UHD_MSG(status) << boost::format("pkt[%u] = 0x%08x\n") % i % pkt[i];
+            }
+
 
         //bounds check before extract
         size_t num_packet_words32 = buff->size()/sizeof(boost::uint32_t);
