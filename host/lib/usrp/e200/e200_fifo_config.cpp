@@ -19,9 +19,9 @@
 #define ZF_CONFIG_BASE 0x40000000
 #define ZF_PAGE_WIDTH 10
 #define H2S_STREAMS_WIDTH 2
-#define H2S_CMDFIFO_DEPTH 8
+#define H2S_CMDFIFO_DEPTH 10
 #define S2H_STREAMS_WIDTH 2
-#define S2H_CMDFIFO_DEPTH 8
+#define S2H_CMDFIFO_DEPTH 10
 
 // calculate more useful constants for this module
 #define ZF_PAGE_SIZE    (1 << ZF_PAGE_WIDTH)
@@ -86,7 +86,7 @@ struct e200_fifo_poll_waiter
             fds[0].fd = fd;
             fds[0].events = POLLIN;
             const int r = ::poll(fds, 1, long(timeout*1000));
-            std::cout << "r " << r << std::endl;
+            //std::cout << "r " << r << std::endl;
             if (fds[0].revents & POLLIN) ::read(fd, NULL, 0);
 
             poll_claimed = false;
@@ -212,8 +212,8 @@ struct e200_transport : zero_copy_if
                 if (_index == _num_frames) _index = 0;
                 return _buffs[_index++]->get_new<T>();
             }
-            //_waiter->wait(timeout);
-            boost::this_thread::sleep(boost::posix_time::milliseconds(1));
+            _waiter->wait(timeout);
+            //boost::this_thread::sleep(boost::posix_time::milliseconds(1));
         }
         while (time_spec_t::get_system_time() < exit_time);
 

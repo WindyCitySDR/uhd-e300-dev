@@ -120,22 +120,33 @@ e200_impl::e200_impl(const uhd::device_addr_t &device_addr)
     ////////////////////////////////////////////////////////////////////
     _fifo_iface = e200_fifo_interface::make(e200_read_sysfs());
 
+    uhd::device_addr_t ctrl_xport_args;
+    ctrl_xport_args["recv_frame_size"] = "64";
+    ctrl_xport_args["num_recv_frames"] = "32";
+    ctrl_xport_args["send_frame_size"] = "64";
+    ctrl_xport_args["num_send_frames"] = "32";
+
+    uhd::device_addr_t data_xport_args;
+    data_xport_args["recv_frame_size"] = "2048";
+    data_xport_args["num_recv_frames"] = "128";
+    data_xport_args["send_frame_size"] = "128";
+    data_xport_args["num_send_frames"] = "256";
+
     ////////////////////////////////////////////////////////////////////
     // radio control
     ////////////////////////////////////////////////////////////////////
-    uhd::device_addr_t xport_args;
-    uhd::transport::zero_copy_if::sptr send_ctrl_xport = _fifo_iface->make_send_xport(1, xport_args);
-    uhd::transport::zero_copy_if::sptr recv_ctrl_xport = _fifo_iface->make_recv_xport(1, xport_args);
-    _radio_ctrl = e200_ctrl::make(send_ctrl_xport, recv_ctrl_xport, 1 | (1 << 16));
+    _send_ctrl_xport = _fifo_iface->make_send_xport(1, ctrl_xport_args);
+    _recv_ctrl_xport = _fifo_iface->make_recv_xport(1, ctrl_xport_args);
+    _radio_ctrl = e200_ctrl::make(_send_ctrl_xport, _recv_ctrl_xport, 1 | (1 << 16));
     this->register_loopback_self_test(_radio_ctrl);
 
     ////////////////////////////////////////////////////////////////////
     // radio data xports
     ////////////////////////////////////////////////////////////////////
-    //_tx_data_xport = _fifo_iface->make_send_xport(0, xport_args);
-    //_tx_flow_xport = _fifo_iface->make_recv_xport(0, xport_args);
-    _rx_data_xport = _fifo_iface->make_recv_xport(2, xport_args);
-    _rx_flow_xport = _fifo_iface->make_send_xport(2, xport_args);
+    _tx_data_xport = _fifo_iface->make_send_xport(0, data_xport_args);
+    _tx_flow_xport = _fifo_iface->make_recv_xport(0, ctrl_xport_args);
+    _rx_data_xport = _fifo_iface->make_recv_xport(2, data_xport_args);
+    _rx_flow_xport = _fifo_iface->make_send_xport(2, ctrl_xport_args);
 
     ////////////////////////////////////////////////////////////////////
     // create rx dsp control objects

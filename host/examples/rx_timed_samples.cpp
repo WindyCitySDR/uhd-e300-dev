@@ -84,11 +84,6 @@ int UHD_SAFE_MAIN(int argc, char *argv[]){
     stream_cmd.stream_now = false;
     stream_cmd.time_spec = uhd::time_spec_t(seconds_in_future);
     rx_stream->issue_stream_cmd(stream_cmd);
-    std::cout << boost::format("UHD Device time: %.2f seconds\n") % (11.25);
-    std::cout << boost::format("UHD Device time: %.2f seconds\n") % (11.5);
-    std::cout << boost::format("UHD Device time: %.2f seconds\n") % (11.0);
-    std::cout << boost::format("UHD Device time: %.2f seconds\n") % (11.7);
-    std::cout << "TRIGGGGGGGGGGGGGGGGERRRRRRRRRRRRRRRRRRRRRRRR NOWWWWWWWWWWWWWWWWWWWWWWWWW!!!!!!!!!!!!!!!!!!!!!!!!\n\n";
 
     //meta-data will be filled in by recv()
     uhd::rx_metadata_t md;

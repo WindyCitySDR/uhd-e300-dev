@@ -73,6 +73,8 @@ private:
     uhd::dict<size_t, boost::weak_ptr<uhd::rx_streamer> > _rx_streamers;
     uhd::dict<size_t, boost::weak_ptr<uhd::tx_streamer> > _tx_streamers;
 
+    uhd::transport::zero_copy_if::sptr _send_ctrl_xport, _recv_ctrl_xport;
+
     uhd::transport::zero_copy_if::sptr _tx_data_xport, _tx_flow_xport;
     uhd::transport::zero_copy_if::sptr _rx_data_xport, _rx_flow_xport;
 

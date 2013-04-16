@@ -72,7 +72,7 @@ static void e200_if_hdr_pack_le(
  **********************************************************************/
 static void handle_rx_flowctrl(const boost::uint32_t sid, zero_copy_if::sptr xport, const size_t last_seq)
 {
-    managed_send_buffer::sptr buff = xport->get_send_buff(0.0);
+    managed_send_buffer::sptr buff = xport->get_send_buff(1.0);
     if (not buff)
     {
         throw uhd::runtime_error("handle_rx_flowctrl timed out getting a send buffer");
@@ -81,7 +81,7 @@ static void handle_rx_flowctrl(const boost::uint32_t sid, zero_copy_if::sptr xpo
 
     //load packet info
     vrt::if_packet_info_t packet_info;
-    packet_info.packet_type = vrt::if_packet_info_t::PACKET_TYPE_CONTEXT;
+    packet_info.packet_type = vrt::if_packet_info_t::PACKET_TYPE_EXTENSION;
     packet_info.num_payload_words32 = 2;
     packet_info.num_payload_bytes = packet_info.num_payload_words32*sizeof(boost::uint32_t);
     packet_info.packet_count = 0;
@@ -98,7 +98,7 @@ static void handle_rx_flowctrl(const boost::uint32_t sid, zero_copy_if::sptr xpo
     e200_if_hdr_pack_le(pkt, packet_info);
 
     //load payload
-    pkt[packet_info.num_header_words32+0] = uhd::htowx<boost::uint32_t>(0);
+    pkt[packet_info.num_header_words32+0] = uhd::htowx<boost::uint32_t>(~0); //off
     pkt[packet_info.num_header_words32+1] = uhd::htowx<boost::uint32_t>(last_seq + 16/*TODO*/);
 
     //send the buffer over the interface
@@ -164,18 +164,21 @@ static managed_send_buffer::sptr get_tx_buff_with_flowctrl(
     zero_copy_if::sptr xport,
     const double timeout
 ){
-    while (true)
-    {
-        const size_t delta = (guts->last_seq_out & 0xfff) - (guts->last_seq_ack & 0xfff);
-        if ((delta & 0xfff) <= 16/*TODO*/) break;
 
-        const bool ok = guts->seq_queue.pop_with_timed_wait(guts->last_seq_ack, timeout);
-        if (not ok) return managed_send_buffer::sptr(); //timeout waiting for flow control
-    }
+    return xport->get_send_buff(timeout); //NO FC so this is OK
 
-    managed_send_buffer::sptr buff = xport->get_send_buff(timeout);
-    if (buff) guts->last_seq_out++; //update seq, this will actually be a send
-    return buff;
+    //while (true)
+    //{
+        //const size_t delta = (guts->last_seq_out & 0xfff) - (guts->last_seq_ack & 0xfff);
+        //if ((delta & 0xfff) <= 16/*TODO*/) break;
+
+        //const bool ok = guts->seq_queue.pop_with_timed_wait(guts->last_seq_ack, timeout);
+        //if (not ok) return managed_send_buffer::sptr(); //timeout waiting for flow control
+    //}
+
+    //managed_send_buffer::sptr buff = xport->get_send_buff(timeout);
+    //if (buff) guts->last_seq_out++; //update seq, this will actually be a send
+    //return buff;
 }
 
 /***********************************************************************
@@ -241,9 +244,11 @@ rx_streamer::sptr e200_impl::get_rx_stream(const uhd::stream_args_t &args_)
     my_streamer->set_overflow_handler(0, boost::bind(
         &rx_vita_core_3000::handle_overflow, _rx_framer
     ));
-    my_streamer->set_xport_handle_flowctrl(0, boost::bind(
-        &handle_rx_flowctrl, data_sid, _rx_flow_xport, _1
-    ), _rx_data_xport->get_num_recv_frames()/8, true/*init*/);
+    //my_streamer->set_xport_handle_flowctrl(0, boost::bind(
+    //    &handle_rx_flowctrl, data_sid, _rx_flow_xport, _1
+    //), _rx_data_xport->get_num_recv_frames()/8, true/*init*/);
+    handle_rx_flowctrl(data_sid, _send_ctrl_xport, 0); //init off
+
     my_streamer->set_issue_stream_cmd(0, boost::bind(
         &rx_vita_core_3000::issue_stream_command, _rx_framer, _1
     ));
@@ -305,7 +310,7 @@ tx_streamer::sptr e200_impl::get_tx_stream(const uhd::stream_args_t &args_)
     _tx_deframer->setup(args);
 
     //flow control setup
-    _tx_deframer->configure_flow_control(0/*cycs off*/, _tx_data_xport->get_num_send_frames()/8/*pkts*/);
+    //_tx_deframer->configure_flow_control(0/*cycs off*/, _tx_data_xport->get_num_send_frames()/8/*pkts*/);
     boost::shared_ptr<tx_fc_guts_t> guts(new tx_fc_guts_t());
     task::sptr task = task::make(boost::bind(&handle_tx_async_msgs, guts, _tx_flow_xport));
 
