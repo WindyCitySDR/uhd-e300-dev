@@ -79,7 +79,11 @@ private:
     uhd::transport::zero_copy_if::sptr _rx_data_xport, _rx_flow_xport;
 
     time_core_3000::sptr _time64;
-    
+
+    void update_tick_rate(const double);
+    void update_rx_samp_rate(const size_t, const double);
+    void update_tx_samp_rate(const size_t, const double);
+
     void update_time_source(const std::string &);
     void update_clock_source(const std::string &);
 

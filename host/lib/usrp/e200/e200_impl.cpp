@@ -102,7 +102,9 @@ e200_impl::e200_impl(const uhd::device_addr_t &device_addr)
     ////////////////////////////////////////////////////////////////////
     // clocking
     ////////////////////////////////////////////////////////////////////
-    _tree->create<double>(mb_path / "tick_rate").set(E200_RADIO_CLOCK_RATE);
+    _tree->create<double>(mb_path / "tick_rate")
+        .set(E200_RADIO_CLOCK_RATE)
+        .subscribe(boost::bind(&e200_impl::update_tick_rate, this, _1));
 
     ////////////////////////////////////////////////////////////////////
     // load the fpga image
@@ -161,7 +163,7 @@ e200_impl::e200_impl(const uhd::device_addr_t &device_addr)
         .publish(boost::bind(&rx_dsp_core_3000::get_host_rates, _rx_dsp));
     _tree->create<double>(rx_dsp_path / "rate" / "value")
         .coerce(boost::bind(&rx_dsp_core_3000::set_host_rate, _rx_dsp, _1))
-        //.subscribe(boost::bind(&e200_impl::update_rx_samp_rate, this, dspno, _1))
+        .subscribe(boost::bind(&e200_impl::update_rx_samp_rate, this, dspno, _1))
         .set(1e6);
     _tree->create<double>(rx_dsp_path / "freq" / "value")
         .coerce(boost::bind(&rx_dsp_core_3000::set_freq, _rx_dsp, _1))
@@ -184,7 +186,7 @@ e200_impl::e200_impl(const uhd::device_addr_t &device_addr)
         .publish(boost::bind(&tx_dsp_core_3000::get_host_rates, _tx_dsp));
     _tree->create<double>(tx_dsp_path / "rate" / "value")
         .coerce(boost::bind(&tx_dsp_core_3000::set_host_rate, _tx_dsp, _1))
-        //.subscribe(boost::bind(&e200_impl::update_tx_samp_rate, this, dspno, _1))
+        .subscribe(boost::bind(&e200_impl::update_tx_samp_rate, this, dspno, _1))
         .set(1e6);
     _tree->create<double>(tx_dsp_path / "freq" / "value")
         .coerce(boost::bind(&tx_dsp_core_3000::set_freq, _tx_dsp, _1))

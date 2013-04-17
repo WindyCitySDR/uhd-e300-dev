@@ -32,6 +32,41 @@ using namespace uhd::usrp;
 using namespace uhd::transport;
 
 /***********************************************************************
+ * update streamer rates
+ **********************************************************************/
+void e200_impl::update_tick_rate(const double rate)
+{
+    BOOST_FOREACH(const size_t &dspno, _rx_streamers.keys())
+    {
+        boost::shared_ptr<sph::recv_packet_streamer> my_streamer =
+            boost::dynamic_pointer_cast<sph::recv_packet_streamer>(_rx_streamers[dspno].lock());
+        if (my_streamer) my_streamer->set_tick_rate(rate);
+    }
+    BOOST_FOREACH(const size_t &dspno, _tx_streamers.keys())
+    {
+        boost::shared_ptr<sph::send_packet_streamer> my_streamer =
+            boost::dynamic_pointer_cast<sph::send_packet_streamer>(_tx_streamers[dspno].lock());
+        if (my_streamer) my_streamer->set_tick_rate(rate);
+    }
+}
+
+void e200_impl::update_rx_samp_rate(const size_t dspno, const double rate)
+{
+    if (not _rx_streamers.has_key(dspno)) return;
+    boost::shared_ptr<sph::recv_packet_streamer> my_streamer =
+        boost::dynamic_pointer_cast<sph::recv_packet_streamer>(_rx_streamers[dspno].lock());
+    if (my_streamer) my_streamer->set_samp_rate(rate);
+}
+
+void e200_impl::update_tx_samp_rate(const size_t dspno, const double rate)
+{
+    if (not _tx_streamers.has_key(dspno)) return;
+    boost::shared_ptr<sph::send_packet_streamer> my_streamer =
+        boost::dynamic_pointer_cast<sph::send_packet_streamer>(_tx_streamers[dspno].lock());
+    if (my_streamer) my_streamer->set_samp_rate(rate);
+}
+
+/***********************************************************************
  * frontend selection
  **********************************************************************/
 void e200_impl::update_rx_subdev_spec(const uhd::usrp::subdev_spec_t &spec)
@@ -254,10 +289,6 @@ rx_streamer::sptr e200_impl::get_rx_stream(const uhd::stream_args_t &args_)
     ));
     _rx_streamers[0] = my_streamer; //store weak pointer
 
-    //lazyness
-    my_streamer->set_tick_rate(E200_RADIO_CLOCK_RATE);
-    my_streamer->set_samp_rate(E200_RADIO_CLOCK_RATE/8);
-
     //sets all tick and samp rates on this streamer
     _tree->access<double>("/mboards/0/tick_rate").update();
     _tree->access<double>(str(boost::format("/mboards/0/rx_dsps/%u/rate/value") % 0)).update();
@@ -323,10 +354,6 @@ tx_streamer::sptr e200_impl::get_tx_stream(const uhd::stream_args_t &args_)
     my_streamer->set_xport_chan_sid(0, true, data_sid);
     my_streamer->set_enable_trailer(false); //TODO not implemented trailer support yet
     _tx_streamers[0] = my_streamer; //store weak pointer
-
-    //lazyness
-    my_streamer->set_tick_rate(E200_RADIO_CLOCK_RATE);
-    my_streamer->set_samp_rate(E200_RADIO_CLOCK_RATE/8);
 
     //sets all tick and samp rates on this streamer
     _tree->access<double>("/mboards/0/tick_rate").update();
