@@ -21,6 +21,7 @@
 #include <uhd/device.hpp>
 #include <uhd/property_tree.hpp>
 #include <uhd/usrp/subdev_spec.hpp>
+#include <uhd/types/serial.hpp>
 #include <boost/weak_ptr.hpp>
 #include "e200_fifo_config.hpp"
 #include "e200_ctrl.hpp"
@@ -32,6 +33,8 @@
 
 static const std::string E200_FPGA_FILE_NAME = "usrp_e200_fpga.bin";
 static const double E200_RADIO_CLOCK_RATE = 50e6; //FIXME fixed for now
+
+uhd::spi_iface::sptr e200_make_aux_spi_iface(void);
 
 /*!
  * USRP-E200 implementation guts:
@@ -63,6 +66,7 @@ private:
 
     e200_fifo_interface::sptr _fifo_iface;
     e200_ctrl::sptr _radio_ctrl;
+    uhd::spi_iface::sptr _aux_spi;
 
     void register_loopback_self_test(wb_iface::sptr iface);
 
