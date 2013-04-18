@@ -95,16 +95,14 @@ public:
         this->spi_sen_gpio(0);
 
         for (size_t i = 0; i < num_bits; i++){
-            this->spi_sclk_gpio(0);
-            this->spi_mosi_gpio((bits >> (num_bits-i-1)) & 0x1);
-            boost::this_thread::sleep(boost::posix_time::microseconds(10));
-            if (readback) rb_bits = (rb_bits << 1) | this->spi_miso_gpio();
             this->spi_sclk_gpio(1);
-            boost::this_thread::sleep(boost::posix_time::microseconds(10));
+            this->spi_mosi_gpio((bits >> (num_bits-i-1)) & 0x1);
+            this->spi_sclk_gpio(0);
+            if (readback) rb_bits = (rb_bits << 1) | this->spi_miso_gpio();
         }
 
+        this->spi_mosi_gpio(0);
         this->spi_sen_gpio(1);
-        boost::this_thread::sleep(boost::posix_time::microseconds(100));
         return rb_bits;
     }
 

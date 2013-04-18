@@ -26,6 +26,7 @@
 #include <boost/functional/hash.hpp>
 #include <boost/bind.hpp>
 #include <boost/assign/list_of.hpp>
+#include <boost/thread/thread.hpp> //sleep
 #include <fstream>
 
 using namespace uhd;
@@ -121,7 +122,33 @@ e200_impl::e200_impl(const uhd::device_addr_t &device_addr)
     // codec setup
     ////////////////////////////////////////////////////////////////////
     _aux_spi = e200_make_aux_spi_iface();
-    //spi->transact_spi(0, spi_config_t::EDGE_RISE, 0x5555, 16, false);
+    #define cat_write_spi(addr, value) \
+        _aux_spi->transact_spi(0, spi_config_t::EDGE_RISE, ((addr) << 16) | ((value) & 0xffff), 24, false)
+
+    ////////////////////////////////////////////////////////////////////
+    // Reset Catalina
+    ////////////////////////////////////////////////////////////////////
+    cat_write_spi(0x000, 0x01);
+    boost::this_thread::sleep(boost::posix_time::milliseconds(5));
+    cat_write_spi(0x000, 0x00);
+    boost::this_thread::sleep(boost::posix_time::milliseconds(20));
+
+    ////////////////////////////////////////////////////////////////////
+    // Get the FPGA a clock from Catalina
+    ////////////////////////////////////////////////////////////////////
+    boost::this_thread::sleep(boost::posix_time::milliseconds(100));
+
+    cat_write_spi(0x00A, BOOST_BINARY( 00000010 ));
+
+
+    UHD_MSG(status) << "TRIGGERNOWWWWWWWWWWWWWWW\n";
+    sleep(5);
+
+    cat_write_spi(0x009, BOOST_BINARY( 00010111 ));
+
+    boost::this_thread::sleep(boost::posix_time::milliseconds(100));
+
+
 
     ////////////////////////////////////////////////////////////////////
     // create fifo interface
