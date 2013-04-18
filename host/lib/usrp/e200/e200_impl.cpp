@@ -123,15 +123,19 @@ e200_impl::e200_impl(const uhd::device_addr_t &device_addr)
     ////////////////////////////////////////////////////////////////////
     _aux_spi = e200_make_aux_spi_iface();
     #define cat_write_spi(addr, value) \
-        _aux_spi->transact_spi(0, spi_config_t::EDGE_RISE, ((addr) << 16) | ((value) & 0xffff), 24, false)
+        _aux_spi->transact_spi(0, spi_config_t::EDGE_RISE, ((addr) << 8) | ((value) & 0xff) | (1 << 23), 24, false)
+    #define cat_read_spi(addr) \
+        (_aux_spi->transact_spi(0, spi_config_t::EDGE_RISE, ((addr) << 8), 24, true) & 0xff)
 
     ////////////////////////////////////////////////////////////////////
     // Reset Catalina
     ////////////////////////////////////////////////////////////////////
     cat_write_spi(0x000, 0x01);
     boost::this_thread::sleep(boost::posix_time::milliseconds(5));
+    UHD_VAR(cat_read_spi(0x0));
     cat_write_spi(0x000, 0x00);
     boost::this_thread::sleep(boost::posix_time::milliseconds(20));
+    UHD_VAR(cat_read_spi(0x1));
 
     ////////////////////////////////////////////////////////////////////
     // Get the FPGA a clock from Catalina
@@ -144,9 +148,12 @@ e200_impl::e200_impl(const uhd::device_addr_t &device_addr)
     UHD_MSG(status) << "TRIGGERNOWWWWWWWWWWWWWWW\n";
     sleep(5);
 
+    UHD_VAR(cat_read_spi(0x00A));
+
     cat_write_spi(0x009, BOOST_BINARY( 00010111 ));
 
     boost::this_thread::sleep(boost::posix_time::milliseconds(100));
+    UHD_VAR(cat_read_spi(0x009));
 
 
 
