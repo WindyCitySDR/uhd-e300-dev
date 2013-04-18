@@ -194,22 +194,13 @@ b200_impl::b200_impl(const device_addr_t &device_addr):
     _iface->reset_gpif();
 
     ////////////////////////////////////////////////////////////////////
-    // Reset Catalina
+    // Init codec - turns on clocks
     ////////////////////////////////////////////////////////////////////
-    _iface->write_reg(0x000, 0x01);
-    boost::this_thread::sleep(boost::posix_time::milliseconds(5));
-    _iface->write_reg(0x000, 0x00);
-    boost::this_thread::sleep(boost::posix_time::milliseconds(20));
-
-    ////////////////////////////////////////////////////////////////////
-    // Get the FPGA a clock from Catalina
-    ////////////////////////////////////////////////////////////////////
-    boost::this_thread::sleep(boost::posix_time::milliseconds(100));
-
-    _iface->write_reg(0x00A, BOOST_BINARY( 00000010 ));
-    _iface->write_reg(0x009, BOOST_BINARY( 00010111 ));
-
-    boost::this_thread::sleep(boost::posix_time::milliseconds(100));
+    //NOTE TO SELF
+    //Eventually we remove the two lines below, when FW supports ad9361
+    //and just do this _codec_ctrl = ad9361_ctrl::make(_iface);
+    _codec_ctrl_iface = ad9361_ctrl_iface_make(boost::bind(&b200_iface::transact_spi, _iface, _1, _2, _3, _4), _iface);
+    _codec_ctrl = ad9361_ctrl::make(_codec_ctrl_iface);
 
     ////////////////////////////////////////////////////////////////////
     // Create control transport
@@ -301,20 +292,20 @@ b200_impl::b200_impl(const device_addr_t &device_addr):
     ////////////////////////////////////////////////////////////////////
     // create codec control objects
     ////////////////////////////////////////////////////////////////////
-    _codec_ctrl = b200_codec_ctrl::make(_iface);
     static const std::vector<std::string> frontends = boost::assign::list_of
         ("TX1")("TX2")("RX1")("RX2");
+
+    //default some chains on -- needed for setup purposes
+    _codec_ctrl->set_active_chains(true, false, true, false);
 
     BOOST_FOREACH(const std::string &fe_name, frontends)
     {
         _fe_enb_map[fe_name] = false;
     }
     {
-        _codec_ctrl->set_active_chains(true, false, true, false);
-        _codec_ctrl->data_port_loopback_on();
+        _codec_ctrl->data_port_loopback(true);
         this->codec_loopback_self_test();
-        _codec_ctrl->data_port_loopback_off();
-        _codec_ctrl->set_active_chains(false, false, false, false);
+        _codec_ctrl->data_port_loopback(false);
     }
     {
         const fs_path codec_path = mb_path / ("rx_codecs") / "A";
@@ -358,7 +349,7 @@ b200_impl::b200_impl(const device_addr_t &device_addr):
     {
         const fs_path rx_dsp_path = mb_path / "rx_dsps" / str(boost::format("%u") % dspno);
         _tree->create<meta_range_t>(rx_dsp_path / "rate" / "range")
-            .publish(boost::bind(&b200_impl::get_possible_rates, this));
+            .publish(boost::bind(&ad9361_ctrl::get_samp_rate_range));
         _tree->create<double>(rx_dsp_path / "rate" / "value")
             .publish(boost::bind(&b200_impl::get_rx_sample_rate, this))
             .subscribe(boost::bind(&b200_impl::set_rx_sample_rate, this, _1));
@@ -378,7 +369,7 @@ b200_impl::b200_impl(const device_addr_t &device_addr):
     {
         const fs_path tx_dsp_path = mb_path / "tx_dsps" / str(boost::format("%u") % dspno);
         _tree->create<meta_range_t>(tx_dsp_path / "rate" / "range")
-            .publish(boost::bind(&b200_impl::get_possible_rates, this));
+            .publish(boost::bind(&ad9361_ctrl::get_samp_rate_range));
         _tree->create<double>(tx_dsp_path / "rate" / "value")
             .publish(boost::bind(&b200_impl::get_tx_sample_rate, this))
             .subscribe(boost::bind(&b200_impl::set_tx_sample_rate, this, _1));
@@ -431,28 +422,29 @@ b200_impl::b200_impl(const device_addr_t &device_addr):
         _tree->create<std::string>(rf_fe_path / "name").set(fe_name);
         _tree->create<int>(rf_fe_path / "sensors"); //empty TODO
         _tree->create<sensor_value_t>(rf_fe_path / "sensors" / "lo_locked");
-        BOOST_FOREACH(const std::string &name, _codec_ctrl->get_gain_names(fe_name))
+        BOOST_FOREACH(const std::string &name, ad9361_ctrl::get_gain_names(fe_name))
         {
             _tree->create<meta_range_t>(rf_fe_path / "gains" / name / "range")
-                    .set(_codec_ctrl->get_gain_range(fe_name));
+                .set(ad9361_ctrl::get_gain_range(fe_name));
 
             _tree->create<double>(rf_fe_path / "gains" / name / "value")
-                .coerce(boost::bind(&b200_codec_ctrl::set_gain, _codec_ctrl, fe_name, _1))
+                .coerce(boost::bind(&ad9361_ctrl::set_gain, _codec_ctrl, fe_name, _1))
                 .set(0.0);
         }
         _tree->create<std::string>(rf_fe_path / "connection").set("IQ");
         _tree->create<bool>(rf_fe_path / "enabled").set(true);
         _tree->create<bool>(rf_fe_path / "use_lo_offset").set(false);
         _tree->create<double>(rf_fe_path / "bandwidth" / "value")
-            .coerce(boost::bind(&b200_codec_ctrl::set_bw_filter, _codec_ctrl, fe_name, _1))
+            .coerce(boost::bind(&ad9361_ctrl::set_bw_filter, _codec_ctrl, fe_name, _1))
             .set(40e6);
         _tree->create<meta_range_t>(rf_fe_path / "bandwidth" / "range")
-            .publish(boost::bind(&b200_codec_ctrl::get_bw_filter_range, _codec_ctrl, fe_name));
+            .publish(boost::bind(&ad9361_ctrl::get_bw_filter_range, fe_name));
         _tree->create<double>(rf_fe_path / "freq" / "value")
-            .coerce(boost::bind(&b200_codec_ctrl::tune, _codec_ctrl, fe_name, _1))
+            .set(0.0)
+            .coerce(boost::bind(&ad9361_ctrl::tune, _codec_ctrl, fe_name, _1))
             .subscribe(boost::bind(&b200_impl::update_bandsel, this, fe_name, _1));
         _tree->create<meta_range_t>(rf_fe_path / "freq" / "range")
-            .publish(boost::bind(&b200_codec_ctrl::get_rf_freq_range, _codec_ctrl, fe_name));
+            .publish(boost::bind(&ad9361_ctrl::get_rf_freq_range));
 
         //setup antenna stuff
         if (fe_name[0] == 'R')
@@ -476,22 +468,17 @@ b200_impl::b200_impl(const device_addr_t &device_addr):
     // do some post-init tasks
     ////////////////////////////////////////////////////////////////////
 
+    //init the clock rate to something, but only when we have active chains
+    _tree->access<double>(mb_path / "tick_rate").set(61.44e6/8);
+    _codec_ctrl->set_active_chains(false, false, false, false);
+
+    //-- this block commented out because we want all chains off by default --//
     //_tree->access<subdev_spec_t>(mb_path / "rx_subdev_spec").set(subdev_spec_t("A:RX2"));
     //_tree->access<subdev_spec_t>(mb_path / "tx_subdev_spec").set(subdev_spec_t("A:TX2"));
+    //-- this block commented out because we want all chains off by default --//
+
     _tree->access<std::string>(mb_path / "clock_source/value").set("internal");
     _tree->access<std::string>(mb_path / "time_source/value").set("none");
-
-    //init the tick rate to something
-    //_tree->access<double>(mb_path / "tick_rate").set(3.84e6);
-
-    _server = task::make(boost::bind(&b200_impl::run_server, this));
-
-    /* Attempting to lock to external reference. */
-    /* TODO lock to ext ref
-    _ctrl->transact_spi(1<<1, spi_config_t::EDGE_RISE, 0x1F8083, 24, false);
-    _ctrl->transact_spi(1<<1, spi_config_t::EDGE_RISE, 0x4, 24, false);
-    _ctrl->transact_spi(1<<1, spi_config_t::EDGE_RISE, 0x401, 24, false);
-    */
 }
 
 b200_impl::~b200_impl(void)
@@ -542,13 +529,19 @@ void b200_impl::codec_loopback_self_test(void)
         if (test_fail) break; //exit loop on any failure
     }
     UHD_MSG(status) << ((test_fail)? " fail" : "pass") << std::endl;
+
+    /* Zero out the idle data. */
+    _ctrl->poke32(TOREG(SR_CODEC_IDLE), 0);
 }
 
 /***********************************************************************
  * Sample and tick rate comprehension below
  **********************************************************************/
-void b200_impl::set_tick_rate(const double rate)
+void b200_impl::set_tick_rate(const double raw_rate)
 {
+    //clip rate (which can be doubled by factor) to possible bounds
+    const double rate = ad9361_ctrl::get_samp_rate_range().clip(raw_rate);
+
     const size_t factor = ((_fe_enb_map["RX1"] and _fe_enb_map["RX2"]) or (_fe_enb_map["TX1"] and _fe_enb_map["TX2"]))? 2:1;
     //UHD_MSG(status) << "asking for clock rate " << rate/1e6 << " MHz\n";
     _tick_rate = _codec_ctrl->set_clock_rate(rate/factor)*factor;
@@ -591,15 +584,15 @@ double b200_impl::get_tx_sample_rate(void)
 void b200_impl::check_fw_compat(void)
 {
     boost::uint16_t compat_num = _iface->get_compat_num();
-    boost::uint32_t compat_major = (uint32_t) (compat_num >> 8);
-    boost::uint32_t compat_minor = (uint32_t) (compat_num & 0x00FF);
+    boost::uint32_t compat_major = (boost::uint32_t) (compat_num >> 8);
+    boost::uint32_t compat_minor = (boost::uint32_t) (compat_num & 0xFF);
 
     if (compat_major != B200_FW_COMPAT_NUM_MAJOR){
         throw uhd::runtime_error(str(boost::format(
-            "Expected firmware compatibility number %x.x, but got %x.%x:\n"
+            "Expected firmware compatibility number 0x%x, but got 0x%x.%x:\n"
             "The firmware build is not compatible with the host code build.\n"
             "%s"
-        ) % B200_FW_COMPAT_NUM_MAJOR % ((int) compat_major) % ((int) compat_minor) 
+        ) % int(B200_FW_COMPAT_NUM_MAJOR) % compat_major % compat_minor
           % print_images_error()));
     }
     _tree->create<std::string>("/mboards/0/fw_version").set(str(boost::format("%u.%u")
@@ -671,10 +664,10 @@ void b200_impl::update_bandsel(const std::string& which, double freq)
             UHD_THROW_INVALID_CODE_PATH();
         }
     } else if(which[0] == 'T') {
-        if(freq < 3e9) {
+        if(freq < 2.5e9) {
             _gpio_state.tx_bandsel_a = 0;
             _gpio_state.tx_bandsel_b = 1;
-        } else if((freq >= 3e9) && (freq <= 6e9)) {
+        } else if((freq >= 2.5e9) && (freq <= 6e9)) {
             _gpio_state.tx_bandsel_a = 1;
             _gpio_state.tx_bandsel_b = 0;
         } else {
@@ -762,49 +755,4 @@ static inline bool wait_for_recv_ready(int sock_fd, const size_t timeout_ms)
 
     //call select with timeout on receive socket
     return ::select(sock_fd+1, &rset, NULL, NULL, &tv) > 0;
-}
-
-void b200_impl::run_server(void)
-{
-    while (true)
-    {try{
-        asio::io_service io_service;
-        asio::ip::tcp::resolver resolver(io_service);
-        asio::ip::tcp::resolver::query query(asio::ip::tcp::v4(), "0.0.0.0", "56789");
-        asio::ip::tcp::endpoint endpoint = *resolver.resolve(query);
-
-        boost::shared_ptr<asio::ip::tcp::acceptor> acceptor(new asio::ip::tcp::acceptor(io_service, endpoint));
-        {
-            boost::shared_ptr<asio::ip::tcp::socket> socket(new asio::ip::tcp::socket(io_service));
-            while (not wait_for_recv_ready(acceptor->native(), 100)){
-                if (boost::this_thread::interruption_requested()) return;
-            }
-            acceptor->accept(*socket);
-            boost::uint32_t buff[512];
-            while (true)
-            {
-                while (not wait_for_recv_ready(socket->native(), 100)){
-                    if (boost::this_thread::interruption_requested()) return;
-                }
-                socket->receive(asio::buffer(buff, sizeof(buff)));
-                const boost::uint32_t action = buff[0];
-                const boost::uint32_t reg = buff[1];
-                const boost::uint32_t val = buff[2];
-                boost::uint32_t result = 0;
-                if (action == 0){ //read spi
-                    result = _iface->read_reg(reg);
-                }
-                if (action == 1){ //write spi
-                    _iface->write_reg(reg, val);
-                }
-                if (action == 2){ //peek32
-                    result = _ctrl->peek32(reg);
-                }
-                if (action == 3){ //poke32
-                    _ctrl->poke32(reg, val);
-                }
-                socket->send(asio::buffer(&result, 4));
-            }
-        }
-    }catch(...){}}
 }

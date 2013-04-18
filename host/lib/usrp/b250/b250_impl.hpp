@@ -43,7 +43,7 @@
 #include <boost/weak_ptr.hpp>
 #include <uhd/usrp/gps_ctrl.hpp>
 
-static const size_t B250_TX_FC_PKT_WINDOW = 100;
+static const size_t B250_TX_FC_PKT_WINDOW = 2048; //16MB/8Kpkts
 static const size_t B250_RX_FC_PKT_WINDOW = 0xfff/32;
 static const std::string B250_FW_FILE_NAME = "usrp_b250_fw.bin";
 static const double B250_RADIO_CLOCK_RATE = 120e6;
@@ -117,15 +117,25 @@ private:
     i2c_core_100_wb32::sptr _zpu_i2c;
 
     //perifs in the radio core
-    b250_ctrl::sptr _radio_ctrl0;
-    b250_ctrl::sptr _radio_ctrl1;
-    spi_core_3000::sptr _radio_spi0;
-    spi_core_3000::sptr _radio_spi1;
-    b250_adc_ctrl::sptr _adc_ctrl0;
-    b250_adc_ctrl::sptr _adc_ctrl1;
-    b250_dac_ctrl::sptr _dac_ctrl0;
-    b250_dac_ctrl::sptr _dac_ctrl1;
-    time_core_3000::sptr _time64;
+    struct radio_perifs_t
+    {
+        b250_ctrl::sptr ctrl;
+        spi_core_3000::sptr spi;
+        b250_adc_ctrl::sptr adc;
+        b250_dac_ctrl::sptr dac;
+        time_core_3000::sptr time64;
+        rx_vita_core_3000::sptr framer;
+        rx_dsp_core_3000::sptr ddc;
+        tx_vita_core_3000::sptr deframer;
+        tx_dsp_core_3000::sptr duc;
+    };
+    radio_perifs_t _radio_perifs[2];
+    uhd::usrp::dboard_eeprom_t _db_eeproms[8];
+    void setup_radio(const size_t which_radio, const std::string &db_name);
+
+    uhd::usrp::subdev_spec_t _rx_fe_map;
+    uhd::usrp::subdev_spec_t _tx_fe_map;
+
     b250_clock_ctrl::sptr _clock;
     uhd::gps_ctrl::sptr _gps;
 
@@ -138,11 +148,6 @@ private:
         boost::uint8_t router_dst_here;
     };
     boost::uint32_t allocate_sid(const sid_config_t &config);
-
-    rx_vita_core_3000::sptr _rx_framer;
-    rx_dsp_core_3000::sptr _rx_dsp;
-    tx_vita_core_3000::sptr _tx_deframer;
-    tx_dsp_core_3000::sptr _tx_dsp;
 
     uhd::dict<size_t, boost::weak_ptr<uhd::rx_streamer> > _rx_streamers;
     uhd::dict<size_t, boost::weak_ptr<uhd::tx_streamer> > _tx_streamers;
@@ -158,6 +163,7 @@ private:
     void update_tx_samp_rate(const size_t, const double);
 
     void update_clock_source(const std::string &);
+    void update_time_source(const std::string &);
     uhd::sensor_value_t get_ref_locked(void);
     void set_db_eeprom(const size_t, const uhd::usrp::dboard_eeprom_t &);
 };

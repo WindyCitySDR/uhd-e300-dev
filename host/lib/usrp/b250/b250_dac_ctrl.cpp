@@ -16,11 +16,13 @@
 //
 
 #include "b250_dac_ctrl.hpp"
+#include <uhd/types/time_spec.hpp>
 #include <uhd/utils/msg.hpp>
 #include <uhd/utils/log.hpp>
 #include <uhd/utils/safe_call.hpp>
 #include <uhd/exception.hpp>
 #include <boost/foreach.hpp>
+#include <boost/thread/thread.hpp> //sleep
 
 using namespace uhd;
 
@@ -38,29 +40,39 @@ public:
     b250_dac_ctrl_impl(uhd::spi_iface::sptr iface, const size_t slaveno):
         _iface(iface), _slaveno(slaveno)
     {
-        write_ad9146_reg(0x0, 1 << 5); //reset
-        write_ad9146_reg(0x0, 1 << 7); //config + out of reset
-        write_ad9146_reg(0x1, 0x0); //out of power down
-        write_ad9146_reg(0x2, 0x0); //out of power down
-        write_ad9146_reg(0x3, 0x0); //2s comp, i first, no swap, byte mode
-        write_ad9146_reg(0x4, 0x0); //no interrupt
-        write_ad9146_reg(0x5, 0x0); //no interrupt
+        write_ad9146_reg(0x00, 0x20); //reset
+        write_ad9146_reg(0x00, 0x80); //config + out of reset
+        write_ad9146_reg(0x1e, 0x01); //data path config - set for proper operation
 
-        write_ad9146_reg(0x8, (0xf << 4)); //duty correction
+        /* Start PLL */
+        write_ad9146_reg(0x0C, 0xD1);
+        write_ad9146_reg(0x0D, 0xD9); // N0=4, N1=4, N2=16
+        write_ad9146_reg(0x0A, 0xCF); // Auto init VCO band training
+        write_ad9146_reg(0x0A, 0xA0); // See above.
 
-        write_ad9146_reg(0xd, (0x0 << 6) | (1 << 4) | (0x2 << 2) | (0x1 << 0));
+        /* Verify PLL is Locked */
+        const time_spec_t exit_time = time_spec_t::get_system_time() + time_spec_t(0.5);
+        while (true)
+        {
+            const size_t reg_e = read_ad9146_reg(0x0E); /* Expect bit 7 = 0, bit 6 = 1 */
+            if ((reg_e & ((1 << 7) | (1 << 6))) != 0) break;
+            if (exit_time < time_spec_t::get_system_time()) throw uhd::runtime_error(
+                "b250_dac_ctrl: timeout waiting for DAC PLL to lock"
+            );
+            boost::this_thread::sleep(boost::posix_time::milliseconds(10));
+        }
 
-        write_ad9146_reg(0x1b, (1 << 7) | (1 << 6) | (1 << 5) | (1 << 2)); //defaults
-        write_ad9146_reg(0x1e, 1); //data path config - set for proper operation
+        write_ad9146_reg(0x03, 0x00); //2s comp, i first, no swap, byte mode
+        write_ad9146_reg(0x10, 0x48); // Choose data rate mode
+        write_ad9146_reg(0x17, 0x04); // Issue software FIFO reset
+        write_ad9146_reg(0x18, 0x01); //
+        write_ad9146_reg(0x18, 0x00); //
+        write_ad9146_reg(0x1B, 0xA4); // Enable inverse SINC
 
-        //write_ad9146_reg(0xa, 0xcf); write_ad9146_reg(0xa, 0xa0); //auto VCO select
+        /* Configure interpolation filters */
+        write_ad9146_reg(0x1C, 0x00); //
+        write_ad9146_reg(0x1D, 0x00); //
 
-        write_ad9146_reg(0xa, 0x0); //disable PLL
-
-        UHD_MSG(status) << std::hex << read_ad9146_reg(0x7f) << std::endl;
-        UHD_MSG(status) << std::hex << read_ad9146_reg(0x1f) << std::endl;
-        UHD_MSG(status) << std::hex << read_ad9146_reg(0xe) << std::endl;
-        UHD_MSG(status) << std::hex << read_ad9146_reg(0xf) << std::endl;
     }
 
     ~b250_dac_ctrl_impl(void)

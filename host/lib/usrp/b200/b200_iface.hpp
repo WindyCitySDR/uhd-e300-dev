@@ -23,8 +23,10 @@
 #include <uhd/types/serial.hpp> //i2c iface
 #include <boost/shared_ptr.hpp>
 #include <boost/utility.hpp>
+#include "ad9361_ctrl.hpp"
 
-class b200_iface: boost::noncopyable, public uhd::i2c_iface {
+class b200_iface: boost::noncopyable, public uhd::i2c_iface,
+                  public ad9361_ctrl_iface_type {
 public:
     typedef boost::shared_ptr<b200_iface> sptr;
 
@@ -62,9 +64,6 @@ public:
     //! send SPI through the FX3
     virtual void transact_spi( unsigned char *tx_data, size_t num_tx_bits, \
             unsigned char *rx_data, size_t num_rx_bits) = 0;
-
-    virtual void write_reg(boost::uint16_t reg, boost::uint8_t val) = 0;
-    virtual uint8_t read_reg(boost::uint16_t reg) = 0;
 };
 
 

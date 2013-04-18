@@ -34,6 +34,42 @@ struct b250_clock_ctrl_impl : b250_clock_ctrl
         _ad9510_regs.soft_reset = 0;
         this->write_reg(0x0);
 
+        _ad9510_regs.pll_power_down = ad9510_regs_t::PLL_POWER_DOWN_NORMAL;
+        _ad9510_regs.prescaler_value = ad9510_regs_t::PRESCALER_VALUE_DIV2;
+        this->write_reg(0xA);
+        _ad9510_regs.cp_current_setting = ad9510_regs_t::CP_CURRENT_SETTING_3_0MA;
+        this->write_reg(0x9);
+        _ad9510_regs.charge_pump_mode = ad9510_regs_t::CHARGE_PUMP_MODE_NORMAL;
+        _ad9510_regs.pll_mux_control = ad9510_regs_t::PLL_MUX_CONTROL_DLD_HIGH;
+        _ad9510_regs.pfd_polarity = ad9510_regs_t::PFD_POLARITY_POS;
+        this->write_reg(0x8);
+
+        _ad9510_regs.acounter = 0;
+        this->write_reg(0x4);
+
+        _ad9510_regs.bcounter_msb = 0;
+        _ad9510_regs.bcounter_lsb = 6;
+        this->write_reg(0x5);
+        this->write_reg(0x6);
+
+        _ad9510_regs.ref_counter_msb = 0;
+        _ad9510_regs.ref_counter_lsb = 1; // r divider = 1
+        this->write_reg(0x0B);
+        this->write_reg(0x0C);
+
+        //want clock2 only
+        _ad9510_regs.clock_select = ad9510_regs_t::CLOCK_SELECT_CLK2_DRIVES;
+        _ad9510_regs.clk1_power_down = 1;
+        _ad9510_regs.clk2_power_down = 0;
+        _ad9510_regs.refin_power_down = 0;
+        _ad9510_regs.prescaler_clock_pd = 0;
+        _ad9510_regs.all_clock_inputs_pd = 0;
+        this->write_reg(0x45);
+
+        _enables[B250_CLOCK_WHICH_ADC0] = true;
+        _enables[B250_CLOCK_WHICH_ADC1] = true;
+        _enables[B250_CLOCK_WHICH_DAC0] = true;
+        _enables[B250_CLOCK_WHICH_DAC1] = true;
         _enables[B250_CLOCK_WHICH_TEST] = true;
         this->update_enables();
         this->update_regs();
@@ -45,6 +81,11 @@ struct b250_clock_ctrl_impl : b250_clock_ctrl
         UHD_SAFE_CALL
         (
             this->update_enables();
+            _ad9510_regs.charge_pump_mode = ad9510_regs_t::CHARGE_PUMP_MODE_3STATE;
+            this->write_reg(0x8);
+            _ad9510_regs.all_clock_inputs_pd = 1;
+            this->write_reg(0x45);
+            this->update_regs();
         )
     }
 
@@ -83,7 +124,12 @@ struct b250_clock_ctrl_impl : b250_clock_ctrl
         _ad9510_regs.bypass_divider_out1 = 1;
 
         //2
-        const bool enb_rx = _enables.get(B250_CLOCK_WHICH_DB0_RX, false) or _enables.get(B250_CLOCK_WHICH_DB1_RX, false);
+        const bool enb_rx = false
+            or _enables.get(B250_CLOCK_WHICH_ADC0, false)
+            or _enables.get(B250_CLOCK_WHICH_ADC1, false)
+            or _enables.get(B250_CLOCK_WHICH_DB0_RX, false)
+            or _enables.get(B250_CLOCK_WHICH_DB1_RX, false)
+        ;
         _ad9510_regs.power_down_lvpecl_out2 = enb_rx?
             ad9510_regs_t::POWER_DOWN_LVPECL_OUT2_NORMAL :
             ad9510_regs_t::POWER_DOWN_LVPECL_OUT2_SAFE_PD;
@@ -94,7 +140,12 @@ struct b250_clock_ctrl_impl : b250_clock_ctrl
         set_divider_foo(_ad9510_regs.bypass_divider_out2, _ad9510_regs.divider_low_cycles_out2, _ad9510_regs.divider_high_cycles_out2, rxdiv);
 
         //3
-        const bool enb_tx = _enables.get(B250_CLOCK_WHICH_DB0_TX, false) or _enables.get(B250_CLOCK_WHICH_DB1_TX, false);
+        const bool enb_tx = false
+            or _enables.get(B250_CLOCK_WHICH_DAC0, false)
+            or _enables.get(B250_CLOCK_WHICH_DAC1, false)
+            or _enables.get(B250_CLOCK_WHICH_DB0_TX, false)
+            or _enables.get(B250_CLOCK_WHICH_DB1_TX, false)
+        ;
         _ad9510_regs.power_down_lvpecl_out3 = enb_tx?
             ad9510_regs_t::POWER_DOWN_LVPECL_OUT3_NORMAL :
             ad9510_regs_t::POWER_DOWN_LVPECL_OUT3_SAFE_PD;

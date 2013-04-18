@@ -105,9 +105,11 @@ int main(void)
         //makes leds do something alive
         const uint32_t counter = wb_peek32(RB0_BASE + 0*4);
         wb_poke32(SET0_BASE + 0*4, counter/CPU_CLOCK);
-        if (counter/CPU_CLOCK != last_counter/CPU_CLOCK)
-
-        last_counter = counter;
+        if (counter/CPU_CLOCK != last_counter/CPU_CLOCK) {
+	  last_counter = counter;
+	  wb_poke32(SET0_BASE + 5*4, counter/CPU_CLOCK);
+	  wb_poke32(SET0_BASE + 6*4, counter);
+	}
 
         //run the serial loader - poll and handle
         //b250_serial_loader_run1();

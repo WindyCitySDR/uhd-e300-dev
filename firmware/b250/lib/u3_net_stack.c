@@ -139,6 +139,9 @@ static void send_eth_pkt(
         buff32[buff_i++] = ((const uint32_t *)p2)[i];
     }
 
+    // Fixes issue where we don't write an even number of 32bit words leaving last data stranded in H/W.
+    if ((buff_i%2) == 1) buff32[buff_i++] = 0;
+
     wb_pkt_iface64_tx_submit(pkt_iface_config, l0 + l1 + l2);
 }
 
