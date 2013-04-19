@@ -989,24 +989,6 @@ public:
 
     void init(void)
     {
-        ////////////////////////////////////////////////////////////////////
-        // Reset Catalina
-        ////////////////////////////////////////////////////////////////////
-        this->write_reg(0x000, 0x01);
-        boost::this_thread::sleep(boost::posix_time::milliseconds(5));
-        this->write_reg(0x000, 0x00);
-        boost::this_thread::sleep(boost::posix_time::milliseconds(20));
-
-        ////////////////////////////////////////////////////////////////////
-        // Get the FPGA a clock from Catalina
-        ////////////////////////////////////////////////////////////////////
-        boost::this_thread::sleep(boost::posix_time::milliseconds(100));
-
-        this->write_reg(0x00A, BOOST_BINARY( 00000010 ));
-        this->write_reg(0x009, BOOST_BINARY( 00010111 ));
-
-        boost::this_thread::sleep(boost::posix_time::milliseconds(100));
-
         /* Initialize shadow registers. */
         reg_vcodivs = 0x00;
         reg_inputsel = 0x30;
@@ -1049,7 +1031,7 @@ public:
         this->write_reg(0x2ac, 0xff);
 
         /* Enable clocks. */
-        this->write_reg(0x009, 0x17);
+        this->write_reg(0x009, 0x07);
         boost::this_thread::sleep(boost::posix_time::milliseconds(20));
 
         /* Tune the BBPLL, write TX and RX FIRS. */
@@ -1797,7 +1779,8 @@ public:
             //At that point, transact is nothing more than a pass-through.
             if (request->action == AD9361_ACTION_ECHO)
             {
-                _usb_iface->transact(in_buff, out_buff);
+                std::memcpy(out_buff, in_buff, sizeof(out_buff));
+                //_usb_iface->transact(in_buff, out_buff);
             }
             if (request->action == AD9361_ACTION_INIT)
             {

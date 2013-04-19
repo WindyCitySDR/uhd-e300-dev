@@ -40,7 +40,7 @@ static const int CAT_MISO = 66;
 class e200_gpio{
 public:
     e200_gpio(const int num, const std::string &dir) : _num(num){
-        UHD_MSG(status) << "open GPIO " << num << " " << dir << std::endl;
+        //UHD_MSG(status) << "open GPIO " << num << " " << dir << std::endl;
         this->set_xport("export");
         this->set_dir(dir);
         _value_file.open(str(boost::format("/sys/class/gpio/gpio%d/value") % num).c_str(), std::ios_base::in | std::ios_base::out);
@@ -52,6 +52,7 @@ public:
     }
     void operator()(const int val){
         _value_file << val << std::endl << std::flush;
+        //boost::this_thread::sleep(boost::posix_time::milliseconds(1));
     }
     int operator()(void){
         std::string val;

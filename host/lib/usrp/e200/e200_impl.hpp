@@ -30,6 +30,7 @@
 #include "time_core_3000.hpp"
 #include "rx_dsp_core_3000.hpp"
 #include "tx_dsp_core_3000.hpp"
+#include "ad9361_ctrl.hpp"
 
 static const std::string E200_FPGA_FILE_NAME = "usrp_e200_fpga.bin";
 static const double E200_RADIO_CLOCK_RATE = 50e6; //FIXME fixed for now
@@ -93,6 +94,28 @@ private:
 
     void update_rx_subdev_spec(const uhd::usrp::subdev_spec_t &spec);
     void update_tx_subdev_spec(const uhd::usrp::subdev_spec_t &spec);
+
+    //! this is half-assed, but temporary
+    ad9361_ctrl::sptr _codec_ctrl;
+    ad9361_ctrl_iface_sptr _codec_ctrl_iface;
+    inline void transact_spi(
+        unsigned char *tx_data,
+        size_t num_tx_bits,
+        unsigned char *rx_data,
+        size_t num_rx_bits
+    ){
+        boost::uint32_t data = 0;
+        data |= (tx_data[0] << 16);
+        data |= (tx_data[1] << 8);
+        data |= (tx_data[2] << 0);
+        const boost::uint32_t result = _aux_spi->transact_spi(0, uhd::spi_config_t::EDGE_RISE, data, 24, rx_data != NULL);
+        if (rx_data)
+        {
+            rx_data[0] = result & 0xff;
+            rx_data[1] = result & 0xff;
+            rx_data[2] = result & 0xff;
+        }
+    }
 
 };
 

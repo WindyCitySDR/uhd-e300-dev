@@ -119,43 +119,14 @@ e200_impl::e200_impl(const uhd::device_addr_t &device_addr)
     this->load_fpga_image(e200_fpga_image);
 
     ////////////////////////////////////////////////////////////////////
-    // codec setup
+    // Init codec - turns on clocks
     ////////////////////////////////////////////////////////////////////
+    //NOTE TO SELF
+    //Eventually we remove the two lines below, when FW supports ad9361
+    //and just do this _codec_ctrl = ad9361_ctrl::make(_iface);
     _aux_spi = e200_make_aux_spi_iface();
-    #define cat_write_spi(addr, value) \
-        _aux_spi->transact_spi(0, spi_config_t::EDGE_RISE, ((addr) << 8) | ((value) & 0xff) | (1 << 23), 24, false)
-    #define cat_read_spi(addr) \
-        (_aux_spi->transact_spi(0, spi_config_t::EDGE_RISE, ((addr) << 8), 24, true) & 0xff)
-
-    ////////////////////////////////////////////////////////////////////
-    // Reset Catalina
-    ////////////////////////////////////////////////////////////////////
-    cat_write_spi(0x000, 0x01);
-    boost::this_thread::sleep(boost::posix_time::milliseconds(5));
-    UHD_VAR(cat_read_spi(0x0));
-    cat_write_spi(0x000, 0x00);
-    boost::this_thread::sleep(boost::posix_time::milliseconds(20));
-    UHD_VAR(cat_read_spi(0x1));
-
-    ////////////////////////////////////////////////////////////////////
-    // Get the FPGA a clock from Catalina
-    ////////////////////////////////////////////////////////////////////
-    boost::this_thread::sleep(boost::posix_time::milliseconds(100));
-
-    cat_write_spi(0x00A, BOOST_BINARY( 00000010 ));
-
-
-    UHD_MSG(status) << "TRIGGERNOWWWWWWWWWWWWWWW\n";
-    sleep(5);
-
-    UHD_VAR(cat_read_spi(0x00A));
-
-    cat_write_spi(0x009, BOOST_BINARY( 00010111 ));
-
-    boost::this_thread::sleep(boost::posix_time::milliseconds(100));
-    UHD_VAR(cat_read_spi(0x009));
-
-
+    _codec_ctrl_iface = ad9361_ctrl_iface_make(boost::bind(&e200_impl::transact_spi, this, _1, _2, _3, _4), ad9361_ctrl_iface_sptr());
+    _codec_ctrl = ad9361_ctrl::make(_codec_ctrl_iface);
 
     ////////////////////////////////////////////////////////////////////
     // create fifo interface
