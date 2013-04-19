@@ -87,12 +87,22 @@ public:
         spi_miso_gpio(CAT_MISO, "in"){}
 
     boost::uint32_t transact_spi(
-        int, const spi_config_t &, //not used params
+        int slaveno, const spi_config_t &, //not used params
         boost::uint32_t bits,
         size_t num_bits,
         bool readback
     ){
+        if (slaveno < 0) //special reset mode
+        {
+            this->spi_sen_gpio(1);
+            this->spi_mosi_gpio(1);
+            this->spi_mosi_gpio(0);
+            this->spi_sen_gpio(0);
+            return 0;
+        }
+
         boost::uint32_t rb_bits = 0;
+        this->spi_mosi_gpio(0);
         this->spi_sen_gpio(0);
 
         for (size_t i = 0; i < num_bits; i++){
