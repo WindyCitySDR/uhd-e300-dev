@@ -21,6 +21,7 @@
 #include <uhd/utils/static.hpp>
 #include <uhd/utils/images.hpp>
 #include <uhd/usrp/dboard_eeprom.hpp>
+#include <uhd/transport/tcp_zero_copy.hpp>
 #include <uhd/types/sensors.hpp>
 #include <boost/filesystem.hpp>
 #include <boost/functional/hash.hpp>
@@ -31,6 +32,7 @@
 
 using namespace uhd;
 using namespace uhd::usrp;
+using namespace uhd::transport;
 namespace fs = boost::filesystem;
 
 /***********************************************************************
@@ -89,11 +91,73 @@ UHD_STATIC_BLOCK(register_e200_device)
  **********************************************************************/
 e200_impl::e200_impl(const uhd::device_addr_t &device_addr)
 {
-    const size_t dspno = 0; //FIXME just one for now
+    ////////////////////////////////////////////////////////////////////
+    // load the fpga image
+    ////////////////////////////////////////////////////////////////////
+    if (not device_addr.has_key("addr"))
+    {
+        //extract the FPGA path for the E200
+        const std::string e200_fpga_image = find_image_path(
+            device_addr.get("fpga", E200_FPGA_FILE_NAME)
+        );
+
+        //load fpga image - its super fast
+        this->load_fpga_image(e200_fpga_image);
+    }
+
+    ////////////////////////////////////////////////////////////////////
+    // setup fifo xports
+    ////////////////////////////////////////////////////////////////////
+    uhd::device_addr_t ctrl_xport_args;
+    ctrl_xport_args["recv_frame_size"] = "64";
+    ctrl_xport_args["num_recv_frames"] = "32";
+    ctrl_xport_args["send_frame_size"] = "64";
+    ctrl_xport_args["num_send_frames"] = "32";
+
+    uhd::device_addr_t data_xport_args;
+    data_xport_args["recv_frame_size"] = "2048";
+    data_xport_args["num_recv_frames"] = "128";
+    data_xport_args["send_frame_size"] = "2048";
+    data_xport_args["num_send_frames"] = "128";
+
+    if (device_addr.has_key("addr"))
+    {
+        _send_ctrl_xport = tcp_zero_copy::make(device_addr["addr"], "321758", ctrl_xport_args);
+        _recv_ctrl_xport = _send_ctrl_xport;
+        _tx_data_xport = tcp_zero_copy::make(device_addr["addr"], "321757", ctrl_xport_args);
+        _tx_flow_xport = _tx_data_xport;
+        _rx_data_xport = tcp_zero_copy::make(device_addr["addr"], "321756", ctrl_xport_args);
+        _rx_flow_xport = _rx_data_xport;
+    }
+    else
+    {
+        _fifo_iface = e200_fifo_interface::make(e200_read_sysfs());
+        _send_ctrl_xport = _fifo_iface->make_send_xport(1, ctrl_xport_args);
+        _recv_ctrl_xport = _fifo_iface->make_recv_xport(1, ctrl_xport_args);
+        _tx_data_xport = _fifo_iface->make_send_xport(0, data_xport_args);
+        _tx_flow_xport = _fifo_iface->make_recv_xport(0, ctrl_xport_args);
+        _rx_data_xport = _fifo_iface->make_recv_xport(2, data_xport_args);
+        _rx_flow_xport = _fifo_iface->make_send_xport(2, ctrl_xport_args);
+    }
+
+    ////////////////////////////////////////////////////////////////////
+    // optional tcp server
+    ////////////////////////////////////////////////////////////////////
+    if (device_addr.has_key("server"))
+    {
+        boost::thread_group tg;
+        tg.create_thread(boost::bind(&e200_impl::run_server, this, "321756", "RX"));
+        tg.create_thread(boost::bind(&e200_impl::run_server, this, "321757", "TX"));
+        tg.create_thread(boost::bind(&e200_impl::run_server, this, "321758", "CTRL"));
+        tg.create_thread(boost::bind(&e200_impl::run_server, this, "321759", "FE"));
+        tg.join_all();
+        return;
+    }
 
     ////////////////////////////////////////////////////////////////////
     // Initialize the properties tree
     ////////////////////////////////////////////////////////////////////
+    const size_t dspno = 0; //FIXME just one for now
     _tree = property_tree::make();
     _tree->create<std::string>("/name").set("E-Series Device");
     const fs_path mb_path = "/mboards/0";
@@ -108,17 +172,6 @@ e200_impl::e200_impl(const uhd::device_addr_t &device_addr)
         .subscribe(boost::bind(&e200_impl::update_tick_rate, this, _1));
 
     ////////////////////////////////////////////////////////////////////
-    // load the fpga image
-    ////////////////////////////////////////////////////////////////////
-    //extract the FPGA path for the E200
-    const std::string e200_fpga_image = find_image_path(
-        device_addr.get("fpga", E200_FPGA_FILE_NAME)
-    );
-
-    //load fpga image - its super fast
-    this->load_fpga_image(e200_fpga_image);
-
-    ////////////////////////////////////////////////////////////////////
     // Init codec - turns on clocks
     ////////////////////////////////////////////////////////////////////
     //NOTE TO SELF
@@ -130,37 +183,10 @@ e200_impl::e200_impl(const uhd::device_addr_t &device_addr)
     _codec_ctrl = ad9361_ctrl::make(_codec_ctrl_iface);
 
     ////////////////////////////////////////////////////////////////////
-    // create fifo interface
-    ////////////////////////////////////////////////////////////////////
-    _fifo_iface = e200_fifo_interface::make(e200_read_sysfs());
-
-    uhd::device_addr_t ctrl_xport_args;
-    ctrl_xport_args["recv_frame_size"] = "64";
-    ctrl_xport_args["num_recv_frames"] = "32";
-    ctrl_xport_args["send_frame_size"] = "64";
-    ctrl_xport_args["num_send_frames"] = "32";
-
-    uhd::device_addr_t data_xport_args;
-    data_xport_args["recv_frame_size"] = "2048";
-    data_xport_args["num_recv_frames"] = "128";
-    data_xport_args["send_frame_size"] = "2048";
-    data_xport_args["num_send_frames"] = "256";
-
-    ////////////////////////////////////////////////////////////////////
     // radio control
     ////////////////////////////////////////////////////////////////////
-    _send_ctrl_xport = _fifo_iface->make_send_xport(1, ctrl_xport_args);
-    _recv_ctrl_xport = _fifo_iface->make_recv_xport(1, ctrl_xport_args);
     _radio_ctrl = e200_ctrl::make(_send_ctrl_xport, _recv_ctrl_xport, 1 | (1 << 16));
     this->register_loopback_self_test(_radio_ctrl);
-
-    ////////////////////////////////////////////////////////////////////
-    // radio data xports
-    ////////////////////////////////////////////////////////////////////
-    _tx_data_xport = _fifo_iface->make_send_xport(0, data_xport_args);
-    _tx_flow_xport = _fifo_iface->make_recv_xport(0, ctrl_xport_args);
-    _rx_data_xport = _fifo_iface->make_recv_xport(2, data_xport_args);
-    _rx_flow_xport = _fifo_iface->make_send_xport(2, ctrl_xport_args);
 
     ////////////////////////////////////////////////////////////////////
     // create rx dsp control objects

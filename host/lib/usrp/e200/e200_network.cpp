@@ -106,6 +106,7 @@ static void e200_send_tunnel(
  **********************************************************************/
 void e200_impl::run_server(const std::string &port, const std::string &what)
 {
+    UHD_MSG(status) << "e200 run server on port " << port << " for " << what << std::endl;
     while (true)
     {
         try
