@@ -122,13 +122,14 @@ e200_impl::e200_impl(const uhd::device_addr_t &device_addr)
 
     if (device_addr.has_key("addr"))
     {
-        _send_ctrl_xport = tcp_zero_copy::make(device_addr["addr"], "321758", ctrl_xport_args);
+        _send_ctrl_xport = tcp_zero_copy::make(device_addr["addr"], E200_SERVER_CTRL_PORT, ctrl_xport_args);
         _recv_ctrl_xport = _send_ctrl_xport;
-        _tx_data_xport = tcp_zero_copy::make(device_addr["addr"], "321757", ctrl_xport_args);
+        _tx_data_xport = tcp_zero_copy::make(device_addr["addr"], E200_SERVER_TX_PORT, ctrl_xport_args);
         _tx_flow_xport = _tx_data_xport;
-        _rx_data_xport = tcp_zero_copy::make(device_addr["addr"], "321756", ctrl_xport_args);
+        _rx_data_xport = tcp_zero_copy::make(device_addr["addr"], E200_SERVER_RX_PORT, ctrl_xport_args);
         _rx_flow_xport = _rx_data_xport;
-        zero_copy_if::sptr codec_xport = tcp_zero_copy::make(device_addr["addr"], "321759", ctrl_xport_args);
+        zero_copy_if::sptr codec_xport;
+        codec_xport = tcp_zero_copy::make(device_addr["addr"], E200_SERVER_CODEC_PORT, ctrl_xport_args);
         ad9361_ctrl_iface_sptr ad9361_ctrl(new ad9361_ctrl_over_zc(codec_xport));
         _codec_ctrl = ad9361_ctrl::make(ad9361_ctrl);
     }
@@ -153,10 +154,10 @@ e200_impl::e200_impl(const uhd::device_addr_t &device_addr)
     if (device_addr.has_key("server"))
     {
         boost::thread_group tg;
-        tg.create_thread(boost::bind(&e200_impl::run_server, this, "321756", "RX"));
-        tg.create_thread(boost::bind(&e200_impl::run_server, this, "321757", "TX"));
-        tg.create_thread(boost::bind(&e200_impl::run_server, this, "321758", "CTRL"));
-        tg.create_thread(boost::bind(&e200_impl::run_server, this, "321759", "FE"));
+        tg.create_thread(boost::bind(&e200_impl::run_server, this, E200_SERVER_RX_PORT, "RX"));
+        tg.create_thread(boost::bind(&e200_impl::run_server, this, E200_SERVER_TX_PORT, "TX"));
+        tg.create_thread(boost::bind(&e200_impl::run_server, this, E200_SERVER_CTRL_PORT, "CTRL"));
+        tg.create_thread(boost::bind(&e200_impl::run_server, this, E200_SERVER_CODEC_PORT, "CODEC"));
         tg.join_all();
         return;
     }

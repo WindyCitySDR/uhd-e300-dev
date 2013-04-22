@@ -162,7 +162,7 @@ void e200_impl::run_server(const std::string &port, const std::string &what)
                     tg.create_thread(boost::bind(&e200_recv_tunnel, "response tunnel", _recv_ctrl_xport, socket));
                     tg.create_thread(boost::bind(&e200_send_tunnel, "control tunnel", socket, _send_ctrl_xport));
                 }
-                if (what == "FE")
+                if (what == "CODEC")
                 {
                     codec_gateway(_codec_ctrl_iface, socket);
                 }

@@ -35,6 +35,11 @@
 static const std::string E200_FPGA_FILE_NAME = "usrp_e200_fpga.bin";
 static const double E200_RADIO_CLOCK_RATE = 50e6; //FIXME fixed for now
 
+static std::string E200_SERVER_RX_PORT = "321756";
+static std::string E200_SERVER_TX_PORT = "321757";
+static std::string E200_SERVER_CTRL_PORT = "321758";
+static std::string E200_SERVER_CODEC_PORT = "321759";
+
 uhd::spi_iface::sptr e200_make_aux_spi_iface(void);
 
 /*!
