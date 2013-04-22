@@ -100,9 +100,9 @@ private:
     ad9361_ctrl_iface_sptr _codec_ctrl_iface;
     inline void transact_spi(
         unsigned char *tx_data,
-        size_t num_tx_bits,
+        size_t,
         unsigned char *rx_data,
-        size_t num_rx_bits
+        size_t
     ){
         boost::uint32_t data = 0;
         data |= (tx_data[0] << 16);

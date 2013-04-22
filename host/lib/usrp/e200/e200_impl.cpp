@@ -128,6 +128,9 @@ e200_impl::e200_impl(const uhd::device_addr_t &device_addr)
         _tx_flow_xport = _tx_data_xport;
         _rx_data_xport = tcp_zero_copy::make(device_addr["addr"], "321756", ctrl_xport_args);
         _rx_flow_xport = _rx_data_xport;
+        zero_copy_if::sptr codec_xport = tcp_zero_copy::make(device_addr["addr"], "321759", ctrl_xport_args);
+        ad9361_ctrl_iface_sptr ad9361_ctrl(new ad9361_ctrl_over_zc(codec_xport));
+        _codec_ctrl = ad9361_ctrl::make(ad9361_ctrl);
     }
     else
     {
@@ -138,6 +141,10 @@ e200_impl::e200_impl(const uhd::device_addr_t &device_addr)
         _tx_flow_xport = _fifo_iface->make_recv_xport(0, ctrl_xport_args);
         _rx_data_xport = _fifo_iface->make_recv_xport(2, data_xport_args);
         _rx_flow_xport = _fifo_iface->make_send_xport(2, ctrl_xport_args);
+        _aux_spi = e200_make_aux_spi_iface();
+        _aux_spi->transact_spi(-1, uhd::spi_config_t::EDGE_RISE, 0, 0, false); //reset
+        _codec_ctrl_iface = ad9361_ctrl_iface_make(boost::bind(&e200_impl::transact_spi, this, _1, _2, _3, _4), ad9361_ctrl_iface_sptr());
+        _codec_ctrl = ad9361_ctrl::make(_codec_ctrl_iface);
     }
 
     ////////////////////////////////////////////////////////////////////
@@ -170,17 +177,6 @@ e200_impl::e200_impl(const uhd::device_addr_t &device_addr)
     _tree->create<double>(mb_path / "tick_rate")
         .set(E200_RADIO_CLOCK_RATE)
         .subscribe(boost::bind(&e200_impl::update_tick_rate, this, _1));
-
-    ////////////////////////////////////////////////////////////////////
-    // Init codec - turns on clocks
-    ////////////////////////////////////////////////////////////////////
-    //NOTE TO SELF
-    //Eventually we remove the two lines below, when FW supports ad9361
-    //and just do this _codec_ctrl = ad9361_ctrl::make(_iface);
-    _aux_spi = e200_make_aux_spi_iface();
-    _aux_spi->transact_spi(-1, uhd::spi_config_t::EDGE_RISE, 0, 0, false); //reset
-    _codec_ctrl_iface = ad9361_ctrl_iface_make(boost::bind(&e200_impl::transact_spi, this, _1, _2, _3, _4), ad9361_ctrl_iface_sptr());
-    _codec_ctrl = ad9361_ctrl::make(_codec_ctrl_iface);
 
     ////////////////////////////////////////////////////////////////////
     // radio control

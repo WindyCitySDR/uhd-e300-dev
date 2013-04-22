@@ -102,6 +102,28 @@ static void e200_send_tunnel(
 }
 
 /***********************************************************************
+ * codec gateway
+ **********************************************************************/
+static void codec_gateway(ad9361_ctrl_iface_sptr ctrl, boost::shared_ptr<asio::ip::tcp::socket> sock)
+{
+    unsigned char in_buff[64];
+    unsigned char out_buff[64];
+    try
+    {
+        while (not boost::this_thread::interruption_requested())
+        {
+            sock->receive(asio::buffer(in_buff));
+            ctrl->transact(in_buff, out_buff);
+            sock->send(asio::buffer(out_buff));
+        }
+    }
+    catch(...)
+    {
+        UHD_MSG(error) << "codec_gateway exit" << std::endl;
+    }
+}
+
+/***********************************************************************
  * The TCP server itself
  **********************************************************************/
 void e200_impl::run_server(const std::string &port, const std::string &what)
@@ -142,7 +164,7 @@ void e200_impl::run_server(const std::string &port, const std::string &what)
                 }
                 if (what == "FE")
                 {
-                    //TODO frontend control response
+                    codec_gateway(_codec_ctrl_iface, socket);
                 }
                 tg.join_all();
             }
@@ -150,52 +172,3 @@ void e200_impl::run_server(const std::string &port, const std::string &what)
         catch(...){}
     }
 }
-
-/*
-
-void e200_impl::run_server(void)
-{
-    while (true)
-    {try{
-        asio::io_service io_service;
-        asio::ip::tcp::resolver resolver(io_service);
-        asio::ip::tcp::resolver::query query(asio::ip::tcp::v4(), "0.0.0.0", "56789");
-        asio::ip::tcp::endpoint endpoint = *resolver.resolve(query);
-
-        boost::shared_ptr<asio::ip::tcp::acceptor> acceptor(new asio::ip::tcp::acceptor(io_service, endpoint));
-        {
-            boost::shared_ptr<asio::ip::tcp::socket> socket(new asio::ip::tcp::socket(io_service));
-            while (not wait_for_recv_ready(acceptor->native(), 100)){
-                if (boost::this_thread::interruption_requested()) return;
-            }
-            acceptor->accept(*socket);
-            boost::uint32_t buff[512];
-            while (true)
-            {
-                while (not wait_for_recv_ready(socket->native(), 100)){
-                    if (boost::this_thread::interruption_requested()) return;
-                }
-                socket->receive(asio::buffer(buff, sizeof(buff)));
-                const boost::uint32_t action = buff[0];
-                const boost::uint32_t reg = buff[1];
-                const boost::uint32_t val = buff[2];
-                boost::uint32_t result = 0;
-                if (action == 0){ //read spi
-                    result = _iface->read_reg(reg);
-                }
-                if (action == 1){ //write spi
-                    _iface->write_reg(reg, val);
-                }
-                if (action == 2){ //peek32
-                    result = _ctrl->peek32(reg);
-                }
-                if (action == 3){ //poke32
-                    _ctrl->poke32(reg, val);
-                }
-                socket->send(asio::buffer(&result, 4));
-            }
-        }
-    }catch(...){}}
-}
-
-*/

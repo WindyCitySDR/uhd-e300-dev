@@ -18,6 +18,7 @@
 #ifndef INCLUDED_AD9361_CTRL_HPP
 #define INCLUDED_AD9361_CTRL_HPP
 
+#include <uhd/transport/zero_copy.hpp>
 #include <uhd/types/serial.hpp>
 #include <uhd/types/ranges.hpp>
 #include <boost/shared_ptr.hpp>
@@ -38,6 +39,31 @@ struct ad9361_ctrl_iface_type
 typedef boost::shared_ptr<ad9361_ctrl_iface_type> ad9361_ctrl_iface_sptr;
 
 ad9361_ctrl_iface_sptr ad9361_ctrl_iface_make(ad9361_ctrl_cb_type callback, ad9361_ctrl_iface_sptr iface);
+
+struct ad9361_ctrl_over_zc : ad9361_ctrl_iface_type
+{
+    ad9361_ctrl_over_zc(uhd::transport::zero_copy_if::sptr xport)
+    {
+        _xport = xport;
+    }
+
+    void transact(const unsigned char in_buff[64], unsigned char out_buff[64])
+    {
+        {
+            uhd::transport::managed_send_buffer::sptr buff = _xport->get_send_buff();
+            if (not buff) throw std::runtime_error("ad9361_ctrl_over_zc send timeout");
+            std::memcpy(buff->cast<void *>(), in_buff, sizeof(in_buff));
+            buff->commit(sizeof(in_buff));
+        }
+        {
+            uhd::transport::managed_recv_buffer::sptr buff = _xport->get_recv_buff();
+            if (not buff) throw std::runtime_error("ad9361_ctrl_over_zc recv timeout");
+            std::memcpy(out_buff, buff->cast<const void *>(), sizeof(out_buff));
+        }
+    }
+
+    uhd::transport::zero_copy_if::sptr _xport;
+};
 
 
 //-------- END super temp stuff to make this work on the host --------//
