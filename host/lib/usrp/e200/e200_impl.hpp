@@ -117,6 +117,9 @@ private:
         }
     }
 
+    //server stuff for network access
+    void run_server(const std::string &port, const std::string &what);
+
 };
 
 #endif /* INCLUDED_E200_IMPL_HPP */

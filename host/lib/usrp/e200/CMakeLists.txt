@@ -35,6 +35,7 @@ IF(ENABLE_E200)
         ${CMAKE_CURRENT_SOURCE_DIR}/e200_io_impl.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/e200_fifo_config.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/e200_sysfs_hooks.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/e200_network.cpp
     )
     LIBUHD_APPEND_LIBS(${UDEV_LIBS})
 ENDIF(ENABLE_E200)
