@@ -45,6 +45,9 @@ static device_addrs_t e200_find(const device_addr_t &hint)
     //return an empty list of addresses when type is set to non-e200
     if (hint.has_key("type") and hint["type"] != "e200") return e200_addrs;
 
+    //------ BIG FAT TODO -----//
+    // need network discovery that takes addr
+
     //device node not provided, assume its 0
     if (not hint.has_key("node"))
     {

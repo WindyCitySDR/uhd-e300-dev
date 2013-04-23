@@ -15,6 +15,8 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 //
 
+#ifdef E200_NATIVE
+
 #include <uhd/exception.hpp>
 #include <uhd/utils/log.hpp>
 #include <uhd/utils/msg.hpp>
@@ -125,3 +127,15 @@ uhd::spi_iface::sptr e200_make_aux_spi_iface(void)
 {
     return uhd::spi_iface::sptr(new e200_aux_spi_iface_impl());
 }
+
+#else //E200_NATIVE
+
+#include <uhd/types/serial.hpp>
+#include <uhd/exception.hpp>
+
+uhd::spi_iface::sptr e200_make_aux_spi_iface(void)
+{
+    throw uhd::runtime_error("e200_make_aux_spi_iface() !E200_NATIVE");
+}
+
+#endif //E200_NATIVE

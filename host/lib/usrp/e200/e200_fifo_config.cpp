@@ -15,6 +15,8 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 //
 
+#ifdef E200_NATIVE
+
 // constants coded into the fpga parameters
 #define ZF_CONFIG_BASE 0x40000000
 #define ZF_PAGE_WIDTH 10
@@ -362,3 +364,15 @@ e200_fifo_interface::sptr e200_fifo_interface::make(const e200_fifo_config_t &co
 {
     return e200_fifo_interface::sptr(new e200_fifo_interface_impl(config));
 }
+
+#else //E200_NATIVE
+
+#include "e200_fifo_config.hpp"
+#include <uhd/exception.hpp>
+
+e200_fifo_interface::sptr e200_fifo_interface::make(const e200_fifo_config_t &)
+{
+    throw uhd::runtime_error("e200_fifo_interface::make() !E200_NATIVE");
+}
+
+#endif //E200_NATIVE

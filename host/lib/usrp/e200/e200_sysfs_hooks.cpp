@@ -15,6 +15,8 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 //
 
+#ifdef E200_NATIVE
+
 #include <stdio.h>
 #include <fcntl.h>
 #include <unistd.h>
@@ -138,3 +140,15 @@ e200_fifo_config_t e200_read_sysfs(void)
     config.phys_addr = phys_addr;
     return config;
 }
+
+#else //E200_NATIVE
+
+#include "e200_fifo_config.hpp"
+#include <uhd/exception.hpp>
+
+e200_fifo_config_t e200_read_sysfs(void)
+{
+    throw uhd::runtime_error("e200_read_sysfs() !E200_NATIVE");
+}
+
+#endif //E200_NATIVE
