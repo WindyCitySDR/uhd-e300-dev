@@ -51,13 +51,13 @@ struct ad9361_ctrl_over_zc : ad9361_ctrl_iface_type
     {
         {
             uhd::transport::managed_send_buffer::sptr buff = _xport->get_send_buff(10.0);
-            if (not buff) throw std::runtime_error("ad9361_ctrl_over_zc send timeout");
+            if (not buff or buff->size() < 64) throw std::runtime_error("ad9361_ctrl_over_zc send timeout");
             std::memcpy(buff->cast<void *>(), in_buff, 64);
             buff->commit(64);
         }
         {
             uhd::transport::managed_recv_buffer::sptr buff = _xport->get_recv_buff(10.0);
-            if (not buff) throw std::runtime_error("ad9361_ctrl_over_zc recv timeout");
+            if (not buff or buff->size() < 64) throw std::runtime_error("ad9361_ctrl_over_zc recv timeout");
             std::memcpy(out_buff, buff->cast<const void *>(), 64);
         }
     }

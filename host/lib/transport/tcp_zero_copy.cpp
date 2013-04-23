@@ -232,7 +232,8 @@ zero_copy_if::sptr tcp_zero_copy::make(
     const std::string &port,
     const device_addr_t &hints
 ){
-    return zero_copy_if::sptr(
-        new tcp_zero_copy_asio_impl(addr, port, hints)
-    );
+    zero_copy_if::sptr xport;
+    xport.reset(new tcp_zero_copy_asio_impl(addr, port, hints));
+    while (xport->get_recv_buff(0.0)){} //flush
+    return xport;
 }
