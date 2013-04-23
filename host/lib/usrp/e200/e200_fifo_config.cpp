@@ -60,6 +60,7 @@
 #include <boost/thread/thread.hpp> //sleep
 #include <uhd/types/time_spec.hpp> //timeout
 #include <uhd/utils/log.hpp>
+#include <uhd/utils/atomic.hpp>
 
 //locking stuff for shared irq
 #include <boost/thread/mutex.hpp>
@@ -68,22 +69,20 @@
 struct e200_fifo_poll_waiter
 {
     e200_fifo_poll_waiter(const int fd):
-        poll_claimed(false), fd(fd)
+        fd(fd)
     {
         //NOP
     }
 
     void wait(const double timeout)
     {
-        boost::mutex::scoped_lock l(mutex);
-        if (poll_claimed)
+        if (_poll_claimed.cas(1, 0))
         {
+            boost::mutex::scoped_lock l(mutex);
             cond.wait(l);
         }
         else
         {
-            poll_claimed = true;
-
             struct pollfd fds[1];
             fds[0].fd = fd;
             fds[0].events = POLLIN;
@@ -91,15 +90,14 @@ struct e200_fifo_poll_waiter
             //std::cout << "r " << r << std::endl;
             if (fds[0].revents & POLLIN) ::read(fd, NULL, 0);
 
-            poll_claimed = false;
-            l.unlock();
+            _poll_claimed.write(0);
             cond.notify_all();
         }
     }
 
+    uhd::atomic_uint32_t _poll_claimed;
     boost::condition_variable cond;
     boost::mutex mutex;
-    bool poll_claimed;
     int fd;
 };
 
@@ -214,8 +212,8 @@ struct e200_transport : zero_copy_if
                 if (_index == _num_frames) _index = 0;
                 return _buffs[_index++]->get_new<T>();
             }
-            //_waiter->wait(timeout);
-            boost::this_thread::sleep(boost::posix_time::milliseconds(1));
+            _waiter->wait(timeout);
+            //boost::this_thread::sleep(boost::posix_time::milliseconds(1));
         }
         while (time_spec_t::get_system_time() < exit_time);
 
