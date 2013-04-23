@@ -1779,7 +1779,7 @@ public:
             //At that point, transact is nothing more than a pass-through.
             if (request->action == AD9361_ACTION_ECHO)
             {
-                std::memcpy(out_buff, in_buff, sizeof(out_buff));
+                std::memcpy(out_buff, in_buff, 64);
                 //_usb_iface->transact(in_buff, out_buff);
             }
             if (request->action == AD9361_ACTION_INIT)

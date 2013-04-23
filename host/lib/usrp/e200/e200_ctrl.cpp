@@ -126,7 +126,7 @@ private:
      ******************************************************************/
     UHD_INLINE void send_pkt(const boost::uint32_t addr, const boost::uint32_t data = 0)
     {
-        managed_send_buffer::sptr buff = _ctrl_xport->get_send_buff(0.0);
+        managed_send_buffer::sptr buff = _ctrl_xport->get_send_buff();
         if (not buff){
             throw uhd::runtime_error("fifo ctrl timed out getting a send buffer");
         }

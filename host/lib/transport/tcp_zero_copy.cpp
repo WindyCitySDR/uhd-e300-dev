@@ -90,6 +90,7 @@ public:
         //But it should be safe to always check for the error.
         while (true)
         {
+            this->commit(_frame_size); //always full size frames to avoid pkt coalescing
             const ssize_t ret = ::send(_sock_fd, (const char *)_mem, size(), 0);
             if (ret == ssize_t(size())) break;
             if (ret == -1 and errno == ENOBUFS)
@@ -148,9 +149,12 @@ public:
 
         //create, open, and connect the socket
         _socket.reset(new asio::ip::tcp::socket(_io_service));
-        _socket->open(asio::ip::tcp::v4());
         _socket->connect(receiver_endpoint);
         _sock_fd = _socket->native();
+
+        //packets go out ASAP
+        asio::ip::tcp::no_delay option(true);
+        _socket->set_option(option);
 
         //allocate re-usable managed receive buffers
         for (size_t i = 0; i < get_num_recv_frames(); i++){

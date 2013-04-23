@@ -50,15 +50,15 @@ struct ad9361_ctrl_over_zc : ad9361_ctrl_iface_type
     void transact(const unsigned char in_buff[64], unsigned char out_buff[64])
     {
         {
-            uhd::transport::managed_send_buffer::sptr buff = _xport->get_send_buff();
+            uhd::transport::managed_send_buffer::sptr buff = _xport->get_send_buff(10.0);
             if (not buff) throw std::runtime_error("ad9361_ctrl_over_zc send timeout");
-            std::memcpy(buff->cast<void *>(), in_buff, sizeof(in_buff));
-            buff->commit(sizeof(in_buff));
+            std::memcpy(buff->cast<void *>(), in_buff, 64);
+            buff->commit(64);
         }
         {
-            uhd::transport::managed_recv_buffer::sptr buff = _xport->get_recv_buff();
+            uhd::transport::managed_recv_buffer::sptr buff = _xport->get_recv_buff(10.0);
             if (not buff) throw std::runtime_error("ad9361_ctrl_over_zc recv timeout");
-            std::memcpy(out_buff, buff->cast<const void *>(), sizeof(out_buff));
+            std::memcpy(out_buff, buff->cast<const void *>(), 64);
         }
     }
 

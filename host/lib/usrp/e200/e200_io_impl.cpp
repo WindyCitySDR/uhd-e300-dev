@@ -282,7 +282,7 @@ rx_streamer::sptr e200_impl::get_rx_stream(const uhd::stream_args_t &args_)
     //my_streamer->set_xport_handle_flowctrl(0, boost::bind(
     //    &handle_rx_flowctrl, data_sid, _rx_flow_xport, _1
     //), _rx_data_xport->get_num_recv_frames()/8, true/*init*/);
-    handle_rx_flowctrl(data_sid, _send_ctrl_xport, 0); //init off
+    handle_rx_flowctrl(data_sid, _rx_flow_xport, 0); //init off
 
     my_streamer->set_issue_stream_cmd(0, boost::bind(
         &rx_vita_core_3000::issue_stream_command, _rx_framer, _1
