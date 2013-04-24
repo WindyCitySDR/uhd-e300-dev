@@ -25,8 +25,9 @@ extern "C" {
 #endif
 
 //various constants
-#define AD9361_TRANSACTION_VERSION 0x1
+#define AD9361_TRANSACTION_VERSION 0x2
 #define AD9361_TRANSACTION_MAX_ERROR_MSG 40
+#define AD9361_INIT_FLAG_HAS_XO (1 << 0)
 
 //action types
 #define AD9361_ACTION_ECHO 0
@@ -71,6 +72,9 @@ typedef struct
 
     union
     {
+        //init flags
+        uint32_t init_flags;
+
         //enable mask for chains
         uint32_t enable_mask;
 

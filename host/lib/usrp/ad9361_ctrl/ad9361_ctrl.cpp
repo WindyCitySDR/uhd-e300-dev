@@ -33,8 +33,14 @@ struct ad9361_ctrl_impl : public ad9361_ctrl
 
         request.action = AD9361_ACTION_ECHO;
         this->do_transaction(request);
+    }
 
+    void init(const bool has_xo)
+    {
+        ad9361_transaction_t request;
         request.action = AD9361_ACTION_INIT;
+        request.value.init_flags = 0;
+        if (has_xo) request.value.init_flags |= AD9361_INIT_FLAG_HAS_XO;
         this->do_transaction(request);
     }
 
@@ -115,6 +121,7 @@ struct ad9361_ctrl_impl : public ad9361_ctrl
         ad9361_transaction_t *in = (ad9361_transaction_t *)in_buff;
         in->version = AD9361_TRANSACTION_VERSION;
         in->sequence = _seq++;
+        in->error_msg[0] = '\0'; // clear any prior errors
 
         //transact
         _iface->transact(in_buff, out_buff);

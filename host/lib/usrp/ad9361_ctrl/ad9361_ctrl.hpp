@@ -90,6 +90,9 @@ public:
         return 56e6; //TODO
     }
 
+    //! init the device with params
+    virtual void init(const bool has_xo) = 0;
+
     //! set the gain for a particular gain element
     virtual double set_gain(const std::string &which, const double value) = 0;
 
