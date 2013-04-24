@@ -68,7 +68,7 @@ double sbx_xcvr::cbx::set_lo_freq(dboard_iface::unit_t unit, double target_freq)
     double actual_freq, pfd_freq;
     double ref_freq = self_base->get_iface()->get_clock_rate(unit);
     max2870_regs_t::int_n_mode_t int_n_mode;
-    int R=0, BS=0, N=0, FRAC=0, MOD=0;
+    int R=0, BS=0, N=0, FRAC=0, MOD=4095;
     int RFdiv = 1;
     max2870_regs_t::reference_divide_by_2_t T     = max2870_regs_t::REFERENCE_DIVIDE_BY_2_DISABLED;
     max2870_regs_t::reference_doubler_t     D     = max2870_regs_t::REFERENCE_DOUBLER_DISABLED;    
@@ -106,15 +106,14 @@ double sbx_xcvr::cbx::set_lo_freq(dboard_iface::unit_t unit, double target_freq)
         //PFD input frequency = f_ref/R ... ignoring Reference doubler/divide-by-2 (D & T)
         pfd_freq = ref_freq*(1+D)/(R*(1+T));
 
-        //keep the PFD frequency at or below 25MHz (Loop Filter Bandwidth)
+        //keep the PFD frequency at or below 25MHz
         if (pfd_freq > 25e6) continue;
 
         //ignore fractional part of tuning
-        N = int(std::floor(vco_freq/pfd_freq));
+        N = int(vco_freq/pfd_freq);
 
         //Fractional-N calculation
-        MOD = 4095; //max fractional accuracy
-        FRAC = int((target_freq/pfd_freq - N)*MOD);
+        FRAC = int((vco_freq/pfd_freq - N)*MOD);
 
         //are we in int-N or frac-N mode?
         int_n_mode = (FRAC == 0) ? max2870_regs_t::INT_N_MODE_INT_N : max2870_regs_t::INT_N_MODE_FRAC_N;
@@ -143,7 +142,7 @@ double sbx_xcvr::cbx::set_lo_freq(dboard_iface::unit_t unit, double target_freq)
     }
 
     //actual frequency calculation
-    actual_freq = double((N + (double(FRAC)/double(MOD)))*ref_freq*(1+int(D))/(R*(1+int(T))));
+    actual_freq = double((N + (double(FRAC)/double(MOD)))*ref_freq*(1+int(D))/(R*(1+int(T)))/RFdiv);
 
     UHD_LOGV(often)
         << boost::format("CBX Intermediates: ref=%0.2f, outdiv=%f, fbdiv=%f") % (ref_freq*(1+int(D))/(R*(1+int(T)))) % double(RFdiv*2) % double(N + double(FRAC)/double(MOD)) << std::endl
