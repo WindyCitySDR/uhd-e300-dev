@@ -397,16 +397,12 @@ void e200_impl::load_fpga_image(const std::string &path)
     UHD_MSG(status) << " done" << std::endl;
 }
 
-//sshfs jblum@blarg:/home/jblum/src src
-//utils/uhd_usrp_probe --tree --args="fpga=/home/root/b200_xport_t0.bin,type=e200"
-//utils/uhd_usrp_probe --tree --args="fpga=/home/root/e200_xport_t1.bin,type=e200"
-
 void e200_impl::register_loopback_self_test(wb_iface::sptr iface)
 {
     bool test_fail = false;
     UHD_MSG(status) << "Performing register loopback test... " << std::flush;
     size_t hash = time(NULL);
-    for (size_t i = 0; i < 100; i++)
+    for (size_t i = 0; i < 30; i++)
     {
         boost::hash_combine(hash, i);
         iface->poke32(TOREG(SR_TEST), boost::uint32_t(hash));

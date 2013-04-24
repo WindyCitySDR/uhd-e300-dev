@@ -48,13 +48,13 @@ static inline bool wait_for_recv_ready(int sock_fd, const size_t timeout_ms)
 static void e200_recv_tunnel(
     const std::string &name,
     uhd::transport::zero_copy_if::sptr recver,
-    boost::shared_ptr<asio::ip::tcp::socket> sender
+    boost::shared_ptr<asio::ip::tcp::socket> sender,
+    bool *running
 )
 {
     try
     {
-        while (recver->get_recv_buff(0.0)){} //flush
-        while (not boost::this_thread::interruption_requested())
+        while (*running)
         {
             //step 1 - get the buffer
             managed_recv_buffer::sptr buff = recver->get_recv_buff();
@@ -65,10 +65,16 @@ static void e200_recv_tunnel(
             sender->send(asio::buffer(buff->cast<const void *>(), buff->size()));
         }
     }
+    catch(const std::exception &ex)
+    {
+        UHD_MSG(error) << "e200_recv_tunnel exit " << name << " " << ex.what() << std::endl;
+    }
     catch(...)
     {
         UHD_MSG(error) << "e200_recv_tunnel exit " << name << std::endl;
     }
+    UHD_MSG(status) << "e200_recv_tunnel exit " << name << std::endl;
+    *running = false;
 }
 
 /***********************************************************************
@@ -77,22 +83,21 @@ static void e200_recv_tunnel(
 static void e200_send_tunnel(
     const std::string &name,
     boost::shared_ptr<asio::ip::tcp::socket> recver,
-    uhd::transport::zero_copy_if::sptr sender
+    uhd::transport::zero_copy_if::sptr sender,
+    bool *running
 )
 {
     try
     {
-        while (not boost::this_thread::interruption_requested())
+        while (*running)
         {
             //step 1 - get the buffer
             managed_send_buffer::sptr buff = sender->get_send_buff();
             if (not buff) continue;
 
             //step 2 - recv from socket
-            while (not wait_for_recv_ready(recver->native(), 100))
-            {
-                if (boost::this_thread::interruption_requested()) return;
-            }
+            while (not wait_for_recv_ready(recver->native(), 100) and *running){}
+            if (not *running) break;
             const size_t num_bytes = recver->receive(asio::buffer(buff->cast<void *>(), buff->size()));
             if (E200_NETWORK_DEBUG) UHD_MSG(status) << name << " got " << num_bytes << std::endl;
 
@@ -100,22 +105,32 @@ static void e200_send_tunnel(
             buff->commit(num_bytes);
         }
     }
+    catch(const std::exception &ex)
+    {
+        UHD_MSG(error) << "e200_send_tunnel exit " << name << " " << ex.what() << std::endl;
+    }
     catch(...)
     {
         UHD_MSG(error) << "e200_send_tunnel exit " << name << std::endl;
     }
+    UHD_MSG(status) << "e200_send_tunnel exit " << name << std::endl;
+    *running = false;
 }
 
 /***********************************************************************
  * codec gateway
  **********************************************************************/
-static void codec_gateway(ad9361_ctrl_iface_sptr ctrl, boost::shared_ptr<asio::ip::tcp::socket> sock)
+static void codec_gateway(
+    ad9361_ctrl_iface_sptr ctrl,
+    boost::shared_ptr<asio::ip::tcp::socket> sock,
+    bool *running
+)
 {
     unsigned char in_buff[64];
     unsigned char out_buff[64];
     try
     {
-        while (not boost::this_thread::interruption_requested())
+        while (*running)
         {
             const size_t num_bytes = sock->receive(asio::buffer(in_buff));
             if (E200_NETWORK_DEBUG) UHD_MSG(status) << "codec_gateway got " << num_bytes << std::endl;
@@ -124,10 +139,16 @@ static void codec_gateway(ad9361_ctrl_iface_sptr ctrl, boost::shared_ptr<asio::i
             sock->send(asio::buffer(out_buff));
         }
     }
+    catch(const std::exception &ex)
+    {
+        UHD_MSG(error) << "codec_gateway exit" << " " << ex.what() << std::endl;
+    }
     catch(...)
     {
         UHD_MSG(error) << "codec_gateway exit" << std::endl;
     }
+    UHD_MSG(status) << "codec_gateway exit" << std::endl;
+    *running = false;
 }
 
 /***********************************************************************
@@ -155,24 +176,25 @@ void e200_impl::run_server(const std::string &port, const std::string &what)
             acceptor->accept(*socket);
             UHD_MSG(status) << "e200 socket accept on port " << port << " for " << what << std::endl;
             boost::thread_group tg;
+            bool running = true;
             if (what == "RX")
             {
-                tg.create_thread(boost::bind(&e200_recv_tunnel, "RX data tunnel", _rx_data_xport, socket));
-                tg.create_thread(boost::bind(&e200_send_tunnel, "RX flow tunnel", socket, _rx_flow_xport));
+                tg.create_thread(boost::bind(&e200_recv_tunnel, "RX data tunnel", _rx_data_xport, socket, &running));
+                tg.create_thread(boost::bind(&e200_send_tunnel, "RX flow tunnel", socket, _rx_flow_xport, &running));
             }
             if (what == "TX")
             {
-                tg.create_thread(boost::bind(&e200_recv_tunnel, "TX flow tunnel", _tx_flow_xport, socket));
-                tg.create_thread(boost::bind(&e200_send_tunnel, "TX data tunnel", socket, _tx_data_xport));
+                tg.create_thread(boost::bind(&e200_recv_tunnel, "TX flow tunnel", _tx_flow_xport, socket, &running));
+                tg.create_thread(boost::bind(&e200_send_tunnel, "TX data tunnel", socket, _tx_data_xport, &running));
             }
             if (what == "CTRL")
             {
-                tg.create_thread(boost::bind(&e200_recv_tunnel, "response tunnel", _recv_ctrl_xport, socket));
-                tg.create_thread(boost::bind(&e200_send_tunnel, "control tunnel", socket, _send_ctrl_xport));
+                tg.create_thread(boost::bind(&e200_recv_tunnel, "response tunnel", _recv_ctrl_xport, socket, &running));
+                tg.create_thread(boost::bind(&e200_send_tunnel, "control tunnel", socket, _send_ctrl_xport, &running));
             }
             if (what == "CODEC")
             {
-                codec_gateway(_codec_ctrl_iface, socket);
+                codec_gateway(_codec_ctrl_iface, socket, &running);
             }
             tg.join_all();
             socket->close();
