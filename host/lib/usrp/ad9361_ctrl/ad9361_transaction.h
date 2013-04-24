@@ -25,7 +25,7 @@ extern "C" {
 #endif
 
 //various constants
-#define AD9361_TRANSACTION_VERSION 0x1
+#define AD9361_TRANSACTION_VERSION 0x3
 #define AD9361_TRANSACTION_MAX_ERROR_MSG 40
 
 //action types
@@ -41,14 +41,14 @@ extern "C" {
 #define AD9361_ACTION_SET_CLOCK_RATE 9
 #define AD9361_ACTION_SET_ACTIVE_CHAINS 10
 
-inline void ad9361_trans_double_pack(const double input, uint32_t *output)
+static inline void ad9361_double_pack(const double input, uint32_t *output)
 {
     const uint32_t *p = (const uint32_t *)&input;
     output[0] = p[0];
     output[1] = p[1];
 }
 
-inline double ad9361_trans_double_unpack(const uint32_t *input)
+static inline double ad9361_double_unpack(const uint32_t *input)
 {
     double output = 0.0;
     uint32_t *p = (uint32_t *)&output;
@@ -71,6 +71,9 @@ typedef struct
 
     union
     {
+        //enumerated init options
+        uint32_t init_type;
+
         //enable mask for chains
         uint32_t enable_mask;
 

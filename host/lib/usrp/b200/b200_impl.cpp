@@ -201,6 +201,7 @@ b200_impl::b200_impl(const device_addr_t &device_addr):
     //and just do this _codec_ctrl = ad9361_ctrl::make(_iface);
     _codec_ctrl_iface = ad9361_ctrl_iface_make(boost::bind(&b200_iface::transact_spi, _iface, _1, _2, _3, _4), _iface);
     _codec_ctrl = ad9361_ctrl::make(_codec_ctrl_iface);
+    _codec_ctrl->init(0 /*type*/);
 
     ////////////////////////////////////////////////////////////////////
     // Create control transport

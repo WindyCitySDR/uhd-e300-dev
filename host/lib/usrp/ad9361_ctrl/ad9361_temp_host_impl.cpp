@@ -1805,27 +1805,27 @@ public:
             }
             if (request->action == AD9361_ACTION_SET_RX1_GAIN)
             {
-                ad9361_trans_double_pack(this->set_gain("RX1", ad9361_trans_double_unpack(request->value.gain)), reply->value.gain);
+                ad9361_double_pack(this->set_gain("RX1", ad9361_double_unpack(request->value.gain)), reply->value.gain);
             }
             if (request->action == AD9361_ACTION_SET_TX1_GAIN)
             {
-                ad9361_trans_double_pack(this->set_gain("TX1", ad9361_trans_double_unpack(request->value.gain)), reply->value.gain);
+                ad9361_double_pack(this->set_gain("TX1", ad9361_double_unpack(request->value.gain)), reply->value.gain);
             }
             if (request->action == AD9361_ACTION_SET_RX2_GAIN)
             {
-                ad9361_trans_double_pack(this->set_gain("RX2", ad9361_trans_double_unpack(request->value.gain)), reply->value.gain);
+                ad9361_double_pack(this->set_gain("RX2", ad9361_double_unpack(request->value.gain)), reply->value.gain);
             }
             if (request->action == AD9361_ACTION_SET_TX2_GAIN)
             {
-                ad9361_trans_double_pack(this->set_gain("TX2", ad9361_trans_double_unpack(request->value.gain)), reply->value.gain);
+                ad9361_double_pack(this->set_gain("TX2", ad9361_double_unpack(request->value.gain)), reply->value.gain);
             }
             if (request->action == AD9361_ACTION_SET_RX_FREQ)
             {
-                ad9361_trans_double_pack(this->tune("RX*", ad9361_trans_double_unpack(request->value.freq)), reply->value.freq);
+                ad9361_double_pack(this->tune("RX*", ad9361_double_unpack(request->value.freq)), reply->value.freq);
             }
             if (request->action == AD9361_ACTION_SET_TX_FREQ)
             {
-                ad9361_trans_double_pack(this->tune("TX*", ad9361_trans_double_unpack(request->value.freq)), reply->value.freq);
+                ad9361_double_pack(this->tune("TX*", ad9361_double_unpack(request->value.freq)), reply->value.freq);
             }
             if (request->action == AD9361_ACTION_SET_CODEC_LOOP)
             {
@@ -1833,7 +1833,7 @@ public:
             }
             if (request->action == AD9361_ACTION_SET_CLOCK_RATE)
             {
-                ad9361_trans_double_pack(this->set_clock_rate(ad9361_trans_double_unpack(request->value.rate)), reply->value.rate);
+                ad9361_double_pack(this->set_clock_rate(ad9361_double_unpack(request->value.rate)), reply->value.rate);
             }
             if (request->action == AD9361_ACTION_SET_ACTIVE_CHAINS)
             {
