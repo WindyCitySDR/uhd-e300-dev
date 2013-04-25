@@ -198,8 +198,13 @@ e200_impl::e200_impl(const uhd::device_addr_t &device_addr)
     // clocking
     ////////////////////////////////////////////////////////////////////
     _tree->create<double>(mb_path / "tick_rate")
-        .set(E200_RADIO_CLOCK_RATE)
+        .coerce(boost::bind(&e200_impl::set_tick_rate, this, _1))
+        .publish(boost::bind(&e200_impl::get_tick_rate, this))
         .subscribe(boost::bind(&e200_impl::update_tick_rate, this, _1));
+
+    //default some chains on -- needed for setup purposes
+    _codec_ctrl->set_active_chains(true, false, true, false);
+    _codec_ctrl->set_clock_rate(50e6);
 
     ////////////////////////////////////////////////////////////////////
     // radio control
@@ -211,10 +216,11 @@ e200_impl::e200_impl(const uhd::device_addr_t &device_addr)
     // create rx dsp control objects
     ////////////////////////////////////////////////////////////////////
     _rx_framer = rx_vita_core_3000::make(_radio_ctrl, TOREG(SR_RX_CTRL+4), TOREG(SR_RX_CTRL));
-    _rx_framer->set_tick_rate(E200_RADIO_CLOCK_RATE);
     _rx_dsp = rx_dsp_core_3000::make(_radio_ctrl, TOREG(SR_RX_DSP));
     _rx_dsp->set_link_rate(10e9/8); //whatever
-    _rx_dsp->set_tick_rate(E200_RADIO_CLOCK_RATE);
+    _tree->access<double>(mb_path / "tick_rate")
+        .subscribe(boost::bind(&rx_vita_core_3000::set_tick_rate, _rx_framer, _1))
+        .subscribe(boost::bind(&rx_dsp_core_3000::set_tick_rate, _rx_dsp, _1));
     const fs_path rx_dsp_path = mb_path / "rx_dsps" / str(boost::format("%u") % dspno);
     _tree->create<meta_range_t>(rx_dsp_path / "rate" / "range")
         .publish(boost::bind(&rx_dsp_core_3000::get_host_rates, _rx_dsp));
@@ -234,10 +240,11 @@ e200_impl::e200_impl(const uhd::device_addr_t &device_addr)
     // create tx dsp control objects
     ////////////////////////////////////////////////////////////////////
     _tx_deframer = tx_vita_core_3000::make(_radio_ctrl, TOREG(SR_TX_CTRL+2), TOREG(SR_TX_CTRL));
-    _tx_deframer->set_tick_rate(E200_RADIO_CLOCK_RATE);
     _tx_dsp = tx_dsp_core_3000::make(_radio_ctrl, TOREG(SR_TX_DSP));
     _tx_dsp->set_link_rate(10e9/8); //whatever
-    _tx_dsp->set_tick_rate(E200_RADIO_CLOCK_RATE);
+    _tree->access<double>(mb_path / "tick_rate")
+        .subscribe(boost::bind(&tx_vita_core_3000::set_tick_rate, _tx_deframer, _1))
+        .subscribe(boost::bind(&tx_dsp_core_3000::set_tick_rate, _tx_dsp, _1));
     const fs_path tx_dsp_path = mb_path / "tx_dsps" / str(boost::format("%u") % dspno);
     _tree->create<meta_range_t>(tx_dsp_path / "rate" / "range")
         .publish(boost::bind(&tx_dsp_core_3000::get_host_rates, _tx_dsp));
@@ -258,8 +265,6 @@ e200_impl::e200_impl(const uhd::device_addr_t &device_addr)
     time64_rb_bases.rb_now = RB64_TIME_NOW;
     time64_rb_bases.rb_pps = RB64_TIME_PPS;
     _time64 = time_core_3000::make(_radio_ctrl, TOREG(SR_TIME), time64_rb_bases);
-    _time64->set_tick_rate(E200_RADIO_CLOCK_RATE);
-    _time64->self_test();
     _tree->create<time_spec_t>(mb_path / "time" / "now")
         .publish(boost::bind(&time_core_3000::get_time_now, _time64))
         .subscribe(boost::bind(&time_core_3000::set_time_now, _time64, _1));
@@ -355,6 +360,11 @@ e200_impl::e200_impl(const uhd::device_addr_t &device_addr)
     ////////////////////////////////////////////////////////////////////
     // do some post-init tasks
     ////////////////////////////////////////////////////////////////////
+
+    //init the clock rate to something, but only when we have active chains
+    _tree->access<double>(mb_path / "tick_rate").set(61.44e6/2);
+    //_codec_ctrl->set_active_chains(false, false, false, false);
+
     _tree->access<std::string>(mb_path / "clock_source" / "value").set("internal");
     _tree->access<std::string>(mb_path / "time_source" / "value").set("none");
 
@@ -363,6 +373,22 @@ e200_impl::e200_impl(const uhd::device_addr_t &device_addr)
 e200_impl::~e200_impl(void)
 {
     /* NOP */
+}
+
+double e200_impl::set_tick_rate(const double raw_rate)
+{
+    //clip rate (which can be doubled by factor) to possible bounds
+    const double rate = ad9361_ctrl::get_samp_rate_range().clip(raw_rate);
+
+    const size_t factor = 1.0;//((_fe_enb_map["RX1"] and _fe_enb_map["RX2"]) or (_fe_enb_map["TX1"] and _fe_enb_map["TX2"]))? 2:1;
+    UHD_MSG(status) << "asking for clock rate " << rate/1e6 << " MHz\n";
+    _tick_rate = _codec_ctrl->set_clock_rate(rate/factor)*factor;
+    UHD_MSG(status) << "actually got clock rate " << _tick_rate/1e6 << " MHz\n";
+    _time64->set_tick_rate(_tick_rate);
+    _time64->self_test();
+    _rx_framer->set_tick_rate(_tick_rate);
+    _tx_deframer->set_tick_rate(_tick_rate);
+    return _tick_rate;
 }
 
 void e200_impl::load_fpga_image(const std::string &path)

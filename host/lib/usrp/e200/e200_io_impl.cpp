@@ -188,7 +188,7 @@ static void handle_tx_async_msgs(boost::shared_ptr<tx_fc_guts_t> guts, zero_copy
 
     //fill in the async metadata
     async_metadata_t metadata;
-    load_metadata_from_buff(uhd::wtohx<boost::uint32_t>, metadata, if_packet_info, packet_buff, E200_RADIO_CLOCK_RATE/*FIXME set from rate update*/);
+    load_metadata_from_buff(uhd::wtohx<boost::uint32_t>, metadata, if_packet_info, packet_buff, 61.44e6/*FIXME set from rate update*/);
     guts->async_queue.push_with_pop_on_full(metadata);
     standard_async_msg_prints(metadata);
 }
@@ -290,7 +290,7 @@ rx_streamer::sptr e200_impl::get_rx_stream(const uhd::stream_args_t &args_)
     _rx_streamers[0] = my_streamer; //store weak pointer
 
     //sets all tick and samp rates on this streamer
-    _tree->access<double>("/mboards/0/tick_rate").update();
+    this->update_tick_rate(this->get_tick_rate());
     _tree->access<double>(str(boost::format("/mboards/0/rx_dsps/%u/rate/value") % 0)).update();
 
     return my_streamer;
@@ -356,7 +356,7 @@ tx_streamer::sptr e200_impl::get_tx_stream(const uhd::stream_args_t &args_)
     _tx_streamers[0] = my_streamer; //store weak pointer
 
     //sets all tick and samp rates on this streamer
-    _tree->access<double>("/mboards/0/tick_rate").update();
+    this->update_tick_rate(this->get_tick_rate());
     _tree->access<double>(str(boost::format("/mboards/0/tx_dsps/%u/rate/value") % 0)).update();
 
     return my_streamer;

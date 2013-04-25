@@ -33,7 +33,6 @@
 #include "ad9361_ctrl.hpp"
 
 static const std::string E200_FPGA_FILE_NAME = "usrp_e200_fpga.bin";
-static const double E200_RADIO_CLOCK_RATE = 50e6; //FIXME fixed for now
 
 static std::string E200_SERVER_RX_PORT = "321756";
 static std::string E200_SERVER_TX_PORT = "321757";
@@ -89,6 +88,10 @@ private:
     uhd::transport::zero_copy_if::sptr _rx_data_xport, _rx_flow_xport;
 
     time_core_3000::sptr _time64;
+
+    double _tick_rate;
+    double get_tick_rate(void){return _tick_rate;}
+    double set_tick_rate(const double rate);
 
     void update_tick_rate(const double);
     void update_rx_samp_rate(const size_t, const double);
