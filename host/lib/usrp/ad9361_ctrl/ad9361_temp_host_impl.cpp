@@ -1032,6 +1032,15 @@ public:
 
         /* Enable clocks. */
         this->write_reg(0x009, 0x07);
+
+        if (1) //IF DCO
+        {
+            this->write_reg(0x292, 0x08);
+            this->write_reg(0x293, 0x80);
+            this->write_reg(0x294, 0x00);
+            this->write_reg(0x295, 0x14);
+        }
+
         boost::this_thread::sleep(boost::posix_time::milliseconds(20));
 
         /* Tune the BBPLL, write TX and RX FIRS. */
@@ -1152,7 +1161,7 @@ public:
         this->write_reg(0x15C, 0x67); // Power Measurement Duration
 
         /* Turn on the default RX & TX chains. */
-        //set_active_chains(true, false, true, false);
+        set_active_chains(false, false, false, false);
 
         /* Set TXers & RXers on (only works in FDD mode) */
         this->write_reg(0x014, 0x21);
