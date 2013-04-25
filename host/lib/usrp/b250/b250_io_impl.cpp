@@ -352,13 +352,14 @@ tx_streamer::sptr b250_impl::get_tx_stream(const uhd::stream_args_t &args_)
     args.channels = args.channels.empty()? std::vector<size_t>(1, 0) : args.channels;
     const std::string db_name = _tx_fe_map[args.channels[0]].db_name;
     const size_t i = (db_name == "A")? 0 : 1;
+    UHD_VAR(i);
     radio_perifs_t &perif = _radio_perifs[i];
 
     //allocate sid and create transport
     sid_config_t data_config;
     data_config.router_addr_there = B250_DEVICE_THERE;
     data_config.dst_prefix = B250_RADIO_DEST_PREFIX_TX;
-    data_config.router_dst_there = B250_XB_DST_R0;
+    data_config.router_dst_there = (i == 0)? B250_XB_DST_R0 : B250_XB_DST_R1;
     data_config.router_dst_here = B250_XB_DST_E0;
     const boost::uint32_t data_sid = this->allocate_sid(data_config);
     zero_copy_if::sptr data_xport = this->make_transport(_addr, data_sid);
