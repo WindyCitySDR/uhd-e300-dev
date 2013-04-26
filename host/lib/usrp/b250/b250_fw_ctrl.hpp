@@ -63,7 +63,8 @@ struct b250_ctrl_iface : wb_iface
 
         //recv reply
         b250_fw_comms_t reply = b250_fw_comms_t();
-        const size_t nbytes = udp->recv(boost::asio::buffer(&reply, sizeof(reply)));
+        const size_t nbytes = udp->recv(boost::asio::buffer(&reply, sizeof(reply)), 1.0);
+        UHD_ASSERT_THROW(nbytes != 0);
 
         //sanity checks
         const size_t flags = uhd::ntohx<boost::uint32_t>(reply.flags);
@@ -93,7 +94,8 @@ struct b250_ctrl_iface : wb_iface
 
         //recv reply
         b250_fw_comms_t reply = b250_fw_comms_t();
-        const size_t nbytes = udp->recv(boost::asio::buffer(&reply, sizeof(reply)));
+        const size_t nbytes = udp->recv(boost::asio::buffer(&reply, sizeof(reply)), 1.0);
+        UHD_ASSERT_THROW(nbytes != 0);
 
         //sanity checks
         const size_t flags = uhd::ntohx<boost::uint32_t>(reply.flags);
