@@ -473,7 +473,6 @@ void b250_impl::setup_radio(const size_t i, const std::string &db_name)
 
 uhd::transport::udp_zero_copy::sptr b250_impl::make_transport(const std::string &addr, const boost::uint32_t sid)
 {
-    boost::mutex::scoped_lock lock(_transport_setup_mutex);
     device_addr_t device_addr;
 
     //setup the dsp transport hints (default to a large recv buff)
@@ -509,8 +508,6 @@ uhd::transport::udp_zero_copy::sptr b250_impl::make_transport(const std::string 
 
 boost::uint32_t b250_impl::allocate_sid(const sid_config_t &config)
 {
-    boost::mutex::scoped_lock lock(_transport_setup_mutex);
-
     _last_sid++;
 
     const boost::uint32_t stream = (config.dst_prefix | (_last_sid << 2)) & 0xff;
