@@ -22,6 +22,7 @@
 #include <uhd/transport/udp_simple.hpp>
 #include <uhd/utils/byteswap.hpp>
 #include <uhd/utils/msg.hpp>
+#include <boost/thread/mutex.hpp>
 
 struct b250_ctrl_iface : wb_iface
 {
@@ -37,6 +38,7 @@ struct b250_ctrl_iface : wb_iface
 
     uhd::transport::udp_simple::sptr udp;
     size_t seq;
+    boost::mutex mutex;
 
     void flush(void)
     {
@@ -46,6 +48,8 @@ struct b250_ctrl_iface : wb_iface
 
     void poke32(const wb_addr_type addr, const boost::uint32_t data)
     {
+        boost::mutex::scoped_lock lock(mutex);
+
         //load request struct
         b250_fw_comms_t request = b250_fw_comms_t();
         request.flags = uhd::htonx<boost::uint32_t>(B250_FW_COMMS_FLAGS_ACK | B250_FW_COMMS_FLAGS_POKE32);
@@ -74,6 +78,8 @@ struct b250_ctrl_iface : wb_iface
 
     boost::uint32_t peek32(const wb_addr_type addr)
     {
+        boost::mutex::scoped_lock lock(mutex);
+
         //load request struct
         b250_fw_comms_t request = b250_fw_comms_t();
         request.flags = uhd::htonx<boost::uint32_t>(B250_FW_COMMS_FLAGS_ACK | B250_FW_COMMS_FLAGS_PEEK32);
