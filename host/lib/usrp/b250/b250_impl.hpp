@@ -106,6 +106,8 @@ private:
         return _tree;
     }
 
+    boost::mutex _transport_setup_mutex;
+
     uhd::transport::udp_zero_copy::sptr make_transport(const std::string &addr, const boost::uint32_t sid);
     void register_loopback_self_test(wb_iface::sptr iface);
 
