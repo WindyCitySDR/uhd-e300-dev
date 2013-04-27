@@ -303,32 +303,29 @@ e200_impl::e200_impl(const uhd::device_addr_t &device_addr)
 
         _tree->create<std::string>(rf_fe_path / "name").set(fe_name);
         _tree->create<int>(rf_fe_path / "sensors"); //empty TODO
-        _tree->create<sensor_value_t>(rf_fe_path / "sensors" / "lo_locked");
-        /*empty for temps*/ _tree->create<int>(rf_fe_path / "gains");
-        /*
-        BOOST_FOREACH(const std::string &name, _codec_ctrl->get_gain_names(fe_name))
+        BOOST_FOREACH(const std::string &name, ad9361_ctrl::get_gain_names(fe_name))
         {
             _tree->create<meta_range_t>(rf_fe_path / "gains" / name / "range")
-                    ;//.set(_codec_ctrl->get_gain_range(fe_name));
+                .set(ad9361_ctrl::get_gain_range(fe_name));
 
             _tree->create<double>(rf_fe_path / "gains" / name / "value")
-                //.coerce(boost::bind(&b200_codec_ctrl::set_gain, _codec_ctrl, fe_name, _1))
+                .coerce(boost::bind(&ad9361_ctrl::set_gain, _codec_ctrl, fe_name, _1))
                 .set(0.0);
         }
-        */
         _tree->create<std::string>(rf_fe_path / "connection").set("IQ");
         _tree->create<bool>(rf_fe_path / "enabled").set(true);
         _tree->create<bool>(rf_fe_path / "use_lo_offset").set(false);
         _tree->create<double>(rf_fe_path / "bandwidth" / "value")
-            //.coerce(boost::bind(&b200_codec_ctrl::set_bw_filter, _codec_ctrl, fe_name, _1))
+            .coerce(boost::bind(&ad9361_ctrl::set_bw_filter, _codec_ctrl, fe_name, _1))
             .set(40e6);
         _tree->create<meta_range_t>(rf_fe_path / "bandwidth" / "range")
-            ;//.publish(boost::bind(&b200_codec_ctrl::get_bw_filter_range, _codec_ctrl, fe_name));
+            .publish(boost::bind(&ad9361_ctrl::get_bw_filter_range, fe_name));
         _tree->create<double>(rf_fe_path / "freq" / "value")
-            //.coerce(boost::bind(&b200_codec_ctrl::tune, _codec_ctrl, fe_name, _1))
-            ;//.subscribe(boost::bind(&b200_impl::update_bandsel, this, fe_name, _1));
+            .set(0.0)
+            .coerce(boost::bind(&ad9361_ctrl::tune, _codec_ctrl, fe_name, _1))
+            .subscribe(boost::bind(&e200_impl::update_fe_lo_freq, this, fe_name, _1));
         _tree->create<meta_range_t>(rf_fe_path / "freq" / "range")
-            ;//.publish(boost::bind(&b200_codec_ctrl::get_rf_freq_range, _codec_ctrl, fe_name));
+            .publish(boost::bind(&ad9361_ctrl::get_rf_freq_range));
 
         //setup antenna stuff
         if (fe_name[0] == 'R')
@@ -336,7 +333,7 @@ e200_impl::e200_impl(const uhd::device_addr_t &device_addr)
             static const std::vector<std::string> ants = boost::assign::list_of("TX/RX")("RX2");
             _tree->create<std::vector<std::string> >(rf_fe_path / "antenna" / "options").set(ants);
             _tree->create<std::string>(rf_fe_path / "antenna" / "value")
-                //.subscribe(boost::bind(&b200_impl::update_antenna_sel, this, fe_name, _1))
+                .subscribe(boost::bind(&e200_impl::update_antenna_sel, this, fe_name, _1))
                 .set("RX2");
         }
         if (fe_name[0] == 'T')
@@ -449,21 +446,22 @@ void e200_impl::update_clock_source(const std::string &)
     
 }
 
-/*
-localparam LED_TXRX_TX = 18;
-localparam LED_TXRX_RX = 17;
-localparam LED_RX_RX = 16;
-localparam VCRX_V2 = 15;
-localparam VCRX_V1 = 14;
-localparam VCTXRX_V2 = 13;
-localparam VCTXRX_V1 = 12;
-localparam TX_ENABLEB = 11;
-localparam TX_ENABLEA = 10;
-localparam RXC_BANDSEL = 8;
-localparam RXB_BANDSEL = 6;
-localparam RX_BANDSEL = 3;
-localparam TX_BANDSEL = 0;
-*/
+void e200_impl::update_antenna_sel(const std::string &fe, const std::string &ant)
+{
+    const size_t i = (fe == "RX1")? 0 : 1;
+    _fe_control_settings[i].rx_ant = ant;
+    this->update_atrs(i);
+}
+
+void e200_impl::update_fe_lo_freq(const std::string &fe, const double freq)
+{
+    for (size_t i = 0; i < 2; i++)
+    {
+        if (fe[0] == 'R') _fe_control_settings[i].rx_freq = freq;
+        if (fe[0] == 'T') _fe_control_settings[i].tx_freq = freq;
+        this->update_atrs(i);
+    }
+}
 
 ////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////
@@ -471,9 +469,12 @@ localparam TX_BANDSEL = 0;
 ////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////
 
-void e200_impl::update_atrs(const std::string &which)
+void e200_impl::update_atrs(const size_t &fe)
 {
-    const fe_control_settings_t &settings = _fe_control_settings[which];
+    //TODO eventually fe 1 when it exists
+    if (fe == 1) return;
+
+    const fe_control_settings_t &settings = _fe_control_settings[fe];
 
     //----------------- rx ant comprehension --------------------//
     const bool rx_ant_rx2 = settings.rx_ant == "RX2";
@@ -598,6 +599,7 @@ void e200_impl::update_atrs(const std::string &which)
     const int tx_reg = xx_selects | tx_selects | tx_enables;
     const int xx_reg = xx_selects | rx_selects | tx_selects | tx_enables;
 
+    //TODO eventually parameterize to atr0 vs 1
     _atr0->set_atr_reg(dboard_iface::ATR_REG_IDLE, oo_reg);
     _atr0->set_atr_reg(dboard_iface::ATR_REG_RX_ONLY, rx_reg);
     _atr0->set_atr_reg(dboard_iface::ATR_REG_TX_ONLY, tx_reg);

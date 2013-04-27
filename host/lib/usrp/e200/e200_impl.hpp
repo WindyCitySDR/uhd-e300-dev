@@ -140,8 +140,10 @@ private:
         double rx_freq;
         double tx_freq;
     };
-    uhd::dict<std::string, fe_control_settings_t> _fe_control_settings;
-    void update_atrs(const std::string &which);
+    fe_control_settings_t _fe_control_settings[2];
+    void update_atrs(const size_t &fe);
+    void update_antenna_sel(const std::string &fe, const std::string &ant);
+    void update_fe_lo_freq(const std::string &fe, const double freq);
 
 };
 
