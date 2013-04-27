@@ -211,6 +211,7 @@ e200_impl::e200_impl(const uhd::device_addr_t &device_addr)
     ////////////////////////////////////////////////////////////////////
     _radio_ctrl = e200_ctrl::make(_send_ctrl_xport, _recv_ctrl_xport, 1 | (1 << 16));
     this->register_loopback_self_test(_radio_ctrl);
+    _atr0 = gpio_core_200_32wo::make(_radio_ctrl, TOREG(SR_GPIO));
 
     ////////////////////////////////////////////////////////////////////
     // create rx dsp control objects
@@ -446,4 +447,159 @@ void e200_impl::update_time_source(const std::string &)
 void e200_impl::update_clock_source(const std::string &)
 {
     
+}
+
+/*
+localparam LED_TXRX_TX = 18;
+localparam LED_TXRX_RX = 17;
+localparam LED_RX_RX = 16;
+localparam VCRX_V2 = 15;
+localparam VCRX_V1 = 14;
+localparam VCTXRX_V2 = 13;
+localparam VCTXRX_V1 = 12;
+localparam TX_ENABLEB = 11;
+localparam TX_ENABLEA = 10;
+localparam RXC_BANDSEL = 8;
+localparam RXB_BANDSEL = 6;
+localparam RX_BANDSEL = 3;
+localparam TX_BANDSEL = 0;
+*/
+
+////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////
+//////////////// ATR SETUP FOR FRONTEND CONTROL VIA GPIO ///////////////
+////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////
+
+void e200_impl::update_atrs(const std::string &which)
+{
+    const fe_control_settings_t &settings = _fe_control_settings[which];
+
+    //----------------- rx ant comprehension --------------------//
+    const bool rx_ant_rx2 = settings.rx_ant == "RX2";
+    const bool rx_ant_txrx = settings.rx_ant == "TX/RX";
+
+    //----------------- high/low band decision --------------------//
+    const bool rx_low_band = settings.rx_freq < 3.0e9;
+    const bool rx_high_band = not rx_low_band;
+    const bool tx_low_band = settings.tx_freq < 3.0e9;
+    const bool tx_high_band = not tx_low_band;
+
+    //------------------- TX low band bandsel ----------------------//
+    int tx_bandsels = 0;
+    if      (settings.tx_freq < 117.7e6)   tx_bandsels = 0;
+    else if (settings.tx_freq < 178.2e6)   tx_bandsels = 1;
+    else if (settings.tx_freq < 284.3e6)   tx_bandsels = 2;
+    else if (settings.tx_freq < 453.7e6)   tx_bandsels = 3;
+    else if (settings.tx_freq < 723.8e6)   tx_bandsels = 4;
+    else if (settings.tx_freq < 1154.9e6)  tx_bandsels = 5;
+    else if (settings.tx_freq < 1842.6e6)  tx_bandsels = 6;
+    else if (settings.tx_freq < 2940.0e6)  tx_bandsels = 7;
+    else                                   tx_bandsels = 0;
+
+    //------------------- RX low band bandsel ----------------------//
+    //TODO these rx freq ranges are copied from TX and not correct!
+    int rx_bandsels = 0, rx_bandsel_b = 0, rx_bandsel_c = 0;
+    if      (settings.rx_freq < 117.7e6)   {rx_bandsels = 0; rx_bandsel_b = 0; rx_bandsel_c = 0;}
+    else if (settings.rx_freq < 178.2e6)   {rx_bandsels = 1; rx_bandsel_b = 0; rx_bandsel_c = 0;}
+    else if (settings.rx_freq < 284.3e6)   {rx_bandsels = 2; rx_bandsel_b = 0; rx_bandsel_c = 0;}
+    else if (settings.rx_freq < 453.7e6)   {rx_bandsels = 3; rx_bandsel_b = 0; rx_bandsel_c = 0;}
+    else if (settings.rx_freq < 723.8e6)   {rx_bandsels = 4; rx_bandsel_b = 0; rx_bandsel_c = 0;}
+    else if (settings.rx_freq < 1154.9e6)  {rx_bandsels = 5; rx_bandsel_b = 0; rx_bandsel_c = 0;}
+    else                                   {rx_bandsels = 0; rx_bandsel_b = 0; rx_bandsel_c = 0;}
+
+    //-------------------- VCRX - rx mode -------------------------//
+    int vcrx_1_rxing = 0, vcrx_2_rxing = 1;
+    if ((rx_ant_rx2 and rx_low_band) or (rx_ant_txrx and rx_high_band))
+    {
+        vcrx_1_rxing = 1; vcrx_2_rxing = 0;
+    }
+    if ((rx_ant_rx2 and rx_high_band) or (rx_ant_txrx and rx_low_band))
+    {
+        vcrx_1_rxing = 0; vcrx_2_rxing = 1;
+    }
+
+    //-------------------- VCRX - tx mode -------------------------//
+    int vcrx_1_txing = 0, vcrx_2_txing = 1;
+    if (rx_low_band)
+    {
+        vcrx_1_txing = 1; vcrx_2_txing = 0;
+    }
+    if (rx_high_band)
+    {
+        vcrx_1_txing = 0; vcrx_2_txing = 1;
+    }
+
+    //-------------------- VCTX - rx mode -------------------------//
+    int vctxrx_1_rxing = 0, vctxrx_2_rxing = 1;
+    if (rx_ant_txrx)
+    {
+        vctxrx_1_rxing = 1; vctxrx_2_rxing = 0;
+    }
+    if (rx_ant_rx2 and tx_high_band)
+    {
+        vctxrx_1_rxing = 1; vctxrx_2_rxing = 1;
+    }
+    if (rx_ant_rx2 and tx_low_band)
+    {
+        vctxrx_1_rxing = 0; vctxrx_2_rxing = 1;
+    }
+
+    //-------------------- VCTX - tx mode -------------------------//
+    int vctxrx_1_txing = 0, vctxrx_2_txing = 1;
+    if (tx_high_band)
+    {
+        vctxrx_1_txing = 1; vctxrx_2_txing = 1;
+    }
+    if (tx_low_band)
+    {
+        vctxrx_1_txing = 0; vctxrx_2_txing = 1;
+    }
+
+    //----------------- TX ENABLES ----------------------------//
+    const int tx_enable_a = (tx_high_band and settings.tx_enb)? 1 : 0;
+    const int tx_enable_b = (tx_low_band and settings.tx_enb)? 1 : 0;
+
+    //----------------- LEDS ----------------------------//
+    const int led_rx2 = (rx_ant_rx2)? 1 : 0;
+    const int led_txrx = (rx_ant_txrx)? 1 : 0;
+    const int led_tx = 1;
+
+    //----------------- ATR values ---------------------------//
+
+    const int rx_selects = 0
+        | (vcrx_1_rxing << VCRX_V1)
+        | (vcrx_2_rxing << VCRX_V2)
+        | (vctxrx_1_rxing << VCTXRX_V1)
+        | (vctxrx_2_rxing << VCTXRX_V2)
+        | (led_rx2 << LED_RX_RX)
+        | (led_txrx << LED_TXRX_RX)
+    ;
+    const int tx_selects = 0
+        | (vcrx_1_txing << VCRX_V1)
+        | (vcrx_2_txing << VCRX_V2)
+        | (vctxrx_1_txing << VCTXRX_V1)
+        | (vctxrx_2_txing << VCTXRX_V2)
+        | (led_tx << LED_TXRX_TX)
+    ;
+    const int xx_selects = 0
+        | (tx_bandsels << TX_BANDSEL)
+        | (rx_bandsels << RX_BANDSEL)
+        | (rx_bandsel_b << RXB_BANDSEL)
+        | (rx_bandsel_c << RXC_BANDSEL)
+    ;
+    const int tx_enables = 0
+        | (tx_enable_a << TX_ENABLEA)
+        | (tx_enable_b << TX_ENABLEB)
+    ;
+
+    const int oo_reg = xx_selects | rx_selects;
+    const int rx_reg = xx_selects | rx_selects;
+    const int tx_reg = xx_selects | tx_selects | tx_enables;
+    const int xx_reg = xx_selects | rx_selects | tx_selects | tx_enables;
+
+    _atr0->set_atr_reg(dboard_iface::ATR_REG_IDLE, oo_reg);
+    _atr0->set_atr_reg(dboard_iface::ATR_REG_RX_ONLY, rx_reg);
+    _atr0->set_atr_reg(dboard_iface::ATR_REG_TX_ONLY, tx_reg);
+    _atr0->set_atr_reg(dboard_iface::ATR_REG_FULL_DUPLEX, xx_reg);
 }

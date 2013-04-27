@@ -42,4 +42,18 @@ localparam RB64_TIME_NOW        = 8;
 localparam RB64_TIME_PPS        = 16;
 localparam RB32_TEST            = 24;
 
+localparam LED_TXRX_TX = 18;
+localparam LED_TXRX_RX = 17;
+localparam LED_RX_RX = 16;
+localparam VCRX_V2 = 15;
+localparam VCRX_V1 = 14;
+localparam VCTXRX_V2 = 13;
+localparam VCTXRX_V1 = 12;
+localparam TX_ENABLEB = 11;
+localparam TX_ENABLEA = 10;
+localparam RXC_BANDSEL = 8;
+localparam RXB_BANDSEL = 6;
+localparam RX_BANDSEL = 3;
+localparam TX_BANDSEL = 0;
+
 #endif /* INCLUDED_B250_REGS_HPP */

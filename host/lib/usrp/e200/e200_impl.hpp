@@ -31,6 +31,7 @@
 #include "rx_dsp_core_3000.hpp"
 #include "tx_dsp_core_3000.hpp"
 #include "ad9361_ctrl.hpp"
+#include "gpio_core_200.hpp"
 
 static const std::string E200_FPGA_FILE_NAME = "usrp_e200_fpga.bin";
 
@@ -88,6 +89,8 @@ private:
     uhd::transport::zero_copy_if::sptr _rx_data_xport, _rx_flow_xport;
 
     time_core_3000::sptr _time64;
+    gpio_core_200_32wo::sptr _atr0;
+    gpio_core_200_32wo::sptr _atr1;
 
     double _tick_rate;
     double get_tick_rate(void){return _tick_rate;}
@@ -127,6 +130,18 @@ private:
 
     //server stuff for network access
     void run_server(const std::string &port, const std::string &what);
+
+    //frontend cache so we can update gpios
+    struct fe_control_settings_t
+    {
+        std::string rx_ant;
+        bool tx_enb;
+        bool rx_enb;
+        double rx_freq;
+        double tx_freq;
+    };
+    uhd::dict<std::string, fe_control_settings_t> _fe_control_settings;
+    void update_atrs(const std::string &which);
 
 };
 
