@@ -575,6 +575,10 @@ void e200_impl::update_atrs(const size_t &fe)
     const int led_txrx = (rx_ant_txrx)? 1 : 0;
     const int led_tx = 1;
 
+    const int rx_leds = (led_rx2 << LED_RX_RX) | (led_txrx << LED_TXRX_RX);
+    const int tx_leds = (led_txrx << LED_TXRX_RX);
+    const int xx_leds = (led_txrx << LED_TXRX_RX) | (1 << LED_RX_RX); //forced to rx2
+
     //----------------- ATR values ---------------------------//
 
     const int rx_selects = 0
@@ -582,15 +586,12 @@ void e200_impl::update_atrs(const size_t &fe)
         | (vcrx_2_rxing << VCRX_V2)
         | (vctxrx_1_rxing << VCTXRX_V1)
         | (vctxrx_2_rxing << VCTXRX_V2)
-        | (led_rx2 << LED_RX_RX)
-        | (led_txrx << LED_TXRX_RX)
     ;
     const int tx_selects = 0
         | (vcrx_1_txing << VCRX_V1)
         | (vcrx_2_txing << VCRX_V2)
         | (vctxrx_1_txing << VCTXRX_V1)
         | (vctxrx_2_txing << VCTXRX_V2)
-        | (led_tx << LED_TXRX_TX)
     ;
     const int xx_selects = 0
         | (tx_bandsels << TX_BANDSEL)
@@ -604,9 +605,9 @@ void e200_impl::update_atrs(const size_t &fe)
     ;
 
     const int oo_reg = xx_selects | rx_selects;
-    const int rx_reg = xx_selects | rx_selects;
-    const int tx_reg = xx_selects | tx_selects | tx_enables;
-    const int xx_reg = xx_selects | rx_selects | tx_selects | tx_enables;
+    const int rx_reg = xx_selects | rx_selects | rx_leds;
+    const int tx_reg = xx_selects | tx_selects | tx_enables | tx_leds;
+    const int xx_reg = xx_selects | rx_selects | tx_selects | tx_enables | xx_leds;
 
     //TODO eventually parameterize to atr0 vs 1
     _atr0->set_atr_reg(dboard_iface::ATR_REG_IDLE, oo_reg);
