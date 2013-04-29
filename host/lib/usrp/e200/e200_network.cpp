@@ -177,20 +177,21 @@ void e200_impl::run_server(const std::string &port, const std::string &what)
             UHD_MSG(status) << "e200 socket accept on port " << port << " for " << what << std::endl;
             boost::thread_group tg;
             bool running = true;
+            radio_perifs_t &perif = _radio_perifs[0];
             if (what == "RX")
             {
-                tg.create_thread(boost::bind(&e200_recv_tunnel, "RX data tunnel", _rx_data_xport, socket, &running));
-                tg.create_thread(boost::bind(&e200_send_tunnel, "RX flow tunnel", socket, _rx_flow_xport, &running));
+                tg.create_thread(boost::bind(&e200_recv_tunnel, "RX data tunnel", perif.rx_data_xport, socket, &running));
+                tg.create_thread(boost::bind(&e200_send_tunnel, "RX flow tunnel", socket, perif.rx_flow_xport, &running));
             }
             if (what == "TX")
             {
-                tg.create_thread(boost::bind(&e200_recv_tunnel, "TX flow tunnel", _tx_flow_xport, socket, &running));
-                tg.create_thread(boost::bind(&e200_send_tunnel, "TX data tunnel", socket, _tx_data_xport, &running));
+                tg.create_thread(boost::bind(&e200_recv_tunnel, "TX flow tunnel", perif.tx_flow_xport, socket, &running));
+                tg.create_thread(boost::bind(&e200_send_tunnel, "TX data tunnel", socket, perif.tx_data_xport, &running));
             }
             if (what == "CTRL")
             {
-                tg.create_thread(boost::bind(&e200_recv_tunnel, "response tunnel", _recv_ctrl_xport, socket, &running));
-                tg.create_thread(boost::bind(&e200_send_tunnel, "control tunnel", socket, _send_ctrl_xport, &running));
+                tg.create_thread(boost::bind(&e200_recv_tunnel, "response tunnel", perif.recv_ctrl_xport, socket, &running));
+                tg.create_thread(boost::bind(&e200_send_tunnel, "control tunnel", socket, perif.send_ctrl_xport, &running));
             }
             if (what == "CODEC")
             {

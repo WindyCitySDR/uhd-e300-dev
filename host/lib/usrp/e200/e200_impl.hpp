@@ -21,6 +21,8 @@
 #include <uhd/device.hpp>
 #include <uhd/property_tree.hpp>
 #include <uhd/usrp/subdev_spec.hpp>
+#include <uhd/usrp/mboard_eeprom.hpp>
+#include <uhd/usrp/dboard_eeprom.hpp>
 #include <uhd/types/serial.hpp>
 #include <boost/weak_ptr.hpp>
 #include "e200_fifo_config.hpp"
@@ -71,26 +73,32 @@ private:
     void load_fpga_image(const std::string &path);
 
     e200_fifo_interface::sptr _fifo_iface;
-    e200_ctrl::sptr _radio_ctrl;
     uhd::spi_iface::sptr _aux_spi;
 
     void register_loopback_self_test(wb_iface::sptr iface);
 
-    rx_vita_core_3000::sptr _rx_framer;
-    rx_dsp_core_3000::sptr _rx_dsp;
-    tx_vita_core_3000::sptr _tx_deframer;
-    tx_dsp_core_3000::sptr _tx_dsp;
-    uhd::dict<size_t, boost::weak_ptr<uhd::rx_streamer> > _rx_streamers;
-    uhd::dict<size_t, boost::weak_ptr<uhd::tx_streamer> > _tx_streamers;
+    //perifs in the radio core
+    struct radio_perifs_t
+    {
+        e200_ctrl::sptr ctrl;
+        gpio_core_200_32wo::sptr atr;
+        time_core_3000::sptr time64;
+        rx_vita_core_3000::sptr framer;
+        rx_dsp_core_3000::sptr ddc;
+        tx_vita_core_3000::sptr deframer;
+        tx_dsp_core_3000::sptr duc;
 
-    uhd::transport::zero_copy_if::sptr _send_ctrl_xport, _recv_ctrl_xport;
-
-    uhd::transport::zero_copy_if::sptr _tx_data_xport, _tx_flow_xport;
-    uhd::transport::zero_copy_if::sptr _rx_data_xport, _rx_flow_xport;
-
-    time_core_3000::sptr _time64;
-    gpio_core_200_32wo::sptr _atr0;
-    gpio_core_200_32wo::sptr _atr1;
+        uhd::transport::zero_copy_if::sptr send_ctrl_xport;
+        uhd::transport::zero_copy_if::sptr recv_ctrl_xport;
+        uhd::transport::zero_copy_if::sptr tx_data_xport;
+        uhd::transport::zero_copy_if::sptr tx_flow_xport;
+        uhd::transport::zero_copy_if::sptr rx_data_xport;
+        uhd::transport::zero_copy_if::sptr rx_flow_xport;
+        boost::weak_ptr<uhd::rx_streamer> rx_streamer;
+        boost::weak_ptr<uhd::tx_streamer> tx_streamer;
+    };
+    radio_perifs_t _radio_perifs[1]; //TODO 1 for now
+    void setup_radio(const size_t which_radio);
 
     double _tick_rate;
     double get_tick_rate(void){return _tick_rate;}
