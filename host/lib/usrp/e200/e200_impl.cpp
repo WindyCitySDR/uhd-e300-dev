@@ -499,15 +499,24 @@ void e200_impl::update_atrs(const size_t &fe)
     else                                   tx_bandsels = 0;
 
     //------------------- RX low band bandsel ----------------------//
-    //TODO these rx freq ranges are copied from TX and not correct!
     int rx_bandsels = 0, rx_bandsel_b = 0, rx_bandsel_c = 0;
-    if      (settings.rx_freq < 117.7e6)   {rx_bandsels = 0; rx_bandsel_b = 0; rx_bandsel_c = 0;}
-    else if (settings.rx_freq < 178.2e6)   {rx_bandsels = 1; rx_bandsel_b = 0; rx_bandsel_c = 0;}
-    else if (settings.rx_freq < 284.3e6)   {rx_bandsels = 2; rx_bandsel_b = 0; rx_bandsel_c = 0;}
-    else if (settings.rx_freq < 453.7e6)   {rx_bandsels = 3; rx_bandsel_b = 0; rx_bandsel_c = 0;}
-    else if (settings.rx_freq < 723.8e6)   {rx_bandsels = 4; rx_bandsel_b = 0; rx_bandsel_c = 0;}
-    else if (settings.rx_freq < 1154.9e6)  {rx_bandsels = 5; rx_bandsel_b = 0; rx_bandsel_c = 0;}
-    else                                   {rx_bandsels = 0; rx_bandsel_b = 0; rx_bandsel_c = 0;}
+    if(fe == 0) {
+        if      (settings.rx_freq < 450e6)   {rx_bandsels = 2; rx_bandsel_b = 0; rx_bandsel_c = 1;}
+        else if (settings.rx_freq < 700e6)   {rx_bandsels = 3; rx_bandsel_b = 0; rx_bandsel_c = 2;}
+        else if (settings.rx_freq < 1200e6)  {rx_bandsels = 1; rx_bandsel_b = 0; rx_bandsel_c = 0;}
+        else if (settings.rx_freq < 1800e6)  {rx_bandsels = 4; rx_bandsel_b = 2; rx_bandsel_c = 0;}
+        else if (settings.rx_freq < 2350e6)  {rx_bandsels = 0; rx_bandsel_b = 1; rx_bandsel_c = 0;}
+        else if (settings.rx_freq < 2600e6)  {rx_bandsels = 5; rx_bandsel_b = 0; rx_bandsel_c = 0;}
+        else                                 {rx_bandsels = 0; rx_bandsel_b = 0; rx_bandsel_c = 0;}
+    } else {
+        if      (settings.rx_freq < 450e6)   {rx_bandsels = 3; rx_bandsel_b = 0; rx_bandsel_c = 0;}
+        else if (settings.rx_freq < 700e6)   {rx_bandsels = 2; rx_bandsel_b = 0; rx_bandsel_c = 2;}
+        else if (settings.rx_freq < 1200e6)  {rx_bandsels = 4; rx_bandsel_b = 0; rx_bandsel_c = 1;}
+        else if (settings.rx_freq < 1800e6)  {rx_bandsels = 1; rx_bandsel_b = 0; rx_bandsel_c = 0;}
+        else if (settings.rx_freq < 2350e6)  {rx_bandsels = 5; rx_bandsel_b = 2; rx_bandsel_c = 0;}
+        else if (settings.rx_freq < 2600e6)  {rx_bandsels = 0; rx_bandsel_b = 1; rx_bandsel_c = 0;}
+        else                                 {rx_bandsels = 0; rx_bandsel_b = 0; rx_bandsel_c = 0;}
+    }
 
     //-------------------- VCRX - rx mode -------------------------//
     int vcrx_1_rxing = 0, vcrx_2_rxing = 1;
