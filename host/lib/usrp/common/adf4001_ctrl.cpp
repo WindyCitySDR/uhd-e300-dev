@@ -20,8 +20,10 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 //
 
-#include "adf4001.hpp"
+#include "adf4001_ctrl.hpp"
 
+using namespace uhd;
+using namespace uhd::usrp;
 
 adf4001_regs_t::adf4001_regs_t(void) {
     ref_counter = 0;
@@ -102,9 +104,9 @@ adf4001_ctrl::adf4001_ctrl(spi_core_3000::sptr _spi, bool lock_to_ext_ref) {
     adf4001_regs.phase_detector_polarity = adf4001_regs_t::PHASE_DETECTOR_POLARITY_POSITIVE;
 
     if(lock_to_ext_ref) {
-        adf4001_regs.charge_pump_mode = CHARGE_PUMP_NORMAL;
+        adf4001_regs.charge_pump_mode = adf4001_regs_t::CHARGE_PUMP_NORMAL;
     } else {
-        adf4001_regs.charge_pump_mode = CHARGE_PUMP_TRISTATE;
+        adf4001_regs.charge_pump_mode = adf4001_regs_t::CHARGE_PUMP_TRISTATE;
     }
 
     //everything else should be defaults
@@ -114,13 +116,13 @@ adf4001_ctrl::adf4001_ctrl(spi_core_3000::sptr _spi, bool lock_to_ext_ref) {
 
 
 void adf4001_ctrl::lock_to_ext_ref(void) {
-    charge_pump_mode = CHARGE_PUMP_NORMAL;
+    adf4001_regs.charge_pump_mode = adf4001_regs_t::CHARGE_PUMP_NORMAL;
 
     program_regs();
 }
 
 
-void adf4001_ctrl::locked(void) {
+bool adf4001_ctrl::locked(void) {
     // TODO
     /* return get_gpio(muxout); */
 }
@@ -143,9 +145,9 @@ void adf4001_ctrl::program_regs(void) {
 
 void adf4001_ctrl::write_reg(boost::uint8_t addr) {
     boost::uint32_t reg = adf4001_regs.get_reg(addr); //load the reg data
-    for(boost:int32_t i = 16; i >= 0; i -= 8) {
+    for(boost::int32_t i = 16; i >= 0; i -= 8) {
         spi_iface->transact_spi(1, 
-                            config,
+                            spi_config,
                             (reg & (boost::uint32_t(0xFF) << i)) >> i,
                             24,
                             false);

@@ -26,6 +26,7 @@
 #include "spi_core_3000.hpp"
 #include <uhd/types/serial.hpp>
 #include <boost/cstdint.hpp>
+#include <boost/thread/thread.hpp>
 
 namespace uhd { namespace usrp {
 
