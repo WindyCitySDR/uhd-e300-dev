@@ -363,24 +363,23 @@ void e200_impl::load_fpga_image(const std::string &path)
 
     UHD_MSG(status) << "Loading FPGA image: " << path << "..." << std::flush;
 
-    /*
     std::ifstream fpga_file(path.c_str(), std::ios_base::binary);
     UHD_ASSERT_THROW(fpga_file.good());
 
-    std::ofstream xdev_file("/dev/xdevcfg", std::ios_base::binary);
-    UHD_ASSERT_THROW(xdev_file.good());
+#include <cstdio>
 
-    char buff[(1 << 22)]; //big enough for entire image
-    fpga_file.read(buff, sizeof(buff));
-    xdev_file.write(buff, fpga_file.gcount());
+    std::FILE *wfile;
+    wfile = std::fopen("/dev/xdevcfg", "wb");
+    UHD_ASSERT_THROW(!(wfile == NULL));
+
+    char buff[16384]; // devcfg driver can't handle huge writes
+    do {
+        fpga_file.read(buff, sizeof(buff));
+        std::fwrite(buff, 1, fpga_file.gcount(), wfile);
+    } while (fpga_file);
 
     fpga_file.close();
-    xdev_file.close();
-    //*/
-
-    //cat works, fstream blows
-    const std::string cmd = str(boost::format("cat \"%s\" > /dev/xdevcfg") % path);
-    ::system(cmd.c_str());
+    std::fclose(wfile);
 
     UHD_MSG(status) << " done" << std::endl;
 }
