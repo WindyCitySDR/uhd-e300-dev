@@ -114,17 +114,26 @@ adf4001_ctrl::adf4001_ctrl(spi_core_3000::sptr _spi, bool lock_to_ext_ref) {
     program_regs();
 }
 
-
-void adf4001_ctrl::lock_to_ext_ref(void) {
-    adf4001_regs.charge_pump_mode = adf4001_regs_t::CHARGE_PUMP_NORMAL;
+void adf4001_ctrl::set_lock_to_ext_ref(bool external) {
+    if(external) {
+        adf4001_regs.charge_pump_mode = adf4001_regs_t::CHARGE_PUMP_NORMAL;
+    } else {
+        adf4001_regs.charge_pump_mode = adf4001_regs_t::CHARGE_PUMP_TRISTATE;
+    }
 
     program_regs();
 }
 
 
 bool adf4001_ctrl::locked(void) {
-    // TODO
-    /* return get_gpio(muxout); */
+    boost::uint32_t ret = spi_iface->transact_spi(2,
+                                                  spi_config,
+                                                  0x01,
+                                                  8,
+                                                  true);
+
+    if(ret) return true;
+    else return false;
 }
 
 

@@ -21,6 +21,7 @@
 #include "b200_iface.hpp"
 #include "b200_ctrl.hpp"
 #include "ad9361_ctrl.hpp"
+#include "adf4001_ctrl.hpp"
 #include "rx_vita_core_3000.hpp"
 #include "tx_vita_core_3000.hpp"
 #include "time_core_3000.hpp"
@@ -85,6 +86,8 @@ private:
     time_core_3000::sptr _time64;
     gpio_core_200_32wo::sptr _atr0;
     gpio_core_200_32wo::sptr _atr1;
+    spi_core_3000::sptr _spi_iface;
+    boost::shared_ptr<uhd::usrp::adf4001_ctrl> _adf4001_iface;
 
     //transports
     uhd::transport::zero_copy_if::sptr _data_transport;

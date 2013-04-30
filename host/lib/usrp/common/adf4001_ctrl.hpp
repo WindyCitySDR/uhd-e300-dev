@@ -125,7 +125,7 @@ class adf4001_ctrl {
 public:
 
     adf4001_ctrl(spi_core_3000::sptr _spi, bool lock_to_ext_ref);
-    void lock_to_ext_ref(void);
+    void set_lock_to_ext_ref(bool external);
     bool locked(void);
 
 private:

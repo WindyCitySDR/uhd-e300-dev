@@ -381,8 +381,11 @@ b200_impl::b200_impl(const device_addr_t &device_addr):
     }
 
     ////////////////////////////////////////////////////////////////////
-    // create time control objects
+    // create time and clock control objects
     ////////////////////////////////////////////////////////////////////
+    _spi_iface = spi_core_3000::make(_ctrl, TOREG(SR_SPI), RB32_SPI);
+    _adf4001_iface = boost::shared_ptr<adf4001_ctrl>(new adf4001_ctrl(_spi_iface, false));
+
     time_core_3000::readback_bases_type time64_rb_bases;
     time64_rb_bases.rb_now = RB64_TIME_NOW;
     time64_rb_bases.rb_pps = RB64_TIME_PPS;
@@ -619,11 +622,18 @@ void b200_impl::set_mb_eeprom(const uhd::usrp::mboard_eeprom_t &mb_eeprom)
 
 void b200_impl::update_clock_source(const std::string &source)
 {
-    if (source == "internal"){}
-    else if (source == "external"){}
-    else if (source == "gpsdo"){}
-    else if (source == "gpsdo_out"){}
-    else throw uhd::key_error("update_clock_source: unknown source: " + source);
+    if (source == "internal"){
+        _adf4001_iface->set_lock_to_ext_ref(false);
+    }
+    else if ((source == "external")
+              or (source == "gpsdo")
+              or (source == "gpsdo_out")){
+
+        _adf4001_iface->set_lock_to_ext_ref(true);
+    } else {
+        throw uhd::key_error("update_clock_source: unknown source: " + source);
+    }
+
     _gpio_state.gps_out_enable = (source == "gpsdo_out")? 0 : 1;
     _gpio_state.gps_ref_enable = ((source == "gpsdo") or (source == "gpsdo_out"))? 0 : 1;
     _gpio_state.ext_ref_enable = (source == "external")? 0 : 1;
