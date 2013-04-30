@@ -366,8 +366,6 @@ void e200_impl::load_fpga_image(const std::string &path)
     std::ifstream fpga_file(path.c_str(), std::ios_base::binary);
     UHD_ASSERT_THROW(fpga_file.good());
 
-#include <cstdio>
-
     std::FILE *wfile;
     wfile = std::fopen("/dev/xdevcfg", "wb");
     UHD_ASSERT_THROW(!(wfile == NULL));
