@@ -258,6 +258,18 @@ e200_impl::e200_impl(const uhd::device_addr_t &device_addr)
     ////////////////////////////////////////////////////////////////////
     static const std::vector<std::string> frontends = boost::assign::list_of
         ("TX1")("TX2")("RX1")("RX2");
+
+    {
+        const fs_path codec_path = mb_path / ("rx_codecs") / "A";
+        _tree->create<std::string>(codec_path / "name").set("B200 RX dual ADC");
+        _tree->create<int>(codec_path / "gains"); //empty cuz gains are in frontend
+    }
+    {
+        const fs_path codec_path = mb_path / ("tx_codecs") / "A";
+        _tree->create<std::string>(codec_path / "name").set("B200 TX dual DAC");
+        _tree->create<int>(codec_path / "gains"); //empty cuz gains are in frontend
+    }
+
     BOOST_FOREACH(const std::string &fe_name, frontends)
     {
         const std::string x = std::string(1, tolower(fe_name[0]));
@@ -324,6 +336,9 @@ e200_impl::e200_impl(const uhd::device_addr_t &device_addr)
     //init the clock rate to something, but only when we have active chains
     _tree->access<double>(mb_path / "tick_rate").set(61.44e6/2);
     //_codec_ctrl->set_active_chains(false, false, false, false);
+
+    _tree->access<subdev_spec_t>(mb_path / "rx_subdev_spec").set(subdev_spec_t("A:RX2"));
+    _tree->access<subdev_spec_t>(mb_path / "tx_subdev_spec").set(subdev_spec_t("A:TX2"));
 
     _tree->access<std::string>(mb_path / "clock_source" / "value").set("internal");
     _tree->access<std::string>(mb_path / "time_source" / "value").set("none");
@@ -422,6 +437,16 @@ void e200_impl::update_fe_lo_freq(const std::string &fe, const double freq)
         if (fe[0] == 'T') _fe_control_settings[i].tx_freq = freq;
         this->update_atrs(i);
     }
+}
+
+void e200_impl::update_active_frontends(void)
+{
+    _codec_ctrl->set_active_chains(
+        _fe_control_settings[0].tx_enb,
+        _fe_control_settings[1].tx_enb,
+        _fe_control_settings[0].rx_enb,
+        _fe_control_settings[1].rx_enb
+    );
 }
 
 void e200_impl::setup_radio(const size_t dspno)

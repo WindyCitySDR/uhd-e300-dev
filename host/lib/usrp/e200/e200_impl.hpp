@@ -142,6 +142,14 @@ private:
     //frontend cache so we can update gpios
     struct fe_control_settings_t
     {
+        fe_control_settings_t(void)
+        {
+            rx_ant = "RX2";
+            tx_enb = false;
+            rx_enb = false;
+            rx_freq = 1e9;
+            tx_freq = 1e9;
+        }
         std::string rx_ant;
         bool tx_enb;
         bool rx_enb;
@@ -152,6 +160,7 @@ private:
     void update_atrs(const size_t &fe);
     void update_antenna_sel(const std::string &fe, const std::string &ant);
     void update_fe_lo_freq(const std::string &fe, const double freq);
+    void update_active_frontends(void);
 
 };
 
