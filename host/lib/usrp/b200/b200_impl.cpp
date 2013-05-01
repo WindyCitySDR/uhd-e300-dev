@@ -755,10 +755,7 @@ void b200_impl::update_enables(void)
 
 sensor_value_t b200_impl::get_ref_locked(void)
 {
-    bool lock;
-    while(true) {
-    lock = _adf4001_iface->locked();
-    }
+    const bool lock = _adf4001_iface->locked();
     return sensor_value_t("Ref", lock, "locked", "unlocked");
 }
 

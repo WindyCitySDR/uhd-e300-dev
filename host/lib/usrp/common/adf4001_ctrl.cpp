@@ -99,11 +99,11 @@ adf4001_ctrl::adf4001_ctrl(spi_core_3000::sptr _spi, bool lock_to_ext_ref) {
     spi_config.mosi_edge = spi_config_t::EDGE_RISE;
 
     //set defaults
-    adf4001_regs.ref_counter = 2;
+    adf4001_regs.ref_counter = 1;
     adf4001_regs.n = 4;
     adf4001_regs.charge_pump_current_1 = 7;
     adf4001_regs.charge_pump_current_2 = 7;
-    adf4001_regs.muxout = adf4001_regs_t::MUXOUT_NDIV;
+    adf4001_regs.muxout = adf4001_regs_t::MUXOUT_DLD;
     adf4001_regs.counter_reset = adf4001_regs_t::COUNTER_RESET_NORMAL;
     adf4001_regs.phase_detector_polarity = adf4001_regs_t::PHASE_DETECTOR_POLARITY_POSITIVE;
 
@@ -159,11 +159,9 @@ void adf4001_ctrl::program_regs(void) {
 void adf4001_ctrl::write_reg(boost::uint8_t addr) {
     boost::uint32_t reg = adf4001_regs.get_reg(addr); //load the reg data
 
-    for(boost::int32_t i = 16; i >= 0; i -= 8) {
         spi_iface->transact_spi(2,
                                 spi_config,
-                                (reg & (boost::uint32_t(0xFF) << i)) >> i,
-                                8,
+                                reg,
+                                24,
                                 false);
-    }
 }
