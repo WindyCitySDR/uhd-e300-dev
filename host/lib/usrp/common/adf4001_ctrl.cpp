@@ -99,8 +99,8 @@ adf4001_ctrl::adf4001_ctrl(spi_core_3000::sptr _spi, bool lock_to_ext_ref) {
     spi_config.mosi_edge = spi_config_t::EDGE_RISE;
 
     //set defaults
-    adf4001_regs.ref_counter = 1;
-    adf4001_regs.n = 8;
+    adf4001_regs.ref_counter = 2;
+    adf4001_regs.n = 4;
     adf4001_regs.charge_pump_current_1 = 7;
     adf4001_regs.charge_pump_current_2 = 7;
     adf4001_regs.muxout = adf4001_regs_t::MUXOUT_NDIV;
@@ -130,8 +130,7 @@ void adf4001_ctrl::set_lock_to_ext_ref(bool external) {
 
 
 bool adf4001_ctrl::locked(void) {
-    /* UHD_VAR(adf4001_regs.charge_pump_mode); */
-    boost::uint32_t ret = spi_iface->transact_spi(2,
+    boost::uint32_t ret = spi_iface->transact_spi(4,
                                                   spi_config,
                                                   0x01,
                                                   8,
@@ -143,7 +142,6 @@ bool adf4001_ctrl::locked(void) {
 
 
 void adf4001_ctrl::program_regs(void) {
-    UHD_VAR(adf4001_regs.charge_pump_mode);
     //no control over CE, only LE, therefore we use the initialization latch method
     write_reg(3);
     boost::this_thread::sleep(boost::posix_time::microseconds(1));
@@ -161,12 +159,11 @@ void adf4001_ctrl::program_regs(void) {
 void adf4001_ctrl::write_reg(boost::uint8_t addr) {
     boost::uint32_t reg = adf4001_regs.get_reg(addr); //load the reg data
 
-    std::cout << "Register: " << (int) addr << " --> 0x" << std::hex << reg << std::flush << std::endl;
     for(boost::int32_t i = 16; i >= 0; i -= 8) {
         spi_iface->transact_spi(2,
-                            spi_config,
-                            (reg & (boost::uint32_t(0xFF) << i)) >> i,
-                            8,
-                            false);
+                                spi_config,
+                                (reg & (boost::uint32_t(0xFF) << i)) >> i,
+                                8,
+                                false);
     }
 }

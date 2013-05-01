@@ -386,7 +386,6 @@ b200_impl::b200_impl(const device_addr_t &device_addr):
     // create time and clock control objects
     ////////////////////////////////////////////////////////////////////
     _spi_iface = spi_core_3000::make(_ctrl, TOREG(SR_SPI), RB32_SPI);
-    UHD_HERE();
     _adf4001_iface = boost::shared_ptr<adf4001_ctrl>(new adf4001_ctrl(_spi_iface, false));
 
     time_core_3000::readback_bases_type time64_rb_bases;
