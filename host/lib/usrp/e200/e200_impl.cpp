@@ -21,7 +21,7 @@
 #include <uhd/utils/static.hpp>
 #include <uhd/utils/images.hpp>
 #include <uhd/usrp/dboard_eeprom.hpp>
-#include <uhd/transport/tcp_zero_copy.hpp>
+#include <uhd/transport/udp_zero_copy.hpp>
 #include <uhd/types/sensors.hpp>
 #include <boost/filesystem.hpp>
 #include <boost/functional/hash.hpp>
@@ -51,12 +51,12 @@ static device_addrs_t e200_find(const device_addr_t &hint)
     if (hint.has_key("addr")) try
     {
         asio::io_service io_service;
-        asio::ip::tcp::resolver resolver(io_service);
-        asio::ip::tcp::resolver::query query(asio::ip::tcp::v4(), hint["addr"], E200_SERVER_CODEC_PORT);
-        asio::ip::tcp::endpoint endpoint = *resolver.resolve(query);
+        asio::ip::udp::resolver resolver(io_service);
+        asio::ip::udp::resolver::query query(asio::ip::udp::v4(), hint["addr"], E200_SERVER_CODEC_PORT);
+        asio::ip::udp::endpoint endpoint = *resolver.resolve(query);
         {
-            boost::shared_ptr<asio::ip::tcp::socket> socket;
-            socket.reset(new asio::ip::tcp::socket(io_service));
+            boost::shared_ptr<asio::ip::udp::socket> socket;
+            socket.reset(new asio::ip::udp::socket(io_service));
             socket->connect(endpoint);
             socket->close();
         }
@@ -138,22 +138,22 @@ e200_impl::e200_impl(const uhd::device_addr_t &device_addr)
     ctrl_xport_args["num_send_frames"] = "32";
 
     uhd::device_addr_t data_xport_args;
-    data_xport_args["recv_frame_size"] = "1400";
+    data_xport_args["recv_frame_size"] = "2048";
     data_xport_args["num_recv_frames"] = "128";
-    data_xport_args["send_frame_size"] = "1400";
+    data_xport_args["send_frame_size"] = "2048";
     data_xport_args["num_send_frames"] = "128";
 
     if (device_addr.has_key("addr"))
     {
         radio_perifs_t &perif = _radio_perifs[0];
-        perif.send_ctrl_xport = tcp_zero_copy::make(device_addr["addr"], E200_SERVER_CTRL_PORT, ctrl_xport_args);
+        perif.send_ctrl_xport = udp_zero_copy::make(device_addr["addr"], E200_SERVER_CTRL_PORT);
         perif.recv_ctrl_xport = perif.send_ctrl_xport;
-        perif.tx_data_xport = tcp_zero_copy::make(device_addr["addr"], E200_SERVER_TX_PORT, data_xport_args);
+        perif.tx_data_xport = udp_zero_copy::make(device_addr["addr"], E200_SERVER_TX_PORT);
         perif.tx_flow_xport = perif.tx_data_xport;
-        perif.rx_data_xport = tcp_zero_copy::make(device_addr["addr"], E200_SERVER_RX_PORT, data_xport_args);
+        perif.rx_data_xport = udp_zero_copy::make(device_addr["addr"], E200_SERVER_RX_PORT);
         perif.rx_flow_xport = perif.rx_data_xport;
         zero_copy_if::sptr codec_xport;
-        codec_xport = tcp_zero_copy::make(device_addr["addr"], E200_SERVER_CODEC_PORT, ctrl_xport_args);
+        codec_xport = udp_zero_copy::make(device_addr["addr"], E200_SERVER_CODEC_PORT);
         ad9361_ctrl_iface_sptr codec_ctrl(new ad9361_ctrl_over_zc(codec_xport));
         _codec_ctrl = ad9361_ctrl::make(codec_ctrl);
     }
@@ -173,7 +173,7 @@ e200_impl::e200_impl(const uhd::device_addr_t &device_addr)
     }
 
     ////////////////////////////////////////////////////////////////////
-    // optional tcp server
+    // optional udp server
     ////////////////////////////////////////////////////////////////////
     if (device_addr.has_key("server"))
     {
