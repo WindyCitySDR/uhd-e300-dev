@@ -119,6 +119,7 @@ private:
     void update_streamer_rates(void);
     void update_bandsel(const std::string& which, double freq);
     void update_antenna_sel(const std::string& which, const std::string &ant);
+    uhd::sensor_value_t get_ref_locked(void);
 
     struct gpio_state {
         boost::uint32_t  tx_bandsel_a, tx_bandsel_b, rx_bandsel_a, rx_bandsel_b, rx_bandsel_c;

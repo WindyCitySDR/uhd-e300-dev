@@ -331,6 +331,8 @@ b200_impl::b200_impl(const device_addr_t &device_addr):
     // and do the misc mboard sensors
     ////////////////////////////////////////////////////////////////////
     _tree->create<int>(mb_path / "sensors"); //empty but path exists TODO
+    _tree->create<sensor_value_t>(mb_path / "sensors" / "ref_locked")
+        .publish(boost::bind(&b200_impl::get_ref_locked, this));
 
     ////////////////////////////////////////////////////////////////////
     // create frontend mapping
@@ -384,6 +386,7 @@ b200_impl::b200_impl(const device_addr_t &device_addr):
     // create time and clock control objects
     ////////////////////////////////////////////////////////////////////
     _spi_iface = spi_core_3000::make(_ctrl, TOREG(SR_SPI), RB32_SPI);
+    UHD_HERE();
     _adf4001_iface = boost::shared_ptr<adf4001_ctrl>(new adf4001_ctrl(_spi_iface, false));
 
     time_core_3000::readback_bases_type time64_rb_bases;
@@ -425,7 +428,6 @@ b200_impl::b200_impl(const device_addr_t &device_addr):
 
         _tree->create<std::string>(rf_fe_path / "name").set(fe_name);
         _tree->create<int>(rf_fe_path / "sensors"); //empty TODO
-        _tree->create<sensor_value_t>(rf_fe_path / "sensors" / "lo_locked");
         BOOST_FOREACH(const std::string &name, ad9361_ctrl::get_gain_names(fe_name))
         {
             _tree->create<meta_range_t>(rf_fe_path / "gains" / name / "range")
@@ -750,6 +752,15 @@ void b200_impl::update_enables(void)
 {
     _codec_ctrl->set_active_chains(_fe_enb_map["TX1"], _fe_enb_map["TX2"], _fe_enb_map["RX1"], _fe_enb_map["RX2"]);
     this->update_atrs();
+}
+
+sensor_value_t b200_impl::get_ref_locked(void)
+{
+    bool lock;
+    while(true) {
+    lock = _adf4001_iface->locked();
+    }
+    return sensor_value_t("Ref", lock, "locked", "unlocked");
 }
 
 static inline bool wait_for_recv_ready(int sock_fd, const size_t timeout_ms)
