@@ -175,6 +175,8 @@ void e200_impl::run_server(const std::string &port, const std::string &what)
             socket.reset(new asio::ip::tcp::socket(io_service));
             acceptor->accept(*socket);
             UHD_MSG(status) << "e200 socket accept on port " << port << " for " << what << std::endl;
+            asio::ip::tcp::no_delay option(true);
+            socket->set_option(option);
             boost::thread_group tg;
             bool running = true;
             radio_perifs_t &perif = _radio_perifs[0];

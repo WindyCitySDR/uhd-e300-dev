@@ -171,20 +171,6 @@ public:
         }
     }
 
-    //get size for internal socket buffer
-    template <typename Opt> size_t get_buff_size(void) const{
-        Opt option;
-        _socket->get_option(option);
-        return option.value();
-    }
-
-    //set size for internal socket buffer
-    template <typename Opt> size_t resize_buff(size_t num_bytes){
-        Opt option(num_bytes);
-        _socket->set_option(option);
-        return get_buff_size<Opt>();
-    }
-
     /*******************************************************************
      * Receive implementation:
      * Block on the managed buffer's get call and advance the index.
