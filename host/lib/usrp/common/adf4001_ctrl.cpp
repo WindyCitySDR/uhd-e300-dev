@@ -130,7 +130,7 @@ void adf4001_ctrl::set_lock_to_ext_ref(bool external) {
 
 
 bool adf4001_ctrl::locked(void) {
-    boost::uint32_t ret = spi_iface->transact_spi(4,
+    boost::uint32_t ret = spi_iface->transact_spi(0,
                                                   spi_config,
                                                   0x01,
                                                   8,
