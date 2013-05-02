@@ -272,8 +272,7 @@ rx_streamer::sptr b250_impl::get_rx_stream(const uhd::stream_args_t &args_)
     }
     args.otw_format = "sc16";
     args.channels = args.channels.empty()? std::vector<size_t>(1, 0) : args.channels;
-    const std::string db_name = _rx_fe_map[args.channels[0]].db_name;
-    const size_t i = (db_name == "A")? 0 : 1;
+    const size_t i = args.channels[0];
     radio_perifs_t &perif = _radio_perifs[i];
 
     //allocate sid and create transport
@@ -352,9 +351,7 @@ tx_streamer::sptr b250_impl::get_tx_stream(const uhd::stream_args_t &args_)
     }
     args.otw_format = "sc16";
     args.channels = args.channels.empty()? std::vector<size_t>(1, 0) : args.channels;
-    const std::string db_name = _tx_fe_map[args.channels[0]].db_name;
-    const size_t i = (db_name == "A")? 0 : 1;
-    UHD_VAR(i);
+    const size_t i = args.channels[0];
     radio_perifs_t &perif = _radio_perifs[i];
 
     //allocate sid and create transport
