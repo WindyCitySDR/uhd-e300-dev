@@ -337,8 +337,8 @@ e200_impl::e200_impl(const uhd::device_addr_t &device_addr)
     _tree->access<double>(mb_path / "tick_rate").set(61.44e6/2);
     //_codec_ctrl->set_active_chains(false, false, false, false);
 
-    _tree->access<subdev_spec_t>(mb_path / "rx_subdev_spec").set(subdev_spec_t("A:RX2"));
-    _tree->access<subdev_spec_t>(mb_path / "tx_subdev_spec").set(subdev_spec_t("A:TX2"));
+    _tree->access<subdev_spec_t>(mb_path / "rx_subdev_spec").set(subdev_spec_t("A:RX1"));
+    _tree->access<subdev_spec_t>(mb_path / "tx_subdev_spec").set(subdev_spec_t("A:TX1"));
 
     _tree->access<std::string>(mb_path / "clock_source" / "value").set("internal");
     _tree->access<std::string>(mb_path / "time_source" / "value").set("none");
@@ -554,43 +554,47 @@ void e200_impl::update_atrs(const size_t &fe)
     //------------------- RX low band bandsel ----------------------//
     int rx_bandsels = 0, rx_bandsel_b = 0, rx_bandsel_c = 0;
     if(fe == 0) {
-        if      (settings.rx_freq < 450e6)   {rx_bandsels = 2; rx_bandsel_b = 0; rx_bandsel_c = 1;}
-        else if (settings.rx_freq < 700e6)   {rx_bandsels = 3; rx_bandsel_b = 0; rx_bandsel_c = 2;}
-        else if (settings.rx_freq < 1200e6)  {rx_bandsels = 1; rx_bandsel_b = 0; rx_bandsel_c = 0;}
-        else if (settings.rx_freq < 1800e6)  {rx_bandsels = 4; rx_bandsel_b = 2; rx_bandsel_c = 0;}
-        else if (settings.rx_freq < 2350e6)  {rx_bandsels = 0; rx_bandsel_b = 1; rx_bandsel_c = 0;}
+        if      (settings.rx_freq < 450e6)   {rx_bandsels = 4; rx_bandsel_b = 0; rx_bandsel_c = 2;}
+        else if (settings.rx_freq < 700e6)   {rx_bandsels = 2; rx_bandsel_b = 0; rx_bandsel_c = 3;}
+        else if (settings.rx_freq < 1200e6)  {rx_bandsels = 0; rx_bandsel_b = 0; rx_bandsel_c = 1;}
+        else if (settings.rx_freq < 1800e6)  {rx_bandsels = 1; rx_bandsel_b = 2; rx_bandsel_c = 0;}
+        else if (settings.rx_freq < 2350e6)  {rx_bandsels = 3; rx_bandsel_b = 1; rx_bandsel_c = 0;}
         else if (settings.rx_freq < 2600e6)  {rx_bandsels = 5; rx_bandsel_b = 0; rx_bandsel_c = 0;}
         else                                 {rx_bandsels = 0; rx_bandsel_b = 0; rx_bandsel_c = 0;}
     } else {
-        if      (settings.rx_freq < 450e6)   {rx_bandsels = 3; rx_bandsel_b = 0; rx_bandsel_c = 0;}
-        else if (settings.rx_freq < 700e6)   {rx_bandsels = 2; rx_bandsel_b = 0; rx_bandsel_c = 2;}
-        else if (settings.rx_freq < 1200e6)  {rx_bandsels = 4; rx_bandsel_b = 0; rx_bandsel_c = 1;}
-        else if (settings.rx_freq < 1800e6)  {rx_bandsels = 1; rx_bandsel_b = 0; rx_bandsel_c = 0;}
-        else if (settings.rx_freq < 2350e6)  {rx_bandsels = 5; rx_bandsel_b = 2; rx_bandsel_c = 0;}
-        else if (settings.rx_freq < 2600e6)  {rx_bandsels = 0; rx_bandsel_b = 1; rx_bandsel_c = 0;}
+        if      (settings.rx_freq < 450e6)   {rx_bandsels = 5; rx_bandsel_b = 0; rx_bandsel_c = 1;}
+        else if (settings.rx_freq < 700e6)   {rx_bandsels = 3; rx_bandsel_b = 0; rx_bandsel_c = 3;}
+        else if (settings.rx_freq < 1200e6)  {rx_bandsels = 1; rx_bandsel_b = 0; rx_bandsel_c = 2;}
+        else if (settings.rx_freq < 1800e6)  {rx_bandsels = 0; rx_bandsel_b = 0; rx_bandsel_c = 0;}
+        else if (settings.rx_freq < 2350e6)  {rx_bandsels = 2; rx_bandsel_b = 2; rx_bandsel_c = 0;}
+        else if (settings.rx_freq < 2600e6)  {rx_bandsels = 4; rx_bandsel_b = 1; rx_bandsel_c = 0;}
         else                                 {rx_bandsels = 0; rx_bandsel_b = 0; rx_bandsel_c = 0;}
     }
+    UHD_VAR(settings.rx_freq);
+    UHD_VAR(rx_bandsels);
+    UHD_VAR(rx_bandsel_b);
+    UHD_VAR(rx_bandsel_c);
 
     //-------------------- VCRX - rx mode -------------------------//
-    int vcrx_1_rxing = 0, vcrx_2_rxing = 1;
+    int vcrx_1_rxing = 1, vcrx_2_rxing = 0;
     if ((rx_ant_rx2 and rx_low_band) or (rx_ant_txrx and rx_high_band))
-    {
-        vcrx_1_rxing = 1; vcrx_2_rxing = 0;
-    }
-    if ((rx_ant_rx2 and rx_high_band) or (rx_ant_txrx and rx_low_band))
     {
         vcrx_1_rxing = 0; vcrx_2_rxing = 1;
     }
+    if ((rx_ant_rx2 and rx_high_band) or (rx_ant_txrx and rx_low_band))
+    {
+        vcrx_1_rxing = 1; vcrx_2_rxing = 0;
+    }
 
     //-------------------- VCRX - tx mode -------------------------//
-    int vcrx_1_txing = 0, vcrx_2_txing = 1;
+    int vcrx_1_txing = 1, vcrx_2_txing = 0;
     if (rx_low_band)
     {
-        vcrx_1_txing = 1; vcrx_2_txing = 0;
+        vcrx_1_txing = 0; vcrx_2_txing = 1;
     }
     if (rx_high_band)
     {
-        vcrx_1_txing = 0; vcrx_2_txing = 1;
+        vcrx_1_txing = 1; vcrx_2_txing = 0;
     }
 
     //-------------------- VCTX - rx mode -------------------------//
