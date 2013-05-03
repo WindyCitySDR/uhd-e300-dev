@@ -33,11 +33,7 @@ struct ad9361_ctrl_impl : public ad9361_ctrl
 
         request.action = AD9361_ACTION_ECHO;
         this->do_transaction(request);
-    }
 
-    void init(void)
-    {
-        ad9361_transaction_t request;
         request.action = AD9361_ACTION_INIT;
         this->do_transaction(request);
     }
@@ -121,7 +117,7 @@ struct ad9361_ctrl_impl : public ad9361_ctrl
         in->sequence = _seq++;
 
         //transact
-        _iface->transact(in_buff, out_buff);
+        _iface->ad9361_transact(in_buff, out_buff);
         ad9361_transaction_t *out = (ad9361_transaction_t *)out_buff;
 
         //sanity checks

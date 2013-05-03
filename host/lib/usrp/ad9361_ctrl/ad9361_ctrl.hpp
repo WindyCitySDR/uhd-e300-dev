@@ -27,20 +27,11 @@
 #include <string>
 
 
-//-------- BEGIN super temp stuff to make this work on the host ------//
-
-typedef boost::function<void(unsigned char *, size_t, unsigned char *, size_t)> ad9361_ctrl_cb_type;
-
 struct ad9361_ctrl_iface_type
 {
-    virtual void transact(const unsigned char in_buff[64], unsigned char out_buff[64]) = 0;
+    virtual void ad9361_transact(const unsigned char in_buff[64], unsigned char out_buff[64]) = 0;
 };
 typedef boost::shared_ptr<ad9361_ctrl_iface_type> ad9361_ctrl_iface_sptr;
-
-ad9361_ctrl_iface_sptr ad9361_ctrl_iface_make(ad9361_ctrl_cb_type callback, ad9361_ctrl_iface_sptr iface);
-
-
-//-------- END super temp stuff to make this work on the host --------//
 
 
 class ad9361_ctrl : boost::noncopyable{
@@ -89,9 +80,6 @@ public:
     {
         return 56e6; //TODO
     }
-
-    //! init the device with params
-    virtual void init(void) = 0;
 
     //! set the gain for a particular gain element
     virtual double set_gain(const std::string &which, const double value) = 0;

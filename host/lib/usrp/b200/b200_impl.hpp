@@ -80,7 +80,6 @@ private:
     b200_iface::sptr _iface;
     b200_ctrl::sptr _ctrl;
     ad9361_ctrl::sptr _codec_ctrl;
-    ad9361_ctrl_iface_sptr _codec_ctrl_iface;
     rx_vita_core_3000::sptr _rx_framer;
     tx_vita_core_3000::sptr _tx_deframer;
     time_core_3000::sptr _time64;
