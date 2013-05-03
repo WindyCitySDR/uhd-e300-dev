@@ -35,11 +35,10 @@ struct ad9361_ctrl_impl : public ad9361_ctrl
         this->do_transaction(request);
     }
 
-    void init(const int type)
+    void init(void)
     {
         ad9361_transaction_t request;
         request.action = AD9361_ACTION_INIT;
-        request.value.init_type = type;
         this->do_transaction(request);
     }
 

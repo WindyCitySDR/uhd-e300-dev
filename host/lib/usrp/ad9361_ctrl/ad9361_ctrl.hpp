@@ -91,7 +91,7 @@ public:
     }
 
     //! init the device with params
-    virtual void init(const int type) = 0;
+    virtual void init(void) = 0;
 
     //! set the gain for a particular gain element
     virtual double set_gain(const std::string &which, const double value) = 0;
