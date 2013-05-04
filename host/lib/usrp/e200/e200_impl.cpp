@@ -138,9 +138,9 @@ e200_impl::e200_impl(const uhd::device_addr_t &device_addr)
     ctrl_xport_args["num_send_frames"] = "32";
 
     uhd::device_addr_t data_xport_args;
-    data_xport_args["recv_frame_size"] = "1400";
+    data_xport_args["recv_frame_size"] = "2048";
     data_xport_args["num_recv_frames"] = "128";
-    data_xport_args["send_frame_size"] = "1400";
+    data_xport_args["send_frame_size"] = "2048";
     data_xport_args["num_send_frames"] = "128";
 
     if (device_addr.has_key("addr"))
