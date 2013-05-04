@@ -138,9 +138,9 @@ e200_impl::e200_impl(const uhd::device_addr_t &device_addr)
     ctrl_xport_args["num_send_frames"] = "32";
 
     uhd::device_addr_t data_xport_args;
-    data_xport_args["recv_frame_size"] = "2048";
+    data_xport_args["recv_frame_size"] = "1400";
     data_xport_args["num_recv_frames"] = "128";
-    data_xport_args["send_frame_size"] = "2048";
+    data_xport_args["send_frame_size"] = "1400";
     data_xport_args["num_send_frames"] = "128";
 
     if (device_addr.has_key("addr"))
@@ -168,7 +168,7 @@ e200_impl::e200_impl(const uhd::device_addr_t &device_addr)
         perif.rx_data_xport = _fifo_iface->make_recv_xport(2, data_xport_args);
         perif.rx_flow_xport = _fifo_iface->make_send_xport(2, ctrl_xport_args);
         zero_copy_if::sptr codec_xport;
-        codec_xport = udp_zero_copy::make(device_addr["addr"], "localhost");
+        codec_xport = udp_zero_copy::make("localhost", E200_SERVER_CODEC_PORT);
         ad9361_ctrl_iface_sptr codec_ctrl(new ad9361_ctrl_over_zc(codec_xport));
         _codec_ctrl = ad9361_ctrl::make(codec_ctrl);
     }
