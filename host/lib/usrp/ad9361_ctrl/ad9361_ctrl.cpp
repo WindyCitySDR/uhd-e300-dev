@@ -47,9 +47,9 @@ struct ad9361_ctrl_impl : public ad9361_ctrl
         if (which == "TX1") request.action = AD9361_ACTION_SET_TX1_GAIN;
         if (which == "TX2") request.action = AD9361_ACTION_SET_TX2_GAIN;
 
-        ad9361_trans_double_pack(value, request.value.gain);
+        ad9361_double_pack(value, request.value.gain);
         const ad9361_transaction_t reply = this->do_transaction(request);
-        return ad9361_trans_double_unpack(reply.value.gain);
+        return ad9361_double_unpack(reply.value.gain);
     }
 
     //! set a new clock rate, return the exact value
@@ -57,9 +57,9 @@ struct ad9361_ctrl_impl : public ad9361_ctrl
     {
         ad9361_transaction_t request;
         request.action = AD9361_ACTION_SET_CLOCK_RATE;
-        ad9361_trans_double_pack(rate, request.value.rate);
+        ad9361_double_pack(rate, request.value.rate);
         const ad9361_transaction_t reply = this->do_transaction(request);
-        return ad9361_trans_double_unpack(reply.value.rate);
+        return ad9361_double_unpack(reply.value.rate);
     }
 
     //! set which RX and TX chains/antennas are active
@@ -86,9 +86,9 @@ struct ad9361_ctrl_impl : public ad9361_ctrl
         if (which[0] == 'T') request.action = AD9361_ACTION_SET_TX_FREQ;
 
         const double value = ad9361_ctrl::get_rf_freq_range().clip(raw_value);
-        ad9361_trans_double_pack(value, request.value.freq);
+        ad9361_double_pack(value, request.value.freq);
         const ad9361_transaction_t reply = this->do_transaction(request);
-        return ad9361_trans_double_unpack(reply.value.freq);
+        return ad9361_double_unpack(reply.value.freq);
     }
 
     //! turn on/off Catalina's data port loopback
@@ -105,8 +105,8 @@ struct ad9361_ctrl_impl : public ad9361_ctrl
         boost::mutex::scoped_lock lock(_mutex);
 
         //declare in/out buffers
-        unsigned char in_buff[64];
-        unsigned char out_buff[64];
+        unsigned char in_buff[64] = {};
+        unsigned char out_buff[64] = {};
 
         //copy the input transaction
         std::memcpy(in_buff, &request, sizeof(request));
@@ -117,7 +117,7 @@ struct ad9361_ctrl_impl : public ad9361_ctrl
         in->sequence = _seq++;
 
         //transact
-        _iface->transact(in_buff, out_buff);
+        _iface->ad9361_transact(in_buff, out_buff);
         ad9361_transaction_t *out = (ad9361_transaction_t *)out_buff;
 
         //sanity checks

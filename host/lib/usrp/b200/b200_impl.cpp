@@ -196,11 +196,7 @@ b200_impl::b200_impl(const device_addr_t &device_addr):
     ////////////////////////////////////////////////////////////////////
     // Init codec - turns on clocks
     ////////////////////////////////////////////////////////////////////
-    //NOTE TO SELF
-    //Eventually we remove the two lines below, when FW supports ad9361
-    //and just do this _codec_ctrl = ad9361_ctrl::make(_iface);
-    _codec_ctrl_iface = ad9361_ctrl_iface_make(boost::bind(&b200_iface::transact_spi, _iface, _1, _2, _3, _4), _iface);
-    _codec_ctrl = ad9361_ctrl::make(_codec_ctrl_iface);
+    _codec_ctrl = ad9361_ctrl::make(_iface);
 
     ////////////////////////////////////////////////////////////////////
     // Create control transport
@@ -330,6 +326,8 @@ b200_impl::b200_impl(const device_addr_t &device_addr):
     // and do the misc mboard sensors
     ////////////////////////////////////////////////////////////////////
     _tree->create<int>(mb_path / "sensors"); //empty but path exists TODO
+    _tree->create<sensor_value_t>(mb_path / "sensors" / "ref_locked")
+        .publish(boost::bind(&b200_impl::get_ref_locked, this));
 
     ////////////////////////////////////////////////////////////////////
     // create frontend mapping
@@ -380,8 +378,11 @@ b200_impl::b200_impl(const device_addr_t &device_addr):
     }
 
     ////////////////////////////////////////////////////////////////////
-    // create time control objects
+    // create time and clock control objects
     ////////////////////////////////////////////////////////////////////
+    _spi_iface = spi_core_3000::make(_ctrl, TOREG(SR_SPI), RB32_SPI);
+    _adf4001_iface = boost::shared_ptr<adf4001_ctrl>(new adf4001_ctrl(_spi_iface, false));
+
     time_core_3000::readback_bases_type time64_rb_bases;
     time64_rb_bases.rb_now = RB64_TIME_NOW;
     time64_rb_bases.rb_pps = RB64_TIME_PPS;
@@ -421,7 +422,6 @@ b200_impl::b200_impl(const device_addr_t &device_addr):
 
         _tree->create<std::string>(rf_fe_path / "name").set(fe_name);
         _tree->create<int>(rf_fe_path / "sensors"); //empty TODO
-        _tree->create<sensor_value_t>(rf_fe_path / "sensors" / "lo_locked");
         BOOST_FOREACH(const std::string &name, ad9361_ctrl::get_gain_names(fe_name))
         {
             _tree->create<meta_range_t>(rf_fe_path / "gains" / name / "range")
@@ -618,11 +618,18 @@ void b200_impl::set_mb_eeprom(const uhd::usrp::mboard_eeprom_t &mb_eeprom)
 
 void b200_impl::update_clock_source(const std::string &source)
 {
-    if (source == "internal"){}
-    else if (source == "external"){}
-    else if (source == "gpsdo"){}
-    else if (source == "gpsdo_out"){}
-    else throw uhd::key_error("update_clock_source: unknown source: " + source);
+    if (source == "internal"){
+        _adf4001_iface->set_lock_to_ext_ref(false);
+    }
+    else if ((source == "external")
+              or (source == "gpsdo")
+              or (source == "gpsdo_out")){
+
+        _adf4001_iface->set_lock_to_ext_ref(true);
+    } else {
+        throw uhd::key_error("update_clock_source: unknown source: " + source);
+    }
+
     _gpio_state.gps_out_enable = (source == "gpsdo_out")? 0 : 1;
     _gpio_state.gps_ref_enable = ((source == "gpsdo") or (source == "gpsdo_out"))? 0 : 1;
     _gpio_state.ext_ref_enable = (source == "external")? 0 : 1;
@@ -739,6 +746,12 @@ void b200_impl::update_enables(void)
 {
     _codec_ctrl->set_active_chains(_fe_enb_map["TX1"], _fe_enb_map["TX2"], _fe_enb_map["RX1"], _fe_enb_map["RX2"]);
     this->update_atrs();
+}
+
+sensor_value_t b200_impl::get_ref_locked(void)
+{
+    const bool lock = _adf4001_iface->locked();
+    return sensor_value_t("Ref", lock, "locked", "unlocked");
 }
 
 static inline bool wait_for_recv_ready(int sock_fd, const size_t timeout_ms)

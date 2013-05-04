@@ -243,7 +243,7 @@ public:
         }
     }
 
-    void transact(const unsigned char in_buff[64], unsigned char out_buff[64]) {
+    void ad9361_transact(const unsigned char in_buff[64], unsigned char out_buff[64]) {
         fx3_control_write(B200_VREQ_AD9361_CTRL_WRITE, 0x00, 0x00, (unsigned char *)in_buff, 64);
         fx3_control_read(B200_VREQ_AD9361_CTRL_READ, 0x00, 0x00, out_buff, 64);
     }

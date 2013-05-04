@@ -62,7 +62,7 @@ public:
             boost::this_thread::sleep(boost::posix_time::milliseconds(10));
         }
 
-        write_ad9146_reg(0x03, 0x00); //2s comp, i first, no swap, byte mode
+        this->set_iq_swap(false);
         write_ad9146_reg(0x10, 0x48); // Choose data rate mode
         write_ad9146_reg(0x17, 0x04); // Issue software FIFO reset
         write_ad9146_reg(0x18, 0x01); //
@@ -84,6 +84,11 @@ public:
         )
     }
 
+    void set_iq_swap(const bool swap)
+    {
+        const int bit = (swap)? (1 << 6) : 0;
+        write_ad9146_reg(0x03, 0x00 | bit); //2s comp, i first, byte mode
+    }
 
 private:
     uhd::spi_iface::sptr _iface;

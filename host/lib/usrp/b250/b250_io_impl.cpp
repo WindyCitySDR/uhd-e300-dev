@@ -75,43 +75,62 @@ void b250_impl::update_rx_subdev_spec(const subdev_spec_t &spec)
 
     //sanity checking
     validate_subdev_spec(_tree, spec, "rx");
+    UHD_ASSERT_THROW(spec.size() <= 2);
+    if (spec.size() > 0) UHD_ASSERT_THROW(spec[0].db_name == "A");
+    if (spec.size() > 1) UHD_ASSERT_THROW(spec[1].db_name == "B");
 
     //setup mux for this spec
-    bool fe_swapped = false;
-    for (size_t i = 0; i < spec.size(); i++)
+    for (size_t i = 0; i < 2; i++)
     {
-        const std::string conn = _tree->access<std::string>(root / spec[i].db_name / "rx_frontends" / spec[i].sd_name / "connection").get();
-        if (i == 0 and (conn == "QI" or conn == "Q")) fe_swapped = true;
-        _radio_perifs[(spec[i].db_name == "A")? 0: 1].ddc->set_mux(conn, fe_swapped); //TODO which frontend?
-    }
-    //TODO _rx_fe->set_mux(fe_swapped);
+        //extract db name
+        const std::string db_name = (i == 0)? "A" : "B";
+        if (i < spec.size()) UHD_ASSERT_THROW(spec[i].db_name == db_name);
 
-    /*
-    //compute the new occupancy and resize
-    _mbc[which_mb].rx_chan_occ = spec.size();
-    size_t nchan = 0;
-    BOOST_FOREACH(const std::string &mb, _mbc.keys()) nchan += _mbc[mb].rx_chan_occ;
-    */
+        //extract fe name
+        std::string fe_name;
+        if (i < spec.size()) fe_name = spec[i].sd_name;
+        else fe_name = _tree->list(root / db_name / "rx_frontends").front();
+
+        //extract connection
+        const std::string conn = _tree->access<std::string>(root / db_name / "rx_frontends" / fe_name / "connection").get();
+
+        //swap condition
+        _radio_perifs[i].ddc->set_mux(conn, false);
+    }
+
     _rx_fe_map = spec;
 }
 
 void b250_impl::update_tx_subdev_spec(const subdev_spec_t &spec)
 {
-    /*
-    fs_path root = "/mboards/" + which_mb + "/dboards";
+    fs_path root = "/mboards/0/dboards";
 
     //sanity checking
-    validate_subdev_spec(_tree, spec, "tx", which_mb);
+    validate_subdev_spec(_tree, spec, "tx");
+    UHD_ASSERT_THROW(spec.size() <= 2);
+    if (spec.size() > 0) UHD_ASSERT_THROW(spec[0].db_name == "A");
+    if (spec.size() > 1) UHD_ASSERT_THROW(spec[1].db_name == "B");
 
     //set the mux for this spec
-    const std::string conn = _tree->access<std::string>(root / spec[0].db_name / "tx_frontends" / spec[0].sd_name / "connection").get();
-    _mbc[which_mb].tx_fe->set_mux(conn);
+    for (size_t i = 0; i < 2; i++)
+    {
+        //extract db name
+        const std::string db_name = (i == 0)? "A" : "B";
+        if (i < spec.size()) UHD_ASSERT_THROW(spec[i].db_name == db_name);
 
-    //compute the new occupancy and resize
-    _mbc[which_mb].tx_chan_occ = spec.size();
-    size_t nchan = 0;
-    BOOST_FOREACH(const std::string &mb, _mbc.keys()) nchan += _mbc[mb].tx_chan_occ;
-    */
+        //extract fe name
+        std::string fe_name;
+        if (i < spec.size()) fe_name = spec[i].sd_name;
+        else fe_name = _tree->list(root / db_name / "tx_frontends").front();
+
+        //extract connection
+        const std::string conn = _tree->access<std::string>(root / db_name / "tx_frontends" / fe_name / "connection").get();
+
+        //swap condition
+        const bool swap = (conn[0] == 'Q');
+        _radio_perifs[i].dac->set_iq_swap(swap);
+    }
+
     _tx_fe_map = spec;
 }
 
@@ -262,6 +281,7 @@ bool b250_impl::recv_async_msg(
  **********************************************************************/
 rx_streamer::sptr b250_impl::get_rx_stream(const uhd::stream_args_t &args_)
 {
+    boost::mutex::scoped_lock lock(_transport_setup_mutex);
     stream_args_t args = args_;
 
     //setup defaults for unspecified values
@@ -271,8 +291,7 @@ rx_streamer::sptr b250_impl::get_rx_stream(const uhd::stream_args_t &args_)
     }
     args.otw_format = "sc16";
     args.channels = args.channels.empty()? std::vector<size_t>(1, 0) : args.channels;
-    const std::string db_name = _rx_fe_map[args.channels[0]].db_name;
-    const size_t i = (db_name == "A")? 0 : 1;
+    const size_t i = args.channels[0];
     radio_perifs_t &perif = _radio_perifs[i];
 
     //allocate sid and create transport
@@ -341,6 +360,7 @@ rx_streamer::sptr b250_impl::get_rx_stream(const uhd::stream_args_t &args_)
  **********************************************************************/
 tx_streamer::sptr b250_impl::get_tx_stream(const uhd::stream_args_t &args_)
 {
+    boost::mutex::scoped_lock lock(_transport_setup_mutex);
     stream_args_t args = args_;
 
     //setup defaults for unspecified values
@@ -350,15 +370,14 @@ tx_streamer::sptr b250_impl::get_tx_stream(const uhd::stream_args_t &args_)
     }
     args.otw_format = "sc16";
     args.channels = args.channels.empty()? std::vector<size_t>(1, 0) : args.channels;
-    const std::string db_name = _tx_fe_map[args.channels[0]].db_name;
-    const size_t i = (db_name == "A")? 0 : 1;
+    const size_t i = args.channels[0];
     radio_perifs_t &perif = _radio_perifs[i];
 
     //allocate sid and create transport
     sid_config_t data_config;
     data_config.router_addr_there = B250_DEVICE_THERE;
     data_config.dst_prefix = B250_RADIO_DEST_PREFIX_TX;
-    data_config.router_dst_there = B250_XB_DST_R0;
+    data_config.router_dst_there = (i == 0)? B250_XB_DST_R0 : B250_XB_DST_R1;
     data_config.router_dst_here = B250_XB_DST_E0;
     const boost::uint32_t data_sid = this->allocate_sid(data_config);
     zero_copy_if::sptr data_xport = this->make_transport(_addr, data_sid);

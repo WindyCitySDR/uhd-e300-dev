@@ -34,6 +34,9 @@ public:
      * \return a new codec control object
      */
     static sptr make(uhd::spi_iface::sptr iface, const size_t slaveno);
+
+    //! Set the IQ data mode (swap means QI)
+    virtual void set_iq_swap(const bool swap) = 0;
 };
 
 #endif /* INCLUDED_B250_DAC_CTRL_HPP */

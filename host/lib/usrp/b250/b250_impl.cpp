@@ -491,7 +491,8 @@ uhd::transport::udp_zero_copy::sptr b250_impl::make_transport(const std::string 
     udp_zero_copy::sptr xport = udp_zero_copy::make(addr, BOOST_STRINGIZE(B250_VITA_UDP_PORT), device_addr);
 
     //clear the ethernet dispatcher's udp port
-    _zpu_ctrl->poke32(SR_ADDR(SET0_BASE, (ZPU_SR_ETHINT0+8+3)), 0);
+    //NOT clearing this, the dispatcher is now intelligent
+    //_zpu_ctrl->poke32(SR_ADDR(SET0_BASE, (ZPU_SR_ETHINT0+8+3)), 0);
 
     //send a mini packet with SID into the ZPU
     //ZPU will reprogram the ethernet framer

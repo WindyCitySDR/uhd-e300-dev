@@ -20,6 +20,7 @@
 #include <boost/foreach.hpp>
 #include <boost/thread.hpp> //sleep
 #include <iostream>
+#include <iomanip>
 
 BOOST_AUTO_TEST_CASE(test_time_spec_compare){
     std::cout << "Testing time specification compare..." << std::endl;
@@ -107,4 +108,22 @@ BOOST_AUTO_TEST_CASE(test_time_large_ticks_to_time_spec)
     std::cout << "t0.get_full_secs() " << t0.get_full_secs() << std::endl;
     std::cout << "t0.get_frac_secs() " << t0.get_frac_secs() << std::endl;
     BOOST_CHECK_EQUAL(t0.get_full_secs(), time_t(1360217663));
+}
+
+BOOST_AUTO_TEST_CASE(test_time_error_irrational_rate)
+{
+    static const double rate = 1625e3/6;
+    const long long tick_in = 23423436291667;
+    const uhd::time_spec_t ts = uhd::time_spec_t::from_ticks(tick_in, rate);
+    const long long tick_out = ts.to_ticks(rate);
+    const long long err = tick_in - tick_out;
+
+    std::cout << std::setprecision(18);
+    std::cout << "time ............ " << ts.get_real_secs() << std::endl;
+    std::cout << "tick in ......... " << tick_in << std::endl;
+    std::cout << "tick out ........ " << tick_out << std::endl;
+    std::cout << "tick error ...... " << err << std::endl;
+    std::cout << std::endl;
+
+    BOOST_CHECK_EQUAL(err, (long long)(0));
 }
