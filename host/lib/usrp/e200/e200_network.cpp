@@ -120,41 +120,6 @@ static void e200_send_tunnel(
 }
 
 /***********************************************************************
- * codec gateway
- **********************************************************************/
-static void codec_gateway(
-    ad9361_ctrl_iface_sptr ctrl,
-    boost::shared_ptr<asio::ip::udp::socket> sock,
-    asio::ip::udp::endpoint *endpoint,
-    bool *running
-)
-{
-    unsigned char in_buff[64];
-    unsigned char out_buff[64];
-    try
-    {
-        while (*running)
-        {
-            const size_t num_bytes = sock->receive_from(asio::buffer(in_buff), *endpoint);
-            if (E200_NETWORK_DEBUG) UHD_MSG(status) << "codec_gateway got " << num_bytes << std::endl;
-            if (num_bytes < 64) continue;
-            ctrl->transact(in_buff, out_buff);
-            sock->send_to(asio::buffer(out_buff), *endpoint);
-        }
-    }
-    catch(const std::exception &ex)
-    {
-        UHD_MSG(error) << "codec_gateway exit" << " " << ex.what() << std::endl;
-    }
-    catch(...)
-    {
-        UHD_MSG(error) << "codec_gateway exit" << std::endl;
-    }
-    UHD_MSG(status) << "codec_gateway exit" << std::endl;
-    *running = false;
-}
-
-/***********************************************************************
  * The TCP server itself
  **********************************************************************/
 void e200_impl::run_server(const std::string &port, const std::string &what)
@@ -197,10 +162,6 @@ void e200_impl::run_server(const std::string &port, const std::string &what)
             {
                 tg.create_thread(boost::bind(&e200_recv_tunnel, "response tunnel", perif.recv_ctrl_xport, socket, &endpoint, &running));
                 tg.create_thread(boost::bind(&e200_send_tunnel, "control tunnel", socket, perif.send_ctrl_xport, &endpoint, &running));
-            }
-            if (what == "CODEC")
-            {
-                codec_gateway(_codec_ctrl_iface, socket, &endpoint, &running);
             }
             tg.join_all();
             socket->close();

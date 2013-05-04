@@ -167,9 +167,10 @@ e200_impl::e200_impl(const uhd::device_addr_t &device_addr)
         perif.tx_flow_xport = _fifo_iface->make_recv_xport(0, ctrl_xport_args);
         perif.rx_data_xport = _fifo_iface->make_recv_xport(2, data_xport_args);
         perif.rx_flow_xport = _fifo_iface->make_send_xport(2, ctrl_xport_args);
-        _aux_spi = e200_make_aux_spi_iface();
-        _codec_ctrl_iface = ad9361_ctrl_iface_make(boost::bind(&e200_impl::transact_spi, this, _1, _2, _3, _4), ad9361_ctrl_iface_sptr());
-        _codec_ctrl = ad9361_ctrl::make(_codec_ctrl_iface);
+        zero_copy_if::sptr codec_xport;
+        codec_xport = udp_zero_copy::make(device_addr["addr"], "localhost");
+        ad9361_ctrl_iface_sptr codec_ctrl(new ad9361_ctrl_over_zc(codec_xport));
+        _codec_ctrl = ad9361_ctrl::make(codec_ctrl);
     }
 
     ////////////////////////////////////////////////////////////////////
@@ -181,7 +182,6 @@ e200_impl::e200_impl(const uhd::device_addr_t &device_addr)
         tg.create_thread(boost::bind(&e200_impl::run_server, this, E200_SERVER_RX_PORT, "RX"));
         tg.create_thread(boost::bind(&e200_impl::run_server, this, E200_SERVER_TX_PORT, "TX"));
         tg.create_thread(boost::bind(&e200_impl::run_server, this, E200_SERVER_CTRL_PORT, "CTRL"));
-        tg.create_thread(boost::bind(&e200_impl::run_server, this, E200_SERVER_CODEC_PORT, "CODEC"));
         tg.join_all();
         return;
     }

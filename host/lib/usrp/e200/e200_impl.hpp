@@ -71,7 +71,6 @@ private:
     void load_fpga_image(const std::string &path);
 
     e200_fifo_interface::sptr _fifo_iface;
-    uhd::spi_iface::sptr _aux_spi;
 
     void register_loopback_self_test(wb_iface::sptr iface);
 
@@ -114,25 +113,6 @@ private:
 
     //! this is half-assed, but temporary
     ad9361_ctrl::sptr _codec_ctrl;
-    ad9361_ctrl_iface_sptr _codec_ctrl_iface;
-    inline void transact_spi(
-        unsigned char *tx_data,
-        size_t,
-        unsigned char *rx_data,
-        size_t
-    ){
-        boost::uint32_t data = 0;
-        data |= (tx_data[0] << 16);
-        data |= (tx_data[1] << 8);
-        data |= (tx_data[2] << 0);
-        const boost::uint32_t result = _aux_spi->transact_spi(0, uhd::spi_config_t::EDGE_RISE, data, 24, rx_data != NULL);
-        if (rx_data)
-        {
-            rx_data[0] = result & 0xff;
-            rx_data[1] = result & 0xff;
-            rx_data[2] = result & 0xff;
-        }
-    }
 
     //server stuff for network access
     void run_server(const std::string &port, const std::string &what);
