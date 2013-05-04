@@ -42,8 +42,6 @@ static std::string E200_SERVER_TX_PORT = "321757";
 static std::string E200_SERVER_CTRL_PORT = "321758";
 static std::string E200_SERVER_CODEC_PORT = "321759";
 
-uhd::spi_iface::sptr e200_make_aux_spi_iface(void);
-
 /*!
  * USRP-E200 implementation guts:
  * The implementation details are encapsulated here.
