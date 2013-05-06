@@ -317,6 +317,7 @@ rx_streamer::sptr e200_impl::get_rx_stream(const uhd::stream_args_t &args_)
     id.num_outputs = 1;
     my_streamer->set_converter(id);
 
+    perif.ddc->set_mux("IQ", true);
     perif.framer->set_nsamps_per_packet(spp); //seems to be a good place to set this
     perif.framer->set_sid((data_sid << 16) | (data_sid >> 16));
     perif.framer->setup(args);

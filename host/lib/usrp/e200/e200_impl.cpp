@@ -139,9 +139,9 @@ e200_impl::e200_impl(const uhd::device_addr_t &device_addr)
 
     uhd::device_addr_t data_xport_args;
     data_xport_args["recv_frame_size"] = "2048";
-    data_xport_args["num_recv_frames"] = "128";
+    data_xport_args["num_recv_frames"] = "32";
     data_xport_args["send_frame_size"] = "2048";
-    data_xport_args["num_send_frames"] = "128";
+    data_xport_args["num_send_frames"] = "32";
 
     if (device_addr.has_key("addr"))
     {
@@ -534,9 +534,9 @@ void e200_impl::update_atrs(const size_t &fe)
     const bool rx_ant_txrx = settings.rx_ant == "TX/RX";
 
     //----------------- high/low band decision --------------------//
-    const bool rx_low_band = settings.rx_freq < 3.0e9;
+    const bool rx_low_band = settings.rx_freq < 2.6e9;
     const bool rx_high_band = not rx_low_band;
-    const bool tx_low_band = settings.tx_freq < 3.0e9;
+    const bool tx_low_band = settings.tx_freq < 2.6e9;
     const bool tx_high_band = not tx_low_band;
 
     //------------------- TX low band bandsel ----------------------//
@@ -558,22 +558,18 @@ void e200_impl::update_atrs(const size_t &fe)
         else if (settings.rx_freq < 700e6)   {rx_bandsels = 2; rx_bandsel_b = 0; rx_bandsel_c = 3;}
         else if (settings.rx_freq < 1200e6)  {rx_bandsels = 0; rx_bandsel_b = 0; rx_bandsel_c = 1;}
         else if (settings.rx_freq < 1800e6)  {rx_bandsels = 1; rx_bandsel_b = 2; rx_bandsel_c = 0;}
-        else if (settings.rx_freq < 2350e6)  {rx_bandsels = 3; rx_bandsel_b = 1; rx_bandsel_c = 0;}
-        else if (settings.rx_freq < 2600e6)  {rx_bandsels = 5; rx_bandsel_b = 0; rx_bandsel_c = 0;}
+        else if (settings.rx_freq < 2350e6)  {rx_bandsels = 3; rx_bandsel_b = 3; rx_bandsel_c = 0;}
+        else if (settings.rx_freq < 2600e6)  {rx_bandsels = 5; rx_bandsel_b = 1; rx_bandsel_c = 0;}
         else                                 {rx_bandsels = 0; rx_bandsel_b = 0; rx_bandsel_c = 0;}
     } else {
         if      (settings.rx_freq < 450e6)   {rx_bandsels = 5; rx_bandsel_b = 0; rx_bandsel_c = 1;}
         else if (settings.rx_freq < 700e6)   {rx_bandsels = 3; rx_bandsel_b = 0; rx_bandsel_c = 3;}
         else if (settings.rx_freq < 1200e6)  {rx_bandsels = 1; rx_bandsel_b = 0; rx_bandsel_c = 2;}
-        else if (settings.rx_freq < 1800e6)  {rx_bandsels = 0; rx_bandsel_b = 0; rx_bandsel_c = 0;}
-        else if (settings.rx_freq < 2350e6)  {rx_bandsels = 2; rx_bandsel_b = 2; rx_bandsel_c = 0;}
-        else if (settings.rx_freq < 2600e6)  {rx_bandsels = 4; rx_bandsel_b = 1; rx_bandsel_c = 0;}
+        else if (settings.rx_freq < 1800e6)  {rx_bandsels = 0; rx_bandsel_b = 1; rx_bandsel_c = 0;}
+        else if (settings.rx_freq < 2350e6)  {rx_bandsels = 2; rx_bandsel_b = 3; rx_bandsel_c = 0;}
+        else if (settings.rx_freq < 2600e6)  {rx_bandsels = 4; rx_bandsel_b = 2; rx_bandsel_c = 0;}
         else                                 {rx_bandsels = 0; rx_bandsel_b = 0; rx_bandsel_c = 0;}
     }
-    UHD_VAR(settings.rx_freq);
-    UHD_VAR(rx_bandsels);
-    UHD_VAR(rx_bandsel_b);
-    UHD_VAR(rx_bandsel_c);
 
     //-------------------- VCRX - rx mode -------------------------//
     int vcrx_1_rxing = 1, vcrx_2_rxing = 0;
@@ -585,6 +581,17 @@ void e200_impl::update_atrs(const size_t &fe)
     {
         vcrx_1_rxing = 1; vcrx_2_rxing = 0;
     }
+
+    UHD_VAR(settings.rx_freq);
+    UHD_VAR(rx_bandsels);
+    UHD_VAR(rx_bandsel_b);
+    UHD_VAR(rx_bandsel_c);
+    UHD_VAR(rx_ant_rx2);
+    UHD_VAR(rx_ant_txrx);
+    UHD_VAR(rx_low_band);
+    UHD_VAR(rx_high_band);
+    UHD_VAR(vcrx_1_rxing);
+    UHD_VAR(vcrx_2_rxing);
 
     //-------------------- VCRX - tx mode -------------------------//
     int vcrx_1_txing = 1, vcrx_2_txing = 0;
