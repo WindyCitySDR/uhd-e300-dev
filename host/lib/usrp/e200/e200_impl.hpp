@@ -61,6 +61,8 @@ public:
 
 private:
 
+    bool _network_mode;
+
     //device properties interface
     uhd::property_tree::sptr _tree;
     uhd::property_tree::sptr get_tree(void) const

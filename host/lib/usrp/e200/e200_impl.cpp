@@ -139,11 +139,13 @@ e200_impl::e200_impl(const uhd::device_addr_t &device_addr)
 
     uhd::device_addr_t data_xport_args;
     data_xport_args["recv_frame_size"] = "2048";
-    data_xport_args["num_recv_frames"] = "32";
+    data_xport_args["num_recv_frames"] = "128";
     data_xport_args["send_frame_size"] = "2048";
-    data_xport_args["num_send_frames"] = "32";
+    data_xport_args["num_send_frames"] = "128";
 
-    if (device_addr.has_key("addr"))
+    _network_mode = device_addr.has_key("addr");
+
+    if (_network_mode)
     {
         radio_perifs_t &perif = _radio_perifs[0];
         perif.send_ctrl_xport = udp_zero_copy::make(device_addr["addr"], E200_SERVER_CTRL_PORT);
@@ -536,7 +538,7 @@ void e200_impl::update_atrs(const size_t &fe)
     //----------------- high/low band decision --------------------//
     const bool rx_low_band = settings.rx_freq < 2.6e9;
     const bool rx_high_band = not rx_low_band;
-    const bool tx_low_band = settings.tx_freq < 2.6e9;
+    const bool tx_low_band = settings.tx_freq < 2940.0e6;
     const bool tx_high_band = not tx_low_band;
 
     //------------------- TX low band bandsel ----------------------//
