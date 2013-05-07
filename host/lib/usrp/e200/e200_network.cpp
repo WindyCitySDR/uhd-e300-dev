@@ -42,6 +42,8 @@ static inline bool wait_for_recv_ready(int sock_fd, const size_t timeout_ms)
     return ::select(sock_fd+1, &rset, NULL, NULL, &tv) > 0;
 }
 
+static boost::mutex endpoint_mutex;
+
 /***********************************************************************
  * Receive tunnel - forwards recv interface to send socket
  **********************************************************************/
@@ -53,6 +55,7 @@ static void e200_recv_tunnel(
     bool *running
 )
 {
+    asio::ip::udp::endpoint _tx_endpoint;
     try
     {
         while (*running)
@@ -62,8 +65,14 @@ static void e200_recv_tunnel(
             if (not buff) continue;
             if (E200_NETWORK_DEBUG) UHD_MSG(status) << name << " got " << buff->size() << std::endl;
 
+            //step 1.5 -- update endpoint
+            {
+                boost::mutex::scoped_lock l(endpoint_mutex);
+                _tx_endpoint = *endpoint;
+            }
+
             //step 2 - send to the socket
-            sender->send_to(asio::buffer(buff->cast<const void *>(), buff->size()), *endpoint);
+            sender->send_to(asio::buffer(buff->cast<const void *>(), buff->size()), _tx_endpoint);
         }
     }
     catch(const std::exception &ex)
@@ -89,6 +98,7 @@ static void e200_send_tunnel(
     bool *running
 )
 {
+    asio::ip::udp::endpoint _rx_endpoint;
     try
     {
         while (*running)
@@ -100,8 +110,14 @@ static void e200_send_tunnel(
             //step 2 - recv from socket
             while (not wait_for_recv_ready(recver->native(), 100) and *running){}
             if (not *running) break;
-            const size_t num_bytes = recver->receive_from(asio::buffer(buff->cast<void *>(), buff->size()), *endpoint);
+            const size_t num_bytes = recver->receive_from(asio::buffer(buff->cast<void *>(), buff->size()), _rx_endpoint);
             if (E200_NETWORK_DEBUG) UHD_MSG(status) << name << " got " << num_bytes << std::endl;
+
+            //step 2.5 -- update endpoint
+            {
+                boost::mutex::scoped_lock l(endpoint_mutex);
+                *endpoint = _rx_endpoint;
+            }
 
             //step 3 - commit the buffer
             buff->commit(num_bytes);
