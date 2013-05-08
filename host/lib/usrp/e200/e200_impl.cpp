@@ -439,11 +439,8 @@ void e200_impl::codec_loopback_self_test(wb_iface::sptr iface)
         const boost::uint64_t rb_word64 = iface->peek64(RB64_CODEC_READBACK);
         const boost::uint32_t rb_tx = boost::uint32_t(rb_word64 >> 32);
         const boost::uint32_t rb_rx = boost::uint32_t(rb_word64 & 0xffffffff);
-        std::cout << std::hex << "\nword32 0x" << word32 << std::endl;
-        std::cout << std::hex << " rb_tx 0x" << rb_tx << std::endl;
-        std::cout << std::hex << " rb_rx 0x" << rb_rx << std::dec << std::endl;
         test_fail = word32 != rb_tx or word32 != rb_rx;
-        //if (test_fail) break; //exit loop on any failure
+        if (test_fail) break; //exit loop on any failure
     }
     UHD_MSG(status) << ((test_fail)? " fail" : "pass") << std::endl;
 
