@@ -113,8 +113,8 @@ private:
     void update_rx_subdev_spec(const uhd::usrp::subdev_spec_t &spec);
     void update_tx_subdev_spec(const uhd::usrp::subdev_spec_t &spec);
 
-    //! this is half-assed, but temporary
     ad9361_ctrl::sptr _codec_ctrl;
+    void codec_loopback_self_test(wb_iface::sptr iface);
 
     //server stuff for network access
     void run_server(const std::string &port, const std::string &what);
