@@ -151,7 +151,7 @@ static void e200_if_hdr_pack_le(
 /***********************************************************************
  * RX flow control handler
  **********************************************************************/
-static void handle_rx_flowctrl(const boost::uint32_t sid, zero_copy_if::sptr xport, const size_t last_seq)
+static void handle_rx_flowctrl(const boost::uint32_t sid, zero_copy_if::sptr xport, boost::shared_ptr<boost::uint32_t> seq32_state, const size_t last_seq)
 {
     managed_send_buffer::sptr buff = xport->get_send_buff(1.0);
     if (not buff)
@@ -159,6 +159,13 @@ static void handle_rx_flowctrl(const boost::uint32_t sid, zero_copy_if::sptr xpo
         throw uhd::runtime_error("handle_rx_flowctrl timed out getting a send buffer");
     }
     boost::uint32_t *pkt = buff->cast<boost::uint32_t *>();
+
+    //recover seq32
+    boost::uint32_t &seq32 = *seq32_state;
+    const size_t seq12 = seq32 & 0xfff;
+    if (last_seq < seq12) seq32 += (1 << 12);
+    seq32 &= ~0xfff;
+    seq32 |= last_seq;
 
     //load packet info
     vrt::if_packet_info_t packet_info;
@@ -179,8 +186,8 @@ static void handle_rx_flowctrl(const boost::uint32_t sid, zero_copy_if::sptr xpo
     e200_if_hdr_pack_le(pkt, packet_info);
 
     //load payload
-    pkt[packet_info.num_header_words32+0] = uhd::htowx<boost::uint32_t>(~0); //off
-    pkt[packet_info.num_header_words32+1] = uhd::htowx<boost::uint32_t>(last_seq + 16/*TODO*/);
+    pkt[packet_info.num_header_words32+0] = uhd::htowx<boost::uint32_t>(0);
+    pkt[packet_info.num_header_words32+1] = uhd::htowx<boost::uint32_t>(seq32);
 
     //send the buffer over the interface
     buff->commit(sizeof(boost::uint32_t)*(packet_info.num_packet_words32));
@@ -329,10 +336,13 @@ rx_streamer::sptr e200_impl::get_rx_stream(const uhd::stream_args_t &args_)
     my_streamer->set_overflow_handler(0, boost::bind(
         &rx_vita_core_3000::handle_overflow, perif.framer
     ));
-    //my_streamer->set_xport_handle_flowctrl(0, boost::bind(
-    //    &handle_rx_flowctrl, data_sid, _rx_flow_xport, _1
-    //), _rx_data_xport->get_num_recv_frames()/8, true/*init*/);
-    handle_rx_flowctrl(data_sid, perif.rx_flow_xport, 0); //init off
+
+    //shetup flow control
+    perif.framer->configure_flow_control(E200_TX_FC_PKT_WINDOW);
+    boost::shared_ptr<boost::uint32_t> seq32(new boost::uint32_t(0));
+    my_streamer->set_xport_handle_flowctrl(0, boost::bind(
+        &handle_rx_flowctrl, data_sid, perif.rx_flow_xport, seq32, _1
+    ), E200_TX_FC_PKT_WINDOW/8, true/*init*/);
 
     my_streamer->set_issue_stream_cmd(0, boost::bind(
         &rx_vita_core_3000::issue_stream_command, perif.framer, _1
@@ -394,12 +404,12 @@ tx_streamer::sptr e200_impl::get_tx_stream(const uhd::stream_args_t &args_)
     perif.deframer->setup(args);
 
     //flow control setup
-    if (_network_mode) perif.deframer->configure_flow_control(0/*cycs off*/, E200_TX_FC_PKT_WINDOW/8/*pkts*/);
+    perif.deframer->configure_flow_control(0/*cycs off*/, E200_TX_FC_PKT_WINDOW/8/*pkts*/);
     boost::shared_ptr<tx_fc_guts_t> guts(new tx_fc_guts_t());
     task::sptr task = task::make(boost::bind(&handle_tx_async_msgs, guts, perif.tx_flow_xport));
 
     my_streamer->set_xport_chan_get_buff(0, boost::bind(
-        &get_tx_buff_with_flowctrl, task, guts, perif.tx_data_xport, _network_mode/*fc on*/, _1
+        &get_tx_buff_with_flowctrl, task, guts, perif.tx_data_xport, true/*fc on*/, _1
     ));
     my_streamer->set_async_receiver(boost::bind(
         &bounded_buffer<async_metadata_t>::pop_with_timed_wait, &(guts->async_queue), _1, _2

@@ -114,6 +114,7 @@ UHD_STATIC_BLOCK(register_e200_device)
  **********************************************************************/
 e200_impl::e200_impl(const uhd::device_addr_t &device_addr)
 {
+    e200_impl_begin:
     ////////////////////////////////////////////////////////////////////
     // load the fpga image
     ////////////////////////////////////////////////////////////////////
@@ -185,7 +186,7 @@ e200_impl::e200_impl(const uhd::device_addr_t &device_addr)
         tg.create_thread(boost::bind(&e200_impl::run_server, this, E200_SERVER_TX_PORT, "TX"));
         tg.create_thread(boost::bind(&e200_impl::run_server, this, E200_SERVER_CTRL_PORT, "CTRL"));
         tg.join_all();
-        return;
+        goto e200_impl_begin;
     }
 
     ////////////////////////////////////////////////////////////////////
