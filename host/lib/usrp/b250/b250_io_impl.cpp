@@ -156,7 +156,7 @@ static void b250_if_hdr_pack_be(
 /***********************************************************************
  * RX flow control handler
  **********************************************************************/
-static void handle_rx_flowctrl(const boost::uint32_t sid, zero_copy_if::sptr xport, const size_t last_seq)
+static void handle_rx_flowctrl(const boost::uint32_t sid, zero_copy_if::sptr xport, boost::shared_ptr<boost::uint32_t> seq32_state, const size_t last_seq)
 {
     managed_send_buffer::sptr buff = xport->get_send_buff(0.0);
     if (not buff)
@@ -164,6 +164,13 @@ static void handle_rx_flowctrl(const boost::uint32_t sid, zero_copy_if::sptr xpo
         throw uhd::runtime_error("handle_rx_flowctrl timed out getting a send buffer");
     }
     boost::uint32_t *pkt = buff->cast<boost::uint32_t *>();
+
+    //recover seq32
+    boost::uint32_t &seq32 = *seq32_state;
+    const size_t seq12 = seq32 & 0xfff;
+    if (last_seq < seq12) seq32 += (1 << 12);
+    seq32 &= ~0xfff;
+    seq32 |= last_seq;
 
     //load packet info
     vrt::if_packet_info_t packet_info;
@@ -184,8 +191,8 @@ static void handle_rx_flowctrl(const boost::uint32_t sid, zero_copy_if::sptr xpo
     b250_if_hdr_pack_be(pkt, packet_info);
 
     //load payload
-    pkt[packet_info.num_header_words32+0] = uhd::htonx<boost::uint32_t>(B250_ENABLE_RX_FC? 0 : ~0);
-    pkt[packet_info.num_header_words32+1] = uhd::htonx<boost::uint32_t>(last_seq + B250_RX_FC_PKT_WINDOW);
+    pkt[packet_info.num_header_words32+0] = uhd::htonx<boost::uint32_t>(0);
+    pkt[packet_info.num_header_words32+1] = uhd::htonx<boost::uint32_t>(seq32);
 
     //send the buffer over the interface
     buff->commit(sizeof(boost::uint32_t)*(packet_info.num_packet_words32));
@@ -334,15 +341,18 @@ rx_streamer::sptr b250_impl::get_rx_stream(const uhd::stream_args_t &args_)
     perif.framer->set_nsamps_per_packet(spp); //seems to be a good place to set this
     perif.framer->set_sid((data_sid << 16) | (data_sid >> 16));
     perif.framer->setup(args);
+    perif.framer->configure_flow_control(B250_RX_FC_PKT_WINDOW);
+    boost::shared_ptr<boost::uint32_t> seq32(new boost::uint32_t(0));
     my_streamer->set_xport_chan_get_buff(0, boost::bind(
         &zero_copy_if::get_recv_buff, data_xport, _1
     ), true /*flush*/);
     my_streamer->set_overflow_handler(0, boost::bind(
         &rx_vita_core_3000::handle_overflow, perif.framer
     ));
+    UHD_ASSERT_THROW(B250_RX_FC_PKT_WINDOW > 0xfff);
     my_streamer->set_xport_handle_flowctrl(0, boost::bind(
-        &handle_rx_flowctrl, data_sid, data_xport, _1
-    ), B250_RX_FC_PKT_WINDOW/8, true/*init*/);
+        &handle_rx_flowctrl, data_sid, data_xport, seq32, _1
+    ), 0xfff/8, true/*init*/);
     my_streamer->set_issue_stream_cmd(0, boost::bind(
         &rx_vita_core_3000::issue_stream_command, perif.framer, _1
     ));

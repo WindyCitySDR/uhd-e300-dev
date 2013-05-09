@@ -28,7 +28,7 @@
 #define REG_CTRL_TIME_LO       _ctrl_base + 8
 
 #define REG_FC_WINDOW       _ctrl_base + 6*4 + 0
-#define REG_FC_ENABLE       _ctrl_base + 6*4 + 0
+#define REG_FC_ENABLE       _ctrl_base + 6*4 + 4
 
 using namespace uhd;
 
