@@ -27,6 +27,9 @@
 #define REG_CTRL_TIME_HI       _ctrl_base + 4
 #define REG_CTRL_TIME_LO       _ctrl_base + 8
 
+#define REG_FC_WINDOW       _ctrl_base + 6*4 + 0
+#define REG_FC_ENABLE       _ctrl_base + 6*4 + 0
+
 using namespace uhd;
 
 struct rx_vita_core_3000_impl : rx_vita_core_3000
@@ -54,9 +57,15 @@ struct rx_vita_core_3000_impl : rx_vita_core_3000
         )
     }
 
+    void configure_flow_control(const size_t window_size)
+    {
+        _iface->poke32(REG_FC_WINDOW, window_size);
+        _iface->poke32(REG_FC_ENABLE, window_size?1:0);
+    }
+
     void clear(void)
     {
-        //TODO
+        this->configure_flow_control(0); //disable fc
     }
 
     void set_nsamps_per_packet(const size_t nsamps)
