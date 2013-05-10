@@ -396,12 +396,12 @@ b200_impl::b200_impl(const device_addr_t &device_addr):
     //setup time source props
     _tree->create<std::string>(mb_path / "time_source" / "value")
         .subscribe(boost::bind(&b200_impl::update_time_source, this, _1));
-    static const std::vector<std::string> time_sources = boost::assign::list_of("none")("external")("gpsdo")("gpsdo_out");
+    static const std::vector<std::string> time_sources = boost::assign::list_of("none")("external")("gpsdo");
     _tree->create<std::vector<std::string> >(mb_path / "time_source" / "options").set(time_sources);
     //setup reference source props
     _tree->create<std::string>(mb_path / "clock_source" / "value")
         .subscribe(boost::bind(&b200_impl::update_clock_source, this, _1));
-    static const std::vector<std::string> clock_sources = boost::assign::list_of("internal")("external")("gpsdo")("gpsdo_out");;
+    static const std::vector<std::string> clock_sources = boost::assign::list_of("internal")("external")("gpsdo");
     _tree->create<std::vector<std::string> >(mb_path / "clock_source" / "options").set(clock_sources);
 
     ////////////////////////////////////////////////////////////////////
@@ -622,8 +622,7 @@ void b200_impl::update_clock_source(const std::string &source)
         _adf4001_iface->set_lock_to_ext_ref(false);
     }
     else if ((source == "external")
-              or (source == "gpsdo")
-              or (source == "gpsdo_out")){
+              or (source == "gpsdo")){
 
         _adf4001_iface->set_lock_to_ext_ref(true);
     } else {
@@ -631,7 +630,7 @@ void b200_impl::update_clock_source(const std::string &source)
     }
 
     _gpio_state.gps_out_enable = (source == "gpsdo_out")? 0 : 1;
-    _gpio_state.gps_ref_enable = ((source == "gpsdo") or (source == "gpsdo_out"))? 0 : 1;
+    _gpio_state.gps_ref_enable = (source == "gpsdo")? 0 : 1;
     _gpio_state.ext_ref_enable = (source == "external")? 0 : 1;
     this->update_gpio_state();
 }
@@ -641,10 +640,9 @@ void b200_impl::update_time_source(const std::string &source)
     if (source == "none"){}
     else if (source == "external"){}
     else if (source == "gpsdo"){}
-    else if (source == "gpsdo_out"){}
     else throw uhd::key_error("update_time_source: unknown source: " + source);
     _time64->set_time_source((source == "external")? "external" : "internal");
-    _gpio_state.pps_fpga_out_enable = (source == "gpsdo_out")? 1 : 0;
+    _gpio_state.pps_fpga_out_enable = 0;
     this->update_gpio_state();
 }
 
