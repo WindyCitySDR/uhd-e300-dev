@@ -161,6 +161,11 @@ b250_impl::b250_impl(const uhd::device_addr_t &dev_addr)
     _tree = uhd::property_tree::make();
     _last_sid = 0;
     _addr = dev_addr["addr"];
+    BOOST_FOREACH(const std::string &key, dev_addr.keys())
+    {
+        if (key[0] == 'r') _recv_args[key] = dev_addr[key];
+        if (key[0] == 's') _send_args[key] = dev_addr[key];
+    }
 
     //extract the FW path for the B250
     //and live load fw over ethernet link
@@ -471,22 +476,12 @@ void b250_impl::setup_radio(const size_t i, const std::string &db_name)
     );
 }
 
-uhd::transport::udp_zero_copy::sptr b250_impl::make_transport(const std::string &addr, const boost::uint32_t sid)
+uhd::transport::udp_zero_copy::sptr b250_impl::make_transport(
+    const std::string &addr,
+    const boost::uint32_t sid,
+    const uhd::device_addr_t &device_addr
+)
 {
-    device_addr_t device_addr;
-
-    //setup the dsp transport hints (default to a large recv buff)
-    if (not device_addr.has_key("recv_buff_size"))
-    {
-        #if defined(UHD_PLATFORM_MACOS) || defined(UHD_PLATFORM_BSD)
-            //limit buffer resize on macos or it will error
-            device_addr["recv_buff_size"] = "1e6";
-        #elif defined(UHD_PLATFORM_LINUX) || defined(UHD_PLATFORM_WIN32)
-            //set to half-a-second of buffering at max rate
-            device_addr["recv_buff_size"] = "50e6";
-        #endif
-    }
-
     //make a new transport - fpga has no idea how to talk to use on this yet
     udp_zero_copy::sptr xport = udp_zero_copy::make(addr, BOOST_STRINGIZE(B250_VITA_UDP_PORT), device_addr);
 

@@ -301,6 +301,19 @@ rx_streamer::sptr b250_impl::get_rx_stream(const uhd::stream_args_t &args_)
     const size_t i = args.channels[0];
     radio_perifs_t &perif = _radio_perifs[i];
 
+    //setup the dsp transport hints (default to a large recv buff)
+    device_addr_t device_addr = _recv_args;
+    if (not device_addr.has_key("recv_buff_size"))
+    {
+        #if defined(UHD_PLATFORM_MACOS) || defined(UHD_PLATFORM_BSD)
+            //limit buffer resize on macos or it will error
+            device_addr["recv_buff_size"] = "1e6";
+        #elif defined(UHD_PLATFORM_LINUX) || defined(UHD_PLATFORM_WIN32)
+            //set to half-a-second of buffering at max rate
+            device_addr["recv_buff_size"] = "50e6";
+        #endif
+    }
+
     //allocate sid and create transport
     sid_config_t data_config;
     data_config.router_addr_there = B250_DEVICE_THERE;
@@ -308,7 +321,7 @@ rx_streamer::sptr b250_impl::get_rx_stream(const uhd::stream_args_t &args_)
     data_config.router_dst_there = (i == 0)? B250_XB_DST_R0 : B250_XB_DST_R1;
     data_config.router_dst_here = B250_XB_DST_E0;
     const boost::uint32_t data_sid = this->allocate_sid(data_config);
-    zero_copy_if::sptr data_xport = this->make_transport(_addr, data_sid);
+    zero_copy_if::sptr data_xport = this->make_transport(_addr, data_sid, device_addr);
     UHD_MSG(status) << boost::format("data_sid = 0x%08x\n") % data_sid << std::endl;
 
     //calculate packet size
@@ -341,7 +354,12 @@ rx_streamer::sptr b250_impl::get_rx_stream(const uhd::stream_args_t &args_)
     perif.framer->set_nsamps_per_packet(spp); //seems to be a good place to set this
     perif.framer->set_sid((data_sid << 16) | (data_sid >> 16));
     perif.framer->setup(args);
-    perif.framer->configure_flow_control(B250_RX_FC_PKT_WINDOW);
+
+    //flow control setup
+    const size_t max_buffering = size_t(device_addr.cast<double>("recv_buff_size", 1e6));
+    const size_t fc_window = max_buffering/data_xport->get_recv_frame_size();
+    perif.framer->configure_flow_control(fc_window);
+
     boost::shared_ptr<boost::uint32_t> seq32(new boost::uint32_t(0));
     my_streamer->set_xport_chan_get_buff(0, boost::bind(
         &zero_copy_if::get_recv_buff, data_xport, _1
@@ -349,10 +367,9 @@ rx_streamer::sptr b250_impl::get_rx_stream(const uhd::stream_args_t &args_)
     my_streamer->set_overflow_handler(0, boost::bind(
         &rx_vita_core_3000::handle_overflow, perif.framer
     ));
-    UHD_ASSERT_THROW(B250_RX_FC_PKT_WINDOW > 0xfff);
     my_streamer->set_xport_handle_flowctrl(0, boost::bind(
         &handle_rx_flowctrl, data_sid, data_xport, seq32, _1
-    ), 0xfff/8, true/*init*/);
+    ), std::min<size_t>(0xfff/2, fc_window/2), true/*init*/);
     my_streamer->set_issue_stream_cmd(0, boost::bind(
         &rx_vita_core_3000::issue_stream_command, perif.framer, _1
     ));
@@ -390,7 +407,7 @@ tx_streamer::sptr b250_impl::get_tx_stream(const uhd::stream_args_t &args_)
     data_config.router_dst_there = (i == 0)? B250_XB_DST_R0 : B250_XB_DST_R1;
     data_config.router_dst_here = B250_XB_DST_E0;
     const boost::uint32_t data_sid = this->allocate_sid(data_config);
-    zero_copy_if::sptr data_xport = this->make_transport(_addr, data_sid);
+    zero_copy_if::sptr data_xport = this->make_transport(_addr, data_sid, _send_args);
     UHD_MSG(status) << boost::format("data_sid = 0x%08x\n") % data_sid << std::endl;
 
     //calculate packet size
