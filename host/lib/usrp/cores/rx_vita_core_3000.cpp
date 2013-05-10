@@ -59,7 +59,7 @@ struct rx_vita_core_3000_impl : rx_vita_core_3000
 
     void configure_flow_control(const size_t window_size)
     {
-        _iface->poke32(REG_FC_WINDOW, window_size);
+        _iface->poke32(REG_FC_WINDOW, window_size-1);
         _iface->poke32(REG_FC_ENABLE, window_size?1:0);
     }
 

@@ -27,8 +27,6 @@
 #include <boost/foreach.hpp>
 #include <boost/make_shared.hpp>
 
-#define E200_TX_FC_PKT_WINDOW 120 //TODO better constants dude
-
 using namespace uhd;
 using namespace uhd::usrp;
 using namespace uhd::transport;
@@ -250,16 +248,13 @@ static managed_send_buffer::sptr get_tx_buff_with_flowctrl(
     task::sptr /*holds ref*/,
     boost::shared_ptr<tx_fc_guts_t> guts,
     zero_copy_if::sptr xport,
-    const bool enable_fc,
+    const size_t fc_window,
     const double timeout
 ){
-
-    if (not enable_fc) return xport->get_send_buff(timeout); //NO FC so this is OK
-
     while (true)
     {
         const size_t delta = (guts->last_seq_out & 0xfff) - (guts->last_seq_ack & 0xfff);
-        if ((delta & 0xfff) <= E200_TX_FC_PKT_WINDOW) break;
+        if ((delta & 0xfff) <= fc_window) break;
 
         const bool ok = guts->seq_queue.pop_with_timed_wait(guts->last_seq_ack, timeout);
         if (not ok) return managed_send_buffer::sptr(); //timeout waiting for flow control
@@ -337,12 +332,13 @@ rx_streamer::sptr e200_impl::get_rx_stream(const uhd::stream_args_t &args_)
         &rx_vita_core_3000::handle_overflow, perif.framer
     ));
 
-    //shetup flow control
-    perif.framer->configure_flow_control(E200_TX_FC_PKT_WINDOW);
+    //setup flow control
+    const size_t fc_window = perif.rx_data_xport->get_num_recv_frames();
+    perif.framer->configure_flow_control(fc_window);
     boost::shared_ptr<boost::uint32_t> seq32(new boost::uint32_t(0));
     my_streamer->set_xport_handle_flowctrl(0, boost::bind(
         &handle_rx_flowctrl, data_sid, perif.rx_flow_xport, seq32, _1
-    ), E200_TX_FC_PKT_WINDOW/8, true/*init*/);
+    ), fc_window, true/*init*/);
 
     my_streamer->set_issue_stream_cmd(0, boost::bind(
         &rx_vita_core_3000::issue_stream_command, perif.framer, _1
@@ -404,12 +400,13 @@ tx_streamer::sptr e200_impl::get_tx_stream(const uhd::stream_args_t &args_)
     perif.deframer->setup(args);
 
     //flow control setup
-    perif.deframer->configure_flow_control(0/*cycs off*/, E200_TX_FC_PKT_WINDOW/8/*pkts*/);
+    const size_t fc_window = perif.tx_data_xport->get_num_send_frames();
+    perif.deframer->configure_flow_control(0/*cycs off*/, fc_window/8/*pkts*/);
     boost::shared_ptr<tx_fc_guts_t> guts(new tx_fc_guts_t());
     task::sptr task = task::make(boost::bind(&handle_tx_async_msgs, guts, perif.tx_flow_xport));
 
     my_streamer->set_xport_chan_get_buff(0, boost::bind(
-        &get_tx_buff_with_flowctrl, task, guts, perif.tx_data_xport, true/*fc on*/, _1
+        &get_tx_buff_with_flowctrl, task, guts, perif.tx_data_xport, fc_window, _1
     ));
     my_streamer->set_async_receiver(boost::bind(
         &bounded_buffer<async_metadata_t>::pop_with_timed_wait, &(guts->async_queue), _1, _2

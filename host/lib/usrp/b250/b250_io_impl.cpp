@@ -369,7 +369,7 @@ rx_streamer::sptr b250_impl::get_rx_stream(const uhd::stream_args_t &args_)
     ));
     my_streamer->set_xport_handle_flowctrl(0, boost::bind(
         &handle_rx_flowctrl, data_sid, data_xport, seq32, _1
-    ), std::min<size_t>(0xfff/2, fc_window/2), true/*init*/);
+    ), fc_window, true/*init*/);
     my_streamer->set_issue_stream_cmd(0, boost::bind(
         &rx_vita_core_3000::issue_stream_command, perif.framer, _1
     ));

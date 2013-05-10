@@ -149,7 +149,8 @@ public:
     void set_xport_handle_flowctrl(const size_t xport_chan, const handle_flowctrl_type &handle_flowctrl, const size_t update_window, const bool do_init = false)
     {
         _props.at(xport_chan).handle_flowctrl = handle_flowctrl;
-        _props.at(xport_chan).fc_update_window = update_window;
+        //we need the window size to be within the 0xfff (max 12 bit seq)
+        _props.at(xport_chan).fc_update_window = std::min<size_t>(update_window, 0xfff);
         if (do_init) handle_flowctrl(0);
     }
 
@@ -337,7 +338,7 @@ private:
         //handle flow control
         if (_props[index].handle_flowctrl)
         {
-            if ((info.ifpi.packet_count % _props[index].fc_update_window) == 0)
+            if ((info.ifpi.packet_count % _props[index].fc_update_window/2) == 0)
             {
                 _props[index].handle_flowctrl(info.ifpi.packet_count);
             }
