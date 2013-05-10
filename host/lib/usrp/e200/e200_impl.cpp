@@ -350,8 +350,8 @@ e200_impl::e200_impl(const uhd::device_addr_t &device_addr)
     _tree->access<double>(mb_path / "tick_rate").set(61.44e6/2);
     //_codec_ctrl->set_active_chains(false, false, false, false);
 
-    _tree->access<subdev_spec_t>(mb_path / "rx_subdev_spec").set(subdev_spec_t("A:RX1"));
-    _tree->access<subdev_spec_t>(mb_path / "tx_subdev_spec").set(subdev_spec_t("A:TX1"));
+    _tree->access<subdev_spec_t>(mb_path / "rx_subdev_spec").set(subdev_spec_t("A:RX2"));
+    _tree->access<subdev_spec_t>(mb_path / "tx_subdev_spec").set(subdev_spec_t("A:TX2"));
 
     _tree->access<std::string>(mb_path / "clock_source" / "value").set("internal");
     _tree->access<std::string>(mb_path / "time_source" / "value").set("none");
@@ -619,17 +619,6 @@ void e200_impl::update_atrs(const size_t &fe)
         vcrx_1_rxing = 1; vcrx_2_rxing = 0;
     }
 
-    UHD_VAR(settings.rx_freq);
-    UHD_VAR(rx_bandsels);
-    UHD_VAR(rx_bandsel_b);
-    UHD_VAR(rx_bandsel_c);
-    UHD_VAR(rx_ant_rx2);
-    UHD_VAR(rx_ant_txrx);
-    UHD_VAR(rx_low_band);
-    UHD_VAR(rx_high_band);
-    UHD_VAR(vcrx_1_rxing);
-    UHD_VAR(vcrx_2_rxing);
-
     //-------------------- VCRX - tx mode -------------------------//
     int vcrx_1_txing = 1, vcrx_2_txing = 0;
     if (rx_low_band)
@@ -666,6 +655,9 @@ void e200_impl::update_atrs(const size_t &fe)
     {
         vctxrx_1_txing = 0; vctxrx_2_txing = 1;
     }
+
+    //swapped for routing reasons, reswap it here
+    if (fe == 1) std::swap(vctxrx_1_txing, vctxrx_2_txing);
 
     //----------------- TX ENABLES ----------------------------//
     const int tx_enable_a = (tx_high_band and settings.tx_enb)? 1 : 0;
@@ -716,6 +708,26 @@ void e200_impl::update_atrs(const size_t &fe)
     if (settings.rx_enb) fd_reg |= xx_leds;
     if (settings.tx_enb) tx_reg |= tx_enables | tx_leds;
     if (settings.tx_enb) fd_reg |= tx_enables | xx_leds;
+
+    /*
+    UHD_VAR(fe);
+    UHD_VAR(settings.rx_enb);
+    UHD_VAR(settings.tx_enb);
+    UHD_VAR(settings.rx_freq);
+    UHD_VAR(settings.tx_freq);
+    UHD_VAR(tx_bandsels);
+    UHD_VAR(rx_bandsels);
+    UHD_VAR(rx_bandsel_b);
+    UHD_VAR(rx_bandsel_c);
+    UHD_VAR(rx_ant_rx2);
+    UHD_VAR(rx_ant_txrx);
+    UHD_VAR(rx_low_band);
+    UHD_VAR(rx_high_band);
+    UHD_VAR(vcrx_1_rxing);
+    UHD_VAR(vcrx_2_rxing);
+    UHD_VAR(vcrx_1_txing);
+    UHD_VAR(vcrx_2_txing);
+    */
 
     //load actual values into atr registers
     gpio_core_200_32wo::sptr atr = (fe == 0)? _radio_perifs[0].atr0 : _radio_perifs[0].atr1;
