@@ -80,7 +80,8 @@ private:
     struct radio_perifs_t
     {
         e200_ctrl::sptr ctrl;
-        gpio_core_200_32wo::sptr atr;
+        gpio_core_200_32wo::sptr atr0;
+        gpio_core_200_32wo::sptr atr1;
         time_core_3000::sptr time64;
         rx_vita_core_3000::sptr framer;
         rx_dsp_core_3000::sptr ddc;

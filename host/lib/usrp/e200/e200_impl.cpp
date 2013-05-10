@@ -484,6 +484,8 @@ void e200_impl::update_active_frontends(void)
         _fe_control_settings[0].rx_enb,
         _fe_control_settings[1].rx_enb
     );
+    this->update_atrs(0);
+    this->update_atrs(1);
 }
 
 void e200_impl::setup_radio(const size_t dspno)
@@ -496,7 +498,8 @@ void e200_impl::setup_radio(const size_t dspno)
     ////////////////////////////////////////////////////////////////////
     perif.ctrl = e200_ctrl::make(perif.send_ctrl_xport, perif.recv_ctrl_xport, 1 | (1 << 16));
     this->register_loopback_self_test(perif.ctrl);
-    perif.atr = gpio_core_200_32wo::make(perif.ctrl, TOREG(SR_GPIO));
+    perif.atr0 = gpio_core_200_32wo::make(perif.ctrl, TOREG(SR_GPIO));
+    perif.atr1 = gpio_core_200_32wo::make(perif.ctrl, TOREG(SR_GPIO2));
 
     ////////////////////////////////////////////////////////////////////
     // create rx dsp control objects
@@ -561,9 +564,6 @@ void e200_impl::setup_radio(const size_t dspno)
 
 void e200_impl::update_atrs(const size_t &fe)
 {
-    //TODO eventually fe 1 when it exists
-    if (fe == 1) return;
-
     const fe_control_settings_t &settings = _fe_control_settings[fe];
 
     //----------------- rx ant comprehension --------------------//
@@ -705,13 +705,22 @@ void e200_impl::update_atrs(const size_t &fe)
         | (tx_enable_b << TX_ENABLEB)
     ;
 
-    const int oo_reg = xx_selects | rx_selects;
-    const int rx_reg = xx_selects | rx_selects | rx_leds;
-    const int tx_reg = xx_selects | tx_selects | tx_enables | tx_leds;
-    const int xx_reg = xx_selects | rx_selects | tx_selects | tx_enables | xx_leds;
+    //default selects
+    int oo_reg = xx_selects | rx_selects;
+    int rx_reg = xx_selects | rx_selects;
+    int tx_reg = xx_selects | tx_selects;
+    int fd_reg = xx_selects | tx_selects; //tx selects dominate in fd mode
 
-    _radio_perifs[fe].atr->set_atr_reg(dboard_iface::ATR_REG_IDLE, oo_reg);
-    _radio_perifs[fe].atr->set_atr_reg(dboard_iface::ATR_REG_RX_ONLY, rx_reg);
-    _radio_perifs[fe].atr->set_atr_reg(dboard_iface::ATR_REG_TX_ONLY, tx_reg);
-    _radio_perifs[fe].atr->set_atr_reg(dboard_iface::ATR_REG_FULL_DUPLEX, xx_reg);
+    //add in leds and tx enables based on fe enable
+    if (settings.rx_enb) rx_reg |= rx_leds;
+    if (settings.rx_enb) fd_reg |= xx_leds;
+    if (settings.tx_enb) tx_reg |= tx_enables | tx_leds;
+    if (settings.tx_enb) fd_reg |= tx_enables | xx_leds;
+
+    //load actual values into atr registers
+    gpio_core_200_32wo::sptr atr = (fe == 0)? _radio_perifs[0].atr0 : _radio_perifs[0].atr1;
+    atr->set_atr_reg(dboard_iface::ATR_REG_IDLE, oo_reg);
+    atr->set_atr_reg(dboard_iface::ATR_REG_RX_ONLY, rx_reg);
+    atr->set_atr_reg(dboard_iface::ATR_REG_TX_ONLY, tx_reg);
+    atr->set_atr_reg(dboard_iface::ATR_REG_FULL_DUPLEX, fd_reg);
 }
