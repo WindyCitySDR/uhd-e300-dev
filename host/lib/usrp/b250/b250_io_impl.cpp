@@ -24,6 +24,7 @@
 #include <uhd/transport/bounded_buffer.hpp>
 #include <boost/bind.hpp>
 #include <uhd/utils/tasks.hpp>
+#include <uhd/utils/log.hpp>
 #include <boost/foreach.hpp>
 #include <boost/make_shared.hpp>
 
@@ -321,8 +322,9 @@ rx_streamer::sptr b250_impl::get_rx_stream(const uhd::stream_args_t &args_)
     data_config.router_dst_there = (i == 0)? B250_XB_DST_R0 : B250_XB_DST_R1;
     data_config.router_dst_here = B250_XB_DST_E0;
     const boost::uint32_t data_sid = this->allocate_sid(data_config);
+    UHD_LOG << "creating rx stream " << device_addr.to_string() << std::endl;
     zero_copy_if::sptr data_xport = this->make_transport(_addr, data_sid, device_addr);
-    UHD_MSG(status) << boost::format("data_sid = 0x%08x\n") % data_sid << std::endl;
+    UHD_LOG << boost::format("data_sid = 0x%08x\n") % data_sid << std::endl;
 
     //calculate packet size
     static const size_t hdr_size = 0
@@ -407,8 +409,9 @@ tx_streamer::sptr b250_impl::get_tx_stream(const uhd::stream_args_t &args_)
     data_config.router_dst_there = (i == 0)? B250_XB_DST_R0 : B250_XB_DST_R1;
     data_config.router_dst_here = B250_XB_DST_E0;
     const boost::uint32_t data_sid = this->allocate_sid(data_config);
+    UHD_LOG << "creating tx stream " << _send_args.to_string() << std::endl;
     zero_copy_if::sptr data_xport = this->make_transport(_addr, data_sid, _send_args);
-    UHD_MSG(status) << boost::format("data_sid = 0x%08x\n") % data_sid << std::endl;
+    UHD_LOG << boost::format("data_sid = 0x%08x\n") % data_sid << std::endl;
 
     //calculate packet size
     static const size_t hdr_size = 0

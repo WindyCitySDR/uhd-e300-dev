@@ -491,12 +491,15 @@ uhd::transport::udp_zero_copy::sptr b250_impl::make_transport(
 
     //send a mini packet with SID into the ZPU
     //ZPU will reprogram the ethernet framer
+    UHD_LOG << "programming packet for new xport on "
+        << addr << std::hex << "sid 0x" << sid << std::dec << std::endl;
     managed_send_buffer::sptr mb = xport->get_send_buff();
     mb->cast<boost::uint32_t *>()[0] = uhd::htonx(sid);
     mb->commit(4);
     mb.reset();
 
-    //reprogram the ethernet dispatcher's udp port
+    //reprogram the ethernet dispatcher's udp port (should be safe to always set)
+    UHD_LOG << "reprogram the ethernet dispatcher's udp port" << std::endl;
     _zpu_ctrl->poke32(SR_ADDR(SET0_BASE, (ZPU_SR_ETHINT0+8+3)), B250_VITA_UDP_PORT);
 
     return xport;
@@ -515,6 +518,12 @@ boost::uint32_t b250_impl::allocate_sid(const sid_config_t &config)
         | (config.router_addr_there << 8)
         | (stream << 0)
     ;
+    UHD_LOG << std::hex
+        << "sid 0x" << sid
+        << "stream 0x" << stream
+        << "router_addr_there 0x" << config.router_addr_there
+        << std::dec << std::endl;
+
     // Program the B250 to recognise it's own local address.
     _zpu_ctrl->poke32(SR_ADDR(SET0_BASE, ZPU_SR_XB_LOCAL), config.router_addr_there);
     // Program CAM entry for outgoing packets matching a B250 resource (for example a Radio)
@@ -524,6 +533,9 @@ boost::uint32_t b250_impl::allocate_sid(const sid_config_t &config)
     // This type of packet does not match the XB_LOCAL address and is looked up in the lower half of the CAM
     _zpu_ctrl->poke32(SR_ADDR(SETXB_BASE, 0   + (B250_DEVICE_HERE)), config.router_dst_here);
 
+    UHD_LOG << std::hex
+        << "done router config for sid 0x" << sid
+        << std::dec << std::endl;
     return sid;
 }
 
