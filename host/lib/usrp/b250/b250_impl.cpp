@@ -519,9 +519,9 @@ boost::uint32_t b250_impl::allocate_sid(const sid_config_t &config)
         | (stream << 0)
     ;
     UHD_LOG << std::hex
-        << "sid 0x" << sid
-        << "stream 0x" << stream
-        << "router_addr_there 0x" << config.router_addr_there
+        << " sid 0x" << sid
+        << " stream 0x" << stream
+        << " router_addr_there 0x" << int(config.router_addr_there)
         << std::dec << std::endl;
 
     // Program the B250 to recognise it's own local address.

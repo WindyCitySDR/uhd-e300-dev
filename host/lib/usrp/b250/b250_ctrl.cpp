@@ -168,7 +168,7 @@ private:
     {
         while (readback or (_outstanding_seqs.size() >= RESP_QUEUE_SIZE))
         {
-            UHD_LOGV(always) << "wait_for_ack: " << "readback = " << readback << "_outstanding_seqs.size() " << _outstanding_seqs.size() << std::endl;
+            UHD_LOGV(always) << "wait_for_ack: " << "readback = " << readback << " outstanding_seqs.size() " << _outstanding_seqs.size() << std::endl;
 
             //get seq to ack from outstanding packets list
             UHD_ASSERT_THROW(not _outstanding_seqs.empty());
