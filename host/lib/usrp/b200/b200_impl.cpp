@@ -500,7 +500,7 @@ void b200_impl::register_loopback_self_test(void)
 {
     bool test_fail = false;
     UHD_MSG(status) << "Performing register loopback test... " << std::flush;
-    size_t hash = time(NULL);
+    size_t hash = size_t(time(NULL));
     for (size_t i = 0; i < 100; i++)
     {
         boost::hash_combine(hash, i);
@@ -515,7 +515,7 @@ void b200_impl::codec_loopback_self_test(void)
 {
     bool test_fail = false;
     UHD_MSG(status) << "Performing CODEC loopback test... " << std::flush;
-    size_t hash = time(NULL);
+    size_t hash = size_t(time(NULL));
     for (size_t i = 0; i < 100; i++)
     {
         boost::hash_combine(hash, i);
@@ -750,20 +750,4 @@ sensor_value_t b200_impl::get_ref_locked(void)
 {
     const bool lock = _adf4001_iface->locked();
     return sensor_value_t("Ref", lock, "locked", "unlocked");
-}
-
-static inline bool wait_for_recv_ready(int sock_fd, const size_t timeout_ms)
-{
-    //setup timeval for timeout
-    timeval tv;
-    tv.tv_sec = 0;
-    tv.tv_usec = timeout_ms*1000;
-
-    //setup rset for timeout
-    fd_set rset;
-    FD_ZERO(&rset);
-    FD_SET(sock_fd, &rset);
-
-    //call select with timeout on receive socket
-    return ::select(sock_fd+1, &rset, NULL, NULL, &tv) > 0;
 }
