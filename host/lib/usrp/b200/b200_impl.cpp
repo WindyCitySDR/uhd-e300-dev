@@ -121,14 +121,12 @@ static device_addrs_t b200_find(const device_addr_t &hint)
             catch(const uhd::exception &){continue;} //ignore claimed
 
             b200_iface::sptr iface = b200_iface::make(control);
-            //TODO
-            //const mboard_eeprom_t mb_eeprom = mboard_eeprom_t(*iface, mboard_eeprom_t::MAP_B100);
+            const mboard_eeprom_t mb_eeprom = mboard_eeprom_t(*iface, "B200");
 
             device_addr_t new_addr;
             new_addr["type"] = "b200";
-            //TODO
-            //new_addr["name"] = mb_eeprom["name"];
-            new_addr["serial"] = handle->get_serial();
+            new_addr["name"] = mb_eeprom["name"];
+            new_addr["serial"] = mb_eeprom["serial"];
             //this is a found b200 when the hint serial and name match or blank
             if (
                 (not hint.has_key("name")   or hint["name"]   == new_addr["name"]) and
@@ -264,11 +262,7 @@ b200_impl::b200_impl(const device_addr_t &device_addr):
     ////////////////////////////////////////////////////////////////////
     // setup the mboard eeprom
     ////////////////////////////////////////////////////////////////////
-    // TODO
-//    const mboard_eeprom_t mb_eeprom(*_iface, mboard_eeprom_t::MAP_B100);
-    mboard_eeprom_t mb_eeprom;
-    mb_eeprom["name"] = "TODO"; //FIXME with real eeprom values
-    mb_eeprom["serial"] = "TODO"; //FIXME with real eeprom values
+    mboard_eeprom_t mb_eeprom(*_iface, "B200");
     _tree->create<mboard_eeprom_t>(mb_path / "eeprom")
         .set(mb_eeprom)
         .subscribe(boost::bind(&b200_impl::set_mb_eeprom, this, _1));
@@ -607,8 +601,7 @@ void b200_impl::check_fpga_compat(void)
 
 void b200_impl::set_mb_eeprom(const uhd::usrp::mboard_eeprom_t &mb_eeprom)
 {
-    //TODO
-    //mb_eeprom.commit(*_iface, mboard_eeprom_t::MAP_B100);
+    mb_eeprom.commit(*_iface, "B200");
 }
 
 
