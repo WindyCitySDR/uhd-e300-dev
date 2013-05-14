@@ -877,6 +877,10 @@ private:
             if (mcp.chan < sss) break;
             mcp.chan -= sss;
         }
+        if (mcp.mboard >= get_num_mboards())
+        {
+            throw uhd::index_error(str(boost::format("multi_usrp: RX channel %u out of range for configured RX frontends") % chan));
+        }
         return mcp;
     }
 
@@ -887,6 +891,10 @@ private:
             size_t sss = get_tx_subdev_spec(mcp.mboard).size();
             if (mcp.chan < sss) break;
             mcp.chan -= sss;
+        }
+        if (mcp.mboard >= get_num_mboards())
+        {
+            throw uhd::index_error(str(boost::format("multi_usrp: TX channel %u out of range for configured TX frontends") % chan));
         }
         return mcp;
     }
