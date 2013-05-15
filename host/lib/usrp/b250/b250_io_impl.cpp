@@ -299,87 +299,93 @@ rx_streamer::sptr b250_impl::get_rx_stream(const uhd::stream_args_t &args_)
     }
     args.otw_format = "sc16";
     args.channels = args.channels.empty()? std::vector<size_t>(1, 0) : args.channels;
-    const size_t i = args.channels[0];
-    radio_perifs_t &perif = _radio_perifs[i];
 
-    //setup the dsp transport hints (default to a large recv buff)
-    device_addr_t device_addr = _recv_args;
-    if (not device_addr.has_key("recv_buff_size"))
+    boost::shared_ptr<sph::recv_packet_streamer> my_streamer;
+    for (size_t stream_i = 0; stream_i < args.channels.size(); stream_i++)
     {
-        #if defined(UHD_PLATFORM_MACOS) || defined(UHD_PLATFORM_BSD)
-            //limit buffer resize on macos or it will error
-            device_addr["recv_buff_size"] = "1e6";
-        #elif defined(UHD_PLATFORM_LINUX) || defined(UHD_PLATFORM_WIN32)
-            //set to half-a-second of buffering at max rate
-            device_addr["recv_buff_size"] = "50e6";
-        #endif
+        const size_t chan = args.channels[stream_i];
+        radio_perifs_t &perif = _radio_perifs[chan];
+
+        //setup the dsp transport hints (default to a large recv buff)
+        device_addr_t device_addr = _recv_args;
+        if (not device_addr.has_key("recv_buff_size"))
+        {
+            #if defined(UHD_PLATFORM_MACOS) || defined(UHD_PLATFORM_BSD)
+                //limit buffer resize on macos or it will error
+                device_addr["recv_buff_size"] = "1e6";
+            #elif defined(UHD_PLATFORM_LINUX) || defined(UHD_PLATFORM_WIN32)
+                //set to half-a-second of buffering at max rate
+                device_addr["recv_buff_size"] = "50e6";
+            #endif
+        }
+
+        //allocate sid and create transport
+        sid_config_t data_config;
+        data_config.router_addr_there = B250_DEVICE_THERE;
+        data_config.dst_prefix = B250_RADIO_DEST_PREFIX_RX;
+        data_config.router_dst_there = (chan == 0)? B250_XB_DST_R0 : B250_XB_DST_R1;
+        data_config.router_dst_here = B250_XB_DST_E0;
+        const boost::uint32_t data_sid = this->allocate_sid(data_config);
+        UHD_LOG << "creating rx stream " << device_addr.to_string() << std::endl;
+        zero_copy_if::sptr data_xport = this->make_transport(_addr, data_sid, device_addr);
+        UHD_LOG << boost::format("data_sid = 0x%08x\n") % data_sid << std::endl;
+
+        //calculate packet size
+        static const size_t hdr_size = 0
+            + vrt::num_vrl_words32*sizeof(boost::uint32_t)
+            + vrt::max_if_hdr_words32*sizeof(boost::uint32_t)
+            + sizeof(vrt::if_packet_info_t().tlr) //forced to have trailer
+            - sizeof(vrt::if_packet_info_t().cid) //no class id ever used
+            - sizeof(vrt::if_packet_info_t().tsi) //no int time ever used
+        ;
+        const size_t bpp = data_xport->get_recv_frame_size() - hdr_size;
+        const size_t bpi = convert::get_bytes_per_item(args.otw_format);
+        const size_t spp = unsigned(args.args.cast<double>("spp", bpp/bpi));
+
+        //make the new streamer given the samples per packet
+        if (not my_streamer) my_streamer = boost::make_shared<sph::recv_packet_streamer>(spp);
+        my_streamer->resize(args.channels.size());
+
+        //init some streamer stuff
+        my_streamer->set_vrt_unpacker(&b250_if_hdr_unpack_be);
+
+        //set the converter
+        uhd::convert::id_type id;
+        id.input_format = args.otw_format + "_item32_be";
+        id.num_inputs = 1;
+        id.output_format = args.cpu_format;
+        id.num_outputs = 1;
+        my_streamer->set_converter(id);
+
+        perif.framer->clear();
+        perif.framer->set_nsamps_per_packet(spp); //seems to be a good place to set this
+        perif.framer->set_sid((data_sid << 16) | (data_sid >> 16));
+        perif.framer->setup(args);
+
+        //flow control setup
+        const size_t max_buffering = size_t(device_addr.cast<double>("recv_buff_size", 1e6));
+        const size_t fc_window = max_buffering/data_xport->get_recv_frame_size();
+        perif.framer->configure_flow_control(fc_window);
+
+        boost::shared_ptr<boost::uint32_t> seq32(new boost::uint32_t(0));
+        my_streamer->set_xport_chan_get_buff(stream_i, boost::bind(
+            &zero_copy_if::get_recv_buff, data_xport, _1
+        ), true /*flush*/);
+        my_streamer->set_overflow_handler(stream_i, boost::bind(
+            &rx_vita_core_3000::handle_overflow, perif.framer
+        ));
+        my_streamer->set_xport_handle_flowctrl(stream_i, boost::bind(
+            &handle_rx_flowctrl, data_sid, data_xport, seq32, _1
+        ), fc_window, true/*init*/);
+        my_streamer->set_issue_stream_cmd(stream_i, boost::bind(
+            &rx_vita_core_3000::issue_stream_command, perif.framer, _1
+        ));
+        _rx_streamers[chan] = my_streamer; //store weak pointer
+
+        //sets all tick and samp rates on this streamer
+        _tree->access<double>("/mboards/0/tick_rate").update();
+        _tree->access<double>(str(boost::format("/mboards/0/rx_dsps/%u/rate/value") % chan)).update();
     }
-
-    //allocate sid and create transport
-    sid_config_t data_config;
-    data_config.router_addr_there = B250_DEVICE_THERE;
-    data_config.dst_prefix = B250_RADIO_DEST_PREFIX_RX;
-    data_config.router_dst_there = (i == 0)? B250_XB_DST_R0 : B250_XB_DST_R1;
-    data_config.router_dst_here = B250_XB_DST_E0;
-    const boost::uint32_t data_sid = this->allocate_sid(data_config);
-    UHD_LOG << "creating rx stream " << device_addr.to_string() << std::endl;
-    zero_copy_if::sptr data_xport = this->make_transport(_addr, data_sid, device_addr);
-    UHD_LOG << boost::format("data_sid = 0x%08x\n") % data_sid << std::endl;
-
-    //calculate packet size
-    static const size_t hdr_size = 0
-        + vrt::num_vrl_words32*sizeof(boost::uint32_t)
-        + vrt::max_if_hdr_words32*sizeof(boost::uint32_t)
-        + sizeof(vrt::if_packet_info_t().tlr) //forced to have trailer
-        - sizeof(vrt::if_packet_info_t().cid) //no class id ever used
-        - sizeof(vrt::if_packet_info_t().tsi) //no int time ever used
-    ;
-    const size_t bpp = data_xport->get_recv_frame_size() - hdr_size;
-    const size_t bpi = convert::get_bytes_per_item(args.otw_format);
-    const size_t spp = unsigned(args.args.cast<double>("spp", bpp/bpi));
-
-    //make the new streamer given the samples per packet
-    boost::shared_ptr<sph::recv_packet_streamer> my_streamer = boost::make_shared<sph::recv_packet_streamer>(spp);
-
-    //init some streamer stuff
-    my_streamer->set_vrt_unpacker(&b250_if_hdr_unpack_be);
-
-    //set the converter
-    uhd::convert::id_type id;
-    id.input_format = args.otw_format + "_item32_be";
-    id.num_inputs = 1;
-    id.output_format = args.cpu_format;
-    id.num_outputs = 1;
-    my_streamer->set_converter(id);
-
-    perif.framer->clear();
-    perif.framer->set_nsamps_per_packet(spp); //seems to be a good place to set this
-    perif.framer->set_sid((data_sid << 16) | (data_sid >> 16));
-    perif.framer->setup(args);
-
-    //flow control setup
-    const size_t max_buffering = size_t(device_addr.cast<double>("recv_buff_size", 1e6));
-    const size_t fc_window = max_buffering/data_xport->get_recv_frame_size();
-    perif.framer->configure_flow_control(fc_window);
-
-    boost::shared_ptr<boost::uint32_t> seq32(new boost::uint32_t(0));
-    my_streamer->set_xport_chan_get_buff(0, boost::bind(
-        &zero_copy_if::get_recv_buff, data_xport, _1
-    ), true /*flush*/);
-    my_streamer->set_overflow_handler(0, boost::bind(
-        &rx_vita_core_3000::handle_overflow, perif.framer
-    ));
-    my_streamer->set_xport_handle_flowctrl(0, boost::bind(
-        &handle_rx_flowctrl, data_sid, data_xport, seq32, _1
-    ), fc_window, true/*init*/);
-    my_streamer->set_issue_stream_cmd(0, boost::bind(
-        &rx_vita_core_3000::issue_stream_command, perif.framer, _1
-    ));
-    _rx_streamers[i] = my_streamer; //store weak pointer
-
-    //sets all tick and samp rates on this streamer
-    _tree->access<double>("/mboards/0/tick_rate").update();
-    _tree->access<double>(str(boost::format("/mboards/0/rx_dsps/%u/rate/value") % i)).update();
 
     return my_streamer;
 }
@@ -399,67 +405,74 @@ tx_streamer::sptr b250_impl::get_tx_stream(const uhd::stream_args_t &args_)
     }
     args.otw_format = "sc16";
     args.channels = args.channels.empty()? std::vector<size_t>(1, 0) : args.channels;
-    const size_t i = args.channels[0];
-    radio_perifs_t &perif = _radio_perifs[i];
 
-    //allocate sid and create transport
-    sid_config_t data_config;
-    data_config.router_addr_there = B250_DEVICE_THERE;
-    data_config.dst_prefix = B250_RADIO_DEST_PREFIX_TX;
-    data_config.router_dst_there = (i == 0)? B250_XB_DST_R0 : B250_XB_DST_R1;
-    data_config.router_dst_here = B250_XB_DST_E0;
-    const boost::uint32_t data_sid = this->allocate_sid(data_config);
-    UHD_LOG << "creating tx stream " << _send_args.to_string() << std::endl;
-    zero_copy_if::sptr data_xport = this->make_transport(_addr, data_sid, _send_args);
-    UHD_LOG << boost::format("data_sid = 0x%08x\n") % data_sid << std::endl;
+    boost::shared_ptr<sph::send_packet_streamer> my_streamer;
+    for (size_t stream_i = 0; stream_i < args.channels.size(); stream_i++)
+    {
+        const size_t chan = args.channels[stream_i];
+        radio_perifs_t &perif = _radio_perifs[chan];
 
-    //calculate packet size
-    static const size_t hdr_size = 0
-        + vrt::num_vrl_words32*sizeof(boost::uint32_t)
-        + vrt::max_if_hdr_words32*sizeof(boost::uint32_t)
-        //+ sizeof(vrt::if_packet_info_t().tlr) //forced to have trailer
-        - sizeof(vrt::if_packet_info_t().cid) //no class id ever used
-        - sizeof(vrt::if_packet_info_t().tsi) //no int time ever used
-    ;
-    const size_t bpp = data_xport->get_send_frame_size() - hdr_size;
-    const size_t bpi = convert::get_bytes_per_item(args.otw_format);
-    const size_t spp = unsigned(args.args.cast<double>("spp", bpp/bpi));
+        //allocate sid and create transport
+        sid_config_t data_config;
+        data_config.router_addr_there = B250_DEVICE_THERE;
+        data_config.dst_prefix = B250_RADIO_DEST_PREFIX_TX;
+        data_config.router_dst_there = (chan == 0)? B250_XB_DST_R0 : B250_XB_DST_R1;
+        data_config.router_dst_here = B250_XB_DST_E0;
+        const boost::uint32_t data_sid = this->allocate_sid(data_config);
+        UHD_LOG << "creating tx stream " << _send_args.to_string() << std::endl;
+        zero_copy_if::sptr data_xport = this->make_transport(_addr, data_sid, _send_args);
+        UHD_LOG << boost::format("data_sid = 0x%08x\n") % data_sid << std::endl;
 
-    //make the new streamer given the samples per packet
-    boost::shared_ptr<sph::send_packet_streamer> my_streamer = boost::make_shared<sph::send_packet_streamer>(spp);
+        //calculate packet size
+        static const size_t hdr_size = 0
+            + vrt::num_vrl_words32*sizeof(boost::uint32_t)
+            + vrt::max_if_hdr_words32*sizeof(boost::uint32_t)
+            //+ sizeof(vrt::if_packet_info_t().tlr) //forced to have trailer
+            - sizeof(vrt::if_packet_info_t().cid) //no class id ever used
+            - sizeof(vrt::if_packet_info_t().tsi) //no int time ever used
+        ;
+        const size_t bpp = data_xport->get_send_frame_size() - hdr_size;
+        const size_t bpi = convert::get_bytes_per_item(args.otw_format);
+        const size_t spp = unsigned(args.args.cast<double>("spp", bpp/bpi));
 
-    //init some streamer stuff
-    my_streamer->set_vrt_packer(&b250_if_hdr_pack_be);
+        //make the new streamer given the samples per packet
+        if (not my_streamer) my_streamer = boost::make_shared<sph::send_packet_streamer>(spp);
+        my_streamer->resize(args.channels.size());
 
-    //set the converter
-    uhd::convert::id_type id;
-    id.input_format = args.cpu_format;
-    id.num_inputs = 1;
-    id.output_format = args.otw_format + "_item32_be";
-    id.num_outputs = 1;
-    my_streamer->set_converter(id);
+        //init some streamer stuff
+        my_streamer->set_vrt_packer(&b250_if_hdr_pack_be);
 
-    perif.deframer->clear();
-    perif.deframer->setup(args);
+        //set the converter
+        uhd::convert::id_type id;
+        id.input_format = args.cpu_format;
+        id.num_inputs = 1;
+        id.output_format = args.otw_format + "_item32_be";
+        id.num_outputs = 1;
+        my_streamer->set_converter(id);
 
-    //flow control setup
-    perif.deframer->configure_flow_control(0/*cycs off*/, B250_TX_FC_PKT_WINDOW/8/*pkts*/);
-    boost::shared_ptr<tx_fc_guts_t> guts(new tx_fc_guts_t());
-    task::sptr task = task::make(boost::bind(&handle_tx_async_msgs, guts, data_xport));
+        perif.deframer->clear();
+        perif.deframer->setup(args);
 
-    my_streamer->set_xport_chan_get_buff(0, boost::bind(
-        &get_tx_buff_with_flowctrl, task, guts, data_xport, _1
-    ));
-    my_streamer->set_async_receiver(boost::bind(
-        &bounded_buffer<async_metadata_t>::pop_with_timed_wait, &(guts->async_queue), _1, _2
-    ));
-    my_streamer->set_xport_chan_sid(0, true, data_sid);
-    my_streamer->set_enable_trailer(false); //TODO not implemented trailer support yet
-    _tx_streamers[i] = my_streamer; //store weak pointer
+        //flow control setup
+        perif.deframer->configure_flow_control(0/*cycs off*/, B250_TX_FC_PKT_WINDOW/8/*pkts*/);
+        boost::shared_ptr<tx_fc_guts_t> guts(new tx_fc_guts_t());
+        task::sptr task = task::make(boost::bind(&handle_tx_async_msgs, guts, data_xport));
 
-    //sets all tick and samp rates on this streamer
-    _tree->access<double>("/mboards/0/tick_rate").update();
-    _tree->access<double>(str(boost::format("/mboards/0/tx_dsps/%u/rate/value") % i)).update();
+        my_streamer->set_xport_chan_get_buff(stream_i, boost::bind(
+            &get_tx_buff_with_flowctrl, task, guts, data_xport, _1
+        ));
+        //FIXME note that this replaces the last async_receiver set in the multi channel case
+        my_streamer->set_async_receiver(boost::bind(
+            &bounded_buffer<async_metadata_t>::pop_with_timed_wait, &(guts->async_queue), _1, _2
+        ));
+        my_streamer->set_xport_chan_sid(stream_i, true, data_sid);
+        my_streamer->set_enable_trailer(false); //TODO not implemented trailer support yet
+        _tx_streamers[chan] = my_streamer; //store weak pointer
+
+        //sets all tick and samp rates on this streamer
+        _tree->access<double>("/mboards/0/tick_rate").update();
+        _tree->access<double>(str(boost::format("/mboards/0/tx_dsps/%u/rate/value") % chan)).update();
+    }
 
     return my_streamer;
 }
