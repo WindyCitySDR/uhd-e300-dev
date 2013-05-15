@@ -42,13 +42,14 @@ class b250_ctrl_impl : public b250_ctrl
 {
 public:
 
-    b250_ctrl_impl(zero_copy_if::sptr xport, const boost::uint32_t sid):
+    b250_ctrl_impl(zero_copy_if::sptr xport, const boost::uint32_t sid, const std::string &name):
         _xport(xport),
         _sid(sid),
+        _name(name),
         _seq_out(0),
         _timeout(ACK_TIMEOUT)
     {
-        UHD_LOG << "b250_ctrl_impl()" << std::endl;
+        UHD_LOG << "b250_ctrl_impl() " << _name << std::endl;
         while (_xport->get_recv_buff(0.0)){} //flush
         this->set_time(uhd::time_spec_t(0.0));
         this->set_tick_rate(1.0); //something possible but bogus
@@ -56,7 +57,7 @@ public:
 
     ~b250_ctrl_impl(void)
     {
-        UHD_LOG << "~b250_ctrl_impl()" << std::endl;
+        UHD_LOG << "~b250_ctrl_impl() " << _name << std::endl;
         _timeout = ACK_TIMEOUT; //reset timeout to something small
         UHD_SAFE_CALL(
             this->peek32(0); //dummy peek with the purpose of ack'ing all packets
@@ -69,7 +70,7 @@ public:
     void poke32(const wb_addr_type addr, const boost::uint32_t data)
     {
         boost::mutex::scoped_lock lock(_mutex);
-        UHD_LOGV(always) << std::hex << "addr 0x" << addr << " data 0x" << data << std::dec << std::endl;
+        UHD_LOGV(always) << _name << std::hex << " addr 0x" << addr << " data 0x" << data << std::dec << std::endl;
 
         this->send_pkt(addr/4, data);
         this->wait_for_ack(false);
@@ -78,7 +79,7 @@ public:
     boost::uint32_t peek32(const wb_addr_type addr)
     {
         boost::mutex::scoped_lock lock(_mutex);
-        UHD_LOGV(always) << std::hex << "addr 0x" << addr << std::dec << std::endl;
+        UHD_LOGV(always) << _name << std::hex << " addr 0x" << addr << std::dec << std::endl;
 
         this->send_pkt(SR_READBACK, addr/8);
         this->wait_for_ack(false);
@@ -93,7 +94,7 @@ public:
     boost::uint64_t peek64(const wb_addr_type addr)
     {
         boost::mutex::scoped_lock lock(_mutex);
-        UHD_LOGV(always) << std::hex << "addr 0x" << addr << std::dec << std::endl;
+        UHD_LOGV(always) << _name << std::hex << " addr 0x" << addr << std::dec << std::endl;
 
         this->send_pkt(SR_READBACK, addr/8);
         this->wait_for_ack(false);
@@ -168,7 +169,7 @@ private:
     {
         while (readback or (_outstanding_seqs.size() >= RESP_QUEUE_SIZE))
         {
-            UHD_LOGV(always) << "wait_for_ack: " << "readback = " << readback << " outstanding_seqs.size() " << _outstanding_seqs.size() << std::endl;
+            UHD_LOGV(always) << _name << " wait_for_ack: " << "readback = " << readback << " outstanding_seqs.size() " << _outstanding_seqs.size() << std::endl;
 
             //get seq to ack from outstanding packets list
             UHD_ASSERT_THROW(not _outstanding_seqs.empty());
@@ -177,8 +178,15 @@ private:
 
             //get buffer from response endpoing - or die in timeout
             managed_recv_buffer::sptr buff = _xport->get_recv_buff(_timeout);
-            UHD_ASSERT_THROW(bool(buff));
-            UHD_ASSERT_THROW(bool(buff->size()));
+            try
+            {
+                UHD_ASSERT_THROW(bool(buff));
+                UHD_ASSERT_THROW(bool(buff->size()));
+            }
+            catch(const std::exception &ex)
+            {
+                throw uhd::io_error(str(boost::format("b250 ctrl (%s) no response packet - %s") % _name % ex.what()));
+            }
 
             //parse the buffer
             const boost::uint32_t *pkt = buff->cast<const boost::uint32_t *>();
@@ -200,11 +208,18 @@ private:
             }
 
             //check the buffer
-            UHD_ASSERT_THROW(packet_info.has_sid);
-            UHD_ASSERT_THROW(packet_info.sid == boost::uint32_t((_sid >> 16) | (_sid << 16)));
-            UHD_ASSERT_THROW(packet_info.packet_count == (seq_to_ack & 0xfff));
-            UHD_ASSERT_THROW(packet_info.num_payload_words32 == 2);
-            UHD_ASSERT_THROW(packet_info.packet_type == vrt::if_packet_info_t::PACKET_TYPE_CONTEXT);
+            try
+            {
+                UHD_ASSERT_THROW(packet_info.has_sid);
+                UHD_ASSERT_THROW(packet_info.sid == boost::uint32_t((_sid >> 16) | (_sid << 16)));
+                UHD_ASSERT_THROW(packet_info.packet_count == (seq_to_ack & 0xfff));
+                UHD_ASSERT_THROW(packet_info.num_payload_words32 == 2);
+                UHD_ASSERT_THROW(packet_info.packet_type == vrt::if_packet_info_t::PACKET_TYPE_CONTEXT);
+            }
+            catch(const std::exception &ex)
+            {
+                throw uhd::io_error(str(boost::format("b250 ctrl (%s) packet parse error - %s") % _name % ex.what()));
+            }
 
             //return the readback value
             if (readback and _outstanding_seqs.empty())
@@ -219,6 +234,7 @@ private:
 
     zero_copy_if::sptr _xport;
     const boost::uint32_t _sid;
+    const std::string _name;
     boost::mutex _mutex;
     size_t _seq_out;
     uhd::time_spec_t _time;
@@ -229,7 +245,7 @@ private:
 };
 
 
-b250_ctrl::sptr b250_ctrl::make(zero_copy_if::sptr xport, const boost::uint32_t sid)
+b250_ctrl::sptr b250_ctrl::make(zero_copy_if::sptr xport, const boost::uint32_t sid, const std::string &name)
 {
-    return sptr(new b250_ctrl_impl(xport, sid));
+    return sptr(new b250_ctrl_impl(xport, sid, name));
 }

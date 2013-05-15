@@ -357,7 +357,7 @@ void b250_impl::setup_radio(const size_t i, const std::string &db_name)
     config.router_dst_here = B250_XB_DST_E0;
     const boost::uint32_t ctrl_sid = this->allocate_sid(config);
     udp_zero_copy::sptr ctrl_xport = this->make_transport(_addr, ctrl_sid);
-    perif.ctrl = b250_ctrl::make(ctrl_xport, ctrl_sid);
+    perif.ctrl = b250_ctrl::make(ctrl_xport, ctrl_sid, db_name);
     perif.ctrl->poke32(TOREG(SR_MISC_OUTS), (1 << 2)); //reset adc + dac
     perif.ctrl->poke32(TOREG(SR_MISC_OUTS),  (1 << 1) | (1 << 0)); //out of reset + dac enable
 

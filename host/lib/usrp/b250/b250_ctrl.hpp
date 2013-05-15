@@ -36,7 +36,8 @@ public:
     //! Make a new control object
     static sptr make(
         uhd::transport::zero_copy_if::sptr xport,
-        const boost::uint32_t sid
+        const boost::uint32_t sid,
+        const std::string &name
     );
 
     //! Set the command time that will activate
