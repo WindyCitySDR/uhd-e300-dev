@@ -30,6 +30,7 @@
 #include <vector>
 #include <cstring>
 #include <iomanip>
+#include <iostream>
 #include <libusb.h>
 
 using namespace uhd;
@@ -66,8 +67,6 @@ const static boost::uint8_t FX3_STATE_FPGA_READY = 0x00;
 const static boost::uint8_t FX3_STATE_CONFIGURING_FPGA = 0x01;
 const static boost::uint8_t FX3_STATE_BUSY = 0x02;
 const static boost::uint8_t FX3_STATE_RUNNING = 0x03;
-
-const static boost::uint16_t EEPROM_BYTE_ADDR_START = 0x400;
 
 typedef boost::uint32_t hash_type;
 
@@ -210,26 +209,22 @@ public:
 
     void write_i2c(boost::uint8_t addr, const byte_vector_t &bytes)
     {
-        fx3_control_write(B200_VREQ_EEPROM_WRITE,
-                          addr,
-                          (EEPROM_BYTE_ADDR_START + bytes[0]),
-                          (unsigned char *) &bytes[1],
-                          1);
+        throw uhd::not_implemented_error("b200 write i2c");
     }
 
 
     byte_vector_t read_i2c(boost::uint8_t addr, size_t num_bytes)
     {
-        /* Normally, the 'addr' here is supposed to indicate the i2c bus
-         * address. For the b200, we use this field as the offset. */
-        byte_vector_t recv_bytes(num_bytes);
-        fx3_control_read(B200_VREQ_EEPROM_READ,
-                         0,
-                         (EEPROM_BYTE_ADDR_START + addr),
-                         (unsigned char*) &recv_bytes[0],
-                         num_bytes);
+        throw uhd::not_implemented_error("b200 read i2c");
+    }
 
-        return recv_bytes;
+    void write_eeprom(boost::uint8_t addr, boost::uint8_t offset,
+            const byte_vector_t &bytes)
+    {
+        fx3_control_write(B200_VREQ_EEPROM_WRITE,
+                          0, offset | (boost::uint16_t(addr) << 8),
+                          (unsigned char *) &bytes[0],
+                          bytes.size());
     }
 
     byte_vector_t read_eeprom(
@@ -237,13 +232,13 @@ public:
         boost::uint8_t offset,
         size_t num_bytes
     ){
-        byte_vector_t bytes;
-        for (size_t i = 0; i < num_bytes; i++){
-            bytes.push_back(this->read_i2c(offset + i, 1).at(0));
-        }
-        return bytes;
+        byte_vector_t recv_bytes(num_bytes);
+        fx3_control_read(B200_VREQ_EEPROM_READ,
+                         0, offset | (boost::uint16_t(addr) << 8),
+                         (unsigned char*) &recv_bytes[0],
+                         num_bytes);
+        return recv_bytes;
     }
-
 
     void transact_spi(
         unsigned char *tx_data,

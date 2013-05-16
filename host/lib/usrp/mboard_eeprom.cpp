@@ -363,7 +363,7 @@ static void store_b100(const mboard_eeprom_t &mb_eeprom, i2c_iface &iface){
  **********************************************************************/
 /* On the B200, this field indicates the slave address. From the FX3, this
  * address is always 0. */
-static const boost::uint8_t B200_EEPROM_SLAVE_ADDR = 0x00;
+static const boost::uint8_t B200_EEPROM_SLAVE_ADDR = 0x04;
 
 //use char array so we dont need to attribute packed
 struct b200_eeprom_map{

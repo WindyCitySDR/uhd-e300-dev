@@ -39,12 +39,12 @@ using namespace uhd;
 using namespace uhd::usrp;
 using namespace uhd::transport;
 
-//const boost::uint16_t B200_VENDOR_ID  = 0x2500;
-//const boost::uint16_t B200_PRODUCT_ID = 0x0003;
+const boost::uint16_t B200_VENDOR_ID  = 0x2500;
+const boost::uint16_t B200_PRODUCT_ID = 0x0020;
 
-const boost::uint16_t B200_VENDOR_ID  = 0x04b4;
-const boost::uint16_t FX3_PRODUCT_ID = 0x00f3;
-const boost::uint16_t B200_PRODUCT_ID = 0x00f0;
+//const boost::uint16_t B200_VENDOR_ID  = 0x04b4;
+//const boost::uint16_t FX3_PRODUCT_ID = 0x00f3;
+//const boost::uint16_t B200_PRODUCT_ID = 0x00f0;
 static const boost::posix_time::milliseconds REENUMERATION_TIMEOUT_MS(3000);
 
 /***********************************************************************
@@ -68,7 +68,7 @@ static device_addrs_t b200_find(const device_addr_t &hint)
         sscanf(hint.get("pid").c_str(), "%x", &pid);
     } else {
         vid = B200_VENDOR_ID;
-        pid = FX3_PRODUCT_ID;
+        pid = B200_PRODUCT_ID;
     }
 
     // Important note:
@@ -104,10 +104,9 @@ static device_addrs_t b200_find(const device_addr_t &hint)
     }
 
     //get descriptors again with serial number, but using the initialized VID/PID now since we have firmware
-    //TODO
-    found = 1;
-    vid = B200_VENDOR_ID;
-    pid = B200_PRODUCT_ID;
+    const bool init = hint.has_key("vid") and hint.has_key("pid");
+    if (init) pid = 0x00f0;
+    //TODO sleep after fw load ?
 
     const boost::system_time timeout_time = boost::get_system_time() + REENUMERATION_TIMEOUT_MS;
 
@@ -121,6 +120,22 @@ static device_addrs_t b200_find(const device_addr_t &hint)
             catch(const uhd::exception &){continue;} //ignore claimed
 
             b200_iface::sptr iface = b200_iface::make(control);
+            if (init)
+            {
+                UHD_HERE();
+                byte_vector_t bytes(8);
+                bytes[0] = 0x43;
+                bytes[1] = 0x59;
+                bytes[2] = 0x14;
+                bytes[3] = 0xB2;
+                bytes[4] = 0x20;
+                bytes[5] = 0x00;
+                bytes[6] = 0x00;
+                bytes[7] = 0x25;
+                iface->write_eeprom(0x0, 0x0, bytes);
+                iface->reset_fx3();
+                return b200_addrs;
+            }
             const mboard_eeprom_t mb_eeprom = mboard_eeprom_t(*iface, "B200");
 
             device_addr_t new_addr;
