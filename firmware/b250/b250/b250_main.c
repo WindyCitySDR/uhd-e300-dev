@@ -5,6 +5,7 @@
 #include "b250_fw_common.h"
 #include "xge_phy.h"
 #include "ethernet.h"
+#include "chinch.h"
 
 #include <wb_utils.h>
 #include <udp_uart.h>
@@ -31,7 +32,7 @@ void handle_udp_prog_framer(
     const size_t ethbase = (ethno == 0)? SR_ETHINT0 : SR_ETHINT1;
     const uint32_t sid = ((const uint32_t *)buff)[0];
     const size_t vdest = (sid >> 16) & 0xff;
-    printf("handle_udp_prog_framer sid %u vdest %u\n", sid, vdest);
+    printf("handle_udp_prog_framer sid %u vdest %u\n\r", sid, vdest);
 
     //setup source framer
     const eth_mac_addr_t *src_mac = u3_net_stack_get_mac_addr(0);
@@ -94,12 +95,53 @@ void handle_udp_fw_comms(
 
 int main(void)
 {
-  uint32_t last_counter = 0;
-  uint32_t xge_sfpp_hotplug_count = 0;
-  
+    uint32_t last_counter = 0;
+    uint32_t xge_sfpp_hotplug_count = 0;
+
+//    bool status = true;
+//    STATUS_CHAIN(chinch_flash_select_sector(156), status);
+//    STATUS_CHAIN(chinch_poke16(0x00408, 0x00AA), status);    //Unlock #1
+//    STATUS_CHAIN(chinch_poke16(0x00400, 0x0055), status);    //Unlock #2
+//    STATUS_CHAIN(chinch_poke16(0xC0000, 0x0025), status);        //Setup write
+//    STATUS_CHAIN(chinch_poke16(0xC0000, 1), status); //Num words
+//    STATUS_CHAIN(chinch_flash_write(0, 0xDEAD), status);
+//    STATUS_CHAIN(chinch_flash_write(2, 0xBEEF), status);
+//    STATUS_CHAIN(chinch_flash_write_commit(), status);
+
+
+    bool status = true;
+    chinch_flash_config_t restore_data;
+    chinch_poke32(0x200, 0x1);
+    STATUS_CHAIN(chinch_flash_init(&restore_data), status);
+//    chinch_poke32(0x200, 0x1);
+    STATUS_CHAIN(chinch_flash_select_sector(156), status);
+//    chinch_poke32(0x200, 0x2);
+//    STATUS_CHAIN(chinch_flash_erase_sector(), status);
+//    chinch_poke32(0x200, 0x3);
+//    STATUS_CHAIN(chinch_flash_write_prep(2), status);
+//    chinch_poke32(0x200, 0x4);
+//    STATUS_CHAIN(chinch_flash_write(0, 0xDEAD), status);
+//    STATUS_CHAIN(chinch_flash_write(2, 0xBEEF), status);
+//    chinch_poke32(0x200, 0x5);
+//    STATUS_CHAIN(chinch_flash_write_commit(), status);
+//    chinch_poke32(0x200, 0x6);
+
+    uint32_t data;
+    STATUS_CHAIN(chinch_flash_read(0, &data), status);
+    chinch_poke32(0x208, data);
+    STATUS_CHAIN(chinch_flash_read(2, &data), status);
+    chinch_poke32(0x20C, data);
+
+    chinch_poke32(0x200, 0x7);
+    chinch_poke32(0x204, status);
+
+    chinch_flash_cleanup(&restore_data);
+    chinch_poke32(0x200, 0xF);
+
     b250_init();
     u3_net_stack_register_udp_handler(B250_FW_COMMS_UDP_PORT, &handle_udp_fw_comms);
     u3_net_stack_register_udp_handler(B250_VITA_UDP_PORT, &handle_udp_prog_framer);
+
     while(true)
     {
         //makes leds do something alive
