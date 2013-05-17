@@ -98,7 +98,11 @@ static device_addrs_t b200_find(const device_addr_t &hint)
         try{control = usb_control::make(handle, 0);}
         catch(const uhd::exception &){continue;} //ignore claimed
 
-        b200_iface::make(control)->load_firmware(b200_fw_image);
+        //check if fw was already loaded
+        if (handle->get_manufacturer() != "Ettus Research LLC")
+        {
+            b200_iface::make(control)->load_firmware(b200_fw_image);
+        }
 
         found++;
     }
