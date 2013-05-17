@@ -1,5 +1,5 @@
 //
-// Copyright 2010 Ettus Research LLC
+// Copyright 2010-2013 Ettus Research LLC
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -60,7 +60,7 @@ public:
                           boost::uint16_t index, 
                           unsigned char *buff,
                           boost::uint16_t length,
-                          boost::int32_t libusb_timeout = 0) = 0;
+                          boost::int32_t timeout = 0) = 0;
 };
 
 }} //namespace
