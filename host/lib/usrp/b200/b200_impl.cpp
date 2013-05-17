@@ -31,9 +31,7 @@
 #include <boost/lexical_cast.hpp>
 #include <boost/functional/hash.hpp>
 #include <cstdio>
-#include <iomanip>
 #include <ctime>
-#include <iostream>
 
 using namespace uhd;
 using namespace uhd::usrp;

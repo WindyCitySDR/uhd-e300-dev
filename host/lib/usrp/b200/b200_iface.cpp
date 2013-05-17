@@ -25,12 +25,9 @@
 #include <boost/lexical_cast.hpp>
 #include <boost/format.hpp>
 #include <fstream>
-#include <sstream>
 #include <string>
 #include <vector>
 #include <cstring>
-#include <iomanip>
-#include <iostream>
 #include <libusb.h>
 
 using namespace uhd;
