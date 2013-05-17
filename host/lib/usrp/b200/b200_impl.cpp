@@ -141,7 +141,7 @@ static device_addrs_t b200_find(const device_addr_t &hint)
             device_addr_t new_addr;
             new_addr["type"] = "b200";
             new_addr["name"] = mb_eeprom["name"];
-            new_addr["serial"] = mb_eeprom["serial"];
+            new_addr["serial"] = handle->get_serial();
             //this is a found b200 when the hint serial and name match or blank
             if (
                 (not hint.has_key("name")   or hint["name"]   == new_addr["name"]) and
