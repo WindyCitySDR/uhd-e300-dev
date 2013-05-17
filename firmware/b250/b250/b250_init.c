@@ -43,7 +43,8 @@ static void init_network(void)
 
 static void putc(void *p, char c)
 {
-    //wb_uart_putc(UART0_BASE, c);
+    //@TODO: Remove this when debugging is done
+    wb_uart_putc(UART0_BASE, c);
 }
 
 /*

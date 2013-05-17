@@ -98,49 +98,32 @@ int main(void)
     uint32_t last_counter = 0;
     uint32_t xge_sfpp_hotplug_count = 0;
 
-//    bool status = true;
-//    STATUS_CHAIN(chinch_flash_select_sector(156), status);
-//    STATUS_CHAIN(chinch_poke16(0x00408, 0x00AA), status);    //Unlock #1
-//    STATUS_CHAIN(chinch_poke16(0x00400, 0x0055), status);    //Unlock #2
-//    STATUS_CHAIN(chinch_poke16(0xC0000, 0x0025), status);        //Setup write
-//    STATUS_CHAIN(chinch_poke16(0xC0000, 1), status); //Num words
-//    STATUS_CHAIN(chinch_flash_write(0, 0xDEAD), status);
-//    STATUS_CHAIN(chinch_flash_write(2, 0xBEEF), status);
-//    STATUS_CHAIN(chinch_flash_write_commit(), status);
-
-
-    bool status = true;
-    chinch_flash_config_t restore_data;
-    chinch_poke32(0x200, 0x1);
-    STATUS_CHAIN(chinch_flash_init(&restore_data), status);
-//    chinch_poke32(0x200, 0x1);
-    STATUS_CHAIN(chinch_flash_select_sector(156), status);
-//    chinch_poke32(0x200, 0x2);
-//    STATUS_CHAIN(chinch_flash_erase_sector(), status);
-//    chinch_poke32(0x200, 0x3);
-//    STATUS_CHAIN(chinch_flash_write_prep(2), status);
-//    chinch_poke32(0x200, 0x4);
-//    STATUS_CHAIN(chinch_flash_write(0, 0xDEAD), status);
-//    STATUS_CHAIN(chinch_flash_write(2, 0xBEEF), status);
-//    chinch_poke32(0x200, 0x5);
-//    STATUS_CHAIN(chinch_flash_write_commit(), status);
-//    chinch_poke32(0x200, 0x6);
-
-    uint32_t data;
-    STATUS_CHAIN(chinch_flash_read(0, &data), status);
-    chinch_poke32(0x208, data);
-    STATUS_CHAIN(chinch_flash_read(2, &data), status);
-    chinch_poke32(0x20C, data);
-
-    chinch_poke32(0x200, 0x7);
-    chinch_poke32(0x204, status);
-
-    chinch_flash_cleanup(&restore_data);
-    chinch_poke32(0x200, 0xF);
-
     b250_init();
     u3_net_stack_register_udp_handler(B250_FW_COMMS_UDP_PORT, &handle_udp_fw_comms);
     u3_net_stack_register_udp_handler(B250_VITA_UDP_PORT, &handle_udp_prog_framer);
+
+    bool status = true;
+    STATUS_CHAIN(chinch_flash_init(), status);
+    STATUS_CHAIN(chinch_flash_select_sector(156), status);
+    STATUS_CHAIN(chinch_flash_erase_sector(), status);
+    STATUS_CHAIN(chinch_flash_write_prep(6), status);
+    STATUS_CHAIN(chinch_flash_write(0x00, 0xDEAD), status);
+    STATUS_CHAIN(chinch_flash_write(0x02, 0xBEEF), status);
+    STATUS_CHAIN(chinch_flash_write(0x04, 0x1234), status);
+    STATUS_CHAIN(chinch_flash_write(0x06, 0x5678), status);
+    STATUS_CHAIN(chinch_flash_write(0x20, 0x0ACE), status);
+    STATUS_CHAIN(chinch_flash_write(0x22, 0xBA5E), status);
+    STATUS_CHAIN(chinch_flash_write_commit(), status);
+    printf("[ASHISH] Done writing!!!\n\r");
+
+    uint32_t data = 0;
+    for (int i = 0; i < 0x30; i+=2) {
+        STATUS_CHAIN(chinch_flash_read(i, &data), status);
+        printf("[ASHISH] Read %x = %x (%d)\n\r", i, data, status);
+    }
+
+    chinch_flash_cleanup();
+    printf("[ASHISH] Exit Status %d\n\r", status);
 
     while(true)
     {
@@ -148,10 +131,10 @@ int main(void)
         const uint32_t counter = wb_peek32(RB0_BASE + 0*4);
         wb_poke32(SET0_BASE + 0*4, counter/CPU_CLOCK);
         if (counter/CPU_CLOCK != last_counter/CPU_CLOCK) {
-	  last_counter = counter;
-	  wb_poke32(SET0_BASE + 5*4, counter/CPU_CLOCK);
-	  wb_poke32(SET0_BASE + 6*4, counter);
-	}
+            last_counter = counter;
+            wb_poke32(SET0_BASE + 5*4, counter/CPU_CLOCK);
+            wb_poke32(SET0_BASE + 6*4, counter);
+        }
 
         //run the serial loader - poll and handle
         //b250_serial_loader_run1();
@@ -160,14 +143,15 @@ int main(void)
         u3_net_stack_handle_one();
 
         //run the udp uart handler for incoming serial data
-        udp_uart_poll();
+        //@TODO: Uncomment this when debugging is done.
+        //udp_uart_poll();
 
-	if ((xge_sfpp_hotplug_count++) == 1000) {
-          // Every so often poll XGE Phy to look for SFP+ hotplug events.
-          xge_sfpp_hotplug_count = 0;
-	  xge_poll_sfpp_status(0);
-	  
-	}
+//        if ((xge_sfpp_hotplug_count++) == 1000) {
+//              // Every so often poll XGE Phy to look for SFP+ hotplug events.
+//              xge_sfpp_hotplug_count = 0;
+//          xge_poll_sfpp_status(0);
+//
+//        }
     }
     return 0;
 }

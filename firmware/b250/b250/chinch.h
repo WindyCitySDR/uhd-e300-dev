@@ -27,6 +27,14 @@ static const uint32_t DEFAULT_TIMEOUT    = 32768;
 #define CHINCH_STATUS_REG_READ_PENDING  (1<<0)
 #define CHINCH_STATUS_REG_PENDING_MASK  (CHINCH_STATUS_REG_REQ_PENDING|CHINCH_STATUS_REG_READ_PENDING)
 
+#define CHINCH_SIG_REG                  0x0
+#define CHINCH_SCRATCH_REG_BASE         0x200
+#define CHINCH_CPWBS_REG                0xC0
+#define CHINCH_CPWC_REG                 0xE0
+#define CHINCH_FLASH_2AAA_REG           0x400
+#define CHINCH_FLASH_5555_REG           0x408
+#define CHINCH_FLASH_WINDOW_BASE        0xC0000
+
 #define STATUS_CHAIN(x, status) if (status) status = (x)
 
 //-----------------------------------------------------
@@ -78,7 +86,7 @@ static inline bool chinch_peek(
         if (++i > timeout) return false;
     }
 
-    //Flush transaction control registers
+    //Flush transaction control register
     if (data) *data = 0;
     wb_poke32(SR_ADDR(CHINCH_REG_BASE, CHINCH_CONTROL_REG), ctrl_word);
 
@@ -117,59 +125,57 @@ static inline bool chinch_peek16(const uint32_t addr, uint32_t* data)
 // Flash access
 //-----------------------------------------------------
 
-typedef struct
-{
-    uint32_t cpwbsr;
-    uint32_t cpwcr;
-} chinch_flash_config_t;
+uint32_t    g_cached_cpwbsr;
+uint32_t    g_cached_cpwcr;
+int32_t     g_writes_remaining;
 
-static inline bool chinch_flash_init(chinch_flash_config_t* restore_data)
+static inline bool chinch_flash_init()
 {
     //Backup window and page registers
-    chinch_peek32(0xC0, &(restore_data->cpwbsr));
-    chinch_peek32(0xE0, &(restore_data->cpwbsr));
+    chinch_peek32(CHINCH_CPWBS_REG, &g_cached_cpwbsr);
+    chinch_peek32(CHINCH_CPWC_REG, &g_cached_cpwcr);
 
     bool status = true;
     //Setup window
-    STATUS_CHAIN(chinch_poke32(0xC0, 0x000C0092), status);
+    STATUS_CHAIN(chinch_poke32(CHINCH_CPWBS_REG, CHINCH_FLASH_WINDOW_BASE | 0x92), status);
 
     //Run a loopback test to ensure that we will not corrupt the flash.
-    STATUS_CHAIN(chinch_poke32(0x200, 0xDEADBEEF), status);
-    STATUS_CHAIN(chinch_poke16(0x204, 0x5678), status);
+    STATUS_CHAIN(chinch_poke32(CHINCH_SCRATCH_REG_BASE + 0, 0xDEADBEEF), status);
+    STATUS_CHAIN(chinch_poke16(CHINCH_SCRATCH_REG_BASE + 4, 0x5678), status);
     uint32_t reg_val;
-    STATUS_CHAIN(chinch_peek16(0x0, &reg_val), status);
-    STATUS_CHAIN(chinch_poke16(0x206, reg_val), status);
-    STATUS_CHAIN(chinch_peek32(0x200, &reg_val), status);
+    STATUS_CHAIN(chinch_peek16(CHINCH_SIG_REG, &reg_val), status);
+    STATUS_CHAIN(chinch_poke16(CHINCH_SCRATCH_REG_BASE + 6, reg_val), status);
+    STATUS_CHAIN(chinch_peek32(CHINCH_SCRATCH_REG_BASE + 0, &reg_val), status);
 
     return status && (reg_val == 0xDEADBEEF);
 }
 
-static inline void chinch_flash_cleanup(chinch_flash_config_t* restore_data)
+static inline void chinch_flash_cleanup()
 {
     //Restore window and page registers
-    chinch_poke32(0xC0, restore_data->cpwbsr);
-    chinch_poke32(0xE0, restore_data->cpwbsr);
+    chinch_poke32(CHINCH_CPWBS_REG, g_cached_cpwbsr);
+    chinch_poke32(CHINCH_CPWC_REG, g_cached_cpwcr);
 }
 
 static inline bool chinch_flash_select_sector(uint32_t sector)
 {
-    return chinch_poke32(0x000E0, sector << 17);
+    return chinch_poke32(CHINCH_CPWC_REG, sector << 17);
 }
 
 static inline bool chinch_flash_erase_sector()
 {
     bool status = true;
-    STATUS_CHAIN(chinch_poke16(0x00408, 0x00AA), status);    //Unlock #1
-    STATUS_CHAIN(chinch_poke16(0x00400, 0x0055), status);    //Unlock #2
-    STATUS_CHAIN(chinch_poke16(0x00408, 0x0080), status);    //Setup
-    STATUS_CHAIN(chinch_poke16(0x00408, 0x00AA), status);    //Unlock #1
-    STATUS_CHAIN(chinch_poke16(0x00400, 0x0055), status);    //Unlock #2
-    STATUS_CHAIN(chinch_poke16(0xC0000, 0x0030), status);    //Erase
+    STATUS_CHAIN(chinch_poke16(CHINCH_FLASH_5555_REG,    0x00AA), status);    //Unlock #1
+    STATUS_CHAIN(chinch_poke16(CHINCH_FLASH_2AAA_REG,    0x0055), status);    //Unlock #2
+    STATUS_CHAIN(chinch_poke16(CHINCH_FLASH_5555_REG,    0x0080), status);    //Setup
+    STATUS_CHAIN(chinch_poke16(CHINCH_FLASH_5555_REG,    0x00AA), status);    //Unlock #1
+    STATUS_CHAIN(chinch_poke16(CHINCH_FLASH_2AAA_REG,    0x0055), status);    //Unlock #2
+    STATUS_CHAIN(chinch_poke16(CHINCH_FLASH_WINDOW_BASE, 0x0030), status);    //Erase
 
     if (status) {
         uint32_t read_data;
         while (true) {
-            status = chinch_peek16(0xC0000, &read_data);    //Wait for sector to erase
+            status = chinch_peek16(CHINCH_FLASH_WINDOW_BASE, &read_data);    //Wait for sector to erase
             if (((read_data & 0xFFFF) == 0xFFFF) || !status) break;
         }
     }
@@ -178,28 +184,32 @@ static inline bool chinch_flash_erase_sector()
 
 static inline bool chinch_flash_write_prep(uint32_t num_hwords)
 {
+    if (num_hwords > 32) return false;
+
     bool status = true;
-    STATUS_CHAIN(chinch_poke16(0x00408, 0x00AA), status);        //Unlock #1
-    STATUS_CHAIN(chinch_poke16(0x00400, 0x0055), status);        //Unlock #2
-    STATUS_CHAIN(chinch_poke16(0xC0000, 0x0025), status);        //Setup write
-    STATUS_CHAIN(chinch_poke16(0xC0000, num_hwords-1), status); //Num words
+    STATUS_CHAIN(chinch_poke16(CHINCH_FLASH_5555_REG,    0x00AA), status);       //Unlock #1
+    STATUS_CHAIN(chinch_poke16(CHINCH_FLASH_2AAA_REG,    0x0055), status);       //Unlock #2
+    STATUS_CHAIN(chinch_poke16(CHINCH_FLASH_WINDOW_BASE, 0x0025), status);       //Setup write
+    STATUS_CHAIN(chinch_poke16(CHINCH_FLASH_WINDOW_BASE, num_hwords-1), status); //Num words
+
+    g_writes_remaining = status ? num_hwords : 0;
     return status;
 }
 
 static inline bool chinch_flash_write_commit()
 {
-    return chinch_poke16(0xC0000, 0x0029);
+    return chinch_poke16(CHINCH_FLASH_WINDOW_BASE, 0x0029);
 }
 
 static inline bool chinch_flash_write(uint32_t offset, uint32_t hword)
 {
-    return chinch_poke16(0xC0000 + (offset & 0x3FFFF), hword);
+    if (g_writes_remaining-- < 1) return false;
+    return chinch_poke16(CHINCH_FLASH_WINDOW_BASE + (offset & 0x3FFFF), hword);
 }
 
 static inline bool chinch_flash_read(uint32_t offset, uint32_t* hword)
 {
-
-return chinch_peek16(0xC0000 + (offset & 0x3FFFF), hword);
+    return chinch_peek16(CHINCH_FLASH_WINDOW_BASE + (offset & 0x3FFFF), hword);
 }
 
 
