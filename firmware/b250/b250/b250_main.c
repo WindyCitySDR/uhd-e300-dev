@@ -6,6 +6,7 @@
 #include "xge_phy.h"
 #include "ethernet.h"
 #include "chinch.h"
+#include "mdelay.h"
 
 #include <wb_utils.h>
 #include <udp_uart.h>
@@ -93,6 +94,51 @@ void handle_udp_fw_comms(
     }
 }
 
+void run_flash_access_test()
+{
+    printf("Running flash access test...\n\r");
+    bool status = true, result = true;
+    STATUS_CHAIN(chinch_flash_init(), status);
+    STATUS_CHAIN(chinch_flash_select_sector(156), status);
+    STATUS_CHAIN(chinch_flash_erase_sector(), status);
+    STATUS_CHAIN(chinch_flash_write_start(6), status);
+    STATUS_CHAIN(chinch_flash_write(0x00, 0xDEAD), status);
+    STATUS_CHAIN(chinch_flash_write(0x02, 0xBEEF), status);
+    STATUS_CHAIN(chinch_flash_write(0x04, 0x1234), status);
+    STATUS_CHAIN(chinch_flash_write(0x06, 0x5678), status);
+    STATUS_CHAIN(chinch_flash_write(0x20, 0x0ACE), status);
+    STATUS_CHAIN(chinch_flash_write(0x22, 0xBA5E), status);
+    STATUS_CHAIN(chinch_flash_write_commit(), status);
+
+    mdelay(1);
+    chinch_poke32(0x200, 0);
+
+    uint32_t data = 0;
+    STATUS_CHAIN(chinch_flash_read(0x00, &data), status);
+    result &= (data == 0xDEAD);
+    STATUS_CHAIN(chinch_flash_read(0x02, &data), status);
+    result &= (data == 0xBEEF);
+    STATUS_CHAIN(chinch_flash_read(0x04, &data), status);
+    result &= (data == 0x1234);
+    STATUS_CHAIN(chinch_flash_read(0x06, &data), status);
+    result &= (data == 0x5678);
+    STATUS_CHAIN(chinch_flash_read(0x10, &data), status);
+    result &= (data == 0xFFFF);
+    STATUS_CHAIN(chinch_flash_read(0x12, &data), status);
+    result &= (data == 0xFFFF);
+    STATUS_CHAIN(chinch_flash_read(0x20, &data), status);
+    result &= (data == 0x0ACE);
+    STATUS_CHAIN(chinch_flash_read(0x22, &data), status);
+    result &= (data == 0xBA5E);
+    chinch_flash_cleanup();
+    result &= status;
+
+    chinch_poke32(0x200, result);
+
+    printf("Debug: Flash access test %s\n\r", result?"PASSED":"FAILED");
+}
+
+
 int main(void)
 {
     uint32_t last_counter = 0;
@@ -102,28 +148,8 @@ int main(void)
     u3_net_stack_register_udp_handler(B250_FW_COMMS_UDP_PORT, &handle_udp_fw_comms);
     u3_net_stack_register_udp_handler(B250_VITA_UDP_PORT, &handle_udp_prog_framer);
 
-    bool status = true;
-    STATUS_CHAIN(chinch_flash_init(), status);
-    STATUS_CHAIN(chinch_flash_select_sector(156), status);
-    STATUS_CHAIN(chinch_flash_erase_sector(), status);
-    STATUS_CHAIN(chinch_flash_write_prep(6), status);
-    STATUS_CHAIN(chinch_flash_write(0x00, 0xDEAD), status);
-    STATUS_CHAIN(chinch_flash_write(0x02, 0xBEEF), status);
-    STATUS_CHAIN(chinch_flash_write(0x04, 0x1234), status);
-    STATUS_CHAIN(chinch_flash_write(0x06, 0x5678), status);
-    STATUS_CHAIN(chinch_flash_write(0x20, 0x0ACE), status);
-    STATUS_CHAIN(chinch_flash_write(0x22, 0xBA5E), status);
-    STATUS_CHAIN(chinch_flash_write_commit(), status);
-    printf("[ASHISH] Done writing!!!\n\r");
-
-    uint32_t data = 0;
-    for (int i = 0; i < 0x30; i+=2) {
-        STATUS_CHAIN(chinch_flash_read(i, &data), status);
-        printf("[ASHISH] Read %x = %x (%d)\n\r", i, data, status);
-    }
-
-    chinch_flash_cleanup();
-    printf("[ASHISH] Exit Status %d\n\r", status);
+    //@TODO: This is commeneted because it overflows the instr mem.
+//    run_flash_access_test();
 
     while(true)
     {
@@ -143,15 +169,14 @@ int main(void)
         u3_net_stack_handle_one();
 
         //run the udp uart handler for incoming serial data
-        //@TODO: Uncomment this when debugging is done.
-        //udp_uart_poll();
+        udp_uart_poll();
 
-//        if ((xge_sfpp_hotplug_count++) == 1000) {
-//              // Every so often poll XGE Phy to look for SFP+ hotplug events.
-//              xge_sfpp_hotplug_count = 0;
-//          xge_poll_sfpp_status(0);
-//
-//        }
+        if ((xge_sfpp_hotplug_count++) == 1000) {
+              // Every so often poll XGE Phy to look for SFP+ hotplug events.
+              xge_sfpp_hotplug_count = 0;
+          xge_poll_sfpp_status(0);
+
+        }
     }
     return 0;
 }

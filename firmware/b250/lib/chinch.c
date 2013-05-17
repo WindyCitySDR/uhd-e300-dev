@@ -1,22 +1,13 @@
 /*
- * chinch.h
+ * chinch.c
  *
  *  Created on: May 14, 2013
  *      Author: ashish
  */
 
-#ifndef INCLUDED_CHINCH_H
-#define INCLUDED_CHINCH_H
+#include "chinch.h"
 
-#include <wb_utils.h>
-
-static const uint32_t CHINCH_DATA_WR_REG = 128;
-static const uint32_t CHINCH_CONTROL_REG = 129;
-static const uint32_t CHINCH_DATA_RD_REG = 5;
-static const uint32_t CHINCH_STATUS_REG  = 6;
-static const uint32_t DEFAULT_TIMEOUT    = 32768;
-
-#define CHINCH_REG_BASE                    0xA000
+#define CHINCH_REG_BASE                 0xA000
 
 #define CHINCH_CONTROL_REG_WRITE        (1<<30)
 #define CHINCH_CONTROL_REG_READ         (1<<29)
@@ -35,13 +26,11 @@ static const uint32_t DEFAULT_TIMEOUT    = 32768;
 #define CHINCH_FLASH_5555_REG           0x408
 #define CHINCH_FLASH_WINDOW_BASE        0xC0000
 
-#define STATUS_CHAIN(x, status) if (status) status = (x)
-
 //-----------------------------------------------------
 // Peek-Poke interface
 //-----------------------------------------------------
 
-static inline bool chinch_poke(
+bool chinch_poke(
     const uint32_t addr,
     const uint32_t data,
     bool half_word,
@@ -67,7 +56,7 @@ static inline bool chinch_poke(
     return true;
 }
 
-static inline bool chinch_peek(
+bool chinch_peek(
     const uint32_t addr,
     uint32_t* data,
     bool half_word,
@@ -101,26 +90,6 @@ static inline bool chinch_peek(
     return true;
 }
 
-static inline bool chinch_poke32(const uint32_t addr, const uint32_t data)
-{
-    return chinch_poke(addr, data, false /*half word*/, DEFAULT_TIMEOUT);
-}
-
-static inline bool chinch_poke16(const uint32_t addr, const uint32_t data)
-{
-    return chinch_poke(addr, data, true /*half word*/, DEFAULT_TIMEOUT);
-}
-
-static inline bool chinch_peek32(const uint32_t addr, uint32_t* data)
-{
-    return chinch_peek(addr, data, false /*half word*/, DEFAULT_TIMEOUT);
-}
-
-static inline bool chinch_peek16(const uint32_t addr, uint32_t* data)
-{
-    return chinch_peek(addr, data, true /*half word*/, DEFAULT_TIMEOUT);
-}
-
 //-----------------------------------------------------
 // Flash access
 //-----------------------------------------------------
@@ -129,7 +98,7 @@ uint32_t    g_cached_cpwbsr;
 uint32_t    g_cached_cpwcr;
 int32_t     g_writes_remaining;
 
-static inline bool chinch_flash_init()
+bool chinch_flash_init()
 {
     //Backup window and page registers
     chinch_peek32(CHINCH_CPWBS_REG, &g_cached_cpwbsr);
@@ -150,19 +119,19 @@ static inline bool chinch_flash_init()
     return status && (reg_val == 0xDEADBEEF);
 }
 
-static inline void chinch_flash_cleanup()
+void chinch_flash_cleanup()
 {
     //Restore window and page registers
     chinch_poke32(CHINCH_CPWBS_REG, g_cached_cpwbsr);
     chinch_poke32(CHINCH_CPWC_REG, g_cached_cpwcr);
 }
 
-static inline bool chinch_flash_select_sector(uint32_t sector)
+bool chinch_flash_select_sector(uint32_t sector)
 {
     return chinch_poke32(CHINCH_CPWC_REG, sector << 17);
 }
 
-static inline bool chinch_flash_erase_sector()
+bool chinch_flash_erase_sector()
 {
     bool status = true;
     STATUS_CHAIN(chinch_poke16(CHINCH_FLASH_5555_REG,    0x00AA), status);    //Unlock #1
@@ -182,7 +151,7 @@ static inline bool chinch_flash_erase_sector()
     return status;
 }
 
-static inline bool chinch_flash_write_prep(uint32_t num_hwords)
+bool chinch_flash_write_start(uint32_t num_hwords)
 {
     if (num_hwords > 32) return false;
 
@@ -196,21 +165,18 @@ static inline bool chinch_flash_write_prep(uint32_t num_hwords)
     return status;
 }
 
-static inline bool chinch_flash_write_commit()
+bool chinch_flash_write_commit()
 {
     return chinch_poke16(CHINCH_FLASH_WINDOW_BASE, 0x0029);
 }
 
-static inline bool chinch_flash_write(uint32_t offset, uint32_t hword)
+bool chinch_flash_write(uint32_t offset, uint32_t hword)
 {
     if (g_writes_remaining-- < 1) return false;
-    return chinch_poke16(CHINCH_FLASH_WINDOW_BASE + (offset & 0x3FFFF), hword);
+    return chinch_poke16(CHINCH_FLASH_WINDOW_BASE | (offset & 0x3FFFF), hword);
 }
 
-static inline bool chinch_flash_read(uint32_t offset, uint32_t* hword)
+bool chinch_flash_read(uint32_t offset, uint32_t* hword)
 {
-    return chinch_peek16(CHINCH_FLASH_WINDOW_BASE + (offset & 0x3FFFF), hword);
+    return chinch_peek16(CHINCH_FLASH_WINDOW_BASE | (offset & 0x3FFFF), hword);
 }
-
-
-#endif /* INCLUDED_CHINCH_H */
