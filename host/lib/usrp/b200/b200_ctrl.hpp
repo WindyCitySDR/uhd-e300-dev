@@ -35,7 +35,8 @@ public:
 
     //! Make a new control object
     static sptr make(
-        uhd::transport::zero_copy_if::sptr xport
+        uhd::transport::zero_copy_if::sptr xport,
+        boost::shared_ptr<void> async_task
     );
 
     //! Set the command time that will activate

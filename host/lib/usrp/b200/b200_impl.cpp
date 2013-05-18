@@ -39,10 +39,8 @@ using namespace uhd::transport;
 
 const boost::uint16_t B200_VENDOR_ID  = 0x2500;
 const boost::uint16_t B200_PRODUCT_ID = 0x0020;
+const boost::uint16_t INIT_PRODUCT_ID = 0x00f0;
 
-//const boost::uint16_t B200_VENDOR_ID  = 0x04b4;
-//const boost::uint16_t FX3_PRODUCT_ID = 0x00f3;
-//const boost::uint16_t B200_PRODUCT_ID = 0x00f0;
 static const boost::posix_time::milliseconds REENUMERATION_TIMEOUT_MS(3000);
 
 /***********************************************************************
@@ -107,7 +105,7 @@ static device_addrs_t b200_find(const device_addr_t &hint)
 
     //get descriptors again with serial number, but using the initialized VID/PID now since we have firmware
     const bool init = hint.has_key("vid") and hint.has_key("pid");
-    if (init) pid = 0x00f0;
+    if (init) pid = INIT_PRODUCT_ID;
     //TODO sleep after fw load ?
 
     const boost::system_time timeout_time = boost::get_system_time() + REENUMERATION_TIMEOUT_MS;
@@ -130,10 +128,10 @@ static device_addrs_t b200_find(const device_addr_t &hint)
                 bytes[1] = 0x59;
                 bytes[2] = 0x14;
                 bytes[3] = 0xB2;
-                bytes[4] = 0x20;
-                bytes[5] = 0x00;
-                bytes[6] = 0x00;
-                bytes[7] = 0x25;
+                bytes[4] = (B200_PRODUCT_ID & 0xff);
+                bytes[5] = (B200_PRODUCT_ID >> 8);
+                bytes[6] = (B200_VENDOR_ID & 0xff);
+                bytes[7] = (B200_VENDOR_ID >> 8);
                 iface->write_eeprom(0x0, 0x0, bytes);
                 iface->reset_fx3();
                 return b200_addrs;
@@ -247,7 +245,7 @@ b200_impl::b200_impl(const device_addr_t &device_addr):
     ////////////////////////////////////////////////////////////////////
     // Initialize control (settings regs and async messages)
     ////////////////////////////////////////////////////////////////////
-    _ctrl = b200_ctrl::make(_ctrl_transport);
+    _ctrl = b200_ctrl::make(_ctrl_transport, _async_task);
     _tree->create<time_spec_t>(mb_path / "time/cmd")
         .subscribe(boost::bind(&b200_ctrl::set_time, _ctrl, _1));
     /*
@@ -498,7 +496,6 @@ b200_impl::~b200_impl(void)
     (
         _async_task.reset();
         _codec_ctrl->set_active_chains(false, false, false, false);
-        //_iface->set_fpga_reset_pin(true);
     )
 }
 

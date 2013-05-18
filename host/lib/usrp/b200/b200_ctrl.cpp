@@ -43,8 +43,9 @@ class b200_ctrl_impl : public b200_ctrl
 {
 public:
 
-    b200_ctrl_impl(zero_copy_if::sptr xport):
+    b200_ctrl_impl(zero_copy_if::sptr xport, boost::shared_ptr<void> async_task):
         _xport(xport),
+        _async_task(async_task),
         _seq_out(0),
         _timeout(ACK_TIMEOUT),
         _resp_queue(RESP_QUEUE_SIZE)
@@ -59,6 +60,7 @@ public:
         _timeout = ACK_TIMEOUT; //reset timeout to something small
         UHD_SAFE_CALL(
             this->peek32(0); //dummy peek with the purpose of ack'ing all packets
+            _async_task.reset(); //now its ok to release the task
         )
     }
 
@@ -216,6 +218,7 @@ private:
     }
 
     zero_copy_if::sptr _xport;
+    boost::shared_ptr<void> _async_task;
     boost::mutex _mutex;
     size_t _seq_out;
     uhd::time_spec_t _time;
@@ -231,7 +234,7 @@ private:
 };
 
 
-b200_ctrl::sptr b200_ctrl::make(zero_copy_if::sptr xport)
+b200_ctrl::sptr b200_ctrl::make(zero_copy_if::sptr xport, boost::shared_ptr<void> async_task)
 {
-    return sptr(new b200_ctrl_impl(xport));
+    return sptr(new b200_ctrl_impl(xport, async_task));
 }
