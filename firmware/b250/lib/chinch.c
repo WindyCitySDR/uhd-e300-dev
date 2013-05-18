@@ -97,6 +97,8 @@ bool chinch_peek(
 uint32_t    g_cached_cpwbsr;
 uint32_t    g_cached_cpwcr;
 int32_t     g_writes_remaining;
+uint32_t    g_first_write_addr;
+uint32_t    g_first_write_data;
 
 bool chinch_flash_init()
 {
@@ -162,18 +164,33 @@ bool chinch_flash_write_start(uint32_t num_hwords)
     STATUS_CHAIN(chinch_poke16(CHINCH_FLASH_WINDOW_BASE, num_hwords-1), status); //Num words
 
     g_writes_remaining = status ? num_hwords : 0;
+    g_first_write_addr = 0xFFFFFFFF;
     return status;
-}
-
-bool chinch_flash_write_commit()
-{
-    return chinch_poke16(CHINCH_FLASH_WINDOW_BASE, 0x0029);
 }
 
 bool chinch_flash_write(uint32_t offset, uint32_t hword)
 {
     if (g_writes_remaining-- < 1) return false;
+
+    if (g_first_write_addr == 0xFFFFFFFF) {
+        g_first_write_addr = offset & 0x3FFFF;
+        g_first_write_data = hword & 0xFFFF;
+    }
     return chinch_poke16(CHINCH_FLASH_WINDOW_BASE | (offset & 0x3FFFF), hword);
+}
+
+bool chinch_flash_write_commit()
+{
+    bool status = true;
+    STATUS_CHAIN(chinch_poke16(CHINCH_FLASH_WINDOW_BASE, 0x0029), status);
+    if (status) {
+        uint32_t read_data;
+        while (true) {
+            status = chinch_flash_read(g_first_write_addr, &read_data);    //Wait for write to finish
+            if ((read_data == g_first_write_data) || !status) break;
+        }
+    }
+    return status;
 }
 
 bool chinch_flash_read(uint32_t offset, uint32_t* hword)
