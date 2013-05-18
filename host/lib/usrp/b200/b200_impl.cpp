@@ -204,6 +204,7 @@ b200_impl::b200_impl(const device_addr_t &device_addr):
     // Load the FPGA image, then reset GPIF
     ////////////////////////////////////////////////////////////////////
     _iface->load_fpga(b200_fpga_image);
+    ad9361_ctrl::make(_iface); //radio clock on before global reset
     _iface->reset_gpif();
 
     ////////////////////////////////////////////////////////////////////
