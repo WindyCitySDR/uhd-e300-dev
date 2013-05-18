@@ -28,6 +28,7 @@
 #include <string>
 #include <vector>
 #include <cstring>
+#include <iomanip>
 #include <libusb.h>
 
 using namespace uhd;
@@ -474,6 +475,12 @@ public:
         hash_type loaded_hash; usrp_get_fpga_hash(loaded_hash);
         if (hash == loaded_hash) return;
 
+        size_t file_size = 0;
+        {
+            std::ifstream file(filename, std::ios::in | std::ios::binary | std::ios::ate);
+            file_size = file.tellg();
+        }
+
         std::ifstream file;
         file.open(filename, std::ios::in | std::ios::binary);
 
@@ -488,7 +495,6 @@ public:
 
         if (load_img_msg) UHD_MSG(status) << "Loading FPGA image: " \
             << filestring << "..." << std::flush;
-        boost::system_time next_dot = boost::get_system_time() + boost::posix_time::milliseconds(700);
 
         unsigned char out_buff[64];
         memset(out_buff, 0x00, sizeof(out_buff));
@@ -500,6 +506,7 @@ public:
         } while(fx3_state != FX3_STATE_CONFIGURING_FPGA);
 
 
+        size_t bytes_sent = 0;
         while(!file.eof()) {
             file.read((char *) out_buff, sizeof(out_buff));
             const std::streamsize n = file.gcount();
@@ -510,12 +517,17 @@ public:
             /* Send the data to the device. */
             fx3_control_write(B200_VREQ_FPGA_DATA, 0, 0, out_buff, transfer_count, 5000);
 
-            if (boost::get_system_time() > next_dot)
+            if (load_img_msg)
             {
-                if (load_img_msg) UHD_MSG(status) << "." << std::flush;
-                next_dot = boost::get_system_time() + boost::posix_time::milliseconds(700);
+                if (bytes_sent == 0) UHD_MSG(status) << "  0%" << std::flush;
+                const size_t percent_before = size_t((bytes_sent*100)/file_size);
+                bytes_sent += transfer_count;
+                const size_t percent_after = size_t((bytes_sent*100)/file_size);
+                if (percent_before/10 != percent_after/10)
+                {
+                    UHD_MSG(status) << "\b\b\b\b" << std::setw(3) << percent_after << "%" << std::flush;
+                }
             }
-
         }
 
         file.close();
@@ -527,7 +539,7 @@ public:
 
         usrp_set_fpga_hash(hash);
 
-        if (load_img_msg) UHD_MSG(status) << " done" << std::endl;
+        if (load_img_msg) UHD_MSG(status) << "\b\b\b\b done" << std::endl;
     }
 
 private:
