@@ -46,7 +46,7 @@
 static const size_t B250_TX_FC_PKT_WINDOW = 2048; //16MB/8Kpkts
 static const std::string B250_FW_FILE_NAME = "usrp_b250_fw.bin";
 static const double B250_RADIO_CLOCK_RATE = 120e6;
-static const double B250_BUS_CLOCK_RATE = 200e6;
+static const double B250_BUS_CLOCK_RATE = 175000000;
 static const bool B250_ENABLE_RX_FC = false;
 
 #define B250_RADIO_DEST_PREFIX_TX 0
