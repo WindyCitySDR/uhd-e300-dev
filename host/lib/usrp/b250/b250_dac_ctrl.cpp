@@ -86,7 +86,11 @@ public:
 
     void set_iq_swap(const bool swap)
     {
-        const int bit = (swap)? (1 << 6) : 0;
+        //fpga wants I,Q in the sample word:
+        //first transaction goes into low bits
+        //second transaction goes into high bits
+        //therefore, we want Q to go first (bit 6 == 1)
+        const int bit = (swap)? 0 : (1 << 6);
         write_ad9146_reg(0x03, 0x00 | bit); //2s comp, i first, byte mode
     }
 
