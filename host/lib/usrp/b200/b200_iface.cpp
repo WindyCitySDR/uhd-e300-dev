@@ -25,7 +25,6 @@
 #include <boost/lexical_cast.hpp>
 #include <boost/format.hpp>
 #include <fstream>
-#include <sstream>
 #include <string>
 #include <vector>
 #include <cstring>
@@ -66,8 +65,6 @@ const static boost::uint8_t FX3_STATE_FPGA_READY = 0x00;
 const static boost::uint8_t FX3_STATE_CONFIGURING_FPGA = 0x01;
 const static boost::uint8_t FX3_STATE_BUSY = 0x02;
 const static boost::uint8_t FX3_STATE_RUNNING = 0x03;
-
-const static boost::uint16_t EEPROM_BYTE_ADDR_START = 0x400;
 
 typedef boost::uint32_t hash_type;
 
@@ -210,26 +207,22 @@ public:
 
     void write_i2c(boost::uint8_t addr, const byte_vector_t &bytes)
     {
-        fx3_control_write(B200_VREQ_EEPROM_WRITE,
-                          addr,
-                          (EEPROM_BYTE_ADDR_START + bytes[0]),
-                          (unsigned char *) &bytes[1],
-                          1);
+        throw uhd::not_implemented_error("b200 write i2c");
     }
 
 
     byte_vector_t read_i2c(boost::uint8_t addr, size_t num_bytes)
     {
-        /* Normally, the 'addr' here is supposed to indicate the i2c bus
-         * address. For the b200, we use this field as the offset. */
-        byte_vector_t recv_bytes(num_bytes);
-        fx3_control_read(B200_VREQ_EEPROM_READ,
-                         0,
-                         (EEPROM_BYTE_ADDR_START + addr),
-                         (unsigned char*) &recv_bytes[0],
-                         num_bytes);
+        throw uhd::not_implemented_error("b200 read i2c");
+    }
 
-        return recv_bytes;
+    void write_eeprom(boost::uint8_t addr, boost::uint8_t offset,
+            const byte_vector_t &bytes)
+    {
+        fx3_control_write(B200_VREQ_EEPROM_WRITE,
+                          0, offset | (boost::uint16_t(addr) << 8),
+                          (unsigned char *) &bytes[0],
+                          bytes.size());
     }
 
     byte_vector_t read_eeprom(
@@ -237,13 +230,13 @@ public:
         boost::uint8_t offset,
         size_t num_bytes
     ){
-        byte_vector_t bytes;
-        for (size_t i = 0; i < num_bytes; i++){
-            bytes.push_back(this->read_i2c(offset + i, 1).at(0));
-        }
-        return bytes;
+        byte_vector_t recv_bytes(num_bytes);
+        fx3_control_read(B200_VREQ_EEPROM_READ,
+                         0, offset | (boost::uint16_t(addr) << 8),
+                         (unsigned char*) &recv_bytes[0],
+                         num_bytes);
+        return recv_bytes;
     }
-
 
     void transact_spi(
         unsigned char *tx_data,
@@ -482,6 +475,12 @@ public:
         hash_type loaded_hash; usrp_get_fpga_hash(loaded_hash);
         if (hash == loaded_hash) return;
 
+        size_t file_size = 0;
+        {
+            std::ifstream file(filename, std::ios::in | std::ios::binary | std::ios::ate);
+            file_size = file.tellg();
+        }
+
         std::ifstream file;
         file.open(filename, std::ios::in | std::ios::binary);
 
@@ -496,7 +495,6 @@ public:
 
         if (load_img_msg) UHD_MSG(status) << "Loading FPGA image: " \
             << filestring << "..." << std::flush;
-        boost::system_time next_dot = boost::get_system_time() + boost::posix_time::milliseconds(700);
 
         unsigned char out_buff[64];
         memset(out_buff, 0x00, sizeof(out_buff));
@@ -508,6 +506,7 @@ public:
         } while(fx3_state != FX3_STATE_CONFIGURING_FPGA);
 
 
+        size_t bytes_sent = 0;
         while(!file.eof()) {
             file.read((char *) out_buff, sizeof(out_buff));
             const std::streamsize n = file.gcount();
@@ -518,12 +517,17 @@ public:
             /* Send the data to the device. */
             fx3_control_write(B200_VREQ_FPGA_DATA, 0, 0, out_buff, transfer_count, 5000);
 
-            if (boost::get_system_time() > next_dot)
+            if (load_img_msg)
             {
-                if (load_img_msg) UHD_MSG(status) << "." << std::flush;
-                next_dot = boost::get_system_time() + boost::posix_time::milliseconds(700);
+                if (bytes_sent == 0) UHD_MSG(status) << "  0%" << std::flush;
+                const size_t percent_before = size_t((bytes_sent*100)/file_size);
+                bytes_sent += transfer_count;
+                const size_t percent_after = size_t((bytes_sent*100)/file_size);
+                if (percent_before/10 != percent_after/10)
+                {
+                    UHD_MSG(status) << "\b\b\b\b" << std::setw(3) << percent_after << "%" << std::flush;
+                }
             }
-
         }
 
         file.close();
@@ -535,7 +539,7 @@ public:
 
         usrp_set_fpga_hash(hash);
 
-        if (load_img_msg) UHD_MSG(status) << " done" << std::endl;
+        if (load_img_msg) UHD_MSG(status) << "\b\b\b\b done" << std::endl;
     }
 
 private:
