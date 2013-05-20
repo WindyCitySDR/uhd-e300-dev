@@ -56,7 +56,7 @@ struct b250_ctrl_iface : wb_iface
         {
             try
             {
-                this->__poke32(addr, data);
+                return this->__poke32(addr, data);
             }
             catch(const std::exception &ex)
             {
