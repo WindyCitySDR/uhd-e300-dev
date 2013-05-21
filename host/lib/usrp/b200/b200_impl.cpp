@@ -171,8 +171,7 @@ UHD_STATIC_BLOCK(register_b200_device)
 /***********************************************************************
  * Structors
  **********************************************************************/
-b200_impl::b200_impl(const device_addr_t &device_addr):
-    _async_md(1000/*messages deep*/)
+b200_impl::b200_impl(const device_addr_t &device_addr)
 {
     //extract the FPGA path for the B200
     std::string b200_fpga_image = find_image_path(
@@ -232,7 +231,8 @@ b200_impl::b200_impl(const device_addr_t &device_addr):
         ctrl_xport_args
     );
     while (_ctrl_transport->get_recv_buff(0.0)){} //flush ctrl xport
-    _async_task = uhd::task::make(boost::bind(&b200_impl::handle_async_task, this));
+    _async_md.reset(new async_md_type(1000/*messages deep*/));
+    _async_task = uhd::task::make(boost::bind(&b200_impl::handle_async_task, this, _ctrl_transport, _async_md));
 
     ////////////////////////////////////////////////////////////////////
     // Initialize the properties tree

@@ -141,9 +141,9 @@ bool b200_impl::recv_async_msg(
     return false;
 }
 
-void b200_impl::handle_async_task(void)
+void b200_impl::handle_async_task(uhd::transport::zero_copy_if::sptr xport, boost::shared_ptr<async_md_type> async_md)
 {
-    managed_recv_buffer::sptr buff = _ctrl_transport->get_recv_buff();
+    managed_recv_buffer::sptr buff = xport->get_recv_buff();
     if (not buff or buff->size() < 8) return;
     const boost::uint32_t sid = uhd::wtohx(buff->cast<const boost::uint32_t *>()[1]);
 
@@ -176,7 +176,7 @@ void b200_impl::handle_async_task(void)
         //fill in the async metadata
         async_metadata_t metadata;
         load_metadata_from_buff(uhd::wtohx<boost::uint32_t>, metadata, if_packet_info, packet_buff, _tick_rate);
-        _async_md.push_with_pop_on_full(metadata);
+        async_md->push_with_pop_on_full(metadata);
         standard_async_msg_prints(metadata);
         return;
     }
@@ -300,7 +300,7 @@ tx_streamer::sptr b200_impl::get_tx_stream(const uhd::stream_args_t &args_)
         &zero_copy_if::get_send_buff, _data_transport, _1
     ));
     my_streamer->set_async_receiver(boost::bind(
-        &bounded_buffer<async_metadata_t>::pop_with_timed_wait, &_async_md, _1, _2
+        &bounded_buffer<async_metadata_t>::pop_with_timed_wait, _async_md, _1, _2
     ));
     my_streamer->set_xport_chan_sid(0, true, B200_TX_DATA_SID_BASE);
     my_streamer->set_enable_trailer(false); //TODO not implemented trailer support yet

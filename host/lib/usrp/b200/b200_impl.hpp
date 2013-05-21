@@ -91,8 +91,6 @@ private:
     //transports
     uhd::transport::zero_copy_if::sptr _data_transport;
     uhd::transport::zero_copy_if::sptr _ctrl_transport;
-    uhd::task::sptr _async_task;
-    void handle_async_task(void);
 
     //device properties interface
     uhd::property_tree::sptr get_tree(void) const
@@ -102,7 +100,12 @@ private:
 
     boost::weak_ptr<uhd::rx_streamer> _rx_streamer;
     boost::weak_ptr<uhd::tx_streamer> _tx_streamer;
-    uhd::transport::bounded_buffer<uhd::async_metadata_t> _async_md;
+
+    //async ctrl + msgs
+    uhd::task::sptr _async_task;
+    typedef uhd::transport::bounded_buffer<uhd::async_metadata_t> async_md_type;
+    boost::shared_ptr<async_md_type> _async_md;
+    void handle_async_task(uhd::transport::zero_copy_if::sptr, boost::shared_ptr<async_md_type>);
 
     void issue_stream_cmd(const size_t dspno, const uhd::stream_cmd_t &);
 
