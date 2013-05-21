@@ -49,7 +49,7 @@ struct ad9361_ctrl_impl : public ad9361_ctrl
 
         ad9361_double_pack(value, request.value.gain);
         const ad9361_transaction_t reply = this->do_transaction(request);
-        return ad9361_double_unpack((uint32_t*)&reply.value.gain);
+        return ad9361_double_unpack(reply.value.gain);
     }
 
     //! set a new clock rate, return the exact value
