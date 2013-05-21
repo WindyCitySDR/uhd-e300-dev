@@ -282,6 +282,7 @@ bool e200_impl::recv_async_msg(
  **********************************************************************/
 rx_streamer::sptr e200_impl::get_rx_stream(const uhd::stream_args_t &args_)
 {
+    boost::mutex::scoped_lock lock(_stream_spawn_mutex);
     stream_args_t args = args_;
 
     //setup defaults for unspecified values
@@ -357,6 +358,7 @@ rx_streamer::sptr e200_impl::get_rx_stream(const uhd::stream_args_t &args_)
  **********************************************************************/
 tx_streamer::sptr e200_impl::get_tx_stream(const uhd::stream_args_t &args_)
 {
+    boost::mutex::scoped_lock lock(_stream_spawn_mutex);
     stream_args_t args = args_;
 
     //setup defaults for unspecified values

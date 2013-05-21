@@ -311,6 +311,8 @@ struct e200_fifo_interface_impl : e200_fifo_interface
 
     uhd::transport::zero_copy_if::sptr make_xport(const size_t which_stream, const uhd::device_addr_t &args, const bool is_recv)
     {
+        boost::mutex::scoped_lock lock(setup_mutex);
+
         const size_t frame_size(size_t(args.cast<double>((is_recv)? "recv_frame_size" : "send_frame_size", DEFAULT_FRAME_SIZE)));
         const size_t num_frames(size_t(args.cast<double>((is_recv)? "num_recv_frames" : "num_send_frames", DEFAULT_NUM_FRAMES)));
         size_t &entries_in_use = (is_recv)? recv_entries_in_use : send_entries_in_use;
@@ -354,6 +356,7 @@ struct e200_fifo_interface_impl : e200_fifo_interface
     size_t data_space;
     size_t recv_entries_in_use;
     size_t send_entries_in_use;
+    boost::mutex setup_mutex;
 };
 
 e200_fifo_interface::sptr e200_fifo_interface::make(const e200_fifo_config_t &config)

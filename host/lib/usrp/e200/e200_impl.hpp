@@ -25,6 +25,7 @@
 #include <uhd/usrp/dboard_eeprom.hpp>
 #include <uhd/types/serial.hpp>
 #include <boost/weak_ptr.hpp>
+#include <boost/thread/mutex.hpp>
 #include "e200_fifo_config.hpp"
 #include "e200_ctrl.hpp"
 #include "rx_vita_core_3000.hpp"
@@ -47,19 +48,17 @@ static std::string E200_SERVER_CODEC_PORT = "321759";
  * The implementation details are encapsulated here.
  * Handles properties on the mboard, dboard, dsps...
  */
-class e200_impl : public uhd::device
+struct e200_impl : public uhd::device
 {
-public:
     //structors
     e200_impl(const uhd::device_addr_t &);
     ~e200_impl(void);
 
     //the io interface
+    boost::mutex _stream_spawn_mutex;
     uhd::rx_streamer::sptr get_rx_stream(const uhd::stream_args_t &);
     uhd::tx_streamer::sptr get_tx_stream(const uhd::stream_args_t &);
     bool recv_async_msg(uhd::async_metadata_t &, double);
-
-private:
 
     bool _network_mode;
 
