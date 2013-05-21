@@ -41,14 +41,14 @@ extern "C" {
 #define AD9361_ACTION_SET_CLOCK_RATE 9
 #define AD9361_ACTION_SET_ACTIVE_CHAINS 10
 
-static inline void ad9361_double_pack(const double input, uint32_t *output)
+static inline void ad9361_double_pack(const double input, uint32_t output[2])
 {
     const uint32_t *p = (const uint32_t *)&input;
     output[0] = p[0];
     output[1] = p[1];
 }
 
-static inline double ad9361_double_unpack(const uint32_t *input)
+static inline double ad9361_double_unpack(const uint32_t input[2])
 {
     double output = 0.0;
     uint32_t *p = (uint32_t *)&output;
