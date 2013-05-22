@@ -18,9 +18,9 @@
 #include "tx_vita_core_3000.hpp"
 #include <uhd/utils/safe_call.hpp>
 
-#define REG_CTRL_ERROR_POLICY           _ctrl_base + 0
-#define REG_DEFRAMER_CYCLE_FC_UPS       _deframer_base + 0
-#define REG_DEFRAMER_PACKET_FC_UPS      _deframer_base + 4
+#define REG_CTRL_ERROR_POLICY           _base + 0
+#define REG_DEFRAMER_CYCLE_FC_UPS       _base + 2*4 + 0
+#define REG_DEFRAMER_PACKET_FC_UPS      _base + 2*4 + 4
 
 using namespace uhd;
 
@@ -28,12 +28,10 @@ struct tx_vita_core_3000_impl : tx_vita_core_3000
 {
     tx_vita_core_3000_impl(
         wb_iface::sptr iface,
-        const size_t deframer_base,
-        const size_t ctrl_base
+        const size_t base
     ):
         _iface(iface),
-        _deframer_base(deframer_base),
-        _ctrl_base(ctrl_base)
+        _base(base)
     {
         this->set_tick_rate(1); //init to non zero
         this->set_underflow_policy("next_packet");
@@ -95,17 +93,15 @@ struct tx_vita_core_3000_impl : tx_vita_core_3000
     }
 
     wb_iface::sptr _iface;
-    const size_t _deframer_base;
-    const size_t _ctrl_base;
+    const size_t _base;
     double _tick_rate;
     std::string _policy;
 };
 
 tx_vita_core_3000::sptr tx_vita_core_3000::make(
     wb_iface::sptr iface,
-    const size_t deframer_base,
-    const size_t ctrl_base
+    const size_t base
 )
 {
-    return tx_vita_core_3000::sptr(new tx_vita_core_3000_impl(iface, deframer_base, ctrl_base));
+    return tx_vita_core_3000::sptr(new tx_vita_core_3000_impl(iface, base));
 }

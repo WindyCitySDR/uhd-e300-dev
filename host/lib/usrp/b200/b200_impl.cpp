@@ -352,7 +352,7 @@ b200_impl::b200_impl(const device_addr_t &device_addr)
     ////////////////////////////////////////////////////////////////////
     // create rx dsp control objects
     ////////////////////////////////////////////////////////////////////
-    _rx_framer = rx_vita_core_3000::make(_ctrl, TOREG(SR_RX_CTRL+4), TOREG(SR_RX_CTRL));
+    _rx_framer = rx_vita_core_3000::make(_ctrl, TOREG(SR_RX_CTRL));
     for (size_t dspno = 0; dspno < B200_NUM_RX_FE; dspno++)
     {
         const fs_path rx_dsp_path = mb_path / "rx_dsps" / str(boost::format("%u") % dspno);
@@ -372,7 +372,7 @@ b200_impl::b200_impl(const device_addr_t &device_addr)
     ////////////////////////////////////////////////////////////////////
     // create tx dsp control objects
     ////////////////////////////////////////////////////////////////////
-    _tx_deframer = tx_vita_core_3000::make(_ctrl, TOREG(SR_TX_CTRL+2), TOREG(SR_TX_CTRL));
+    _tx_deframer = tx_vita_core_3000::make(_ctrl, TOREG(SR_TX_CTRL));
     for (size_t dspno = 0; dspno < B200_NUM_TX_FE; dspno++)
     {
         const fs_path tx_dsp_path = mb_path / "tx_dsps" / str(boost::format("%u") % dspno);
