@@ -278,9 +278,12 @@ static managed_send_buffer::sptr get_tx_buff_with_flowctrl(
 bool b250_impl::recv_async_msg(
     async_metadata_t &async_metadata, double timeout
 ){
-    boost::shared_ptr<sph::send_packet_streamer> my_streamer =
-        boost::dynamic_pointer_cast<sph::send_packet_streamer>(_tx_streamers[0].lock());
-    if (my_streamer) return my_streamer->recv_async_msg(async_metadata, timeout);
+    for (size_t i = 0; i < _tx_streamers.size(); i++)
+    {
+        boost::shared_ptr<sph::send_packet_streamer> my_streamer =
+            boost::dynamic_pointer_cast<sph::send_packet_streamer>(_tx_streamers[i].lock());
+        if (my_streamer) return my_streamer->recv_async_msg(async_metadata, timeout);
+    }
     return false;
 }
 
