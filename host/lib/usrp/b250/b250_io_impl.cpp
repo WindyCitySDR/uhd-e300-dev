@@ -206,11 +206,13 @@ static void handle_rx_flowctrl(const boost::uint32_t sid, zero_copy_if::sptr xpo
 struct b250_tx_fc_guts_t
 {
     b250_tx_fc_guts_t(void):
-        channel(0),
+        stream_channel(0),
+        device_channel(0),
         last_seq_out(0),
         last_seq_ack(0),
         seq_queue(1){}
-    size_t channel;
+    size_t stream_channel;
+    size_t device_channel;
     size_t last_seq_out;
     size_t last_seq_ack;
     bounded_buffer<size_t> seq_queue;
@@ -251,8 +253,9 @@ static void handle_tx_async_msgs(boost::shared_ptr<b250_tx_fc_guts_t> guts, zero
     async_metadata_t metadata;
     load_metadata_from_buff(
         uhd::ntohx<boost::uint32_t>, metadata, if_packet_info, packet_buff,
-        B250_RADIO_CLOCK_RATE/*FIXME set from rate update*/, guts->channel);
+        B250_RADIO_CLOCK_RATE/*FIXME set from rate update*/, guts->stream_channel);
     guts->async_queue->push_with_pop_on_full(metadata);
+    metadata.channel = guts->device_channel;
     guts->old_async_queue->push_with_pop_on_full(metadata);
     standard_async_msg_prints(metadata);
 }
@@ -461,7 +464,8 @@ tx_streamer::sptr b250_impl::get_tx_stream(const uhd::stream_args_t &args_)
         //flow control setup
         perif.deframer->configure_flow_control(0/*cycs off*/, B250_TX_FC_PKT_WINDOW/8/*pkts*/);
         boost::shared_ptr<b250_tx_fc_guts_t> guts(new b250_tx_fc_guts_t());
-        guts->channel = stream_i;
+        guts->stream_channel = stream_i;
+        guts->device_channel = chan;
         guts->async_queue = async_md;
         guts->old_async_queue = _async_md;
         task::sptr task = task::make(boost::bind(&handle_tx_async_msgs, guts, data_xport));
