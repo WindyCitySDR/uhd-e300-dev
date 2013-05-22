@@ -195,9 +195,9 @@ static void handle_rx_flowctrl(const boost::uint32_t sid, zero_copy_if::sptr xpo
 /***********************************************************************
  * TX flow control handler
  **********************************************************************/
-struct tx_fc_guts_t
+struct e200_tx_fc_guts_t
 {
-    tx_fc_guts_t(void):
+    e200_tx_fc_guts_t(void):
         last_seq_out(0),
         last_seq_ack(0),
         seq_queue(1),
@@ -208,7 +208,7 @@ struct tx_fc_guts_t
     bounded_buffer<async_metadata_t> async_queue;
 };
 
-static void handle_tx_async_msgs(boost::shared_ptr<tx_fc_guts_t> guts, zero_copy_if::sptr xport)
+static void handle_tx_async_msgs(boost::shared_ptr<e200_tx_fc_guts_t> guts, zero_copy_if::sptr xport)
 {
     managed_recv_buffer::sptr buff = xport->get_recv_buff();
     if (not buff) return;
@@ -246,7 +246,7 @@ static void handle_tx_async_msgs(boost::shared_ptr<tx_fc_guts_t> guts, zero_copy
 
 static managed_send_buffer::sptr get_tx_buff_with_flowctrl(
     task::sptr /*holds ref*/,
-    boost::shared_ptr<tx_fc_guts_t> guts,
+    boost::shared_ptr<e200_tx_fc_guts_t> guts,
     zero_copy_if::sptr xport,
     const size_t fc_window,
     const double timeout
@@ -404,7 +404,7 @@ tx_streamer::sptr e200_impl::get_tx_stream(const uhd::stream_args_t &args_)
     //flow control setup
     const size_t fc_window = perif.tx_data_xport->get_num_send_frames();
     perif.deframer->configure_flow_control(0/*cycs off*/, fc_window/8/*pkts*/);
-    boost::shared_ptr<tx_fc_guts_t> guts(new tx_fc_guts_t());
+    boost::shared_ptr<e200_tx_fc_guts_t> guts(new e200_tx_fc_guts_t());
     task::sptr task = task::make(boost::bind(&handle_tx_async_msgs, guts, perif.tx_flow_xport));
 
     my_streamer->set_xport_chan_get_buff(0, boost::bind(

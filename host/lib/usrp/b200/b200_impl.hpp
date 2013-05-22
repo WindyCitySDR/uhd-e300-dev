@@ -61,9 +61,8 @@ static const size_t          B200_NUM_TX_FE = 2;
  **********************************************************************/
 
 //! Implementation guts
-class b200_impl : public uhd::device
+struct b200_impl : public uhd::device
 {
-public:
     //structors
     b200_impl(const uhd::device_addr_t &);
     ~b200_impl(void);
@@ -73,7 +72,6 @@ public:
     uhd::tx_streamer::sptr get_tx_stream(const uhd::stream_args_t &args);
     bool recv_async_msg(uhd::async_metadata_t &, double);
 
-private:
     uhd::property_tree::sptr _tree;
 
     //controllers

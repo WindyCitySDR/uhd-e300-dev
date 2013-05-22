@@ -42,6 +42,7 @@
 #include "gpio_core_200.hpp"
 #include <boost/weak_ptr.hpp>
 #include <uhd/usrp/gps_ctrl.hpp>
+#include <uhd/transport/bounded_buffer.hpp>
 
 static const size_t B250_TX_FC_PKT_WINDOW = 2048; //16MB/8Kpkts
 static const std::string B250_FW_FILE_NAME = "usrp_b250_fw.bin";
@@ -86,18 +87,20 @@ struct b250_dboard_iface_config_t
 
 uhd::usrp::dboard_iface::sptr b250_make_dboard_iface(const b250_dboard_iface_config_t &);
 
-class b250_impl : public uhd::device
+struct b250_impl : public uhd::device
 {
-public:
     b250_impl(const uhd::device_addr_t &);
     ~b250_impl(void);
 
     //the io interface
     uhd::rx_streamer::sptr get_rx_stream(const uhd::stream_args_t &);
     uhd::tx_streamer::sptr get_tx_stream(const uhd::stream_args_t &);
+
+    //support old async call
+    typedef uhd::transport::bounded_buffer<uhd::async_metadata_t> async_md_type;
+    boost::shared_ptr<async_md_type> _async_md;
     bool recv_async_msg(uhd::async_metadata_t &, double);
 
-private:
     uhd::property_tree::sptr _tree;
     //device properties interface
     uhd::property_tree::sptr get_tree(void) const

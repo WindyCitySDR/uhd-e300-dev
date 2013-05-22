@@ -158,6 +158,7 @@ static void b250_load_fw(const std::string &addr, const std::string &file_name)
 
 b250_impl::b250_impl(const uhd::device_addr_t &dev_addr)
 {
+    _async_md.reset(new async_md_type(1000/*messages deep*/));
     _tree = uhd::property_tree::make();
     _last_sid = 0;
     _addr = dev_addr["addr"];

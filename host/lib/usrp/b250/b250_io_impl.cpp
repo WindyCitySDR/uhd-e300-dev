@@ -203,20 +203,22 @@ static void handle_rx_flowctrl(const boost::uint32_t sid, zero_copy_if::sptr xpo
 /***********************************************************************
  * TX flow control handler
  **********************************************************************/
-struct tx_fc_guts_t
+struct b250_tx_fc_guts_t
 {
-    tx_fc_guts_t(void):
+    b250_tx_fc_guts_t(void):
+        channel(0),
         last_seq_out(0),
         last_seq_ack(0),
-        seq_queue(1),
-        async_queue(1000){}
+        seq_queue(1){}
+    size_t channel;
     size_t last_seq_out;
     size_t last_seq_ack;
     bounded_buffer<size_t> seq_queue;
-    bounded_buffer<async_metadata_t> async_queue;
+    boost::shared_ptr<b250_impl::async_md_type> async_queue;
+    boost::shared_ptr<b250_impl::async_md_type> old_async_queue;
 };
 
-static void handle_tx_async_msgs(boost::shared_ptr<tx_fc_guts_t> guts, zero_copy_if::sptr xport)
+static void handle_tx_async_msgs(boost::shared_ptr<b250_tx_fc_guts_t> guts, zero_copy_if::sptr xport)
 {
     managed_recv_buffer::sptr buff = xport->get_recv_buff();
     if (not buff) return;
@@ -247,14 +249,17 @@ static void handle_tx_async_msgs(boost::shared_ptr<tx_fc_guts_t> guts, zero_copy
 
     //fill in the async metadata
     async_metadata_t metadata;
-    load_metadata_from_buff(uhd::ntohx<boost::uint32_t>, metadata, if_packet_info, packet_buff, B250_RADIO_CLOCK_RATE/*FIXME set from rate update*/);
-    guts->async_queue.push_with_pop_on_full(metadata);
+    load_metadata_from_buff(
+        uhd::ntohx<boost::uint32_t>, metadata, if_packet_info, packet_buff,
+        B250_RADIO_CLOCK_RATE/*FIXME set from rate update*/, guts->channel);
+    guts->async_queue->push_with_pop_on_full(metadata);
+    guts->old_async_queue->push_with_pop_on_full(metadata);
     standard_async_msg_prints(metadata);
 }
 
 static managed_send_buffer::sptr get_tx_buff_with_flowctrl(
     task::sptr /*holds ref*/,
-    boost::shared_ptr<tx_fc_guts_t> guts,
+    boost::shared_ptr<b250_tx_fc_guts_t> guts,
     zero_copy_if::sptr xport,
     const double timeout
 ){
@@ -278,13 +283,7 @@ static managed_send_buffer::sptr get_tx_buff_with_flowctrl(
 bool b250_impl::recv_async_msg(
     async_metadata_t &async_metadata, double timeout
 ){
-    for (size_t i = 0; i < _tx_streamers.size(); i++)
-    {
-        boost::shared_ptr<sph::send_packet_streamer> my_streamer =
-            boost::dynamic_pointer_cast<sph::send_packet_streamer>(_tx_streamers[i].lock());
-        if (my_streamer) return my_streamer->recv_async_msg(async_metadata, timeout);
-    }
-    return false;
+    return _async_md->pop_with_timed_wait(async_metadata, timeout);
 }
 
 /***********************************************************************
@@ -409,6 +408,9 @@ tx_streamer::sptr b250_impl::get_tx_stream(const uhd::stream_args_t &args_)
     args.otw_format = "sc16";
     args.channels = args.channels.empty()? std::vector<size_t>(1, 0) : args.channels;
 
+    //shared async queue for all channels in streamer
+    boost::shared_ptr<async_md_type> async_md(new async_md_type(1000/*messages deep*/));
+
     boost::shared_ptr<sph::send_packet_streamer> my_streamer;
     for (size_t stream_i = 0; stream_i < args.channels.size(); stream_i++)
     {
@@ -458,15 +460,17 @@ tx_streamer::sptr b250_impl::get_tx_stream(const uhd::stream_args_t &args_)
 
         //flow control setup
         perif.deframer->configure_flow_control(0/*cycs off*/, B250_TX_FC_PKT_WINDOW/8/*pkts*/);
-        boost::shared_ptr<tx_fc_guts_t> guts(new tx_fc_guts_t());
+        boost::shared_ptr<b250_tx_fc_guts_t> guts(new b250_tx_fc_guts_t());
+        guts->channel = stream_i;
+        guts->async_queue = async_md;
+        guts->old_async_queue = _async_md;
         task::sptr task = task::make(boost::bind(&handle_tx_async_msgs, guts, data_xport));
 
         my_streamer->set_xport_chan_get_buff(stream_i, boost::bind(
             &get_tx_buff_with_flowctrl, task, guts, data_xport, _1
         ));
-        //FIXME note that this replaces the last async_receiver set in the multi channel case
         my_streamer->set_async_receiver(boost::bind(
-            &bounded_buffer<async_metadata_t>::pop_with_timed_wait, &(guts->async_queue), _1, _2
+            &async_md_type::pop_with_timed_wait, async_md, _1, _2
         ));
         my_streamer->set_xport_chan_sid(stream_i, true, data_sid);
         my_streamer->set_enable_trailer(false); //TODO not implemented trailer support yet

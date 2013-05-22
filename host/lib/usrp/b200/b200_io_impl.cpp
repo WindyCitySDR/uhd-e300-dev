@@ -135,10 +135,7 @@ static void b200_if_hdr_pack_le(
 bool b200_impl::recv_async_msg(
     async_metadata_t &async_metadata, double timeout
 ){
-    boost::shared_ptr<sph::send_packet_streamer> my_streamer =
-        boost::dynamic_pointer_cast<sph::send_packet_streamer>(_tx_streamer.lock());
-    if (my_streamer) return my_streamer->recv_async_msg(async_metadata, timeout);
-    return false;
+    return _async_md->pop_with_timed_wait(async_metadata, timeout);
 }
 
 void b200_impl::handle_async_task(uhd::transport::zero_copy_if::sptr xport, boost::shared_ptr<async_md_type> async_md)
