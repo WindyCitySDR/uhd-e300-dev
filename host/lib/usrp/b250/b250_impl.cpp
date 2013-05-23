@@ -507,6 +507,10 @@ uhd::transport::udp_zero_copy::sptr b250_impl::make_transport(
     UHD_LOG << "reprogram the ethernet dispatcher's udp port" << std::endl;
     _zpu_ctrl->poke32(SR_ADDR(SET0_BASE, (ZPU_SR_ETHINT0+8+3)), B250_VITA_UDP_PORT);
 
+    //Do a peek to an arbitrary address to guarantee that the
+    //ethernet framer has been programmed before we return.
+    _zpu_ctrl->peek32(0);
+
     return xport;
 }
 
