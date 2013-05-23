@@ -47,7 +47,7 @@ static device_addrs_t b250_find_with_addr(const device_addr_t &dev_addr)
     //load request struct
     b250_fw_comms_t request = b250_fw_comms_t();
     request.flags = uhd::htonx<boost::uint32_t>(B250_FW_COMMS_FLAGS_ACK);
-    request.sequence = 0;
+    request.sequence = uhd::htonx<boost::uint32_t>(std::rand());
 
     //send request
     comm->send(asio::buffer(&request, sizeof(request)));
@@ -59,6 +59,9 @@ static device_addrs_t b250_find_with_addr(const device_addr_t &dev_addr)
         char buff[B250_FW_COMMS_MTU] = {};
         const size_t nbytes = comm->recv(asio::buffer(buff), 0.050);
         if (nbytes == 0) break;
+        const b250_fw_comms_t *reply = (const b250_fw_comms_t *)buff;
+        if (request.flags != reply->flags) break;
+        if (request.sequence != reply->sequence) break;
         device_addr_t new_addr;
         new_addr["type"] = "b250";
         new_addr["addr"] = comm->get_recv_addr();
