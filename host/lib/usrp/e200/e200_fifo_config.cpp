@@ -165,16 +165,16 @@ struct e200_transport : zero_copy_if
 {
 
     e200_transport(const __mem_addrz_t &addrs, const size_t num_frames, const size_t frame_size, e200_fifo_poll_waiter *waiter, const bool auto_release):
-        _ctrl_base(addrs.ctrl), _num_frames(num_frames), _frame_size(frame_size), _index(0), _waiter(waiter)
+        _addrs(addrs), _num_frames(num_frames), _frame_size(frame_size), _index(0), _waiter(waiter)
     {
         UHD_MSG(status) << boost::format("phys 0x%x") % addrs.phys << std::endl;
         UHD_MSG(status) << boost::format("data 0x%x") % addrs.data << std::endl;
         UHD_MSG(status) << boost::format("ctrl 0x%x") % addrs.ctrl << std::endl;
 
-        const boost::uint32_t sig = zf_peek32(_ctrl_base + ARBITER_RD_SIG);
+        const boost::uint32_t sig = zf_peek32(_addrs.ctrl + ARBITER_RD_SIG);
         UHD_ASSERT_THROW((sig >> 16) == 0xACE0);
 
-        zf_poke32(_ctrl_base + ARBITER_WR_CLEAR, 1);
+        zf_poke32(_addrs.ctrl + ARBITER_WR_CLEAR, 1);
         for (size_t i = 0; i < num_frames; i++)
         {
             //create a managed buffer at the given offset
@@ -184,8 +184,9 @@ struct e200_transport : zero_copy_if
             boost::shared_ptr<e200_fifo_mb> mb(new e200_fifo_mb(mb_addrs, frame_size));
 
             //setup the buffers so they are "positioned for use"
+            const size_t sts_good = (1 << 7) | (_addrs.which & 0xf);
             if (auto_release) mb->get_new<managed_recv_buffer>(); //release for read
-            else zf_poke32(_ctrl_base + ARBITER_WR_STS, 1 << 7); //poke an ok into the sts fifo
+            else zf_poke32(_addrs.ctrl + ARBITER_WR_STS, sts_good); //poke an ok into the sts fifo
 
             _buffs.push_back(mb);
         }
@@ -202,11 +203,12 @@ struct e200_transport : zero_copy_if
         const time_spec_t exit_time = time_spec_t::get_system_time() + time_spec_t(timeout);
         do
         {
-            if (zf_peek32(_ctrl_base + ARBITER_RB_STATUS_OCC))
+            if (zf_peek32(_addrs.ctrl + ARBITER_RB_STATUS_OCC))
             {
-                const boost::uint32_t sts = zf_peek32(_ctrl_base + ARBITER_RB_STATUS);
+                const boost::uint32_t sts = zf_peek32(_addrs.ctrl + ARBITER_RB_STATUS);
                 UHD_ASSERT_THROW((sts >> 7) & 0x1); //assert OK
-                zf_poke32(_ctrl_base + ARBITER_WR_STS_RDY, 1); //pop from sts fifo
+                UHD_ASSERT_THROW((sts & 0xf) == _addrs.which); //expected tag
+                zf_poke32(_addrs.ctrl + ARBITER_WR_STS_RDY, 1); //pop from sts fifo
                 if (_index == _num_frames) _index = 0;
                 return _buffs[_index++]->get_new<T>();
             }
@@ -248,7 +250,7 @@ struct e200_transport : zero_copy_if
         return _frame_size;
     }
 
-    const size_t _ctrl_base;
+    const __mem_addrz_t _addrs;
     const size_t _num_frames;
     const size_t _frame_size;
     size_t _index;
