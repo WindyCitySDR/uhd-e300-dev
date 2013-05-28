@@ -40,7 +40,8 @@ struct rx_vita_core_3000_impl : rx_vita_core_3000
     ):
         _iface(iface),
         _base(base),
-        _continuous_streaming(false)
+        _continuous_streaming(false),
+        _is_setup(false)
     {
         this->set_tick_rate(1); //init to non zero
         this->set_nsamps_per_packet(100); //init to non zero
@@ -73,6 +74,7 @@ struct rx_vita_core_3000_impl : rx_vita_core_3000
 
     void issue_stream_command(const uhd::stream_cmd_t &stream_cmd)
     {
+        if (not _is_setup) throw uhd::runtime_error(str(boost::format("rx vita core 3000 issue stream command - not setup yet! base: %d") % _base));
         UHD_ASSERT_THROW(stream_cmd.num_samps <= 0x0fffffff);
         _continuous_streaming = stream_cmd.stream_mode == stream_cmd_t::STREAM_MODE_START_CONTINUOUS;
 
@@ -122,12 +124,14 @@ struct rx_vita_core_3000_impl : rx_vita_core_3000
 
     void setup(const uhd::stream_args_t &)
     {
+        _is_setup = true;
     }
 
     wb_iface::sptr _iface;
     const size_t _base;
     double _tick_rate;
     bool _continuous_streaming;
+    bool _is_setup;
 };
 
 rx_vita_core_3000::sptr rx_vita_core_3000::make(
