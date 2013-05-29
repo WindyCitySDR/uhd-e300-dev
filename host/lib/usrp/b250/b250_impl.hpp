@@ -145,7 +145,7 @@ struct b250_impl : public uhd::device
     b250_clock_ctrl::sptr _clock;
     uhd::gps_ctrl::sptr _gps;
 
-    size_t _last_sid;
+    size_t _sid_framer;
     struct sid_config_t
     {
         boost::uint8_t router_addr_there;

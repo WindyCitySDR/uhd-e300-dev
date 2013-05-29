@@ -163,7 +163,7 @@ b250_impl::b250_impl(const uhd::device_addr_t &dev_addr)
 {
     _async_md.reset(new async_md_type(1000/*messages deep*/));
     _tree = uhd::property_tree::make();
-    _last_sid = 0;
+    _sid_framer = 0;
     _addr = dev_addr["addr"];
     BOOST_FOREACH(const std::string &key, dev_addr.keys())
     {
@@ -519,22 +519,24 @@ uhd::transport::udp_zero_copy::sptr b250_impl::make_transport(
 
 boost::uint32_t b250_impl::allocate_sid(const sid_config_t &config)
 {
-    _last_sid++;
-
-    const boost::uint32_t stream = (config.dst_prefix | (_last_sid << 2)) & 0xff;
-    UHD_VAR(stream);
+    const boost::uint32_t stream = (config.dst_prefix | (config.router_dst_there << 2)) & 0xff;
 
     const boost::uint32_t sid = 0
-      | (B250_DEVICE_HERE << 24) // IJB. DONT UNDERSTAND WHAT 4 represents. B250_DEVICE_HERE = 0
-        | (stream << 16)
+        | (B250_DEVICE_HERE << 24)
+        | (_sid_framer << 16)
         | (config.router_addr_there << 8)
         | (stream << 0)
     ;
     UHD_LOG << std::hex
         << " sid 0x" << sid
+        << " framer 0x" << _sid_framer
         << " stream 0x" << stream
+        << " router_dst_there 0x" << int(config.router_dst_there)
         << " router_addr_there 0x" << int(config.router_addr_there)
         << std::dec << std::endl;
+
+    //increment for next setup
+    _sid_framer++;
 
     // Program the B250 to recognise it's own local address.
     _zpu_ctrl->poke32(SR_ADDR(SET0_BASE, ZPU_SR_XB_LOCAL), config.router_addr_there);
@@ -543,7 +545,7 @@ boost::uint32_t b250_impl::allocate_sid(const sid_config_t &config)
     _zpu_ctrl->poke32(SR_ADDR(SETXB_BASE, 256 + (stream)), config.router_dst_there);
     // Program CAM entry for returning packets to us (for example GR host via Eth0)
     // This type of packet does not match the XB_LOCAL address and is looked up in the lower half of the CAM
-    _zpu_ctrl->poke32(SR_ADDR(SETXB_BASE, 0   + (B250_DEVICE_HERE)), config.router_dst_here);
+    _zpu_ctrl->poke32(SR_ADDR(SETXB_BASE, 0 + (B250_DEVICE_HERE)), config.router_dst_here);
 
     UHD_LOG << std::hex
         << "done router config for sid 0x" << sid
