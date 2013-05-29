@@ -27,7 +27,7 @@
 #include <boost/weak_ptr.hpp>
 #include <boost/thread/mutex.hpp>
 #include "e200_fifo_config.hpp"
-#include "e200_ctrl.hpp"
+#include "radio_ctrl_core_3000.hpp"
 #include "rx_vita_core_3000.hpp"
 #include "tx_vita_core_3000.hpp"
 #include "time_core_3000.hpp"
@@ -78,7 +78,7 @@ struct e200_impl : public uhd::device
     //perifs in the radio core
     struct radio_perifs_t
     {
-        e200_ctrl::sptr ctrl;
+        radio_ctrl_core_3000::sptr ctrl;
         gpio_core_200_32wo::sptr atr0;
         gpio_core_200_32wo::sptr atr1;
         time_core_3000::sptr time64;
