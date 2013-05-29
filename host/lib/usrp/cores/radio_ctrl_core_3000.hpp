@@ -15,30 +15,39 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 //
 
-#ifndef INCLUDED_B250_CTRL_HPP
-#define INCLUDED_B250_CTRL_HPP
+#ifndef INCLUDED_LIBUHD_USRP_RADIO_CTRL_3000_HPP
+#define INCLUDED_LIBUHD_USRP_RADIO_CTRL_3000_HPP
 
 #include <uhd/types/time_spec.hpp>
 #include <uhd/transport/zero_copy.hpp>
+#include <uhd/transport/vrt_if_packet.hpp>
 #include <boost/shared_ptr.hpp>
 #include <boost/utility.hpp>
 #include "wb_iface.hpp"
 #include <string>
 
 /*!
- * Provide access to peek, poke
+ * Provide access to peek, poke for the radio ctrl module
  */
-class b250_ctrl : public wb_iface
+class radio_ctrl_core_3000 : public wb_iface
 {
 public:
-    typedef boost::shared_ptr<b250_ctrl> sptr;
+    typedef boost::shared_ptr<radio_ctrl_core_3000> sptr;
 
     //! Make a new control object
     static sptr make(
-        uhd::transport::zero_copy_if::sptr xport,
+        uhd::transport::vrt::if_packet_info_t::link_type_t link_type,
+        uhd::transport::zero_copy_if::sptr ctrl_xport,
+        uhd::transport::zero_copy_if::sptr resp_xport,
         const boost::uint32_t sid,
-        const std::string &name
+        const std::string &name = "0"
     );
+
+    //! Hold a ref to a task thats feeding push response
+    virtual void hold_task(boost::shared_ptr<void> task) = 0;
+
+    //! Push a response externall (resp_xport is NULL)
+    virtual void push_response(const boost::uint32_t *buff) = 0;
 
     //! Set the command time that will activate
     virtual void set_time(const uhd::time_spec_t &time) = 0;
@@ -47,4 +56,4 @@ public:
     virtual void set_tick_rate(const double rate) = 0;
 };
 
-#endif /* INCLUDED_B250_CTRL_HPP */
+#endif /* INCLUDED_LIBUHD_USRP_RADIO_CTRL_3000_HPP */

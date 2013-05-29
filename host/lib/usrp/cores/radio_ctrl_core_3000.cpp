@@ -15,15 +15,13 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 //
 
-#include "b250_ctrl.hpp"
-#include "b250_impl.hpp"
-#include "b250_regs.hpp"
+#include "radio_ctrl_core_3000.hpp"
 #include "async_packet_handler.hpp"
 #include <uhd/exception.hpp>
 #include <uhd/utils/msg.hpp>
 #include <uhd/utils/byteswap.hpp>
 #include <uhd/utils/safe_call.hpp>
-#include <uhd/transport/vrt_if_packet.hpp>
+#include <uhd/transport/bounded_buffer.hpp>
 #include <boost/thread/mutex.hpp>
 #include <boost/thread/thread.hpp>
 #include <boost/format.hpp>
@@ -37,30 +35,46 @@ using namespace uhd::transport;
 static const double ACK_TIMEOUT = 0.5;
 static const double MASSIVE_TIMEOUT = 10.0; //for when we wait on a timed command
 static const size_t RESP_QUEUE_SIZE = 2;
+static const size_t SR_READBACK  = 32;
 
-class b250_ctrl_impl : public b250_ctrl
+class radio_ctrl_core_3000_impl : public radio_ctrl_core_3000
 {
 public:
 
-    b250_ctrl_impl(zero_copy_if::sptr xport, const boost::uint32_t sid, const std::string &name):
-        _xport(xport),
+    radio_ctrl_core_3000_impl(
+        vrt::if_packet_info_t::link_type_t link_type,
+        uhd::transport::zero_copy_if::sptr ctrl_xport,
+        uhd::transport::zero_copy_if::sptr resp_xport,
+        const boost::uint32_t sid,
+        const std::string &name
+    ):
+        _link_type(link_type),
+        _packet_type((link_type == vrt::if_packet_info_t::LINK_TYPE_VRLP)? vrt::if_packet_info_t::PACKET_TYPE_CONTEXT : vrt::if_packet_info_t::PACKET_TYPE_EXTENSION),
+        _bige(link_type == vrt::if_packet_info_t::LINK_TYPE_VRLP),
+        _ctrl_xport(ctrl_xport),
+        _resp_xport(resp_xport),
         _sid(sid),
         _name(name),
         _seq_out(0),
-        _timeout(ACK_TIMEOUT)
+        _timeout(ACK_TIMEOUT),
+        _resp_queue(RESP_QUEUE_SIZE)
     {
-        UHD_LOG << "b250_ctrl_impl() " << _name << std::endl;
-        while (_xport->get_recv_buff(0.0)){} //flush
+        UHD_LOG << "radio_ctrl_core_3000_impl() " << _name << std::endl;
+        if (_ctrl_xport)
+        {
+            while (_ctrl_xport->get_recv_buff(0.0)){} //flush
+        }
         this->set_time(uhd::time_spec_t(0.0));
         this->set_tick_rate(1.0); //something possible but bogus
     }
 
-    ~b250_ctrl_impl(void)
+    ~radio_ctrl_core_3000_impl(void)
     {
-        UHD_LOG << "~b250_ctrl_impl() " << _name << std::endl;
+        UHD_LOG << "~radio_ctrl_core_3000_impl() " << _name << std::endl;
         _timeout = ACK_TIMEOUT; //reset timeout to something small
         UHD_SAFE_CALL(
             this->peek32(0); //dummy peek with the purpose of ack'ing all packets
+            _async_task.reset(); //now its ok to release the task
         )
     }
 
@@ -127,7 +141,7 @@ private:
      ******************************************************************/
     UHD_INLINE void send_pkt(const boost::uint32_t addr, const boost::uint32_t data = 0)
     {
-        managed_send_buffer::sptr buff = _xport->get_send_buff(0.0);
+        managed_send_buffer::sptr buff = _ctrl_xport->get_send_buff(0.0);
         if (not buff){
             throw uhd::runtime_error("fifo ctrl timed out getting a send buffer");
         }
@@ -135,8 +149,8 @@ private:
 
         //load packet info
         vrt::if_packet_info_t packet_info;
-        packet_info.link_type = vrt::if_packet_info_t::LINK_TYPE_VRLP;
-        packet_info.packet_type = vrt::if_packet_info_t::PACKET_TYPE_CONTEXT;
+        packet_info.link_type = _link_type;
+        packet_info.packet_type = _packet_type;
         packet_info.num_payload_words32 = 2;
         packet_info.num_payload_bytes = packet_info.num_payload_words32*sizeof(boost::uint32_t);
         packet_info.packet_count = _seq_out;
@@ -151,11 +165,12 @@ private:
         packet_info.has_tlr = false;
 
         //load header
-        vrt::if_hdr_pack_be(pkt, packet_info);
+        if (_bige) vrt::if_hdr_pack_be(pkt, packet_info);
+        else vrt::if_hdr_pack_le(pkt, packet_info);
 
         //load payload
-        pkt[packet_info.num_header_words32+0] = uhd::htonx(addr);
-        pkt[packet_info.num_header_words32+1] = uhd::htonx(data);
+        pkt[packet_info.num_header_words32+0] = (_bige)? uhd::htonx(addr) : uhd::htowx(addr);
+        pkt[packet_info.num_header_words32+1] = (_bige)? uhd::htonx(data) : uhd::htowx(data);
         //UHD_MSG(status) << boost::format("0x%08x, 0x%08x\n") % addr % data;
 
         //send the buffer over the interface
@@ -176,30 +191,47 @@ private:
             const size_t seq_to_ack = _outstanding_seqs.front();
             _outstanding_seqs.pop();
 
-            //get buffer from response endpoing - or die in timeout
-            managed_recv_buffer::sptr buff = _xport->get_recv_buff(_timeout);
-            try
+            //parse the packet
+            vrt::if_packet_info_t packet_info;
+            resp_buff_type resp_buff;
+            boost::uint32_t const *pkt = NULL;
+            managed_recv_buffer::sptr buff;
+
+            //get buffer from response endpoint - or die in timeout
+            if (_resp_xport)
             {
-                UHD_ASSERT_THROW(bool(buff));
-                UHD_ASSERT_THROW(bool(buff->size()));
+                buff = _resp_xport->get_recv_buff(_timeout);
+                try
+                {
+                    UHD_ASSERT_THROW(bool(buff));
+                    UHD_ASSERT_THROW(bool(buff->size()));
+                }
+                catch(const std::exception &ex)
+                {
+                    throw uhd::io_error(str(boost::format("b250 ctrl (%s) no response packet - %s") % _name % ex.what()));
+                }
+                pkt = buff->cast<const boost::uint32_t *>();
+                packet_info.num_packet_words32 = buff->size()/sizeof(boost::uint32_t);
             }
-            catch(const std::exception &ex)
+
+            //get buffer from response endpoint - or die in timeout
+            else
             {
-                throw uhd::io_error(str(boost::format("b250 ctrl (%s) no response packet - %s") % _name % ex.what()));
+                UHD_ASSERT_THROW(_resp_queue.pop_with_timed_wait(resp_buff, _timeout));
+                pkt = resp_buff.data;
+                packet_info.num_packet_words32 = sizeof(resp_buff)/sizeof(boost::uint32_t);
             }
 
             //parse the buffer
-            const boost::uint32_t *pkt = buff->cast<const boost::uint32_t *>();
-            vrt::if_packet_info_t packet_info;
-            packet_info.link_type = vrt::if_packet_info_t::LINK_TYPE_VRLP;
-            packet_info.num_packet_words32 = buff->size()/sizeof(boost::uint32_t);
             try
             {
-                vrt::if_hdr_unpack_be(pkt, packet_info);
+                packet_info.link_type = _link_type;
+                if (_bige) vrt::if_hdr_unpack_be(pkt, packet_info);
+                else vrt::if_hdr_unpack_le(pkt, packet_info);
             }
             catch(const std::exception &ex)
             {
-                UHD_MSG(error) << "B250 ctrl bad VITA packet: " << ex.what() << std::endl;
+                UHD_MSG(error) << "Radio ctrl bad VITA packet: " << ex.what() << std::endl;
                 UHD_VAR(buff->size());
                 UHD_MSG(status) << std::hex << pkt[0] << std::dec << std::endl;
                 UHD_MSG(status) << std::hex << pkt[1] << std::dec << std::endl;
@@ -214,7 +246,7 @@ private:
                 UHD_ASSERT_THROW(packet_info.sid == boost::uint32_t((_sid >> 16) | (_sid << 16)));
                 UHD_ASSERT_THROW(packet_info.packet_count == (seq_to_ack & 0xfff));
                 UHD_ASSERT_THROW(packet_info.num_payload_words32 == 2);
-                UHD_ASSERT_THROW(packet_info.packet_type == vrt::if_packet_info_t::PACKET_TYPE_CONTEXT);
+                UHD_ASSERT_THROW(packet_info.packet_type == _packet_type);
             }
             catch(const std::exception &ex)
             {
@@ -224,15 +256,32 @@ private:
             //return the readback value
             if (readback and _outstanding_seqs.empty())
             {
-                const boost::uint64_t hi = uhd::ntohx(pkt[packet_info.num_header_words32+0]);
-                const boost::uint64_t lo = uhd::ntohx(pkt[packet_info.num_header_words32+1]);
+                const boost::uint64_t hi = (_bige)? uhd::ntohx(pkt[packet_info.num_header_words32+0]) : uhd::wtohx(pkt[packet_info.num_header_words32+0]);
+                const boost::uint64_t lo = (_bige)? uhd::ntohx(pkt[packet_info.num_header_words32+1]) : uhd::wtohx(pkt[packet_info.num_header_words32+1]);
                 return ((hi << 32) | lo);
             }
         }
         return 0;
     }
 
-    zero_copy_if::sptr _xport;
+    void push_response(const boost::uint32_t *buff)
+    {
+        resp_buff_type resp_buff;
+        std::memcpy(resp_buff.data, buff, sizeof(resp_buff));
+        _resp_queue.push_with_haste(resp_buff);
+    }
+
+    void hold_task(boost::shared_ptr<void> task)
+    {
+        _async_task = task;
+    }
+
+    const vrt::if_packet_info_t::link_type_t _link_type;
+    const vrt::if_packet_info_t::packet_type_t _packet_type;
+    const bool _bige;
+    const uhd::transport::zero_copy_if::sptr _ctrl_xport;
+    const uhd::transport::zero_copy_if::sptr _resp_xport;
+    boost::shared_ptr<void> _async_task;
     const boost::uint32_t _sid;
     const std::string _name;
     boost::mutex _mutex;
@@ -242,10 +291,21 @@ private:
     double _tick_rate;
     double _timeout;
     std::queue<size_t> _outstanding_seqs;
+    struct resp_buff_type
+    {
+        boost::uint32_t data[8];
+    };
+    bounded_buffer<resp_buff_type> _resp_queue;
 };
 
 
-b250_ctrl::sptr b250_ctrl::make(zero_copy_if::sptr xport, const boost::uint32_t sid, const std::string &name)
+radio_ctrl_core_3000::sptr radio_ctrl_core_3000::make(
+    vrt::if_packet_info_t::link_type_t link_type,
+    zero_copy_if::sptr ctrl_xport,
+    zero_copy_if::sptr resp_xport,
+    const boost::uint32_t sid,
+    const std::string &name
+)
 {
-    return sptr(new b250_ctrl_impl(xport, sid, name));
+    return sptr(new radio_ctrl_core_3000_impl(link_type, ctrl_xport, resp_xport, sid, name));
 }

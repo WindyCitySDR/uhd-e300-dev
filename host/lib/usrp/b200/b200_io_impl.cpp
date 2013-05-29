@@ -147,7 +147,7 @@ void b200_impl::handle_async_task(uhd::transport::zero_copy_if::sptr xport, boos
     //if the packet is a control response
     if (sid == B200_RESP_MSG_SID)
     {
-        _ctrl->push_resp(buff->cast<const boost::uint32_t *>());
+        _ctrl->push_response(buff->cast<const boost::uint32_t *>());
         return;
     }
 

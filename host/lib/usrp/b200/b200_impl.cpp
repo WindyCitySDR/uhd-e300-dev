@@ -246,9 +246,10 @@ b200_impl::b200_impl(const device_addr_t &device_addr)
     ////////////////////////////////////////////////////////////////////
     // Initialize control (settings regs and async messages)
     ////////////////////////////////////////////////////////////////////
-    _ctrl = b200_ctrl::make(_ctrl_transport, _async_task);
-    _tree->create<time_spec_t>(mb_path / "time/cmd")
-        .subscribe(boost::bind(&b200_ctrl::set_time, _ctrl, _1));
+    _ctrl = radio_ctrl_core_3000::make(vrt::if_packet_info_t::LINK_TYPE_CHDR, _ctrl_transport, zero_copy_if::sptr()/*null*/, B200_CTRL_MSG_SID);
+    _ctrl->hold_task(_async_task);
+    _tree->create<time_spec_t>(mb_path / "time" / "cmd")
+        .subscribe(boost::bind(&radio_ctrl_core_3000::set_time, _ctrl, _1));
     /*
     this->check_fpga_compat(); //check after making
     */

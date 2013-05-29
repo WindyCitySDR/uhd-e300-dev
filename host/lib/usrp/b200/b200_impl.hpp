@@ -19,13 +19,13 @@
 #define INCLUDED_B200_IMPL_HPP
 
 #include "b200_iface.hpp"
-#include "b200_ctrl.hpp"
 #include "ad9361_ctrl.hpp"
 #include "adf4001_ctrl.hpp"
 #include "rx_vita_core_3000.hpp"
 #include "tx_vita_core_3000.hpp"
 #include "time_core_3000.hpp"
 #include "gpio_core_200.hpp"
+#include "radio_ctrl_core_3000.hpp"
 #include <uhd/device.hpp>
 #include <uhd/property_tree.hpp>
 #include <uhd/utils/pimpl.hpp>
@@ -76,7 +76,7 @@ struct b200_impl : public uhd::device
 
     //controllers
     b200_iface::sptr _iface;
-    b200_ctrl::sptr _ctrl;
+    radio_ctrl_core_3000::sptr _ctrl;
     ad9361_ctrl::sptr _codec_ctrl;
     rx_vita_core_3000::sptr _rx_framer;
     tx_vita_core_3000::sptr _tx_deframer;

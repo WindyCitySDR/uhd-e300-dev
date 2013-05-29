@@ -27,7 +27,6 @@
 #include "wb_iface.hpp"
 #include "b250_clock_ctrl.hpp"
 #include "b250_fw_common.h"
-#include "b250_ctrl.hpp"
 #include "b250_fw_ctrl.hpp"
 #include <uhd/transport/udp_zero_copy.hpp>
 #include "spi_core_3000.hpp"
@@ -39,6 +38,7 @@
 #include "rx_dsp_core_3000.hpp"
 #include "tx_dsp_core_3000.hpp"
 #include "i2c_core_100_wb32.hpp"
+#include "radio_ctrl_core_3000.hpp"
 #include "gpio_core_200.hpp"
 #include <boost/weak_ptr.hpp>
 #include <uhd/usrp/gps_ctrl.hpp>
@@ -125,7 +125,7 @@ struct b250_impl : public uhd::device
     //perifs in the radio core
     struct radio_perifs_t
     {
-        b250_ctrl::sptr ctrl;
+        radio_ctrl_core_3000::sptr ctrl;
         spi_core_3000::sptr spi;
         b250_adc_ctrl::sptr adc;
         b250_dac_ctrl::sptr dac;
