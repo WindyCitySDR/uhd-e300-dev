@@ -208,7 +208,7 @@ private:
                 }
                 catch(const std::exception &ex)
                 {
-                    throw uhd::io_error(str(boost::format("b250 ctrl (%s) no response packet - %s") % _name % ex.what()));
+                    throw uhd::io_error(str(boost::format("Radio ctrl (%s) no response packet - %s") % _name % ex.what()));
                 }
                 pkt = buff->cast<const boost::uint32_t *>();
                 packet_info.num_packet_words32 = buff->size()/sizeof(boost::uint32_t);
@@ -250,7 +250,7 @@ private:
             }
             catch(const std::exception &ex)
             {
-                throw uhd::io_error(str(boost::format("b250 ctrl (%s) packet parse error - %s") % _name % ex.what()));
+                throw uhd::io_error(str(boost::format("Radio ctrl (%s) packet parse error - %s") % _name % ex.what()));
             }
 
             //return the readback value
