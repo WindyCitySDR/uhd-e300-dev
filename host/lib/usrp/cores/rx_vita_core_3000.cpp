@@ -74,7 +74,7 @@ struct rx_vita_core_3000_impl : rx_vita_core_3000
 
     void issue_stream_command(const uhd::stream_cmd_t &stream_cmd)
     {
-        if (not _is_setup) throw uhd::runtime_error(str(boost::format("rx vita core 3000 issue stream command - not setup yet! base: %d") % _base));
+        if (not _is_setup) throw uhd::runtime_error("rx vita core 3000 issue stream command - not setup yet!");
         UHD_ASSERT_THROW(stream_cmd.num_samps <= 0x0fffffff);
         _continuous_streaming = stream_cmd.stream_mode == stream_cmd_t::STREAM_MODE_START_CONTINUOUS;
 
