@@ -431,7 +431,7 @@ void print_vita_header( struct pbuf_info *packet_buffer, struct in_addr *host_ad
 	      else
 		radio_response = (struct radio_response *)(packet_buffer->current->payload+ETH_SIZE+IP_SIZE+UDP_SIZE+VRLP_SIZE+VRT_SIZE);
 	      
-	      fprintf(stdout,"Radio Response = 0x%08x",radio_response->data);
+	      fprintf(stdout,"Radio Response = 0x%016lx",swaplong(radio_response->data));
 	    }
 	}  
     }

@@ -142,7 +142,7 @@ struct radio_ctrl_payload {
 };
 
 struct radio_response {
-  u32 data;
+  u64 data;
 };
 
 struct tx_response {

@@ -6,7 +6,7 @@ OBJECTS = uhd_dump.o
 
 CFLAGS = -g -O0 -Wall
 
-LDFLAGS = -lpcap -lm
+LDFLAGS = -lpcap -lm -L/usr/lib/x86_64-linux-gnu
 
 CC = cc
 
