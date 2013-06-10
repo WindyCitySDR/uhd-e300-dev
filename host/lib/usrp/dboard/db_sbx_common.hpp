@@ -100,7 +100,7 @@ using namespace boost::assign;
  * The SBX dboard constants
  **********************************************************************/
 static const freq_range_t sbx_freq_range(400e6, 4.4e9);
-static const freq_range_t cbx_freq_range(2000e6, 6.0e9);
+static const freq_range_t cbx_freq_range(1200e6, 6.0e9);
 
 static const freq_range_t sbx_tx_lo_2dbm = list_of
     (range_t(0.35e9, 0.37e9))

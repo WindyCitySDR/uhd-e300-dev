@@ -1,5 +1,5 @@
-
-# Copyright 2010-2011,2013 Ettus Research LLC
+#
+# Copyright 2013 Ettus Research LLC
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -15,23 +15,7 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
 
-
-ADD_SUBDIRECTORY(transport)
-ADD_SUBDIRECTORY(types)
-ADD_SUBDIRECTORY(usrp)
-ADD_SUBDIRECTORY(utils)
-
-UHD_INSTALL(FILES
-    config.hpp
-    convert.hpp
-    deprecated.hpp
-    device.hpp
-    device_deprecated.ipp
-    exception.hpp
-    property_tree.ipp
-    property_tree.hpp
-    stream.hpp
-    version.hpp
-    DESTINATION ${INCLUDE_DIR}/uhd
-    COMPONENT headers
-)
+########################################################################
+FIND_PROGRAM(GZIP_EXECUTABLE NAMES gzip)
+INCLUDE(FindPackageHandleStandardArgs)
+FIND_PACKAGE_HANDLE_STANDARD_ARGS(GZip DEFAULT_MSG GZIP_EXECUTABLE)

@@ -1,5 +1,5 @@
 #
-# Copyright 2010-2012 Ettus Research LLC
+# Copyright 2010-2013 Ettus Research LLC
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -45,6 +45,10 @@ FIND_PACKAGE(Docutils)
 
 LIBUHD_REGISTER_COMPONENT("Manual" ENABLE_MANUAL ON "DOCUTILS_FOUND" OFF)
 
+IF(UHDHOST_PKG)
+    SET(PKG_DOC_DIR share/doc/uhd-host)
+ENDIF(UHDHOST_PKG)
+
 IF(ENABLE_MANUAL)
     #setup rst2html options
     SET(stylesheet ${CMAKE_CURRENT_SOURCE_DIR}/style.css)
@@ -69,14 +73,13 @@ IF(ENABLE_MANUAL)
 
         #make the manual target depend on the html file
         LIST(APPEND manual_html_files ${htmlfile})
-        INSTALL(FILES ${htmlfile} DESTINATION ${PKG_DOC_DIR}/manual/html COMPONENT manual)
+        UHD_INSTALL(FILES ${htmlfile} DESTINATION ${PKG_DOC_DIR}/manual/html COMPONENT manual)
     ENDFOREACH(rstfile ${manual_sources})
 
     #make the html manual a build-time dependency
     ADD_CUSTOM_TARGET(manual_html ALL DEPENDS ${manual_html_files})
+    UHD_INSTALL(FILES ${manual_sources} DESTINATION ${PKG_DOC_DIR}/manual/rst COMPONENT manual)
 ENDIF(ENABLE_MANUAL)
-
-INSTALL(FILES ${manual_sources} DESTINATION ${PKG_DOC_DIR}/manual/rst COMPONENT manual)
 
 ########################################################################
 # Setup Doxygen
@@ -85,6 +88,10 @@ MESSAGE(STATUS "")
 FIND_PACKAGE(Doxygen)
 
 LIBUHD_REGISTER_COMPONENT("Doxygen" ENABLE_DOXYGEN ON "DOXYGEN_FOUND" OFF)
+
+IF(LIBUHDDEV_PKG)
+    SET(PKG_DOC_DIR share/doc/libuhd-dev)
+ENDIF(LIBUHDDEV_PKG)
 
 IF(ENABLE_DOXYGEN)
     #generate the doxygen configuration file
@@ -104,5 +111,51 @@ IF(ENABLE_DOXYGEN)
 
     #make the doxygen generation a built-time dependency
     ADD_CUSTOM_TARGET(doxygen_docs ALL DEPENDS ${CMAKE_CURRENT_BINARY_DIR_DOXYGEN})
-    INSTALL(DIRECTORY ${CMAKE_CURRENT_BINARY_DIR_DOXYGEN} DESTINATION ${PKG_DOC_DIR} COMPONENT doxygen)
+    UHD_INSTALL(DIRECTORY ${CMAKE_CURRENT_BINARY_DIR_DOXYGEN} DESTINATION ${PKG_DOC_DIR} COMPONENT doxygen)
 ENDIF(ENABLE_DOXYGEN)
+
+########################################################################
+# List of man page sources
+########################################################################
+
+SET(man_page_sources
+    uhd_cal_rx_iq_balance.1
+    uhd_cal_tx_dc_offset.1
+    uhd_cal_tx_iq_balance.1
+    uhd_find_devices.1
+    uhd_images_downloader.1
+    uhd_usrp_probe.1
+    usrp_n2xx_simple_net_burner.1
+    usrp2_card_burner.1
+)
+
+########################################################################
+# Setup man pages
+########################################################################
+MESSAGE(STATUS "")
+FIND_PACKAGE(GZip)
+
+LIBUHD_REGISTER_COMPONENT("Man Pages" ENABLE_MAN_PAGES ON "GZIP_FOUND;LINUX" OFF)
+
+IF(ENABLE_MAN_PAGES)
+    #Generate man pages
+    FOREACH(manfile ${man_page_sources})
+        #make the gzip file depend on the text file
+        STRING(REPLACE ".1" "" PROGRAM_NAME "${manfile}")
+        SET(gzfile "${CMAKE_CURRENT_BINARY_DIR}/${manfile}.gz")
+        SET(manfile "${CMAKE_CURRENT_SOURCE_DIR}/${manfile}")
+        ADD_CUSTOM_COMMAND(
+            OUTPUT ${gzfile}
+            DEPENDS ${manfile}
+            COMMAND ${GZIP_EXECUTABLE} -9 -cf ${manfile} > ${gzfile}
+            COMMENT "Generating ${PROGRAM_NAME} man page"
+        )
+
+        #make the man page target depend on the gz file
+        LIST(APPEND man_page_gz_files ${gzfile})
+        UHD_INSTALL(FILES ${gzfile} DESTINATION ${PKG_MAN_DIR} COMPONENT manpages)
+    ENDFOREACH(manfile ${man_page_sources})
+
+    #make the man pages a build-time dependency
+    ADD_CUSTOM_TARGET(man_page_gzips ALL DEPENDS ${man_page_gz_files})
+ENDIF(ENABLE_MAN_PAGES)
