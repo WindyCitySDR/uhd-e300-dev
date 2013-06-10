@@ -34,7 +34,6 @@ using namespace uhd::transport;
 
 static const double ACK_TIMEOUT = 0.5;
 static const double MASSIVE_TIMEOUT = 10.0; //for when we wait on a timed command
-static const size_t RESP_QUEUE_SIZE = 2;
 static const size_t SR_READBACK  = 32;
 
 class radio_ctrl_core_3000_impl : public radio_ctrl_core_3000
@@ -57,7 +56,8 @@ public:
         _name(name),
         _seq_out(0),
         _timeout(ACK_TIMEOUT),
-        _resp_queue(RESP_QUEUE_SIZE)
+        _resp_queue(128/*max response msgs*/),
+        _resp_queue_size(_resp_xport? _resp_xport->get_num_recv_frames() : 3)
     {
         UHD_LOG << "radio_ctrl_core_3000_impl() " << _name << std::endl;
         if (resp_xport)
@@ -182,7 +182,7 @@ private:
 
     UHD_INLINE boost::uint64_t wait_for_ack(const bool readback)
     {
-        while (readback or (_outstanding_seqs.size() >= RESP_QUEUE_SIZE))
+        while (readback or (_outstanding_seqs.size() >= _resp_queue_size))
         {
             UHD_LOGV(always) << _name << " wait_for_ack: " << "readback = " << readback << " outstanding_seqs.size() " << _outstanding_seqs.size() << std::endl;
 
@@ -296,6 +296,7 @@ private:
         boost::uint32_t data[8];
     };
     bounded_buffer<resp_buff_type> _resp_queue;
+    const size_t _resp_queue_size;
 };
 
 
