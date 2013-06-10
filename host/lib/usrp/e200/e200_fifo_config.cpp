@@ -281,7 +281,7 @@ struct e200_fifo_interface_impl : e200_fifo_interface
         UHD_VAR(config.ctrl_length);
         UHD_VAR(config.buff_length);
         UHD_VAR(config.phys_addr);
-        void *buff = ::mmap(NULL, config.ctrl_length + config.buff_length, PROT_READ|PROT_WRITE, MAP_SHARED, fd, 0);
+        buff = ::mmap(NULL, config.ctrl_length + config.buff_length, PROT_READ|PROT_WRITE, MAP_SHARED, fd, 0);
         if (buff == MAP_FAILED)
         {
             ::close(fd);
