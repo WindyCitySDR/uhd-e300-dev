@@ -18,6 +18,7 @@
 #include "e200_impl.hpp"
 #include "e200_regs.hpp"
 #include <uhd/utils/msg.hpp>
+#include <uhd/utils/log.hpp>
 #include <uhd/utils/static.hpp>
 #include <uhd/utils/images.hpp>
 #include <uhd/usrp/dboard_eeprom.hpp>
@@ -42,6 +43,7 @@ namespace asio = boost::asio;
  **********************************************************************/
 static device_addrs_t e200_find(const device_addr_t &hint)
 {
+    UHD_LOG << "e200_find with hint " << hint.to_pp_string() << std::endl;
     device_addrs_t e200_addrs;
 
     //return an empty list of addresses when type is set to non-e200
@@ -50,6 +52,7 @@ static device_addrs_t e200_find(const device_addr_t &hint)
     // need network discovery that takes addr
     if (hint.has_key("addr")) try
     {
+        UHD_LOG << "e200_find try network discovery..." << std::endl;
         asio::io_service io_service;
         asio::ip::udp::resolver resolver(io_service);
         asio::ip::udp::resolver::query query(asio::ip::udp::v4(), hint["addr"], E200_SERVER_CODEC_PORT);
@@ -64,9 +67,13 @@ static device_addrs_t e200_find(const device_addr_t &hint)
         new_addr["type"] = "e200";
         new_addr["addr"] = hint["addr"];
         e200_addrs.push_back(new_addr);
+        UHD_LOG << "e200_find network discovery good " << new_addr.to_pp_string() << std::endl;
         return e200_addrs;
     }
-    catch(...){}
+    catch(...)
+    {
+        UHD_LOG << "e200_find network discovery threw" << std::endl;
+    }
 
     //device node not provided, assume its 0
     if (not hint.has_key("node"))
@@ -101,6 +108,7 @@ static device_addrs_t e200_find(const device_addr_t &hint)
  **********************************************************************/
 static device::sptr e200_make(const device_addr_t &device_addr)
 {
+    UHD_LOG << "e200_make with args " << device_addr.to_pp_string() << std::endl;
     return device::sptr(new e200_impl(device_addr));
 }
 
