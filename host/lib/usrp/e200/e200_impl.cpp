@@ -41,8 +41,11 @@ namespace asio = boost::asio;
 /***********************************************************************
  * Discovery
  **********************************************************************/
-static device_addrs_t e200_find(const device_addr_t &hint)
+static device_addrs_t e200_find(const device_addr_t &hint_)
 {
+    //we only do single device discovery for now
+    const device_addr_t hint = separate_device_addr(hint_).at(0);
+
     UHD_LOG << "e200_find with hint " << hint.to_pp_string() << std::endl;
     device_addrs_t e200_addrs;
 

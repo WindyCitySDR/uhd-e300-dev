@@ -71,8 +71,11 @@ static device_addrs_t b250_find_with_addr(const device_addr_t &dev_addr)
     return addrs;
 }
 
-static device_addrs_t b250_find(const device_addr_t &hint)
+static device_addrs_t b250_find(const device_addr_t &hint_)
 {
+    //we only do single device discovery for now
+    const device_addr_t hint = separate_device_addr(hint_).at(0);
+
     device_addrs_t addrs;
     if (hint.has_key("type") and hint["type"] != "b250") return addrs;
 
