@@ -20,6 +20,7 @@
 
 #include <uhd/types/device_addr.hpp>
 #include <uhd/transport/zero_copy.hpp>
+#include <boost/enable_shared_from_this.hpp>
 
 struct e200_fifo_config_t
 {
@@ -30,7 +31,7 @@ struct e200_fifo_config_t
 
 e200_fifo_config_t e200_read_sysfs(void);
 
-struct e200_fifo_interface
+struct e200_fifo_interface : boost::enable_shared_from_this<e200_fifo_interface>
 {
     typedef boost::shared_ptr<e200_fifo_interface> sptr;
     static sptr make(const e200_fifo_config_t &config);

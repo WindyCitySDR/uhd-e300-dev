@@ -164,8 +164,20 @@ template <typename BaseClass>
 struct e200_transport : zero_copy_if
 {
 
-    e200_transport(const __mem_addrz_t &addrs, const size_t num_frames, const size_t frame_size, e200_fifo_poll_waiter *waiter, const bool auto_release):
-        _addrs(addrs), _num_frames(num_frames), _frame_size(frame_size), _index(0), _waiter(waiter)
+    e200_transport(
+        boost::shared_ptr<void> allocator,
+        const __mem_addrz_t &addrs,
+        const size_t num_frames,
+        const size_t frame_size,
+        e200_fifo_poll_waiter *waiter,
+        const bool auto_release
+    ):
+        _allocator(allocator),
+        _addrs(addrs),
+        _num_frames(num_frames),
+        _frame_size(frame_size),
+        _index(0),
+        _waiter(waiter)
     {
         UHD_MSG(status) << boost::format("phys 0x%x") % addrs.phys << std::endl;
         UHD_MSG(status) << boost::format("data 0x%x") % addrs.data << std::endl;
@@ -250,6 +262,7 @@ struct e200_transport : zero_copy_if
         return _frame_size;
     }
 
+    boost::shared_ptr<void> _allocator;
     const __mem_addrz_t _addrs;
     const size_t _num_frames;
     const size_t _frame_size;
@@ -302,13 +315,9 @@ struct e200_fifo_interface_impl : e200_fifo_interface
     ~e200_fifo_interface_impl(void)
     {
         delete waiter;
-        UHD_HERE();
         UHD_LOG << "cleanup: munmap" << std::endl;
-        UHD_HERE();
         ::munmap(buff, config.ctrl_length + config.buff_length);
-        UHD_HERE();
         ::close(fd);
-        UHD_HERE();
     }
 
     uhd::transport::zero_copy_if::sptr make_xport(const size_t which_stream, const uhd::device_addr_t &args, const bool is_recv)
@@ -326,8 +335,8 @@ struct e200_fifo_interface_impl : e200_fifo_interface
         addrs.ctrl = ((is_recv)? S2H_BASE(ctrl_space) : H2S_BASE(ctrl_space)) + ZF_STREAM_OFF(which_stream);
 
         uhd::transport::zero_copy_if::sptr xport;
-        if (is_recv) xport.reset(new e200_transport<managed_recv_buffer>(addrs, num_frames, frame_size, waiter, is_recv));
-        else         xport.reset(new e200_transport<managed_send_buffer>(addrs, num_frames, frame_size, waiter, is_recv));
+        if (is_recv) xport.reset(new e200_transport<managed_recv_buffer>(shared_from_this(), addrs, num_frames, frame_size, waiter, is_recv));
+        else         xport.reset(new e200_transport<managed_send_buffer>(shared_from_this(), addrs, num_frames, frame_size, waiter, is_recv));
 
         bytes_in_use += num_frames*frame_size;
         entries_in_use += num_frames;
