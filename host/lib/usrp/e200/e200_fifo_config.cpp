@@ -45,8 +45,9 @@
 #define ARBITER_RB_SIZE_SPACE 28
 
 //helper macros to determine config addrs
-#define H2S_BASE(base) (size_t(base) + (ZF_PAGE_SIZE*1))
 #define S2H_BASE(base) (size_t(base) + (ZF_PAGE_SIZE*0))
+#define H2S_BASE(base) (size_t(base) + (ZF_PAGE_SIZE*1))
+#define DST_BASE(base) (size_t(base) + (ZF_PAGE_SIZE*2))
 #define ZF_STREAM_OFF(which) ((which)*32)
 
 #include <boost/cstdint.hpp>
@@ -344,6 +345,13 @@ struct e200_fifo_interface_impl : e200_fifo_interface
         UHD_ASSERT_THROW(recv_entries_in_use <= S2H_NUM_CMDS);
         UHD_ASSERT_THROW(send_entries_in_use <= H2S_NUM_CMDS);
         UHD_ASSERT_THROW(bytes_in_use <= config.buff_length);
+
+        //program the dest table based on the stream
+        //TODO make this part of SID allocation
+        if (is_recv)
+        {
+            zf_poke32(DST_BASE(ctrl_space) + which_stream*4, which_stream);
+        }
 
         return xport;
     }
