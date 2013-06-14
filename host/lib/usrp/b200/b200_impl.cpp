@@ -182,12 +182,8 @@ UHD_STATIC_BLOCK(register_b200_device)
  **********************************************************************/
 b200_impl::b200_impl(const device_addr_t &device_addr)
 {
-    //extract the FPGA path for the B200
-    std::string b200_fpga_image = find_image_path(
-        device_addr.has_key("fpga")? device_addr["fpga"] : B200_FPGA_FILE_NAME
-    );
-
     _tree = property_tree::make();
+    const fs_path mb_path = "/mboards/0";
 
     //try to match the given device address with something on the USB bus
     std::vector<usb_device_handle::sptr> device_list =
@@ -209,8 +205,36 @@ b200_impl::b200_impl(const device_addr_t &device_addr)
     this->check_fw_compat(); //check after making
 
     ////////////////////////////////////////////////////////////////////
+    // setup the mboard eeprom
+    ////////////////////////////////////////////////////////////////////
+    const mboard_eeprom_t mb_eeprom(*_iface, "B200");
+    _tree->create<mboard_eeprom_t>(mb_path / "eeprom")
+        .set(mb_eeprom)
+        .subscribe(boost::bind(&b200_impl::set_mb_eeprom, this, _1));
+
+    ////////////////////////////////////////////////////////////////////
     // Load the FPGA image, then reset GPIF
     ////////////////////////////////////////////////////////////////////
+    std::string default_file_name;
+    if (not mb_eeprom["product"].empty())
+    {
+        switch (boost::lexical_cast<boost::uint16_t>(mb_eeprom["product"]))
+        {
+        case 0x0001: default_file_name = B200_FPGA_FILE_NAME; break;
+        case 0x0002: default_file_name = B210_FPGA_FILE_NAME; break;
+        default: throw uhd::runtime_error("b200 unknown product code: " + mb_eeprom["product"]);
+        }
+    }
+    if (default_file_name.empty())
+    {
+        UHD_ASSERT_THROW(device_addr.has_key("fpga"));
+    }
+
+    //extract the FPGA path for the B200
+    std::string b200_fpga_image = find_image_path(
+        device_addr.has_key("fpga")? device_addr["fpga"] : default_file_name
+    );
+
     _iface->load_fpga(b200_fpga_image);
     ad9361_ctrl::make(_iface); //radio clock on before global reset
     _iface->reset_gpif();
@@ -247,7 +271,6 @@ b200_impl::b200_impl(const device_addr_t &device_addr)
     // Initialize the properties tree
     ////////////////////////////////////////////////////////////////////
     _tree->create<std::string>("/name").set("B-Series Device");
-    const fs_path mb_path = "/mboards/0";
     _tree->create<std::string>(mb_path / "name").set("B200");
     _tree->create<std::string>(mb_path / "codename").set("Sasquatch");
     _tree->create<std::string>(mb_path / "fpga_version").set("1.0");
@@ -284,14 +307,6 @@ b200_impl::b200_impl(const device_addr_t &device_addr)
         data_xport_args    // param hints
     );
     while (_data_transport->get_recv_buff(0.0)){} //flush ctrl xport
-
-    ////////////////////////////////////////////////////////////////////
-    // setup the mboard eeprom
-    ////////////////////////////////////////////////////////////////////
-    mboard_eeprom_t mb_eeprom(*_iface, "B200");
-    _tree->create<mboard_eeprom_t>(mb_path / "eeprom")
-        .set(mb_eeprom)
-        .subscribe(boost::bind(&b200_impl::set_mb_eeprom, this, _1));
 
     ////////////////////////////////////////////////////////////////////
     // create gpio and misc controls
