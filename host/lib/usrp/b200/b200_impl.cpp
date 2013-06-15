@@ -264,8 +264,9 @@ b200_impl::b200_impl(const device_addr_t &device_addr)
         ctrl_xport_args
     );
     while (_ctrl_transport->get_recv_buff(0.0)){} //flush ctrl xport
+    _gpsdo_uart = b200_uart::make(_ctrl_transport, B200_TX_GPS_UART_SID);
     _async_md.reset(new async_md_type(1000/*messages deep*/));
-    _async_task = uhd::task::make(boost::bind(&b200_impl::handle_async_task, this, _ctrl_transport, _async_md));
+    _async_task = uhd::task::make(boost::bind(&b200_impl::handle_async_task, this, _ctrl_transport, _async_md, _gpsdo_uart));
 
     ////////////////////////////////////////////////////////////////////
     // Initialize the properties tree

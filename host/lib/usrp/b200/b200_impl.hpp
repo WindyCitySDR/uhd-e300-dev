@@ -19,6 +19,7 @@
 #define INCLUDED_B200_IMPL_HPP
 
 #include "b200_iface.hpp"
+#include "b200_uart.hpp"
 #include "ad9361_ctrl.hpp"
 #include "adf4001_ctrl.hpp"
 #include "rx_vita_core_3000.hpp"
@@ -53,6 +54,8 @@ static const boost::uint32_t B200_RESP_MSG_SID = 0x00000001;
 static const boost::uint32_t B200_TX_DATA_SID_BASE = 0x00020000;
 static const boost::uint32_t B200_TX_MSG_SID_BASE = 0x00000002;
 static const boost::uint32_t B200_RX_DATA_SID_BASE = 0x00040000;
+static const boost::uint32_t B200_TX_GPS_UART_SID = 0x00000100;
+static const boost::uint32_t B200_RX_GPS_UART_SID = 0x01000000;
 static const size_t          B200_NUM_RX_FE = 2;
 static const size_t          B200_NUM_TX_FE = 2;
 
@@ -77,6 +80,7 @@ struct b200_impl : public uhd::device
 
     //controllers
     b200_iface::sptr _iface;
+    b200_uart::sptr _gpsdo_uart;
     radio_ctrl_core_3000::sptr _ctrl;
     ad9361_ctrl::sptr _codec_ctrl;
     rx_vita_core_3000::sptr _rx_framer;
@@ -104,7 +108,7 @@ struct b200_impl : public uhd::device
     uhd::task::sptr _async_task;
     typedef uhd::transport::bounded_buffer<uhd::async_metadata_t> async_md_type;
     boost::shared_ptr<async_md_type> _async_md;
-    void handle_async_task(uhd::transport::zero_copy_if::sptr, boost::shared_ptr<async_md_type>);
+    void handle_async_task(uhd::transport::zero_copy_if::sptr, boost::shared_ptr<async_md_type>, b200_uart::sptr);
 
     void issue_stream_cmd(const size_t dspno, const uhd::stream_cmd_t &);
 

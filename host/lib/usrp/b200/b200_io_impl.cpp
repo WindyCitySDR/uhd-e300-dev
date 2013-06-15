@@ -138,7 +138,11 @@ bool b200_impl::recv_async_msg(
     return _async_md->pop_with_timed_wait(async_metadata, timeout);
 }
 
-void b200_impl::handle_async_task(uhd::transport::zero_copy_if::sptr xport, boost::shared_ptr<async_md_type> async_md)
+void b200_impl::handle_async_task(
+    uhd::transport::zero_copy_if::sptr xport,
+    boost::shared_ptr<async_md_type> async_md,
+    b200_uart::sptr gpsdo_uart
+)
 {
     managed_recv_buffer::sptr buff = xport->get_recv_buff();
     if (not buff or buff->size() < 8) return;
@@ -148,6 +152,13 @@ void b200_impl::handle_async_task(uhd::transport::zero_copy_if::sptr xport, boos
     if (sid == B200_RESP_MSG_SID)
     {
         _ctrl->push_response(buff->cast<const boost::uint32_t *>());
+        return;
+    }
+
+    //if the packet is a uart message
+    if (sid == B200_RX_GPS_UART_SID)
+    {
+        gpsdo_uart->handle_uart_packet(buff);
         return;
     }
 
