@@ -710,7 +710,6 @@ void b200_impl::update_clock_source(const std::string &source)
         throw uhd::key_error("update_clock_source: unknown source: " + source);
     }
 
-    _gpio_state.gps_out_enable = (source == "gpsdo_out")? 0 : 1;
     _gpio_state.gps_ref_enable = (source == "gpsdo")? 0 : 1;
     _gpio_state.ext_ref_enable = (source == "external")? 0 : 1;
     this->update_gpio_state();
@@ -778,7 +777,6 @@ void b200_impl::update_gpio_state(void)
         | (_gpio_state.mimo_rx << 4)
         | (_gpio_state.ext_ref_enable << 3)
         | (_gpio_state.pps_fpga_out_enable << 2)
-        | (_gpio_state.gps_out_enable << 1)
         | (_gpio_state.gps_ref_enable << 0)
     ;
 
