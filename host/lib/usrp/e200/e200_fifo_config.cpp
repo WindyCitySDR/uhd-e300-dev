@@ -20,9 +20,9 @@
 // constants coded into the fpga parameters
 #define ZF_CONFIG_BASE 0x40000000
 #define ZF_PAGE_WIDTH 10
-#define H2S_STREAMS_WIDTH 2
+#define H2S_STREAMS_WIDTH 3
 #define H2S_CMDFIFO_DEPTH 10
-#define S2H_STREAMS_WIDTH 2
+#define S2H_STREAMS_WIDTH 3
 #define S2H_CMDFIFO_DEPTH 10
 
 // calculate more useful constants for this module
