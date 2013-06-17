@@ -33,7 +33,8 @@ struct b200_uart_impl : b200_uart
         _count(0),
         _char_queue(1024)
     {
-        //NOP
+        //this default baud divider is over 9000
+        this->set_baud_divider(9001);
     }
 
     void send_char(const char ch)
@@ -58,7 +59,7 @@ struct b200_uart_impl : b200_uart
 
         boost::uint32_t *packet_buff = buff->cast<boost::uint32_t *>();
         vrt::if_hdr_pack_le(packet_buff, packet_info);
-        packet_buff[packet_info.num_header_words32+0] = uhd::htowx(boost::uint32_t(0));
+        packet_buff[packet_info.num_header_words32+0] = uhd::htowx(boost::uint32_t(_baud_div));
         packet_buff[packet_info.num_header_words32+1] = uhd::htowx(boost::uint32_t(ch));
         buff->commit(packet_info.num_packet_words32*sizeof(boost::uint32_t));
     }
@@ -82,8 +83,9 @@ struct b200_uart_impl : b200_uart
             const double to = (exit_time - time_spec_t::get_system_time()).get_real_secs();
             if (_char_queue.pop_with_timed_wait(ch, std::max(to, 0.0)))
             {
+                if (ch == '\r') continue;
                 line += std::string(&ch, 1);
-                if (ch == '\n' or ch == '\r') return line;
+                if (ch == '\n') return line;
             }
             else return line;
         }
@@ -101,9 +103,15 @@ struct b200_uart_impl : b200_uart
         _char_queue.push_with_pop_on_full(ch);
     }
 
+    void set_baud_divider(const double baud_div)
+    {
+        _baud_div = size_t(baud_div + 0.5);
+    }
+
     const zero_copy_if::sptr _xport;
     const boost::uint32_t _sid;
     size_t _count;
+    size_t _baud_div;
     bounded_buffer<char> _char_queue;
 };
 

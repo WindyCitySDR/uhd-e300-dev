@@ -56,6 +56,7 @@ static const boost::uint32_t B200_TX_MSG_SID_BASE = 0x00000002;
 static const boost::uint32_t B200_RX_DATA_SID_BASE = 0x00040000;
 static const boost::uint32_t B200_TX_GPS_UART_SID = 0x00000100;
 static const boost::uint32_t B200_RX_GPS_UART_SID = 0x01000000;
+static const double          B200_BUS_CLOCK_RATE = 100e6;
 static const size_t          B200_NUM_RX_FE = 2;
 static const size_t          B200_NUM_TX_FE = 2;
 
