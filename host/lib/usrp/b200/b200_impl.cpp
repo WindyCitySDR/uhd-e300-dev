@@ -264,8 +264,44 @@ b200_impl::b200_impl(const device_addr_t &device_addr)
         ctrl_xport_args
     );
     while (_ctrl_transport->get_recv_buff(0.0)){} //flush ctrl xport
+    _gpsdo_uart = b200_uart::make(_ctrl_transport, B200_TX_GPS_UART_SID);
+    _gpsdo_uart->set_baud_divider(B200_BUS_CLOCK_RATE/115200);
     _async_md.reset(new async_md_type(1000/*messages deep*/));
-    _async_task = uhd::task::make(boost::bind(&b200_impl::handle_async_task, this, _ctrl_transport, _async_md));
+    _async_task = uhd::task::make(boost::bind(&b200_impl::handle_async_task, this, _ctrl_transport, _async_md, _gpsdo_uart));
+
+    ////////////////////////////////////////////////////////////////////
+    // Create the GPSDO control
+    ////////////////////////////////////////////////////////////////////
+    static const boost::uint32_t dont_look_for_gpsdo = 0x1234abcdul;
+
+    //otherwise if not disabled, look for the internal GPSDO
+    //TODO if (_iface->peekfw(U2_FW_REG_HAS_GPSDO) != dont_look_for_gpsdo)
+    //if (false)
+    {
+        UHD_MSG(status) << "Detecting internal GPSDO.... " << std::flush;
+        try
+        {
+            _gps = gps_ctrl::make(_gpsdo_uart);
+        }
+        catch(std::exception &e)
+        {
+            UHD_MSG(error) << "An error occurred making GPSDO control: " << e.what() << std::endl;
+        }
+        if (_gps and _gps->gps_detected())
+        {
+            UHD_MSG(status) << "found" << std::endl;
+            BOOST_FOREACH(const std::string &name, _gps->get_sensors())
+            {
+                _tree->create<sensor_value_t>(mb_path / "sensors" / name)
+                    .publish(boost::bind(&gps_ctrl::get_sensor, _gps, name));
+            }
+        }
+        else
+        {
+            UHD_MSG(status) << "not found" << std::endl;
+            //TODO _iface->pokefw(U2_FW_REG_HAS_GPSDO, dont_look_for_gpsdo);
+        }
+    }
 
     ////////////////////////////////////////////////////////////////////
     // Initialize the properties tree
@@ -514,6 +550,18 @@ b200_impl::b200_impl(const device_addr_t &device_addr)
 
     _tree->access<std::string>(mb_path / "clock_source/value").set("internal");
     _tree->access<std::string>(mb_path / "time_source/value").set("none");
+
+    //GPS installed: use external ref, time, and init time spec
+    if (_gps and _gps->gps_detected())
+    {
+        UHD_MSG(status) << "Setting references to the internal GPSDO" << std::endl;
+        _tree->access<std::string>(mb_path / "time_source" / "value").set("gpsdo");
+        _tree->access<std::string>(mb_path / "clock_source" / "value").set("gpsdo");
+        UHD_MSG(status) << "Initializing time to the internal GPSDO" << std::endl;
+        const time_t tp = time_t(_gps->get_sensor("gps_time").to_int()+1);
+        _tree->access<time_spec_t>(mb_path / "time" / "pps").set(time_spec_t(tp));
+    }
+
 }
 
 b200_impl::~b200_impl(void)
@@ -662,9 +710,7 @@ void b200_impl::update_clock_source(const std::string &source)
         throw uhd::key_error("update_clock_source: unknown source: " + source);
     }
 
-    _gpio_state.gps_out_enable = (source == "gpsdo_out")? 0 : 1;
-    _gpio_state.gps_ref_enable = (source == "gpsdo")? 0 : 1;
-    _gpio_state.ext_ref_enable = (source == "external")? 0 : 1;
+    _gpio_state.ref_sel = (source == "gpsdo")? 1 : 0;
     this->update_gpio_state();
 }
 
@@ -675,7 +721,6 @@ void b200_impl::update_time_source(const std::string &source)
     else if (source == "gpsdo"){}
     else throw uhd::key_error("update_time_source: unknown source: " + source);
     _time64->set_time_source((source == "external")? "external" : "internal");
-    _gpio_state.pps_fpga_out_enable = 0;
     this->update_gpio_state();
 }
 
@@ -726,12 +771,9 @@ void b200_impl::update_gpio_state(void)
         | (_gpio_state.rx_bandsel_a << 8)
         | (_gpio_state.rx_bandsel_b << 7)
         | (_gpio_state.rx_bandsel_c << 6)
-        | (_gpio_state.mimo_tx << 5)
-        | (_gpio_state.mimo_rx << 4)
-        | (_gpio_state.ext_ref_enable << 3)
-        | (_gpio_state.pps_fpga_out_enable << 2)
-        | (_gpio_state.gps_out_enable << 1)
-        | (_gpio_state.gps_ref_enable << 0)
+        | (_gpio_state.mimo_tx << 2)
+        | (_gpio_state.mimo_rx << 1)
+        | (_gpio_state.ref_sel << 0)
     ;
 
     _ctrl->poke32(TOREG(SR_MISC_OUTS), misc_word);
