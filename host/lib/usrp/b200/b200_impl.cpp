@@ -509,6 +509,45 @@ b200_impl::b200_impl(const device_addr_t &device_addr)
     _tree->access<double>(mb_path / "tick_rate").set(61.44e6/8);
     _codec_ctrl->set_active_chains(false, false, false, false);
 
+    ////////////////////////////////////////////////////////////////////
+    // Create the GPSDO control
+    // FIXME the UART on the GPSDO is 100% non responsive until after the tick rate is set above -- WTF
+    ////////////////////////////////////////////////////////////////////
+    static const boost::uint32_t dont_look_for_gpsdo = 0x1234abcdul;
+
+    _gpsdo_uart->write_uart("GPSDO there?\n");
+    while(_gpsdo_uart->read_uart(1.0).size()){}
+    while(_gpsdo_uart->read_uart(1.0).size()){}
+
+    //otherwise if not disabled, look for the internal GPSDO
+    //TODO if (_iface->peekfw(U2_FW_REG_HAS_GPSDO) != dont_look_for_gpsdo)
+    //if (false)
+    {
+        UHD_MSG(status) << "Detecting internal GPSDO.... " << std::flush;
+        try
+        {
+            _gps = gps_ctrl::make(_gpsdo_uart);
+        }
+        catch(std::exception &e)
+        {
+            UHD_MSG(error) << "An error occurred making GPSDO control: " << e.what() << std::endl;
+        }
+        if (_gps and _gps->gps_detected())
+        {
+            UHD_MSG(status) << "found" << std::endl;
+            BOOST_FOREACH(const std::string &name, _gps->get_sensors())
+            {
+                _tree->create<sensor_value_t>(mb_path / "sensors" / name)
+                    .publish(boost::bind(&gps_ctrl::get_sensor, _gps, name));
+            }
+        }
+        else
+        {
+            UHD_MSG(status) << "not found" << std::endl;
+            //TODO _iface->pokefw(U2_FW_REG_HAS_GPSDO, dont_look_for_gpsdo);
+        }
+    }
+
     //-- this block commented out because we want all chains off by default --//
     //_tree->access<subdev_spec_t>(mb_path / "rx_subdev_spec").set(subdev_spec_t("A:RX2"));
     //_tree->access<subdev_spec_t>(mb_path / "tx_subdev_spec").set(subdev_spec_t("A:TX2"));
@@ -516,6 +555,18 @@ b200_impl::b200_impl(const device_addr_t &device_addr)
 
     _tree->access<std::string>(mb_path / "clock_source/value").set("internal");
     _tree->access<std::string>(mb_path / "time_source/value").set("none");
+
+    //GPS installed: use external ref, time, and init time spec
+    if (_gps and _gps->gps_detected() and _gps->get_sensor("gps_locked").to_bool())
+    {
+        UHD_MSG(status) << "Setting references to the internal GPSDO" << std::endl;
+        _tree->access<std::string>(mb_path / "time_source" / "value").set("gpsdo");
+        _tree->access<std::string>(mb_path / "clock_source" / "value").set("gpsdo");
+        UHD_MSG(status) << "Initializing time to the internal GPSDO" << std::endl;
+        const time_t tp = time_t(_gps->get_sensor("gps_time").to_int()+1);
+        _tree->access<time_spec_t>(mb_path / "time" / "pps").set(time_spec_t(tp));
+    }
+
 }
 
 b200_impl::~b200_impl(void)

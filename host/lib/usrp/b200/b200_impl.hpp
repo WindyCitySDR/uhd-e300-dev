@@ -37,6 +37,7 @@
 #include <uhd/types/stream_cmd.hpp>
 #include <uhd/usrp/mboard_eeprom.hpp>
 #include <uhd/usrp/subdev_spec.hpp>
+#include <uhd/usrp/gps_ctrl.hpp>
 #include <uhd/transport/usb_zero_copy.hpp>
 #include <uhd/transport/bounded_buffer.hpp>
 #include <boost/weak_ptr.hpp>
@@ -91,6 +92,7 @@ struct b200_impl : public uhd::device
     gpio_core_200_32wo::sptr _atr1;
     spi_core_3000::sptr _spi_iface;
     boost::shared_ptr<uhd::usrp::adf4001_ctrl> _adf4001_iface;
+    uhd::gps_ctrl::sptr _gps;
 
     //transports
     uhd::transport::zero_copy_if::sptr _data_transport;

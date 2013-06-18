@@ -19,6 +19,7 @@
 #include <uhd/transport/bounded_buffer.hpp>
 #include <uhd/transport/vrt_if_packet.hpp>
 #include <uhd/utils/byteswap.hpp>
+#include <uhd/utils/msg.hpp>
 #include <uhd/types/time_spec.hpp>
 #include <uhd/exception.hpp>
 
@@ -31,7 +32,7 @@ struct b200_uart_impl : b200_uart
         _xport(xport),
         _sid(sid),
         _count(0),
-        _char_queue(1024)
+        _char_queue(4096)
     {
         //this default baud divider is over 9000
         this->set_baud_divider(9001);
@@ -76,19 +77,14 @@ struct b200_uart_impl : b200_uart
     std::string read_uart(double timeout)
     {
         std::string line;
-        const time_spec_t exit_time = time_spec_t::get_system_time() + time_spec_t(timeout);
-        while (true)
+        char ch = '\0';
+        while (_char_queue.pop_with_timed_wait(ch, timeout))
         {
-            char ch;
-            const double to = (exit_time - time_spec_t::get_system_time()).get_real_secs();
-            if (_char_queue.pop_with_timed_wait(ch, std::max(to, 0.0)))
-            {
-                if (ch == '\r') continue;
-                line += std::string(&ch, 1);
-                if (ch == '\n') return line;
-            }
-            else return line;
+            if (ch == '\r') continue;
+            line += std::string(&ch, 1);
+            if (ch == '\n') return line;
         }
+        return line;
     }
 
     void handle_uart_packet(managed_recv_buffer::sptr buff)
