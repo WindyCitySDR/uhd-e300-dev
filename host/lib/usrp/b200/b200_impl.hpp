@@ -131,7 +131,7 @@ struct b200_impl : public uhd::device
 
     struct gpio_state {
         boost::uint32_t  tx_bandsel_a, tx_bandsel_b, rx_bandsel_a, rx_bandsel_b, rx_bandsel_c;
-        boost::uint32_t  mimo_tx, mimo_rx, ext_ref_enable, pps_fpga_out_enable, gps_ref_enable;
+        boost::uint32_t  mimo_tx, mimo_rx, ref_sel;
 
         gpio_state() {
             tx_bandsel_a = 0;
@@ -141,9 +141,7 @@ struct b200_impl : public uhd::device
             rx_bandsel_c = 0;
             mimo_tx = 0;
             mimo_rx = 0;
-            ext_ref_enable = 0;
-            pps_fpga_out_enable = 0;
-            gps_ref_enable = 0;
+            ref_sel = 0;
         }
     } _gpio_state;
 

@@ -710,8 +710,7 @@ void b200_impl::update_clock_source(const std::string &source)
         throw uhd::key_error("update_clock_source: unknown source: " + source);
     }
 
-    _gpio_state.gps_ref_enable = (source == "gpsdo")? 0 : 1;
-    _gpio_state.ext_ref_enable = (source == "external")? 0 : 1;
+    _gpio_state.ref_sel = (source == "gpsdo")? 1 : 0;
     this->update_gpio_state();
 }
 
@@ -722,7 +721,6 @@ void b200_impl::update_time_source(const std::string &source)
     else if (source == "gpsdo"){}
     else throw uhd::key_error("update_time_source: unknown source: " + source);
     _time64->set_time_source((source == "external")? "external" : "internal");
-    _gpio_state.pps_fpga_out_enable = 0;
     this->update_gpio_state();
 }
 
@@ -773,11 +771,9 @@ void b200_impl::update_gpio_state(void)
         | (_gpio_state.rx_bandsel_a << 8)
         | (_gpio_state.rx_bandsel_b << 7)
         | (_gpio_state.rx_bandsel_c << 6)
-        | (_gpio_state.mimo_tx << 5)
-        | (_gpio_state.mimo_rx << 4)
-        | (_gpio_state.ext_ref_enable << 3)
-        | (_gpio_state.pps_fpga_out_enable << 2)
-        | (_gpio_state.gps_ref_enable << 0)
+        | (_gpio_state.mimo_tx << 2)
+        | (_gpio_state.mimo_rx << 1)
+        | (_gpio_state.ref_sel << 0)
     ;
 
     _ctrl->poke32(TOREG(SR_MISC_OUTS), misc_word);
