@@ -155,6 +155,13 @@ void b200_impl::handle_async_task(
         return;
     }
 
+    //if the packet is a local control response
+    if (sid == B200_LOCAL_RESP_SID)
+    {
+        _local_ctrl->push_response(buff->cast<const boost::uint32_t *>());
+        return;
+    }
+
     //if the packet is a uart message
     if (sid == B200_RX_GPS_UART_SID)
     {

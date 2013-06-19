@@ -24,7 +24,12 @@
 
 #define localparam static const int
 
-localparam SR_SPI           = 8;
+localparam SR_CORE_SPI       = 8;
+localparam SR_CORE_MISC      = 16;
+localparam SR_CORE_COMPAT    = 24;
+localparam RB32_CORE_SPI     = 8;
+localparam RB32_CORE_MISC    = 16;
+
 localparam SR_ATR0          = 12;
 localparam SR_LEDS          = 20;
 localparam SR_TEST          = 21;
@@ -37,7 +42,6 @@ localparam SR_TIME          = 128;
 localparam SR_ATR1          = 144;
 
 localparam RB32_TEST            = 0;
-localparam RB32_SPI             = 4;
 localparam RB64_TIME_NOW        = 8;
 localparam RB64_TIME_PPS        = 16;
 localparam RB64_CODEC_READBACK  = 24;

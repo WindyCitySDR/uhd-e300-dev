@@ -47,7 +47,7 @@ static const std::string     B200_FPGA_FILE_NAME = "usrp_b200_fpga.bin";
 static const std::string     B210_FPGA_FILE_NAME = "usrp_b210_fpga.bin";
 static const boost::uint8_t  B200_FW_COMPAT_NUM_MAJOR = 0x02;
 static const boost::uint8_t  B200_FW_COMPAT_NUM_MINOR = 0x00;
-static const boost::uint16_t B200_FPGA_COMPAT_NUM = 0x09;
+static const boost::uint16_t B200_FPGA_COMPAT_NUM = 0x01;
 static const size_t          B200_MAX_PKT_BYTE_LIMIT = 2048*4;
 static const double          B200_LINK_RATE_BPS = (5e9)/8; //practical link rate (5 Gbps)
 static const boost::uint32_t B200_CTRL_MSG_SID = 0x00000010;
@@ -57,6 +57,8 @@ static const boost::uint32_t B200_TX_MSG_SID_BASE = 0x00000002;
 static const boost::uint32_t B200_RX_DATA_SID_BASE = 0x00040000;
 static const boost::uint32_t B200_TX_GPS_UART_SID = 0x00000030;
 static const boost::uint32_t B200_RX_GPS_UART_SID = (B200_TX_GPS_UART_SID<<16)|(B200_TX_GPS_UART_SID>>16);
+static const boost::uint32_t B200_LOCAL_CTRL_SID = 0x00000040;
+static const boost::uint32_t B200_LOCAL_RESP_SID = (B200_LOCAL_CTRL_SID<<16)|(B200_LOCAL_CTRL_SID>>16);
 static const double          B200_BUS_CLOCK_RATE = 100e6;
 static const size_t          B200_NUM_RX_FE = 2;
 static const size_t          B200_NUM_TX_FE = 2;
@@ -84,6 +86,7 @@ struct b200_impl : public uhd::device
     b200_iface::sptr _iface;
     b200_uart::sptr _gpsdo_uart;
     radio_ctrl_core_3000::sptr _ctrl;
+    radio_ctrl_core_3000::sptr _local_ctrl;
     ad9361_ctrl::sptr _codec_ctrl;
     rx_vita_core_3000::sptr _rx_framer;
     tx_vita_core_3000::sptr _tx_deframer;

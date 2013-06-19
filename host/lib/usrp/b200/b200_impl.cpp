@@ -270,6 +270,13 @@ b200_impl::b200_impl(const device_addr_t &device_addr)
     _async_task = uhd::task::make(boost::bind(&b200_impl::handle_async_task, this, _ctrl_transport, _async_md, _gpsdo_uart));
 
     ////////////////////////////////////////////////////////////////////
+    // Local control endpoint
+    ////////////////////////////////////////////////////////////////////
+    _local_ctrl = radio_ctrl_core_3000::make(vrt::if_packet_info_t::LINK_TYPE_CHDR, _ctrl_transport, zero_copy_if::sptr()/*null*/, B200_LOCAL_CTRL_SID);
+    _local_ctrl->hold_task(_async_task);
+    this->check_fpga_compat();
+
+    ////////////////////////////////////////////////////////////////////
     // Create the GPSDO control
     ////////////////////////////////////////////////////////////////////
     static const boost::uint32_t dont_look_for_gpsdo = 0x1234abcdul;
@@ -309,7 +316,6 @@ b200_impl::b200_impl(const device_addr_t &device_addr)
     _tree->create<std::string>("/name").set("B-Series Device");
     _tree->create<std::string>(mb_path / "name").set("B200");
     _tree->create<std::string>(mb_path / "codename").set("Sasquatch");
-    _tree->create<std::string>(mb_path / "fpga_version").set("1.0");
 
     ////////////////////////////////////////////////////////////////////
     // Initialize control (settings regs and async messages)
@@ -318,10 +324,6 @@ b200_impl::b200_impl(const device_addr_t &device_addr)
     _ctrl->hold_task(_async_task);
     _tree->create<time_spec_t>(mb_path / "time" / "cmd")
         .subscribe(boost::bind(&radio_ctrl_core_3000::set_time, _ctrl, _1));
-    /*
-    this->check_fpga_compat(); //check after making
-    */
-
     this->register_loopback_self_test();
 
     ////////////////////////////////////////////////////////////////////
@@ -451,8 +453,9 @@ b200_impl::b200_impl(const device_addr_t &device_addr)
     ////////////////////////////////////////////////////////////////////
     // create time and clock control objects
     ////////////////////////////////////////////////////////////////////
-    _spi_iface = spi_core_3000::make(_ctrl, TOREG(SR_SPI), RB32_SPI);
-    _adf4001_iface = boost::shared_ptr<adf4001_ctrl>(new adf4001_ctrl(_spi_iface, false));
+    _spi_iface = spi_core_3000::make(_local_ctrl, TOREG(SR_CORE_SPI), RB32_CORE_SPI);
+    _spi_iface->set_divider(B200_BUS_CLOCK_RATE/100);
+    _adf4001_iface = boost::shared_ptr<adf4001_ctrl>(new adf4001_ctrl(_spi_iface, (1 << 1)/*slaveno*/));
 
     time_core_3000::readback_bases_type time64_rb_bases;
     time64_rb_bases.rb_now = RB64_TIME_NOW;
@@ -552,7 +555,7 @@ b200_impl::b200_impl(const device_addr_t &device_addr)
     _tree->access<std::string>(mb_path / "time_source/value").set("none");
 
     //GPS installed: use external ref, time, and init time spec
-    if (_gps and _gps->gps_detected())
+    if (false and _gps and _gps->gps_detected())
     {
         UHD_MSG(status) << "Setting references to the internal GPSDO" << std::endl;
         _tree->access<std::string>(mb_path / "time_source" / "value").set("gpsdo");
@@ -683,8 +686,23 @@ void b200_impl::check_fw_compat(void)
 
 void b200_impl::check_fpga_compat(void)
 {
-    //TODO
-    //_ctrl->peek32(REG_RB_COMPAT);....
+    const boost::uint64_t compat = _local_ctrl->peek64(0);
+    const boost::uint32_t signature = boost::uint32_t(compat >> 32);
+    const boost::uint16_t compat_major = boost::uint16_t(compat >> 16);
+    const boost::uint16_t compat_minor = boost::uint16_t(compat & 0xffff);
+    if (signature != 0xACE0BA5E) throw uhd::runtime_error(
+        "b200::check_fpga_compat signature register readback failed");
+
+    if (compat_major != B200_FPGA_COMPAT_NUM){
+        throw uhd::runtime_error(str(boost::format(
+            "Expected FPGA compatibility number 0x%x, but got 0x%x.%x:\n"
+            "The FPGA build is not compatible with the host code build.\n"
+            "%s"
+        ) % int(B200_FPGA_COMPAT_NUM) % compat_major % compat_minor
+          % print_images_error()));
+    }
+    _tree->create<std::string>("/mboards/0/fpga_version").set(str(boost::format("%u.%u")
+                % compat_major % compat_minor));
 }
 
 void b200_impl::set_mb_eeprom(const uhd::usrp::mboard_eeprom_t &mb_eeprom)
@@ -823,6 +841,6 @@ void b200_impl::update_enables(void)
 
 sensor_value_t b200_impl::get_ref_locked(void)
 {
-    const bool lock = _adf4001_iface->locked();
+    const bool lock = (_local_ctrl->peek32(RB32_CORE_MISC) & 0x1) == 0x1;
     return sensor_value_t("Ref", lock, "locked", "unlocked");
 }
