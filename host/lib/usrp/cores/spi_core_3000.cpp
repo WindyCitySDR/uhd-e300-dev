@@ -30,7 +30,10 @@ class spi_core_3000_impl : public spi_core_3000
 {
 public:
     spi_core_3000_impl(wb_iface::sptr iface, const size_t base, const size_t readback):
-        _iface(iface), _base(base), _readback(readback), _ctrl_word_cache(0) { /* NOP */}
+        _iface(iface), _base(base), _readback(readback), _ctrl_word_cache(0)
+    {
+        this->set_divider(30);
+    }
 
     boost::uint32_t transact_spi(
         int which_slave,
@@ -54,7 +57,7 @@ public:
         //conditionally send control word
         if (_ctrl_word_cache != ctrl_word)
         {
-            _iface->poke32(SPI_DIV, 16);
+            _iface->poke32(SPI_DIV, _div);
             _iface->poke32(SPI_CTRL, ctrl_word);
             _ctrl_word_cache = ctrl_word;
         }
@@ -71,6 +74,11 @@ public:
         return 0;
     }
 
+    void set_divider(const double div)
+    {
+        _div = size_t((div/2) - 0.5);
+    }
+
 private:
 
     wb_iface::sptr _iface;
@@ -78,6 +86,7 @@ private:
     const size_t _readback;
     boost::uint32_t _ctrl_word_cache;
     boost::mutex _mutex;
+    size_t _div;
 };
 
 spi_core_3000::sptr spi_core_3000::make(wb_iface::sptr iface, const size_t base, const size_t readback)
