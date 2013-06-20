@@ -33,7 +33,7 @@ void handle_udp_prog_framer(
     const size_t ethbase = (ethno == 0)? SR_ETHINT0 : SR_ETHINT1;
     const uint32_t sid = ((const uint32_t *)buff)[0];
     const size_t vdest = (sid >> 16) & 0xff;
-    printf("handle_udp_prog_framer sid %u vdest %u\n\r", sid, vdest);
+    printf("handle_udp_prog_framer sid %u vdest %u\n", sid, vdest);
 
     //setup source framer
     const eth_mac_addr_t *src_mac = u3_net_stack_get_mac_addr(0);
@@ -163,7 +163,7 @@ void handle_udp_fpga_prog(
 
 void run_flash_access_test()
 {
-    printf("Running flash access test...\n\r");
+    printf("Running flash access test...\n");
     bool status = true, result = true;
 
     chinch_poke32(0x200, 0);
@@ -197,7 +197,7 @@ void run_flash_access_test()
 
     chinch_poke32(0x200, result);
 
-    printf("[Debug] Flash access test %s\n\r", result?"PASSED":"FAILED");
+    printf("[Debug] Flash access test %s\n", result?"PASSED":"FAILED");
 }
 
 int main(void)

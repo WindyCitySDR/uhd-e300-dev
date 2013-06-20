@@ -14,7 +14,7 @@
 
 #define STATUS_CHAIN(x, status) if (status) status = (x)
 #define STATUS_MERGE(x, status) status &= (x)
-#define STATUS_CHAIN_DBG(x, status) STATUS_CHAIN(x, status); printf("%s: %s\n\r", #x, status?"succeeded":"failed!")
+#define STATUS_CHAIN_DBG(x, status) STATUS_CHAIN(x, status); printf("%s: %s\n", #x, status?"succeeded":"failed!")
 
 //@TODO: Ashish
 //The unit for this timeout is somewhat arbitrary. We could use the counter reg to enforce this in

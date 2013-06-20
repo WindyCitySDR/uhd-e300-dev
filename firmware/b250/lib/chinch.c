@@ -291,11 +291,9 @@ bool forward_pcie_user_xact_to_wb()
         if (xact_info->size == PCIE_XACT_32_BIT) {
             //Only respond to 32-bit transactions because that is all the LVFPGA interface can send
             if (xact_info->type == PCIE_XACT_WRITE) {
-                printf("[Debug] Forwarding PCIe Write to WB (Addr:0x%x, Data:0x%x)\n\r", xact_info->addr, xact_info->data);
                 wb_poke32(xact_info->addr, xact_info->data);
                 return true;
             } else if (xact_info->type == PCIE_XACT_READ) {
-                printf("[Debug] Forwarding PCIe Read to WB (Addr:0x%x)\n\r", xact_info->addr);
                 return xact_info->respond(wb_peek32(xact_info->addr), CHINCH_DEFAULT_XACT_TIMEOUT);
             }
         }
