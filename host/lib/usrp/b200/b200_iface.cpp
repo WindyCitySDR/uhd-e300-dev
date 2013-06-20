@@ -1,5 +1,5 @@
 //
-// Copyright 2012 Ettus Research LLC
+// Copyright 2012-2013 Ettus Research LLC
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -23,8 +23,8 @@
 #include <boost/thread/thread.hpp>
 #include <boost/cstdint.hpp>
 #include <boost/lexical_cast.hpp>
+#include <boost/format.hpp>
 #include <fstream>
-#include <sstream>
 #include <string>
 #include <vector>
 #include <cstring>
@@ -58,6 +58,8 @@ const static boost::uint8_t B200_VREQ_GET_STATUS = 0x83;
 const static boost::uint8_t B200_VREQ_AD9361_CTRL_WRITE = 0x90;
 const static boost::uint8_t B200_VREQ_AD9361_CTRL_READ = 0x91;
 const static boost::uint8_t B200_VREQ_FX3_RESET = 0x99;
+const static boost::uint8_t B200_VREQ_EEPROM_WRITE = 0xBA;
+const static boost::uint8_t B200_VREQ_EEPROM_READ = 0xBB;
 
 const static boost::uint8_t FX3_STATE_FPGA_READY = 0x00;
 const static boost::uint8_t FX3_STATE_CONFIGURING_FPGA = 0x01;
@@ -205,9 +207,36 @@ public:
 
     void write_i2c(boost::uint8_t addr, const byte_vector_t &bytes)
     {
-        //TODO
+        throw uhd::not_implemented_error("b200 write i2c");
     }
 
+
+    byte_vector_t read_i2c(boost::uint8_t addr, size_t num_bytes)
+    {
+        throw uhd::not_implemented_error("b200 read i2c");
+    }
+
+    void write_eeprom(boost::uint8_t addr, boost::uint8_t offset,
+            const byte_vector_t &bytes)
+    {
+        fx3_control_write(B200_VREQ_EEPROM_WRITE,
+                          0, offset | (boost::uint16_t(addr) << 8),
+                          (unsigned char *) &bytes[0],
+                          bytes.size());
+    }
+
+    byte_vector_t read_eeprom(
+        boost::uint8_t addr,
+        boost::uint8_t offset,
+        size_t num_bytes
+    ){
+        byte_vector_t recv_bytes(num_bytes);
+        fx3_control_read(B200_VREQ_EEPROM_READ,
+                         0, offset | (boost::uint16_t(addr) << 8),
+                         (unsigned char*) &recv_bytes[0],
+                         num_bytes);
+        return recv_bytes;
+    }
 
     void transact_spi(
         unsigned char *tx_data,
@@ -245,13 +274,13 @@ public:
 
     void ad9361_transact(const unsigned char in_buff[64], unsigned char out_buff[64]) {
         fx3_control_write(B200_VREQ_AD9361_CTRL_WRITE, 0x00, 0x00, (unsigned char *)in_buff, 64);
-        fx3_control_read(B200_VREQ_AD9361_CTRL_READ, 0x00, 0x00, out_buff, 64);
-    }
-
-    byte_vector_t read_i2c(boost::uint8_t addr, size_t num_bytes)
-    {
-        //TODO
-        return byte_vector_t();
+        int ret = 0;
+        for (size_t i = 0; i < 10; i++)
+        {
+            ret = fx3_control_read(B200_VREQ_AD9361_CTRL_READ, 0x00, 0x00, out_buff, 64, 1000);
+            if (ret == 64) return;
+        }
+        throw uhd::io_error(str(boost::format("ad9361_transact failed with usb error: %d") % ret));
     }
 
 
@@ -379,6 +408,8 @@ public:
         unsigned char data[4];
         memset(data, (reset)? 0xFF : 0x00, sizeof(data));
 
+        UHD_THROW_INVALID_CODE_PATH();
+
         fx3_control_write(B200_VREQ_FPGA_RESET, 0x00, 0x00, data, 4);
     }
 
@@ -444,6 +475,12 @@ public:
         hash_type loaded_hash; usrp_get_fpga_hash(loaded_hash);
         if (hash == loaded_hash) return;
 
+        size_t file_size = 0;
+        {
+            std::ifstream file(filename, std::ios::in | std::ios::binary | std::ios::ate);
+            file_size = file.tellg();
+        }
+
         std::ifstream file;
         file.open(filename, std::ios::in | std::ios::binary);
 
@@ -458,7 +495,6 @@ public:
 
         if (load_img_msg) UHD_MSG(status) << "Loading FPGA image: " \
             << filestring << "..." << std::flush;
-        boost::system_time next_dot = boost::get_system_time() + boost::posix_time::milliseconds(700);
 
         unsigned char out_buff[64];
         memset(out_buff, 0x00, sizeof(out_buff));
@@ -470,6 +506,7 @@ public:
         } while(fx3_state != FX3_STATE_CONFIGURING_FPGA);
 
 
+        size_t bytes_sent = 0;
         while(!file.eof()) {
             file.read((char *) out_buff, sizeof(out_buff));
             const std::streamsize n = file.gcount();
@@ -480,12 +517,17 @@ public:
             /* Send the data to the device. */
             fx3_control_write(B200_VREQ_FPGA_DATA, 0, 0, out_buff, transfer_count, 5000);
 
-            if (boost::get_system_time() > next_dot)
+            if (load_img_msg)
             {
-                if (load_img_msg) UHD_MSG(status) << "." << std::flush;
-                next_dot = boost::get_system_time() + boost::posix_time::milliseconds(700);
+                if (bytes_sent == 0) UHD_MSG(status) << "  0%" << std::flush;
+                const size_t percent_before = size_t((bytes_sent*100)/file_size);
+                bytes_sent += transfer_count;
+                const size_t percent_after = size_t((bytes_sent*100)/file_size);
+                if (percent_before/10 != percent_after/10)
+                {
+                    UHD_MSG(status) << "\b\b\b\b" << std::setw(3) << percent_after << "%" << std::flush;
+                }
             }
-
         }
 
         file.close();
@@ -497,7 +539,7 @@ public:
 
         usrp_set_fpga_hash(hash);
 
-        if (load_img_msg) UHD_MSG(status) << " done" << std::endl;
+        if (load_img_msg) UHD_MSG(status) << "\b\b\b\b done" << std::endl;
     }
 
 private:

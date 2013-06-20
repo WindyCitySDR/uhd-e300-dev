@@ -27,7 +27,6 @@
 #include "wb_iface.hpp"
 #include "b250_clock_ctrl.hpp"
 #include "b250_fw_common.h"
-#include "b250_ctrl.hpp"
 #include "b250_fw_ctrl.hpp"
 #include <uhd/transport/udp_zero_copy.hpp>
 #include "spi_core_3000.hpp"
@@ -39,14 +38,16 @@
 #include "rx_dsp_core_3000.hpp"
 #include "tx_dsp_core_3000.hpp"
 #include "i2c_core_100_wb32.hpp"
+#include "radio_ctrl_core_3000.hpp"
 #include "gpio_core_200.hpp"
 #include <boost/weak_ptr.hpp>
 #include <uhd/usrp/gps_ctrl.hpp>
+#include <uhd/transport/bounded_buffer.hpp>
 
 static const size_t B250_TX_FC_PKT_WINDOW = 2048; //16MB/8Kpkts
 static const std::string B250_FW_FILE_NAME = "usrp_b250_fw.bin";
 static const double B250_RADIO_CLOCK_RATE = 120e6;
-static const double B250_BUS_CLOCK_RATE = 200e6;
+static const double B250_BUS_CLOCK_RATE = 175000000;
 static const bool B250_ENABLE_RX_FC = false;
 
 #define B250_RADIO_DEST_PREFIX_TX 0
@@ -86,18 +87,20 @@ struct b250_dboard_iface_config_t
 
 uhd::usrp::dboard_iface::sptr b250_make_dboard_iface(const b250_dboard_iface_config_t &);
 
-class b250_impl : public uhd::device
+struct b250_impl : public uhd::device
 {
-public:
     b250_impl(const uhd::device_addr_t &);
     ~b250_impl(void);
 
     //the io interface
     uhd::rx_streamer::sptr get_rx_stream(const uhd::stream_args_t &);
     uhd::tx_streamer::sptr get_tx_stream(const uhd::stream_args_t &);
+
+    //support old async call
+    typedef uhd::transport::bounded_buffer<uhd::async_metadata_t> async_md_type;
+    boost::shared_ptr<async_md_type> _async_md;
     bool recv_async_msg(uhd::async_metadata_t &, double);
 
-private:
     uhd::property_tree::sptr _tree;
     //device properties interface
     uhd::property_tree::sptr get_tree(void) const
@@ -122,7 +125,7 @@ private:
     //perifs in the radio core
     struct radio_perifs_t
     {
-        b250_ctrl::sptr ctrl;
+        radio_ctrl_core_3000::sptr ctrl;
         spi_core_3000::sptr spi;
         b250_adc_ctrl::sptr adc;
         b250_dac_ctrl::sptr dac;
@@ -142,7 +145,7 @@ private:
     b250_clock_ctrl::sptr _clock;
     uhd::gps_ctrl::sptr _gps;
 
-    size_t _last_sid;
+    size_t _sid_framer;
     struct sid_config_t
     {
         boost::uint8_t router_addr_there;

@@ -1,5 +1,5 @@
 #
-# Copyright 2010-2012 Ettus Research LLC
+# Copyright 2010-2013 Ettus Research LLC
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -27,6 +27,15 @@ CMAKE_MINIMUM_REQUIRED(VERSION 2.6)
 PROJECT(UHD CXX)
 ENABLE_TESTING()
 LIST(APPEND CMAKE_MODULE_PATH ${CMAKE_SOURCE_DIR}/cmake/Modules)
+
+########################################################################
+# Packaging Variables
+########################################################################
+
+SET(LIBUHD_PKG ${LIBUHD_PKG} CACHE BOOL "Build Debian libuhd003 package")
+SET(LIBUHDDEV_PKG ${LIBUHDDEV_PKG} CACHE BOOL "Build Debian libuhd-dev package")
+SET(UHDHOST_PKG ${UHDPOST_PKG} CACHE BOOL "Build Debian uhd-host package")
+
 INCLUDE(UHDComponent) #enable components
 INCLUDE(UHDPackage)   #setup cpack
 
@@ -46,6 +55,7 @@ IF(NOT DEFINED PKG_LIB_DIR)
     SET(PKG_LIB_DIR ${LIBRARY_DIR}/uhd)
 ENDIF()
 SET(PKG_DOC_DIR share/doc/uhd)
+SET(PKG_MAN_DIR share/man/man1)
 
 ########################################################################
 # Local Include Dir
@@ -74,6 +84,9 @@ SET(CMAKE_BUILD_TYPE "${CMAKE_BUILD_TYPE}" CACHE STRING "")
 SET(UHD_RELEASE_MODE "${UHD_RELEASE_MODE}" CACHE STRING "UHD Release Mode")
 
 IF(CMAKE_COMPILER_IS_GNUCXX)
+    IF(NOT CMAKE_BUILD_TYPE STREQUAL "Debug")
+        set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -s")
+    ENDIF(NOT CMAKE_BUILD_TYPE STREQUAL "Debug")
     ADD_DEFINITIONS(-Wall)
     ADD_DEFINITIONS(-Wextra)
     ADD_DEFINITIONS(-Wsign-compare)
@@ -186,7 +199,7 @@ ADD_CUSTOM_TARGET(uninstall
 ########################################################################
 # Install Package Docs
 ########################################################################
-INSTALL(FILES
+UHD_INSTALL(FILES
     ${CMAKE_CURRENT_SOURCE_DIR}/README.txt
     ${CMAKE_CURRENT_SOURCE_DIR}/LICENSE.txt
     ${CMAKE_CURRENT_SOURCE_DIR}/AUTHORS.txt
@@ -198,7 +211,8 @@ INSTALL(FILES
 # Images download directory for utils/uhd_images_downloader.py
 ########################################################################
 
-SET(UHD_IMAGES_DOWNLOAD_SRC "http://files.ettus.com/binaries/maint_images/archive/uhd-images_003.005.002-release.zip")
+SET(UHD_IMAGES_MD5SUM "f5acbc2f795fa1acfa9ad9986d59ed3b")
+SET(UHD_IMAGES_DOWNLOAD_SRC "http://files.ettus.com/binaries/maint_images/archive/uhd-images_003.005.003-release.zip")
 
 ########################################################################
 # Register top level components
@@ -213,11 +227,11 @@ LIBUHD_REGISTER_COMPONENT("Tests" ENABLE_TESTS ON "ENABLE_LIBUHD" OFF)
 ########################################################################
 ADD_SUBDIRECTORY(docs)
 
+ADD_SUBDIRECTORY(include)
+
 IF(ENABLE_EXAMPLES)
     ADD_SUBDIRECTORY(examples)
 ENDIF(ENABLE_EXAMPLES)
-
-ADD_SUBDIRECTORY(include)
 
 IF(ENABLE_LIBUHD)
     ADD_SUBDIRECTORY(lib)
@@ -253,16 +267,18 @@ IF(CMAKE_CROSSCOMPILING)
     UNSET(UHD_PC_LIBS)
 ENDIF(CMAKE_CROSSCOMPILING)
 
-CONFIGURE_FILE(
-    ${CMAKE_CURRENT_SOURCE_DIR}/uhd.pc.in
-    ${CMAKE_CURRENT_BINARY_DIR}/uhd.pc
-@ONLY)
+IF(NOT LIBUHD_PKG AND NOT UHDHOST_PKG)
+    CONFIGURE_FILE(
+        ${CMAKE_CURRENT_SOURCE_DIR}/uhd.pc.in
+        ${CMAKE_CURRENT_BINARY_DIR}/uhd.pc
+    @ONLY)
 
-INSTALL(
-    FILES ${CMAKE_CURRENT_BINARY_DIR}/uhd.pc
-    DESTINATION ${LIBRARY_DIR}/pkgconfig
-    COMPONENT libraries
-)
+    INSTALL(
+        FILES ${CMAKE_CURRENT_BINARY_DIR}/uhd.pc
+        DESTINATION ${LIBRARY_DIR}/pkgconfig
+        COMPONENT libraries
+    )
+ENDIF(NOT LIBUHD_PKG AND NOT UHDHOST_PKG)
 
 ########################################################################
 # Handle pre-built images
@@ -273,13 +289,23 @@ IF(DEFINED UHD_IMAGES_DIR AND EXISTS "${UHD_IMAGES_DIR}")
     FOREACH(_img ${_image_files})
         MESSAGE(STATUS "  ${_img}")
     ENDFOREACH(_img)
-    INSTALL(FILES ${_image_files} DESTINATION ${PKG_DATA_DIR}/images COMPONENT images)
+    UHD_INSTALL(FILES ${_image_files} DESTINATION ${PKG_DATA_DIR}/images COMPONENT images)
 ENDIF(DEFINED UHD_IMAGES_DIR AND EXISTS "${UHD_IMAGES_DIR}")
 
 ########################################################################
 # Print Summary
 ########################################################################
+IF(LIBUHD_PKG)
+    MESSAGE(STATUS "")
+    SET(PRINT_APPEND " (Debian libuhd003 package configuration)")
+ELSEIF(LIBUHDDEV_PKG)
+    MESSAGE(STATUS "")
+    SET(PRINT_APPEND " (Debian libuhd-dev package configuration)")
+ELSEIF(UHDHOST_PKG)
+    MESSAGE(STATUS "")
+    SET(PRINT_APPEND " (Debian uhd-host package configuration)")
+ENDIF(LIBUHD_PKG)
 UHD_PRINT_COMPONENT_SUMMARY()
-MESSAGE(STATUS "Building version: ${UHD_VERSION}")
+MESSAGE(STATUS "Building version: ${UHD_VERSION}${PRINT_APPEND}")
 MESSAGE(STATUS "Using install prefix: ${CMAKE_INSTALL_PREFIX}")
 MESSAGE(STATUS "Compatible images can be downloaded from: ${UHD_IMAGES_DOWNLOAD_SRC}")

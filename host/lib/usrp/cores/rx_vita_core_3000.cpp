@@ -20,15 +20,15 @@
 #include <boost/assign/list_of.hpp>
 #include <boost/tuple/tuple.hpp>
 
-#define REG_FRAMER_MAXLEN    _framer_base + 0
-#define REG_FRAMER_SID       _framer_base + 4
+#define REG_FRAMER_MAXLEN    _base + 4*4 + 0
+#define REG_FRAMER_SID       _base + 4*4 + 4
 
-#define REG_CTRL_CMD           _ctrl_base + 0
-#define REG_CTRL_TIME_HI       _ctrl_base + 4
-#define REG_CTRL_TIME_LO       _ctrl_base + 8
+#define REG_CTRL_CMD           _base + 0
+#define REG_CTRL_TIME_HI       _base + 4
+#define REG_CTRL_TIME_LO       _base + 8
 
-#define REG_FC_WINDOW       _ctrl_base + 6*4 + 0
-#define REG_FC_ENABLE       _ctrl_base + 6*4 + 4
+#define REG_FC_WINDOW       _base + 6*4 + 0
+#define REG_FC_ENABLE       _base + 6*4 + 4
 
 using namespace uhd;
 
@@ -36,16 +36,15 @@ struct rx_vita_core_3000_impl : rx_vita_core_3000
 {
     rx_vita_core_3000_impl(
         wb_iface::sptr iface,
-        const size_t framer_base,
-        const size_t ctrl_base
+        const size_t base
     ):
         _iface(iface),
-        _framer_base(framer_base),
-        _ctrl_base(ctrl_base),
-        _continuous_streaming(false)
+        _base(base),
+        _continuous_streaming(false),
+        _is_setup(false)
     {
         this->set_tick_rate(1); //init to non zero
-        this->set_nsamps_per_packet(1); //init to non zero
+        this->set_nsamps_per_packet(100); //init to non zero
         this->clear();
     }
 
@@ -75,6 +74,7 @@ struct rx_vita_core_3000_impl : rx_vita_core_3000
 
     void issue_stream_command(const uhd::stream_cmd_t &stream_cmd)
     {
+        if (not _is_setup) throw uhd::runtime_error("rx vita core 3000 issue stream command - not setup yet!");
         UHD_ASSERT_THROW(stream_cmd.num_samps <= 0x0fffffff);
         _continuous_streaming = stream_cmd.stream_mode == stream_cmd_t::STREAM_MODE_START_CONTINUOUS;
 
@@ -124,20 +124,20 @@ struct rx_vita_core_3000_impl : rx_vita_core_3000
 
     void setup(const uhd::stream_args_t &)
     {
+        _is_setup = true;
     }
 
     wb_iface::sptr _iface;
-    const size_t _framer_base;
-    const size_t _ctrl_base;
+    const size_t _base;
     double _tick_rate;
     bool _continuous_streaming;
+    bool _is_setup;
 };
 
 rx_vita_core_3000::sptr rx_vita_core_3000::make(
     wb_iface::sptr iface,
-    const size_t framer_base,
-    const size_t ctrl_base
+    const size_t base
 )
 {
-    return rx_vita_core_3000::sptr(new rx_vita_core_3000_impl(iface, framer_base, ctrl_base));
+    return rx_vita_core_3000::sptr(new rx_vita_core_3000_impl(iface, base));
 }

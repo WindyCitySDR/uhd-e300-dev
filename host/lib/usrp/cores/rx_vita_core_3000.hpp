@@ -34,8 +34,7 @@ public:
 
     static sptr make(
         wb_iface::sptr iface,
-        const size_t framer_base,
-        const size_t ctrl_base
+        const size_t base
     );
 
     virtual void clear(void) = 0;

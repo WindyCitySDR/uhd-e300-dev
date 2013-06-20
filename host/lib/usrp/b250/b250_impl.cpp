@@ -47,7 +47,7 @@ static device_addrs_t b250_find_with_addr(const device_addr_t &dev_addr)
     //load request struct
     b250_fw_comms_t request = b250_fw_comms_t();
     request.flags = uhd::htonx<boost::uint32_t>(B250_FW_COMMS_FLAGS_ACK);
-    request.sequence = 0;
+    request.sequence = uhd::htonx<boost::uint32_t>(std::rand());
 
     //send request
     comm->send(asio::buffer(&request, sizeof(request)));
@@ -59,6 +59,9 @@ static device_addrs_t b250_find_with_addr(const device_addr_t &dev_addr)
         char buff[B250_FW_COMMS_MTU] = {};
         const size_t nbytes = comm->recv(asio::buffer(buff), 0.050);
         if (nbytes == 0) break;
+        const b250_fw_comms_t *reply = (const b250_fw_comms_t *)buff;
+        if (request.flags != reply->flags) break;
+        if (request.sequence != reply->sequence) break;
         device_addr_t new_addr;
         new_addr["type"] = "b250";
         new_addr["addr"] = comm->get_recv_addr();
@@ -68,8 +71,11 @@ static device_addrs_t b250_find_with_addr(const device_addr_t &dev_addr)
     return addrs;
 }
 
-static device_addrs_t b250_find(const device_addr_t &hint)
+static device_addrs_t b250_find(const device_addr_t &hint_)
 {
+    //we only do single device discovery for now
+    const device_addr_t hint = separate_device_addr(hint_).at(0);
+
     device_addrs_t addrs;
     if (hint.has_key("type") and hint["type"] != "b250") return addrs;
 
@@ -166,8 +172,9 @@ static void b250_load_fw(const std::string &addr, const std::string &file_name)
 
 b250_impl::b250_impl(const uhd::device_addr_t &dev_addr)
 {
+    _async_md.reset(new async_md_type(1000/*messages deep*/));
     _tree = uhd::property_tree::make();
-    _last_sid = 0;
+    _sid_framer = 0;
     _addr = dev_addr["addr"];
     BOOST_FOREACH(const std::string &key, dev_addr.keys())
     {
@@ -316,14 +323,18 @@ b250_impl::b250_impl(const uhd::device_addr_t &dev_addr)
     ////////////////////////////////////////////////////////////////////
     // do some post-init tasks
     ////////////////////////////////////////////////////////////////////
-    UHD_HERE();
-
     _tree->access<double>(mb_path / "tick_rate") //now subscribe the clock rate setter
         .subscribe(boost::bind(&b250_impl::update_tick_rate, this, _1))
         .set(B250_RADIO_CLOCK_RATE);
 
-    _tree->access<subdev_spec_t>(mb_path / "rx_subdev_spec").set(subdev_spec_t("A:" + _tree->list(mb_path / "dboards" / "A" / "rx_frontends").at(0)));
-    _tree->access<subdev_spec_t>(mb_path / "tx_subdev_spec").set(subdev_spec_t("A:" + _tree->list(mb_path / "dboards" / "A" / "tx_frontends").at(0)));
+    subdev_spec_t rx_fe_spec, tx_fe_spec;
+    rx_fe_spec.push_back(subdev_spec_pair_t("A", _tree->list(mb_path / "dboards" / "A" / "rx_frontends").at(0)));
+    rx_fe_spec.push_back(subdev_spec_pair_t("B", _tree->list(mb_path / "dboards" / "B" / "rx_frontends").at(0)));
+    tx_fe_spec.push_back(subdev_spec_pair_t("A", _tree->list(mb_path / "dboards" / "A" / "tx_frontends").at(0)));
+    tx_fe_spec.push_back(subdev_spec_pair_t("B", _tree->list(mb_path / "dboards" / "B" / "tx_frontends").at(0)));
+
+    _tree->access<subdev_spec_t>(mb_path / "rx_subdev_spec").set(rx_fe_spec);
+    _tree->access<subdev_spec_t>(mb_path / "tx_subdev_spec").set(tx_fe_spec);
     _tree->access<std::string>(mb_path / "clock_source" / "value").set("internal");
     _tree->access<std::string>(mb_path / "time_source" / "value").set("none");
 
@@ -365,7 +376,7 @@ void b250_impl::setup_radio(const size_t i, const std::string &db_name)
     config.router_dst_here = B250_XB_DST_E0;
     const boost::uint32_t ctrl_sid = this->allocate_sid(config);
     udp_zero_copy::sptr ctrl_xport = this->make_transport(_addr, ctrl_sid);
-    perif.ctrl = b250_ctrl::make(ctrl_xport, ctrl_sid);
+    perif.ctrl = radio_ctrl_core_3000::make(vrt::if_packet_info_t::LINK_TYPE_VRLP, ctrl_xport, ctrl_xport, ctrl_sid, db_name);
     perif.ctrl->poke32(TOREG(SR_MISC_OUTS), (1 << 2)); //reset adc + dac
     perif.ctrl->poke32(TOREG(SR_MISC_OUTS),  (1 << 1) | (1 << 0)); //out of reset + dac enable
 
@@ -394,7 +405,7 @@ void b250_impl::setup_radio(const size_t i, const std::string &db_name)
     ////////////////////////////////////////////////////////////////////
     // create rx dsp control objects
     ////////////////////////////////////////////////////////////////////
-    perif.framer = rx_vita_core_3000::make(perif.ctrl, TOREG(SR_RX_CTRL+4), TOREG(SR_RX_CTRL));
+    perif.framer = rx_vita_core_3000::make(perif.ctrl, TOREG(SR_RX_CTRL));
     perif.framer->set_tick_rate(B250_RADIO_CLOCK_RATE);
     perif.ddc = rx_dsp_core_3000::make(perif.ctrl, TOREG(SR_RX_DSP));
     perif.ddc->set_link_rate(10e9/8); //whatever
@@ -418,7 +429,7 @@ void b250_impl::setup_radio(const size_t i, const std::string &db_name)
     ////////////////////////////////////////////////////////////////////
     // create tx dsp control objects
     ////////////////////////////////////////////////////////////////////
-    perif.deframer = tx_vita_core_3000::make(perif.ctrl, TOREG(SR_TX_CTRL+2), TOREG(SR_TX_CTRL));
+    perif.deframer = tx_vita_core_3000::make(perif.ctrl, TOREG(SR_TX_CTRL));
     perif.deframer->set_tick_rate(B250_RADIO_CLOCK_RATE);
     perif.duc = tx_dsp_core_3000::make(perif.ctrl, TOREG(SR_TX_DSP));
     perif.duc->set_link_rate(10e9/8); //whatever
@@ -510,27 +521,33 @@ uhd::transport::udp_zero_copy::sptr b250_impl::make_transport(
     UHD_LOG << "reprogram the ethernet dispatcher's udp port" << std::endl;
     _zpu_ctrl->poke32(SR_ADDR(SET0_BASE, (ZPU_SR_ETHINT0+8+3)), B250_VITA_UDP_PORT);
 
+    //Do a peek to an arbitrary address to guarantee that the
+    //ethernet framer has been programmed before we return.
+    _zpu_ctrl->peek32(0);
+
     return xport;
 }
 
 boost::uint32_t b250_impl::allocate_sid(const sid_config_t &config)
 {
-    _last_sid++;
-
-    const boost::uint32_t stream = (config.dst_prefix | (_last_sid << 2)) & 0xff;
-    UHD_VAR(stream);
+    const boost::uint32_t stream = (config.dst_prefix | (config.router_dst_there << 2)) & 0xff;
 
     const boost::uint32_t sid = 0
-      | (B250_DEVICE_HERE << 24) // IJB. DONT UNDERSTAND WHAT 4 represents. B250_DEVICE_HERE = 0
-        | (stream << 16)
+        | (B250_DEVICE_HERE << 24)
+        | (_sid_framer << 16)
         | (config.router_addr_there << 8)
         | (stream << 0)
     ;
     UHD_LOG << std::hex
-        << "sid 0x" << sid
-        << "stream 0x" << stream
-        << "router_addr_there 0x" << config.router_addr_there
+        << " sid 0x" << sid
+        << " framer 0x" << _sid_framer
+        << " stream 0x" << stream
+        << " router_dst_there 0x" << int(config.router_dst_there)
+        << " router_addr_there 0x" << int(config.router_addr_there)
         << std::dec << std::endl;
+
+    //increment for next setup
+    _sid_framer++;
 
     // Program the B250 to recognise it's own local address.
     _zpu_ctrl->poke32(SR_ADDR(SET0_BASE, ZPU_SR_XB_LOCAL), config.router_addr_there);
@@ -539,7 +556,7 @@ boost::uint32_t b250_impl::allocate_sid(const sid_config_t &config)
     _zpu_ctrl->poke32(SR_ADDR(SETXB_BASE, 256 + (stream)), config.router_dst_there);
     // Program CAM entry for returning packets to us (for example GR host via Eth0)
     // This type of packet does not match the XB_LOCAL address and is looked up in the lower half of the CAM
-    _zpu_ctrl->poke32(SR_ADDR(SETXB_BASE, 0   + (B250_DEVICE_HERE)), config.router_dst_here);
+    _zpu_ctrl->poke32(SR_ADDR(SETXB_BASE, 0 + (B250_DEVICE_HERE)), config.router_dst_here);
 
     UHD_LOG << std::hex
         << "done router config for sid 0x" << sid

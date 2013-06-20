@@ -1,5 +1,5 @@
 //
-// Copyright 2012 Ettus Research LLC
+// Copyright 2012-2013 Ettus Research LLC
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -60,6 +60,17 @@ public:
 
     //! load an FPGA image
     virtual void load_fpga(const std::string filestring) = 0;
+
+    //! Read and Write to/from the EEPROM on the motherboard
+    virtual void write_i2c(boost::uint8_t addr, const uhd::byte_vector_t &bytes) = 0;
+    virtual uhd::byte_vector_t read_i2c(boost::uint8_t addr, size_t num_bytes) = 0;
+
+    //! Overload the virtual read_eeprom function from i2c_iface, which won't
+    //  work on the B200 since the i2c controller is actually the FX3.
+    virtual void write_eeprom(boost::uint8_t addr, boost::uint8_t offset,
+            const uhd::byte_vector_t &bytes) = 0;
+    virtual uhd::byte_vector_t read_eeprom(boost::uint8_t addr, boost::uint8_t offset,
+            size_t num_bytes) = 0;
 
     //! send SPI through the FX3
     virtual void transact_spi( unsigned char *tx_data, size_t num_tx_bits, \

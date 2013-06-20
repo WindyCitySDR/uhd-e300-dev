@@ -31,20 +31,25 @@
 #include <boost/lexical_cast.hpp>
 #include <boost/functional/hash.hpp>
 #include <cstdio>
-#include <iomanip>
 #include <ctime>
-#include <iostream>
+
+#ifdef _MSC_VER
+
+#ifndef WIN32_LEAN_AND_MEAN
+#define WIN32_LEAN_AND_MEAN
+#include <winsock2.h>
+#endif
+
+#endif
 
 using namespace uhd;
 using namespace uhd::usrp;
 using namespace uhd::transport;
 
-//const boost::uint16_t B200_VENDOR_ID  = 0x2500;
-//const boost::uint16_t B200_PRODUCT_ID = 0x0003;
+const boost::uint16_t B200_VENDOR_ID  = 0x2500;
+const boost::uint16_t B200_PRODUCT_ID = 0x0020;
+const boost::uint16_t INIT_PRODUCT_ID = 0x00f0;
 
-const boost::uint16_t B200_VENDOR_ID  = 0x04b4;
-const boost::uint16_t FX3_PRODUCT_ID = 0x00f3;
-const boost::uint16_t B200_PRODUCT_ID = 0x00f0;
 static const boost::posix_time::milliseconds REENUMERATION_TIMEOUT_MS(3000);
 
 /***********************************************************************
@@ -68,7 +73,7 @@ static device_addrs_t b200_find(const device_addr_t &hint)
         sscanf(hint.get("pid").c_str(), "%x", &pid);
     } else {
         vid = B200_VENDOR_ID;
-        pid = FX3_PRODUCT_ID;
+        pid = B200_PRODUCT_ID;
     }
 
     // Important note:
@@ -98,16 +103,19 @@ static device_addrs_t b200_find(const device_addr_t &hint)
         try{control = usb_control::make(handle, 0);}
         catch(const uhd::exception &){continue;} //ignore claimed
 
-        b200_iface::make(control)->load_firmware(b200_fw_image);
+        //check if fw was already loaded
+        if (handle->get_manufacturer() != "Ettus Research LLC")
+        {
+            b200_iface::make(control)->load_firmware(b200_fw_image);
+        }
 
         found++;
     }
 
     //get descriptors again with serial number, but using the initialized VID/PID now since we have firmware
-    //TODO
-    found = 1;
-    vid = B200_VENDOR_ID;
-    pid = B200_PRODUCT_ID;
+    const bool init = hint.has_key("vid") and hint.has_key("pid");
+    if (init) pid = INIT_PRODUCT_ID;
+    //TODO sleep after fw load ?
 
     const boost::system_time timeout_time = boost::get_system_time() + REENUMERATION_TIMEOUT_MS;
 
@@ -121,13 +129,27 @@ static device_addrs_t b200_find(const device_addr_t &hint)
             catch(const uhd::exception &){continue;} //ignore claimed
 
             b200_iface::sptr iface = b200_iface::make(control);
-            //TODO
-            //const mboard_eeprom_t mb_eeprom = mboard_eeprom_t(*iface, mboard_eeprom_t::MAP_B100);
+            if (init)
+            {
+                UHD_HERE();
+                byte_vector_t bytes(8);
+                bytes[0] = 0x43;
+                bytes[1] = 0x59;
+                bytes[2] = 0x14;
+                bytes[3] = 0xB2;
+                bytes[4] = (B200_PRODUCT_ID & 0xff);
+                bytes[5] = (B200_PRODUCT_ID >> 8);
+                bytes[6] = (B200_VENDOR_ID & 0xff);
+                bytes[7] = (B200_VENDOR_ID >> 8);
+                iface->write_eeprom(0x0, 0x0, bytes);
+                iface->reset_fx3();
+                return b200_addrs;
+            }
+            const mboard_eeprom_t mb_eeprom = mboard_eeprom_t(*iface, "B200");
 
             device_addr_t new_addr;
             new_addr["type"] = "b200";
-            //TODO
-            //new_addr["name"] = mb_eeprom["name"];
+            new_addr["name"] = mb_eeprom["name"];
             new_addr["serial"] = handle->get_serial();
             //this is a found b200 when the hint serial and name match or blank
             if (
@@ -158,15 +180,10 @@ UHD_STATIC_BLOCK(register_b200_device)
 /***********************************************************************
  * Structors
  **********************************************************************/
-b200_impl::b200_impl(const device_addr_t &device_addr):
-    _async_md(1000/*messages deep*/)
+b200_impl::b200_impl(const device_addr_t &device_addr)
 {
-    //extract the FPGA path for the B200
-    std::string b200_fpga_image = find_image_path(
-        device_addr.has_key("fpga")? device_addr["fpga"] : B200_FPGA_FILE_NAME
-    );
-
     _tree = property_tree::make();
+    const fs_path mb_path = "/mboards/0";
 
     //try to match the given device address with something on the USB bus
     std::vector<usb_device_handle::sptr> device_list =
@@ -188,9 +205,38 @@ b200_impl::b200_impl(const device_addr_t &device_addr):
     this->check_fw_compat(); //check after making
 
     ////////////////////////////////////////////////////////////////////
+    // setup the mboard eeprom
+    ////////////////////////////////////////////////////////////////////
+    const mboard_eeprom_t mb_eeprom(*_iface, "B200");
+    _tree->create<mboard_eeprom_t>(mb_path / "eeprom")
+        .set(mb_eeprom)
+        .subscribe(boost::bind(&b200_impl::set_mb_eeprom, this, _1));
+
+    ////////////////////////////////////////////////////////////////////
     // Load the FPGA image, then reset GPIF
     ////////////////////////////////////////////////////////////////////
+    std::string default_file_name;
+    if (not mb_eeprom["product"].empty())
+    {
+        switch (boost::lexical_cast<boost::uint16_t>(mb_eeprom["product"]))
+        {
+        case 0x0001: default_file_name = B200_FPGA_FILE_NAME; break;
+        case 0x0002: default_file_name = B210_FPGA_FILE_NAME; break;
+        default: throw uhd::runtime_error("b200 unknown product code: " + mb_eeprom["product"]);
+        }
+    }
+    if (default_file_name.empty())
+    {
+        UHD_ASSERT_THROW(device_addr.has_key("fpga"));
+    }
+
+    //extract the FPGA path for the B200
+    std::string b200_fpga_image = find_image_path(
+        device_addr.has_key("fpga")? device_addr["fpga"] : default_file_name
+    );
+
     _iface->load_fpga(b200_fpga_image);
+    ad9361_ctrl::make(_iface); //radio clock on before global reset
     _iface->reset_gpif();
 
     ////////////////////////////////////////////////////////////////////
@@ -218,13 +264,49 @@ b200_impl::b200_impl(const device_addr_t &device_addr):
         ctrl_xport_args
     );
     while (_ctrl_transport->get_recv_buff(0.0)){} //flush ctrl xport
-    _async_task = uhd::task::make(boost::bind(&b200_impl::handle_async_task, this));
+    _gpsdo_uart = b200_uart::make(_ctrl_transport, B200_TX_GPS_UART_SID);
+    _gpsdo_uart->set_baud_divider(B200_BUS_CLOCK_RATE/115200);
+    _async_md.reset(new async_md_type(1000/*messages deep*/));
+    _async_task = uhd::task::make(boost::bind(&b200_impl::handle_async_task, this, _ctrl_transport, _async_md, _gpsdo_uart));
+
+    ////////////////////////////////////////////////////////////////////
+    // Create the GPSDO control
+    ////////////////////////////////////////////////////////////////////
+    static const boost::uint32_t dont_look_for_gpsdo = 0x1234abcdul;
+
+    //otherwise if not disabled, look for the internal GPSDO
+    //TODO if (_iface->peekfw(U2_FW_REG_HAS_GPSDO) != dont_look_for_gpsdo)
+    //if (false)
+    {
+        UHD_MSG(status) << "Detecting internal GPSDO.... " << std::flush;
+        try
+        {
+            _gps = gps_ctrl::make(_gpsdo_uart);
+        }
+        catch(std::exception &e)
+        {
+            UHD_MSG(error) << "An error occurred making GPSDO control: " << e.what() << std::endl;
+        }
+        if (_gps and _gps->gps_detected())
+        {
+            UHD_MSG(status) << "found" << std::endl;
+            BOOST_FOREACH(const std::string &name, _gps->get_sensors())
+            {
+                _tree->create<sensor_value_t>(mb_path / "sensors" / name)
+                    .publish(boost::bind(&gps_ctrl::get_sensor, _gps, name));
+            }
+        }
+        else
+        {
+            UHD_MSG(status) << "not found" << std::endl;
+            //TODO _iface->pokefw(U2_FW_REG_HAS_GPSDO, dont_look_for_gpsdo);
+        }
+    }
 
     ////////////////////////////////////////////////////////////////////
     // Initialize the properties tree
     ////////////////////////////////////////////////////////////////////
     _tree->create<std::string>("/name").set("B-Series Device");
-    const fs_path mb_path = "/mboards/0";
     _tree->create<std::string>(mb_path / "name").set("B200");
     _tree->create<std::string>(mb_path / "codename").set("Sasquatch");
     _tree->create<std::string>(mb_path / "fpga_version").set("1.0");
@@ -232,9 +314,10 @@ b200_impl::b200_impl(const device_addr_t &device_addr):
     ////////////////////////////////////////////////////////////////////
     // Initialize control (settings regs and async messages)
     ////////////////////////////////////////////////////////////////////
-    _ctrl = b200_ctrl::make(_ctrl_transport);
-    _tree->create<time_spec_t>(mb_path / "time/cmd")
-        .subscribe(boost::bind(&b200_ctrl::set_time, _ctrl, _1));
+    _ctrl = radio_ctrl_core_3000::make(vrt::if_packet_info_t::LINK_TYPE_CHDR, _ctrl_transport, zero_copy_if::sptr()/*null*/, B200_CTRL_MSG_SID);
+    _ctrl->hold_task(_async_task);
+    _tree->create<time_spec_t>(mb_path / "time" / "cmd")
+        .subscribe(boost::bind(&radio_ctrl_core_3000::set_time, _ctrl, _1));
     /*
     this->check_fpga_compat(); //check after making
     */
@@ -260,18 +343,6 @@ b200_impl::b200_impl(const device_addr_t &device_addr):
         data_xport_args    // param hints
     );
     while (_data_transport->get_recv_buff(0.0)){} //flush ctrl xport
-
-    ////////////////////////////////////////////////////////////////////
-    // setup the mboard eeprom
-    ////////////////////////////////////////////////////////////////////
-    // TODO
-//    const mboard_eeprom_t mb_eeprom(*_iface, mboard_eeprom_t::MAP_B100);
-    mboard_eeprom_t mb_eeprom;
-    mb_eeprom["name"] = "TODO"; //FIXME with real eeprom values
-    mb_eeprom["serial"] = "TODO"; //FIXME with real eeprom values
-    _tree->create<mboard_eeprom_t>(mb_path / "eeprom")
-        .set(mb_eeprom)
-        .subscribe(boost::bind(&b200_impl::set_mb_eeprom, this, _1));
 
     ////////////////////////////////////////////////////////////////////
     // create gpio and misc controls
@@ -342,7 +413,7 @@ b200_impl::b200_impl(const device_addr_t &device_addr):
     ////////////////////////////////////////////////////////////////////
     // create rx dsp control objects
     ////////////////////////////////////////////////////////////////////
-    _rx_framer = rx_vita_core_3000::make(_ctrl, TOREG(SR_RX_CTRL+4), TOREG(SR_RX_CTRL));
+    _rx_framer = rx_vita_core_3000::make(_ctrl, TOREG(SR_RX_CTRL));
     for (size_t dspno = 0; dspno < B200_NUM_RX_FE; dspno++)
     {
         const fs_path rx_dsp_path = mb_path / "rx_dsps" / str(boost::format("%u") % dspno);
@@ -362,7 +433,7 @@ b200_impl::b200_impl(const device_addr_t &device_addr):
     ////////////////////////////////////////////////////////////////////
     // create tx dsp control objects
     ////////////////////////////////////////////////////////////////////
-    _tx_deframer = tx_vita_core_3000::make(_ctrl, TOREG(SR_TX_CTRL+2), TOREG(SR_TX_CTRL));
+    _tx_deframer = tx_vita_core_3000::make(_ctrl, TOREG(SR_TX_CTRL));
     for (size_t dspno = 0; dspno < B200_NUM_TX_FE; dspno++)
     {
         const fs_path tx_dsp_path = mb_path / "tx_dsps" / str(boost::format("%u") % dspno);
@@ -479,6 +550,18 @@ b200_impl::b200_impl(const device_addr_t &device_addr):
 
     _tree->access<std::string>(mb_path / "clock_source/value").set("internal");
     _tree->access<std::string>(mb_path / "time_source/value").set("none");
+
+    //GPS installed: use external ref, time, and init time spec
+    if (_gps and _gps->gps_detected())
+    {
+        UHD_MSG(status) << "Setting references to the internal GPSDO" << std::endl;
+        _tree->access<std::string>(mb_path / "time_source" / "value").set("gpsdo");
+        _tree->access<std::string>(mb_path / "clock_source" / "value").set("gpsdo");
+        UHD_MSG(status) << "Initializing time to the internal GPSDO" << std::endl;
+        const time_t tp = time_t(_gps->get_sensor("gps_time").to_int()+1);
+        _tree->access<time_spec_t>(mb_path / "time" / "pps").set(time_spec_t(tp));
+    }
+
 }
 
 b200_impl::~b200_impl(void)
@@ -487,7 +570,6 @@ b200_impl::~b200_impl(void)
     (
         _async_task.reset();
         _codec_ctrl->set_active_chains(false, false, false, false);
-        //_iface->set_fpga_reset_pin(true);
     )
 }
 
@@ -500,7 +582,7 @@ void b200_impl::register_loopback_self_test(void)
 {
     bool test_fail = false;
     UHD_MSG(status) << "Performing register loopback test... " << std::flush;
-    size_t hash = time(NULL);
+    size_t hash = size_t(time(NULL));
     for (size_t i = 0; i < 100; i++)
     {
         boost::hash_combine(hash, i);
@@ -515,7 +597,7 @@ void b200_impl::codec_loopback_self_test(void)
 {
     bool test_fail = false;
     UHD_MSG(status) << "Performing CODEC loopback test... " << std::flush;
-    size_t hash = time(NULL);
+    size_t hash = size_t(time(NULL));
     for (size_t i = 0; i < 100; i++)
     {
         boost::hash_combine(hash, i);
@@ -607,8 +689,7 @@ void b200_impl::check_fpga_compat(void)
 
 void b200_impl::set_mb_eeprom(const uhd::usrp::mboard_eeprom_t &mb_eeprom)
 {
-    //TODO
-    //mb_eeprom.commit(*_iface, mboard_eeprom_t::MAP_B100);
+    mb_eeprom.commit(*_iface, "B200");
 }
 
 
@@ -629,9 +710,7 @@ void b200_impl::update_clock_source(const std::string &source)
         throw uhd::key_error("update_clock_source: unknown source: " + source);
     }
 
-    _gpio_state.gps_out_enable = (source == "gpsdo_out")? 0 : 1;
-    _gpio_state.gps_ref_enable = (source == "gpsdo")? 0 : 1;
-    _gpio_state.ext_ref_enable = (source == "external")? 0 : 1;
+    _gpio_state.ref_sel = (source == "gpsdo")? 1 : 0;
     this->update_gpio_state();
 }
 
@@ -642,7 +721,6 @@ void b200_impl::update_time_source(const std::string &source)
     else if (source == "gpsdo"){}
     else throw uhd::key_error("update_time_source: unknown source: " + source);
     _time64->set_time_source((source == "external")? "external" : "internal");
-    _gpio_state.pps_fpga_out_enable = 0;
     this->update_gpio_state();
 }
 
@@ -693,12 +771,9 @@ void b200_impl::update_gpio_state(void)
         | (_gpio_state.rx_bandsel_a << 8)
         | (_gpio_state.rx_bandsel_b << 7)
         | (_gpio_state.rx_bandsel_c << 6)
-        | (_gpio_state.mimo_tx << 5)
-        | (_gpio_state.mimo_rx << 4)
-        | (_gpio_state.ext_ref_enable << 3)
-        | (_gpio_state.pps_fpga_out_enable << 2)
-        | (_gpio_state.gps_out_enable << 1)
-        | (_gpio_state.gps_ref_enable << 0)
+        | (_gpio_state.mimo_tx << 2)
+        | (_gpio_state.mimo_rx << 1)
+        | (_gpio_state.ref_sel << 0)
     ;
 
     _ctrl->poke32(TOREG(SR_MISC_OUTS), misc_word);
@@ -750,20 +825,4 @@ sensor_value_t b200_impl::get_ref_locked(void)
 {
     const bool lock = _adf4001_iface->locked();
     return sensor_value_t("Ref", lock, "locked", "unlocked");
-}
-
-static inline bool wait_for_recv_ready(int sock_fd, const size_t timeout_ms)
-{
-    //setup timeval for timeout
-    timeval tv;
-    tv.tv_sec = 0;
-    tv.tv_usec = timeout_ms*1000;
-
-    //setup rset for timeout
-    fd_set rset;
-    FD_ZERO(&rset);
-    FD_SET(sock_fd, &rset);
-
-    //call select with timeout on receive socket
-    return ::select(sock_fd+1, &rset, NULL, NULL, &tv) > 0;
 }

@@ -31,6 +31,9 @@ public:
 
     //! makes a new spi core from iface and slave base
     static sptr make(wb_iface::sptr iface, const size_t base, const size_t readback);
+
+    //! Set the spi clock divider to something usable
+    virtual void set_divider(const double div) = 0;
 };
 
 #endif /* INCLUDED_LIBUHD_USRP_SPI_CORE_3000_HPP */

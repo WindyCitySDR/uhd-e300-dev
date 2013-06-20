@@ -135,22 +135,30 @@ static void b200_if_hdr_pack_le(
 bool b200_impl::recv_async_msg(
     async_metadata_t &async_metadata, double timeout
 ){
-    boost::shared_ptr<sph::send_packet_streamer> my_streamer =
-        boost::dynamic_pointer_cast<sph::send_packet_streamer>(_tx_streamer.lock());
-    if (my_streamer) return my_streamer->recv_async_msg(async_metadata, timeout);
-    return false;
+    return _async_md->pop_with_timed_wait(async_metadata, timeout);
 }
 
-void b200_impl::handle_async_task(void)
+void b200_impl::handle_async_task(
+    uhd::transport::zero_copy_if::sptr xport,
+    boost::shared_ptr<async_md_type> async_md,
+    b200_uart::sptr gpsdo_uart
+)
 {
-    managed_recv_buffer::sptr buff = _ctrl_transport->get_recv_buff();
+    managed_recv_buffer::sptr buff = xport->get_recv_buff();
     if (not buff or buff->size() < 8) return;
     const boost::uint32_t sid = uhd::wtohx(buff->cast<const boost::uint32_t *>()[1]);
 
     //if the packet is a control response
     if (sid == B200_RESP_MSG_SID)
     {
-        _ctrl->push_resp(buff->cast<const boost::uint32_t *>());
+        _ctrl->push_response(buff->cast<const boost::uint32_t *>());
+        return;
+    }
+
+    //if the packet is a uart message
+    if (sid == B200_RX_GPS_UART_SID)
+    {
+        gpsdo_uart->handle_uart_packet(buff);
         return;
     }
 
@@ -176,7 +184,7 @@ void b200_impl::handle_async_task(void)
         //fill in the async metadata
         async_metadata_t metadata;
         load_metadata_from_buff(uhd::wtohx<boost::uint32_t>, metadata, if_packet_info, packet_buff, _tick_rate);
-        _async_md.push_with_pop_on_full(metadata);
+        async_md->push_with_pop_on_full(metadata);
         standard_async_msg_prints(metadata);
         return;
     }
@@ -300,7 +308,7 @@ tx_streamer::sptr b200_impl::get_tx_stream(const uhd::stream_args_t &args_)
         &zero_copy_if::get_send_buff, _data_transport, _1
     ));
     my_streamer->set_async_receiver(boost::bind(
-        &bounded_buffer<async_metadata_t>::pop_with_timed_wait, &_async_md, _1, _2
+        &bounded_buffer<async_metadata_t>::pop_with_timed_wait, _async_md, _1, _2
     ));
     my_streamer->set_xport_chan_sid(0, true, B200_TX_DATA_SID_BASE);
     my_streamer->set_enable_trailer(false); //TODO not implemented trailer support yet

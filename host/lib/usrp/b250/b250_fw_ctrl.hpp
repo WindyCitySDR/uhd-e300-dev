@@ -22,10 +22,14 @@
 #include <uhd/transport/udp_simple.hpp>
 #include <uhd/utils/byteswap.hpp>
 #include <uhd/utils/msg.hpp>
+#include <uhd/exception.hpp>
+#include <boost/format.hpp>
 #include <boost/thread/mutex.hpp>
 
 struct b250_ctrl_iface : wb_iface
 {
+    enum {num_retries = 3};
+
     b250_ctrl_iface(uhd::transport::udp_simple::sptr udp):
         udp(udp), seq(0)
     {
@@ -48,6 +52,43 @@ struct b250_ctrl_iface : wb_iface
 
     void poke32(const wb_addr_type addr, const boost::uint32_t data)
     {
+        for (size_t i = 1; i <= num_retries; i++)
+        {
+            try
+            {
+                return this->__poke32(addr, data);
+            }
+            catch(const std::exception &ex)
+            {
+                const std::string error_msg = str(boost::format(
+                    "b250 fw communication failure #%u\n%s") % i % ex.what());
+                UHD_MSG(error) << error_msg << std::endl;
+                if (i == num_retries) throw uhd::io_error(error_msg);
+            }
+        }
+    }
+
+    boost::uint32_t peek32(const wb_addr_type addr)
+    {
+        for (size_t i = 1; i <= num_retries; i++)
+        {
+            try
+            {
+                return this->__peek32(addr);
+            }
+            catch(const std::exception &ex)
+            {
+                const std::string error_msg = str(boost::format(
+                    "b250 fw communication failure #%u\n%s") % i % ex.what());
+                UHD_MSG(error) << error_msg << std::endl;
+                if (i == num_retries) throw uhd::io_error(error_msg);
+            }
+        }
+        return 0;
+    }
+
+    void __poke32(const wb_addr_type addr, const boost::uint32_t data)
+    {
         boost::mutex::scoped_lock lock(mutex);
 
         //load request struct
@@ -64,7 +105,7 @@ struct b250_ctrl_iface : wb_iface
         //recv reply
         b250_fw_comms_t reply = b250_fw_comms_t();
         const size_t nbytes = udp->recv(boost::asio::buffer(&reply, sizeof(reply)), 1.0);
-        UHD_ASSERT_THROW(nbytes != 0);
+        if (nbytes == 0) throw uhd::io_error("b250 fw poke32 - reply timed out");
 
         //sanity checks
         const size_t flags = uhd::ntohx<boost::uint32_t>(reply.flags);
@@ -77,7 +118,7 @@ struct b250_ctrl_iface : wb_iface
         UHD_ASSERT_THROW(reply.data == request.data);
     }
 
-    boost::uint32_t peek32(const wb_addr_type addr)
+    boost::uint32_t __peek32(const wb_addr_type addr)
     {
         boost::mutex::scoped_lock lock(mutex);
 
@@ -95,7 +136,7 @@ struct b250_ctrl_iface : wb_iface
         //recv reply
         b250_fw_comms_t reply = b250_fw_comms_t();
         const size_t nbytes = udp->recv(boost::asio::buffer(&reply, sizeof(reply)), 1.0);
-        UHD_ASSERT_THROW(nbytes != 0);
+        if (nbytes == 0) throw uhd::io_error("b250 fw peek32 - reply timed out");
 
         //sanity checks
         const size_t flags = uhd::ntohx<boost::uint32_t>(reply.flags);

@@ -18,6 +18,7 @@
 #include "e200_impl.hpp"
 #include "e200_regs.hpp"
 #include <uhd/utils/msg.hpp>
+#include <uhd/utils/log.hpp>
 #include <uhd/utils/static.hpp>
 #include <uhd/utils/images.hpp>
 #include <uhd/usrp/dboard_eeprom.hpp>
@@ -40,8 +41,12 @@ namespace asio = boost::asio;
 /***********************************************************************
  * Discovery
  **********************************************************************/
-static device_addrs_t e200_find(const device_addr_t &hint)
+static device_addrs_t e200_find(const device_addr_t &hint_)
 {
+    //we only do single device discovery for now
+    const device_addr_t hint = separate_device_addr(hint_).at(0);
+
+    UHD_LOG << "e200_find with hint " << hint.to_pp_string() << std::endl;
     device_addrs_t e200_addrs;
 
     //return an empty list of addresses when type is set to non-e200
@@ -50,6 +55,7 @@ static device_addrs_t e200_find(const device_addr_t &hint)
     // need network discovery that takes addr
     if (hint.has_key("addr")) try
     {
+        UHD_LOG << "e200_find try network discovery..." << std::endl;
         asio::io_service io_service;
         asio::ip::udp::resolver resolver(io_service);
         asio::ip::udp::resolver::query query(asio::ip::udp::v4(), hint["addr"], E200_SERVER_CODEC_PORT);
@@ -64,9 +70,13 @@ static device_addrs_t e200_find(const device_addr_t &hint)
         new_addr["type"] = "e200";
         new_addr["addr"] = hint["addr"];
         e200_addrs.push_back(new_addr);
+        UHD_LOG << "e200_find network discovery good " << new_addr.to_pp_string() << std::endl;
         return e200_addrs;
     }
-    catch(...){}
+    catch(...)
+    {
+        UHD_LOG << "e200_find network discovery threw" << std::endl;
+    }
 
     //device node not provided, assume its 0
     if (not hint.has_key("node"))
@@ -101,6 +111,7 @@ static device_addrs_t e200_find(const device_addr_t &hint)
  **********************************************************************/
 static device::sptr e200_make(const device_addr_t &device_addr)
 {
+    UHD_LOG << "e200_make with args " << device_addr.to_pp_string() << std::endl;
     return device::sptr(new e200_impl(device_addr));
 }
 
@@ -496,7 +507,7 @@ void e200_impl::setup_radio(const size_t dspno)
     ////////////////////////////////////////////////////////////////////
     // radio control
     ////////////////////////////////////////////////////////////////////
-    perif.ctrl = e200_ctrl::make(perif.send_ctrl_xport, perif.recv_ctrl_xport, 1 | (1 << 16));
+    perif.ctrl = radio_ctrl_core_3000::make(vrt::if_packet_info_t::LINK_TYPE_CHDR, perif.send_ctrl_xport, perif.recv_ctrl_xport, 1 | (1 << 16));
     this->register_loopback_self_test(perif.ctrl);
     perif.atr0 = gpio_core_200_32wo::make(perif.ctrl, TOREG(SR_GPIO));
     perif.atr1 = gpio_core_200_32wo::make(perif.ctrl, TOREG(SR_GPIO2));
@@ -504,7 +515,7 @@ void e200_impl::setup_radio(const size_t dspno)
     ////////////////////////////////////////////////////////////////////
     // create rx dsp control objects
     ////////////////////////////////////////////////////////////////////
-    perif.framer = rx_vita_core_3000::make(perif.ctrl, TOREG(SR_RX_CTRL+4), TOREG(SR_RX_CTRL));
+    perif.framer = rx_vita_core_3000::make(perif.ctrl, TOREG(SR_RX_CTRL));
     perif.ddc = rx_dsp_core_3000::make(perif.ctrl, TOREG(SR_RX_DSP));
     perif.ddc->set_link_rate(10e9/8); //whatever
     _tree->access<double>(mb_path / "tick_rate")
@@ -528,7 +539,7 @@ void e200_impl::setup_radio(const size_t dspno)
     ////////////////////////////////////////////////////////////////////
     // create tx dsp control objects
     ////////////////////////////////////////////////////////////////////
-    perif.deframer = tx_vita_core_3000::make(perif.ctrl, TOREG(SR_TX_CTRL+2), TOREG(SR_TX_CTRL));
+    perif.deframer = tx_vita_core_3000::make(perif.ctrl, TOREG(SR_TX_CTRL));
     perif.duc = tx_dsp_core_3000::make(perif.ctrl, TOREG(SR_TX_DSP));
     perif.duc->set_link_rate(10e9/8); //whatever
     _tree->access<double>(mb_path / "tick_rate")

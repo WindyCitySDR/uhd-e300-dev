@@ -20,9 +20,9 @@
 // constants coded into the fpga parameters
 #define ZF_CONFIG_BASE 0x40000000
 #define ZF_PAGE_WIDTH 10
-#define H2S_STREAMS_WIDTH 2
+#define H2S_STREAMS_WIDTH 3
 #define H2S_CMDFIFO_DEPTH 10
-#define S2H_STREAMS_WIDTH 2
+#define S2H_STREAMS_WIDTH 3
 #define S2H_CMDFIFO_DEPTH 10
 
 // calculate more useful constants for this module
@@ -45,8 +45,9 @@
 #define ARBITER_RB_SIZE_SPACE 28
 
 //helper macros to determine config addrs
-#define H2S_BASE(base) (size_t(base) + (ZF_PAGE_SIZE*1))
 #define S2H_BASE(base) (size_t(base) + (ZF_PAGE_SIZE*0))
+#define H2S_BASE(base) (size_t(base) + (ZF_PAGE_SIZE*1))
+#define DST_BASE(base) (size_t(base) + (ZF_PAGE_SIZE*2))
 #define ZF_STREAM_OFF(which) ((which)*32)
 
 #include <boost/cstdint.hpp>
@@ -164,17 +165,29 @@ template <typename BaseClass>
 struct e200_transport : zero_copy_if
 {
 
-    e200_transport(const __mem_addrz_t &addrs, const size_t num_frames, const size_t frame_size, e200_fifo_poll_waiter *waiter, const bool auto_release):
-        _ctrl_base(addrs.ctrl), _num_frames(num_frames), _frame_size(frame_size), _index(0), _waiter(waiter)
+    e200_transport(
+        boost::shared_ptr<void> allocator,
+        const __mem_addrz_t &addrs,
+        const size_t num_frames,
+        const size_t frame_size,
+        e200_fifo_poll_waiter *waiter,
+        const bool auto_release
+    ):
+        _allocator(allocator),
+        _addrs(addrs),
+        _num_frames(num_frames),
+        _frame_size(frame_size),
+        _index(0),
+        _waiter(waiter)
     {
         UHD_MSG(status) << boost::format("phys 0x%x") % addrs.phys << std::endl;
         UHD_MSG(status) << boost::format("data 0x%x") % addrs.data << std::endl;
         UHD_MSG(status) << boost::format("ctrl 0x%x") % addrs.ctrl << std::endl;
 
-        const boost::uint32_t sig = zf_peek32(_ctrl_base + ARBITER_RD_SIG);
+        const boost::uint32_t sig = zf_peek32(_addrs.ctrl + ARBITER_RD_SIG);
         UHD_ASSERT_THROW((sig >> 16) == 0xACE0);
 
-        zf_poke32(_ctrl_base + ARBITER_WR_CLEAR, 1);
+        zf_poke32(_addrs.ctrl + ARBITER_WR_CLEAR, 1);
         for (size_t i = 0; i < num_frames; i++)
         {
             //create a managed buffer at the given offset
@@ -184,8 +197,9 @@ struct e200_transport : zero_copy_if
             boost::shared_ptr<e200_fifo_mb> mb(new e200_fifo_mb(mb_addrs, frame_size));
 
             //setup the buffers so they are "positioned for use"
+            const size_t sts_good = (1 << 7) | (_addrs.which & 0xf);
             if (auto_release) mb->get_new<managed_recv_buffer>(); //release for read
-            else zf_poke32(_ctrl_base + ARBITER_WR_STS, 1 << 7); //poke an ok into the sts fifo
+            else zf_poke32(_addrs.ctrl + ARBITER_WR_STS, sts_good); //poke an ok into the sts fifo
 
             _buffs.push_back(mb);
         }
@@ -202,11 +216,12 @@ struct e200_transport : zero_copy_if
         const time_spec_t exit_time = time_spec_t::get_system_time() + time_spec_t(timeout);
         do
         {
-            if (zf_peek32(_ctrl_base + ARBITER_RB_STATUS_OCC))
+            if (zf_peek32(_addrs.ctrl + ARBITER_RB_STATUS_OCC))
             {
-                const boost::uint32_t sts = zf_peek32(_ctrl_base + ARBITER_RB_STATUS);
+                const boost::uint32_t sts = zf_peek32(_addrs.ctrl + ARBITER_RB_STATUS);
                 UHD_ASSERT_THROW((sts >> 7) & 0x1); //assert OK
-                zf_poke32(_ctrl_base + ARBITER_WR_STS_RDY, 1); //pop from sts fifo
+                UHD_ASSERT_THROW((sts & 0xf) == _addrs.which); //expected tag
+                zf_poke32(_addrs.ctrl + ARBITER_WR_STS_RDY, 1); //pop from sts fifo
                 if (_index == _num_frames) _index = 0;
                 return _buffs[_index++]->get_new<T>();
             }
@@ -248,7 +263,8 @@ struct e200_transport : zero_copy_if
         return _frame_size;
     }
 
-    const size_t _ctrl_base;
+    boost::shared_ptr<void> _allocator;
+    const __mem_addrz_t _addrs;
     const size_t _num_frames;
     const size_t _frame_size;
     size_t _index;
@@ -279,7 +295,7 @@ struct e200_fifo_interface_impl : e200_fifo_interface
         UHD_VAR(config.ctrl_length);
         UHD_VAR(config.buff_length);
         UHD_VAR(config.phys_addr);
-        void *buff = ::mmap(NULL, config.ctrl_length + config.buff_length, PROT_READ|PROT_WRITE, MAP_SHARED, fd, 0);
+        buff = ::mmap(NULL, config.ctrl_length + config.buff_length, PROT_READ|PROT_WRITE, MAP_SHARED, fd, 0);
         if (buff == MAP_FAILED)
         {
             ::close(fd);
@@ -300,17 +316,15 @@ struct e200_fifo_interface_impl : e200_fifo_interface
     ~e200_fifo_interface_impl(void)
     {
         delete waiter;
-        UHD_HERE();
         UHD_LOG << "cleanup: munmap" << std::endl;
-        UHD_HERE();
         ::munmap(buff, config.ctrl_length + config.buff_length);
-        UHD_HERE();
         ::close(fd);
-        UHD_HERE();
     }
 
     uhd::transport::zero_copy_if::sptr make_xport(const size_t which_stream, const uhd::device_addr_t &args, const bool is_recv)
     {
+        boost::mutex::scoped_lock lock(setup_mutex);
+
         const size_t frame_size(size_t(args.cast<double>((is_recv)? "recv_frame_size" : "send_frame_size", DEFAULT_FRAME_SIZE)));
         const size_t num_frames(size_t(args.cast<double>((is_recv)? "num_recv_frames" : "num_send_frames", DEFAULT_NUM_FRAMES)));
         size_t &entries_in_use = (is_recv)? recv_entries_in_use : send_entries_in_use;
@@ -322,8 +336,8 @@ struct e200_fifo_interface_impl : e200_fifo_interface
         addrs.ctrl = ((is_recv)? S2H_BASE(ctrl_space) : H2S_BASE(ctrl_space)) + ZF_STREAM_OFF(which_stream);
 
         uhd::transport::zero_copy_if::sptr xport;
-        if (is_recv) xport.reset(new e200_transport<managed_recv_buffer>(addrs, num_frames, frame_size, waiter, is_recv));
-        else         xport.reset(new e200_transport<managed_send_buffer>(addrs, num_frames, frame_size, waiter, is_recv));
+        if (is_recv) xport.reset(new e200_transport<managed_recv_buffer>(shared_from_this(), addrs, num_frames, frame_size, waiter, is_recv));
+        else         xport.reset(new e200_transport<managed_send_buffer>(shared_from_this(), addrs, num_frames, frame_size, waiter, is_recv));
 
         bytes_in_use += num_frames*frame_size;
         entries_in_use += num_frames;
@@ -331,6 +345,13 @@ struct e200_fifo_interface_impl : e200_fifo_interface
         UHD_ASSERT_THROW(recv_entries_in_use <= S2H_NUM_CMDS);
         UHD_ASSERT_THROW(send_entries_in_use <= H2S_NUM_CMDS);
         UHD_ASSERT_THROW(bytes_in_use <= config.buff_length);
+
+        //program the dest table based on the stream
+        //TODO make this part of SID allocation
+        if (is_recv)
+        {
+            zf_poke32(DST_BASE(ctrl_space) + which_stream*4, which_stream);
+        }
 
         return xport;
     }
@@ -354,6 +375,7 @@ struct e200_fifo_interface_impl : e200_fifo_interface
     size_t data_space;
     size_t recv_entries_in_use;
     size_t send_entries_in_use;
+    boost::mutex setup_mutex;
 };
 
 e200_fifo_interface::sptr e200_fifo_interface::make(const e200_fifo_config_t &config)

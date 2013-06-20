@@ -24,12 +24,11 @@
 ########################################################################
 find_package(UDev)
 
-LIBUHD_REGISTER_COMPONENT("E200" ENABLE_E200 OFF "ENABLE_LIBUHD;LINUX" OFF)
+LIBUHD_REGISTER_COMPONENT("E200" ENABLE_E200 ON "ENABLE_LIBUHD" OFF)
 
 IF(ENABLE_E200)
     LIST(APPEND E200_SOURCES
         ${CMAKE_CURRENT_SOURCE_DIR}/e200_impl.cpp
-        ${CMAKE_CURRENT_SOURCE_DIR}/e200_ctrl.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/e200_io_impl.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/e200_fifo_config.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/e200_sysfs_hooks.cpp
