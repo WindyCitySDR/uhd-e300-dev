@@ -6,10 +6,10 @@
 
 #define CPU_CLOCK 175000000
 #define MAIN_RAM_BASE 0x0000
-#define BOOT_RAM_BASE 0x4000
 #define PKT_RAM0_BASE 0x8000
 #define XGE0_BASE 0xC000
 #define XGE1_BASE 0xD000
+#define BOOT_LDR_BASE 0xFC00
 #define UART0_BASE 0xfd00
 #define UART0_BAUD 115200
 #define I2C0_BASE 0xfe00
@@ -22,7 +22,7 @@
 
 // Setting Regs Memeory Map
 static const int SR_LEDS       = 0;
-static const int SR_SW_RST    = 1;
+static const int SR_SW_RST     = 1;
 static const int SR_CLOCK_CTRL = 2;
 static const int SR_XB_LOCAL   = 3;
 static const int SR_SFPP_CTRL  = 4;
@@ -36,6 +36,10 @@ static const int RB_SPI_RDY     = 1;
 static const int RB_SPI_DATA    = 2;
 static const int RB_SFPP_STATUS = 3;
 static const int RB_VERSION     = 4;
+
+// Bootloader Memory Map
+static const int BL_ADDRESS     = 0;
+static const int BL_DATA        = 1;
 
 #define SW_RST_PHY 0x01
 #define SW_RST_RADIO 0x02

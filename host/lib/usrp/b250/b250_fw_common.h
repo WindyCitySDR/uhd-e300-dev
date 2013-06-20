@@ -29,16 +29,27 @@
 extern "C" {
 #endif
 
-#define B250_FW_NUM_BYTES (1 << 14) //16k
+#define B250_FW_NUM_BYTES (1 << 15) //64k
 #define B250_FW_COMMS_MTU (1 << 13) //8k
 #define B250_FW_COMMS_UDP_PORT 49152
+
 #define B250_VITA_UDP_PORT 49153
 #define B250_GPSDO_UDP_PORT 49156
+#define B250_FPGA_PROG_UDP_PORT 49157
 
 #define B250_FW_COMMS_FLAGS_ACK        (1 << 0)
 #define B250_FW_COMMS_FLAGS_ERROR      (1 << 1)
 #define B250_FW_COMMS_FLAGS_POKE32     (1 << 2)
 #define B250_FW_COMMS_FLAGS_PEEK32     (1 << 3)
+
+#define B250_FPGA_PROG_FLAGS_ACK       (1 << 0)
+#define B250_FPGA_PROG_FLAGS_ERROR     (1 << 1)
+#define B250_FPGA_PROG_FLAGS_INIT      (1 << 2)
+#define B250_FPGA_PROG_FLAGS_CLEANUP   (1 << 3)
+#define B250_FPGA_PROG_FLAGS_ERASE     (1 << 4)
+#define B250_FPGA_PROG_FLAGS_VERIFY    (1 << 5)
+#define B250_FPGA_PROG_CONFIGURE       (1 << 6)
+#define B250_FPGA_PROG_CONFIG_STATUS   (1 << 7)
 
 typedef struct
 {
@@ -47,6 +58,20 @@ typedef struct
     uint32_t addr;
     uint32_t data;
 } b250_fw_comms_t;
+
+typedef struct
+{
+    uint32_t flags;
+    uint32_t sector;
+    uint32_t index;
+    uint32_t size;
+    uint16_t data[128];
+} b250_fpga_prog_t;
+
+typedef struct
+{
+    uint32_t flags;
+} b250_fpga_prog_flags_t;
 
 #ifdef __cplusplus
 }

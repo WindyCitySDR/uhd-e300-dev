@@ -131,26 +131,34 @@ static void b250_load_fw(const std::string &addr, const std::string &file_name)
 
     //poke the fw words into the upper bootram half
     size_t seq = 0;
+    b250_fw_comms_t request = b250_fw_comms_t();
+    char buff[B250_FW_COMMS_MTU] = {};
+
+    request.flags = uhd::htonx<boost::uint32_t>(B250_FW_COMMS_FLAGS_POKE32 | B250_FW_COMMS_FLAGS_ACK);
+    request.sequence = uhd::htonx<boost::uint32_t>(seq++);
+    request.addr = uhd::htonx<boost::uint32_t>(SR_ADDR(BOOT_LDR_BASE, BL_ADDRESS));
+    request.data = 0;
+    comm->send(asio::buffer(&request, sizeof(request)));
+    comm->recv(asio::buffer(buff));
+
     for (size_t i = 0; i < B250_FW_NUM_BYTES; i+=sizeof(boost::uint32_t))
     {
         //do ack for occasional backpressure
         const bool ack = (i & 0xf) == 0;
 
         //load request struct
-        b250_fw_comms_t request = b250_fw_comms_t();
         request.flags = uhd::htonx<boost::uint32_t>(B250_FW_COMMS_FLAGS_POKE32 | (ack?B250_FW_COMMS_FLAGS_ACK : 0));
         request.sequence = uhd::htonx<boost::uint32_t>(seq++);
-        request.addr = uhd::htonx<boost::uint32_t>(B250_FW_NUM_BYTES+i);
+        request.addr = uhd::htonx<boost::uint32_t>(SR_ADDR(BOOT_LDR_BASE, BL_DATA));
         request.data = uhd::htonx(uhd::byteswap(fw_file_buff[i/sizeof(boost::uint32_t)]));
 
         //send request
         comm->send(asio::buffer(&request, sizeof(request)));
 
         //do ack for occasional backpressure
-        char buff[B250_FW_COMMS_MTU] = {};
         if (ack) comm->recv(asio::buffer(buff));
 
-        if ((i & 0xfff) == 0) UHD_MSG(status) << "." << std::flush;
+        if ((i & 0x1fff) == 0) UHD_MSG(status) << "." << std::flush;
     }
 
     UHD_MSG(status) << " done!" << std::endl;
