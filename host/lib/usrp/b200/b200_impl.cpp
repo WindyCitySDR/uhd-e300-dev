@@ -276,6 +276,9 @@ b200_impl::b200_impl(const device_addr_t &device_addr)
     _local_ctrl->hold_task(_async_task);
     this->check_fpga_compat();
 
+    //cause a radio clock domain reset once bus domain is up
+    this->reset_codec_dcm();
+
     ////////////////////////////////////////////////////////////////////
     // Create the GPSDO control
     ////////////////////////////////////////////////////////////////////
@@ -627,6 +630,9 @@ void b200_impl::set_tick_rate(const double raw_rate)
     //clip rate (which can be doubled by factor) to possible bounds
     const double rate = ad9361_ctrl::get_samp_rate_range().clip(raw_rate);
 
+    //reset after clock rate change
+    this->reset_codec_dcm();
+
     const size_t factor = ((_fe_enb_map["RX1"] and _fe_enb_map["RX2"]) or (_fe_enb_map["TX1"] and _fe_enb_map["TX2"]))? 2:1;
     //UHD_MSG(status) << "asking for clock rate " << rate/1e6 << " MHz\n";
     _tick_rate = _codec_ctrl->set_clock_rate(rate/factor)*factor;
@@ -784,17 +790,26 @@ void b200_impl::update_bandsel(const std::string& which, double freq)
 void b200_impl::update_gpio_state(void)
 {
     const boost::uint32_t misc_word = 0
-        | (_gpio_state.tx_bandsel_a << 10)
-        | (_gpio_state.tx_bandsel_b << 9)
-        | (_gpio_state.rx_bandsel_a << 8)
-        | (_gpio_state.rx_bandsel_b << 7)
-        | (_gpio_state.rx_bandsel_c << 6)
-        | (_gpio_state.mimo_tx << 2)
-        | (_gpio_state.mimo_rx << 1)
+        | (_gpio_state.tx_bandsel_a << 7)
+        | (_gpio_state.tx_bandsel_b << 6)
+        | (_gpio_state.rx_bandsel_a << 5)
+        | (_gpio_state.rx_bandsel_b << 4)
+        | (_gpio_state.rx_bandsel_c << 3)
+        | (_gpio_state.codec_arst << 2)
+        | (_gpio_state.mimo << 1)
         | (_gpio_state.ref_sel << 0)
     ;
 
-    _ctrl->poke32(TOREG(SR_MISC_OUTS), misc_word);
+    _local_ctrl->poke32(TOREG(RB32_CORE_MISC), misc_word);
+}
+
+void b200_impl::reset_codec_dcm(void)
+{
+    _gpio_state.codec_arst = 1;
+    this->update_gpio_state();
+    boost::this_thread::sleep(boost::posix_time::milliseconds(10));
+    _gpio_state.codec_arst = 0;
+    this->update_gpio_state();
 }
 
 void b200_impl::update_atrs(void)
@@ -837,6 +852,14 @@ void b200_impl::update_enables(void)
 {
     _codec_ctrl->set_active_chains(_fe_enb_map["TX1"], _fe_enb_map["TX2"], _fe_enb_map["RX1"], _fe_enb_map["RX2"]);
     this->update_atrs();
+
+    //figure out if mimo is enabled based on new state
+    const bool mimo = (_fe_enb_map["TX1"] and _fe_enb_map["TX2"]) or (_fe_enb_map["RX1"] and _fe_enb_map["RX2"]);
+    _gpio_state.mimo = (mimo)? 1 : 0;
+    update_gpio_state();
+
+    //this could cause a clock rate change - reset dcm
+    this->reset_codec_dcm();
 }
 
 sensor_value_t b200_impl::get_ref_locked(void)

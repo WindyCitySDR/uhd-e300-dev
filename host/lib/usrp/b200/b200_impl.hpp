@@ -133,8 +133,7 @@ struct b200_impl : public uhd::device
     uhd::sensor_value_t get_ref_locked(void);
 
     struct gpio_state {
-        boost::uint32_t  tx_bandsel_a, tx_bandsel_b, rx_bandsel_a, rx_bandsel_b, rx_bandsel_c;
-        boost::uint32_t  mimo_tx, mimo_rx, ref_sel;
+        boost::uint32_t  tx_bandsel_a, tx_bandsel_b, rx_bandsel_a, rx_bandsel_b, rx_bandsel_c, codec_arst, mimo, ref_sel;
 
         gpio_state() {
             tx_bandsel_a = 0;
@@ -142,13 +141,14 @@ struct b200_impl : public uhd::device
             rx_bandsel_a = 0;
             rx_bandsel_b = 0;
             rx_bandsel_c = 0;
-            mimo_tx = 0;
-            mimo_rx = 0;
+            codec_arst = 0;
+            mimo = 0;
             ref_sel = 0;
         }
     } _gpio_state;
 
     void update_gpio_state(void);
+    void reset_codec_dcm(void);
 
     uhd::dict<std::string, std::string> _fe_ant_map;
     uhd::dict<std::string, bool> _fe_enb_map;

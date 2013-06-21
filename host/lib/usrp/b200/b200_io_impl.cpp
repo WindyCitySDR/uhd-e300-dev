@@ -108,7 +108,7 @@ void b200_impl::issue_stream_cmd(const size_t dspno, const uhd::stream_cmd_t &cm
     if (dspno == 0)
     {
         uhd::stream_cmd_t new_cmd = cmd;
-        if (_gpio_state.mimo_rx) new_cmd.num_samps *= 2;
+        if (_gpio_state.mimo) new_cmd.num_samps *= 2;
         _rx_framer->issue_stream_command(new_cmd);
     }
 }
@@ -260,10 +260,6 @@ rx_streamer::sptr b200_impl::get_rx_stream(const uhd::stream_args_t &args_)
     //sets all tick and samp rates on this streamer
     this->update_streamer_rates();
 
-    //set the mimo bit as per number of channels
-    _gpio_state.mimo_rx = (nchans == 2)? 1 : 0;
-    update_gpio_state();
-
     return my_streamer;
 }
 
@@ -323,10 +319,6 @@ tx_streamer::sptr b200_impl::get_tx_stream(const uhd::stream_args_t &args_)
 
     //sets all tick and samp rates on this streamer
     this->update_streamer_rates();
-
-    //set the mimo bit as per number of channels
-    _gpio_state.mimo_tx = (nchans == 2)? 1 : 0;
-    update_gpio_state();
 
     return my_streamer;
 }
