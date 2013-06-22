@@ -282,11 +282,10 @@ b200_impl::b200_impl(const device_addr_t &device_addr)
     ////////////////////////////////////////////////////////////////////
     // Create the GPSDO control
     ////////////////////////////////////////////////////////////////////
-    static const boost::uint32_t dont_look_for_gpsdo = 0x1234abcdul;
+    static const boost::uint32_t dont_look_for_gpsdo = 0x83;
 
     //otherwise if not disabled, look for the internal GPSDO
-    //TODO if (_iface->peekfw(U2_FW_REG_HAS_GPSDO) != dont_look_for_gpsdo)
-    //if (false)
+    if ((_local_ctrl->peek32(RB32_CORE_GPS) & 0xff) != dont_look_for_gpsdo)
     {
         UHD_MSG(status) << "Detecting internal GPSDO.... " << std::flush;
         try
@@ -309,7 +308,7 @@ b200_impl::b200_impl(const device_addr_t &device_addr)
         else
         {
             UHD_MSG(status) << "not found" << std::endl;
-            //TODO _iface->pokefw(U2_FW_REG_HAS_GPSDO, dont_look_for_gpsdo);
+            _local_ctrl->poke32(TOREG(SR_CORE_GPSDO_ST), dont_look_for_gpsdo);
         }
     }
 
