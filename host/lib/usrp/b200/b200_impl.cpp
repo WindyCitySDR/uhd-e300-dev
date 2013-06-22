@@ -216,12 +216,18 @@ b200_impl::b200_impl(const device_addr_t &device_addr)
     // Load the FPGA image, then reset GPIF
     ////////////////////////////////////////////////////////////////////
     std::string default_file_name;
+    bool look_for_gpsdo = false;
+    size_t num_radio_chains = 1;
     if (not mb_eeprom["product"].empty())
     {
         switch (boost::lexical_cast<boost::uint16_t>(mb_eeprom["product"]))
         {
         case 0x0001: default_file_name = B200_FPGA_FILE_NAME; break;
-        case 0x0002: default_file_name = B210_FPGA_FILE_NAME; break;
+        case 0x0002:
+            look_for_gpsdo = true;
+            num_radio_chains = 2;
+            default_file_name = B210_FPGA_FILE_NAME;
+            break;
         default: throw uhd::runtime_error("b200 unknown product code: " + mb_eeprom["product"]);
         }
     }
@@ -280,10 +286,8 @@ b200_impl::b200_impl(const device_addr_t &device_addr)
     ////////////////////////////////////////////////////////////////////
     // Create the GPSDO control
     ////////////////////////////////////////////////////////////////////
-    static const boost::uint32_t dont_look_for_gpsdo = 0x83;
 
-    //otherwise if not disabled, look for the internal GPSDO
-    if ((_local_ctrl->peek32(RB32_CORE_GPS) & 0xff) != dont_look_for_gpsdo)
+    if (look_for_gpsdo and (_local_ctrl->peek32(RB32_CORE_GPS) & 0xff) != B200_GPSDO_ST_NONE)
     {
         UHD_MSG(status) << "Detecting internal GPSDO.... " << std::flush;
         try
@@ -306,7 +310,7 @@ b200_impl::b200_impl(const device_addr_t &device_addr)
         else
         {
             UHD_MSG(status) << "not found" << std::endl;
-            _local_ctrl->poke32(TOREG(SR_CORE_GPSDO_ST), dont_look_for_gpsdo);
+            _local_ctrl->poke32(TOREG(SR_CORE_GPSDO_ST), B200_GPSDO_ST_NONE);
         }
     }
 
@@ -397,9 +401,8 @@ b200_impl::b200_impl(const device_addr_t &device_addr)
     // setup radio control
     ////////////////////////////////////////////////////////////////////
     UHD_MSG(status) << "Initialize Radio control..." << std::endl;
-    _radio_perifs.resize(2);
-    this->setup_radio(0);
-    this->setup_radio(1);
+    _radio_perifs.resize(num_radio_chains);
+    for (size_t i = 0; i < _radio_perifs.size(); i++) this->setup_radio(i);
 
     _codec_ctrl->data_port_loopback(true);
     this->codec_loopback_self_test();
@@ -412,14 +415,19 @@ b200_impl::b200_impl(const device_addr_t &device_addr)
     _spi_iface->set_divider(B200_BUS_CLOCK_RATE/ADF4001_SPI_RATE);
     _adf4001_iface = boost::shared_ptr<adf4001_ctrl>(new adf4001_ctrl(_spi_iface, ADF4001_SLAVENO));
 
+    //register time now and pps onto available radio cores
     _tree->create<time_spec_t>(mb_path / "time" / "now")
-        .publish(boost::bind(&time_core_3000::get_time_now, _radio_perifs[0].time64))
-        .subscribe(boost::bind(&time_core_3000::set_time_now, _radio_perifs[0].time64, _1))
-        .subscribe(boost::bind(&time_core_3000::set_time_now, _radio_perifs[1].time64, _1));
+        .publish(boost::bind(&time_core_3000::get_time_now, _radio_perifs[0].time64));
     _tree->create<time_spec_t>(mb_path / "time" / "pps")
-        .publish(boost::bind(&time_core_3000::get_time_last_pps, _radio_perifs[0].time64))
-        .subscribe(boost::bind(&time_core_3000::set_time_next_pps, _radio_perifs[0].time64, _1))
-        .subscribe(boost::bind(&time_core_3000::set_time_next_pps, _radio_perifs[1].time64, _1));
+        .publish(boost::bind(&time_core_3000::get_time_last_pps, _radio_perifs[0].time64));
+    for (size_t i = 0; i < _radio_perifs.size(); i++)
+    {
+        _tree->access<time_spec_t>(mb_path / "time" / "now")
+            .subscribe(boost::bind(&time_core_3000::set_time_now, _radio_perifs[i].time64, _1));
+        _tree->access<time_spec_t>(mb_path / "time" / "pps")
+            .subscribe(boost::bind(&time_core_3000::set_time_next_pps, _radio_perifs[i].time64, _1));
+    }
+
     //setup time source props
     _tree->create<std::string>(mb_path / "time_source" / "value")
         .subscribe(boost::bind(&b200_impl::update_time_source, this, _1));
@@ -819,6 +827,7 @@ void b200_impl::reset_codec_dcm(void)
 
 void b200_impl::update_atrs(void)
 {
+    if (_radio_perifs.size() > 0)
     {
         const bool is_rx2 = _fe_ant_map.get("RX1", "RX2") == "RX2";
         const size_t rxonly = (_fe_enb_map["RX1"])? ((is_rx2)? STATE_RX1_RX2 : STATE_RX1_TXRX) : STATE_OFF;
@@ -833,6 +842,7 @@ void b200_impl::update_atrs(void)
         atr->set_atr_reg(dboard_iface::ATR_REG_TX_ONLY, txonly);
         atr->set_atr_reg(dboard_iface::ATR_REG_FULL_DUPLEX, fd);
     }
+    if (_radio_perifs.size() > 1)
     {
         const bool is_rx2 = _fe_ant_map.get("RX2", "RX2") == "RX2";
         const size_t rxonly = (_fe_enb_map["RX2"])? ((is_rx2)? STATE_RX2_RX2 : STATE_RX2_TXRX) : STATE_OFF;

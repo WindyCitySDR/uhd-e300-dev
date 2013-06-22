@@ -52,6 +52,8 @@ static const boost::uint8_t  B200_FW_COMPAT_NUM_MINOR = 0x00;
 static const boost::uint16_t B200_FPGA_COMPAT_NUM = 0x01;
 static const size_t          B200_MAX_PKT_BYTE_LIMIT = 2048*4;
 static const double          B200_LINK_RATE_BPS = (5e9)/8; //practical link rate (5 Gbps)
+static const double          B200_BUS_CLOCK_RATE = 100e6;
+static const boost::uint32_t B200_GPSDO_ST_NONE = 0x83;
 
 #define FLIP_SID(sid) (((sid)<<16)|((sid)>>16))
 
@@ -67,16 +69,15 @@ static const boost::uint32_t B200_TX_MSG0_SID = FLIP_SID(B200_TX_DATA0_SID);
 static const boost::uint32_t B200_TX_DATA1_SID = 0x00000060;
 static const boost::uint32_t B200_TX_MSG1_SID = FLIP_SID(B200_TX_DATA1_SID);
 
-static const boost::uint32_t B200_RX_DATA_SID = 0x00040000;
+static const boost::uint32_t B200_RX_DATA0_SID = 0x000000A0;
+static const boost::uint32_t B200_RX_DATA1_SID = 0x000000B0;
+
 static const boost::uint32_t B200_TX_GPS_UART_SID = 0x00000030;
 static const boost::uint32_t B200_RX_GPS_UART_SID = FLIP_SID(B200_TX_GPS_UART_SID);
 
 static const boost::uint32_t B200_LOCAL_CTRL_SID = 0x00000040;
 static const boost::uint32_t B200_LOCAL_RESP_SID = FLIP_SID(B200_LOCAL_CTRL_SID);
 
-static const double          B200_BUS_CLOCK_RATE = 100e6;
-static const size_t          B200_NUM_RX_FE = 2;
-static const size_t          B200_NUM_TX_FE = 2;
 
 
 /***********************************************************************
@@ -124,8 +125,6 @@ struct b200_impl : public uhd::device
     typedef uhd::transport::bounded_buffer<uhd::async_metadata_t> async_md_type;
     boost::shared_ptr<async_md_type> _async_md;
     void handle_async_task(uhd::transport::zero_copy_if::sptr, boost::shared_ptr<async_md_type>, b200_uart::sptr);
-
-    void issue_stream_cmd(const size_t dspno, const uhd::stream_cmd_t &);
 
     void register_loopback_self_test(wb_iface::sptr iface);
     void codec_loopback_self_test(void);
