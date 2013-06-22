@@ -244,6 +244,10 @@ b200_impl::b200_impl(const device_addr_t &device_addr)
     ////////////////////////////////////////////////////////////////////
     _codec_ctrl = ad9361_ctrl::make(_iface);
 
+    //default some chains on -- needed for setup purposes
+    _codec_ctrl->set_active_chains(true, false, true, false);
+    _codec_ctrl->set_clock_rate(50e6);
+
     ////////////////////////////////////////////////////////////////////
     // Create control transport
     ////////////////////////////////////////////////////////////////////
@@ -275,6 +279,12 @@ b200_impl::b200_impl(const device_addr_t &device_addr)
     _local_ctrl = radio_ctrl_core_3000::make(vrt::if_packet_info_t::LINK_TYPE_CHDR, _ctrl_transport, zero_copy_if::sptr()/*null*/, B200_LOCAL_CTRL_SID);
     _local_ctrl->hold_task(_async_task);
     this->check_fpga_compat();
+
+    /* Initialize the GPIOs, set the default bandsels to the lower range. Note
+     * that calling update_bandsel calls update_gpio_state(). */
+    _gpio_state = gpio_state();
+    update_bandsel("RX", 800e6);
+    update_bandsel("TX", 850e6);
 
     //cause a radio clock domain reset once bus domain is up
     this->reset_codec_dcm();
@@ -320,15 +330,6 @@ b200_impl::b200_impl(const device_addr_t &device_addr)
     _tree->create<std::string>(mb_path / "codename").set("Sasquatch");
 
     ////////////////////////////////////////////////////////////////////
-    // Initialize control (settings regs and async messages)
-    ////////////////////////////////////////////////////////////////////
-    _ctrl = radio_ctrl_core_3000::make(vrt::if_packet_info_t::LINK_TYPE_CHDR, _ctrl_transport, zero_copy_if::sptr()/*null*/, B200_CTRL_MSG_SID);
-    _ctrl->hold_task(_async_task);
-    _tree->create<time_spec_t>(mb_path / "time" / "cmd")
-        .subscribe(boost::bind(&radio_ctrl_core_3000::set_time, _ctrl, _1));
-    this->register_loopback_self_test();
-
-    ////////////////////////////////////////////////////////////////////
     // Create data transport
     // This happens after FPGA ctrl instantiated so any junk that might
     // be in the FPGAs buffers doesn't get pulled into the transport
@@ -349,34 +350,14 @@ b200_impl::b200_impl(const device_addr_t &device_addr)
     while (_data_transport->get_recv_buff(0.0)){} //flush ctrl xport
 
     ////////////////////////////////////////////////////////////////////
-    // create gpio and misc controls
-    ////////////////////////////////////////////////////////////////////
-    _atr0 = gpio_core_200_32wo::make(_ctrl, TOREG(SR_ATR0));
-    _atr1 = gpio_core_200_32wo::make(_ctrl, TOREG(SR_ATR1));
-
-    /* Initialize the GPIOs, set the default bandsels to the lower range. Note
-     * that calling update_bandsel calls update_gpio_state(). */
-    _gpio_state = gpio_state();
-    update_bandsel("RX", 800e6);
-    update_bandsel("TX", 850e6);
-
-    ////////////////////////////////////////////////////////////////////
     // create codec control objects
     ////////////////////////////////////////////////////////////////////
     static const std::vector<std::string> frontends = boost::assign::list_of
         ("TX1")("TX2")("RX1")("RX2");
 
-    //default some chains on -- needed for setup purposes
-    _codec_ctrl->set_active_chains(true, false, true, false);
-
     BOOST_FOREACH(const std::string &fe_name, frontends)
     {
         _fe_enb_map[fe_name] = false;
-    }
-    {
-        _codec_ctrl->data_port_loopback(true);
-        this->codec_loopback_self_test();
-        _codec_ctrl->data_port_loopback(false);
     }
     {
         const fs_path codec_path = mb_path / ("rx_codecs") / "A";
@@ -392,15 +373,14 @@ b200_impl::b200_impl(const device_addr_t &device_addr)
     ////////////////////////////////////////////////////////////////////
     // create clock control objects
     ////////////////////////////////////////////////////////////////////
-    //^^^ clock created up top, just reg props here... ^^^
     _tree->create<double>(mb_path / "tick_rate")
+        .coerce(boost::bind(&b200_impl::set_tick_rate, this, _1))
         .publish(boost::bind(&b200_impl::get_tick_rate, this))
-        .subscribe(boost::bind(&b200_impl::set_tick_rate, this, _1));
+        .subscribe(boost::bind(&b200_impl::update_tick_rate, this, _1));
 
     ////////////////////////////////////////////////////////////////////
     // and do the misc mboard sensors
     ////////////////////////////////////////////////////////////////////
-    _tree->create<int>(mb_path / "sensors"); //empty but path exists TODO
     _tree->create<sensor_value_t>(mb_path / "sensors" / "ref_locked")
         .publish(boost::bind(&b200_impl::get_ref_locked, this));
 
@@ -414,61 +394,32 @@ b200_impl::b200_impl(const device_addr_t &device_addr)
         .set(subdev_spec_t())
         .subscribe(boost::bind(&b200_impl::update_tx_subdev_spec, this, _1));
 
+    ///////////////////////////////////////////////////////////////////
+    // setup radio goo
     ////////////////////////////////////////////////////////////////////
-    // create rx dsp control objects
-    ////////////////////////////////////////////////////////////////////
-    _rx_framer = rx_vita_core_3000::make(_ctrl, TOREG(SR_RX_CTRL));
-    for (size_t dspno = 0; dspno < B200_NUM_RX_FE; dspno++)
-    {
-        const fs_path rx_dsp_path = mb_path / "rx_dsps" / str(boost::format("%u") % dspno);
-        _tree->create<meta_range_t>(rx_dsp_path / "rate" / "range")
-            .publish(boost::bind(&ad9361_ctrl::get_samp_rate_range));
-        _tree->create<double>(rx_dsp_path / "rate" / "value")
-            .publish(boost::bind(&b200_impl::get_rx_sample_rate, this))
-            .subscribe(boost::bind(&b200_impl::set_rx_sample_rate, this, _1));
-        _tree->create<double>(rx_dsp_path / "freq" / "value")
-            .publish(boost::bind(&b200_impl::get_dsp_freq, this));
-        _tree->create<meta_range_t>(rx_dsp_path / "freq/range")
-            .publish(boost::bind(&b200_impl::get_dsp_freq_range, this));
-        _tree->create<stream_cmd_t>(rx_dsp_path / "stream_cmd")
-            .subscribe(boost::bind(&b200_impl::issue_stream_cmd, this, dspno, _1));
-    }
+    _radio_perifs.resize(2);
+    this->setup_radio(0);
+    this->setup_radio(1);
 
-    ////////////////////////////////////////////////////////////////////
-    // create tx dsp control objects
-    ////////////////////////////////////////////////////////////////////
-    _tx_deframer = tx_vita_core_3000::make(_ctrl, TOREG(SR_TX_CTRL));
-    for (size_t dspno = 0; dspno < B200_NUM_TX_FE; dspno++)
-    {
-        const fs_path tx_dsp_path = mb_path / "tx_dsps" / str(boost::format("%u") % dspno);
-        _tree->create<meta_range_t>(tx_dsp_path / "rate" / "range")
-            .publish(boost::bind(&ad9361_ctrl::get_samp_rate_range));
-        _tree->create<double>(tx_dsp_path / "rate" / "value")
-            .publish(boost::bind(&b200_impl::get_tx_sample_rate, this))
-            .subscribe(boost::bind(&b200_impl::set_tx_sample_rate, this, _1));
-        _tree->create<double>(tx_dsp_path / "freq" / "value")
-            .publish(boost::bind(&b200_impl::get_dsp_freq, this));
-        _tree->create<meta_range_t>(tx_dsp_path / "freq" / "range")
-            .publish(boost::bind(&b200_impl::get_dsp_freq_range, this));
-    }
+    _codec_ctrl->data_port_loopback(true);
+    this->codec_loopback_self_test();
+    _codec_ctrl->data_port_loopback(false);
 
     ////////////////////////////////////////////////////////////////////
     // create time and clock control objects
     ////////////////////////////////////////////////////////////////////
     _spi_iface = spi_core_3000::make(_local_ctrl, TOREG(SR_CORE_SPI), RB32_CORE_SPI);
-    _spi_iface->set_divider(B200_BUS_CLOCK_RATE/100);
-    _adf4001_iface = boost::shared_ptr<adf4001_ctrl>(new adf4001_ctrl(_spi_iface, (1 << 1)/*slaveno*/));
+    _spi_iface->set_divider(B200_BUS_CLOCK_RATE/ADF4001_SPI_RATE);
+    _adf4001_iface = boost::shared_ptr<adf4001_ctrl>(new adf4001_ctrl(_spi_iface, ADF4001_SLAVENO));
 
-    time_core_3000::readback_bases_type time64_rb_bases;
-    time64_rb_bases.rb_now = RB64_TIME_NOW;
-    time64_rb_bases.rb_pps = RB64_TIME_PPS;
-    _time64 = time_core_3000::make(_ctrl, TOREG(SR_TIME), time64_rb_bases);
     _tree->create<time_spec_t>(mb_path / "time" / "now")
-        .publish(boost::bind(&time_core_3000::get_time_now, _time64))
-        .subscribe(boost::bind(&time_core_3000::set_time_now, _time64, _1));
+        .publish(boost::bind(&time_core_3000::get_time_now, _radio_perifs[0].time64))
+        .subscribe(boost::bind(&time_core_3000::set_time_now, _radio_perifs[0].time64, _1))
+        .subscribe(boost::bind(&time_core_3000::set_time_now, _radio_perifs[1].time64, _1));
     _tree->create<time_spec_t>(mb_path / "time" / "pps")
-        .publish(boost::bind(&time_core_3000::get_time_last_pps, _time64))
-        .subscribe(boost::bind(&time_core_3000::set_time_next_pps, _time64, _1));
+        .publish(boost::bind(&time_core_3000::get_time_last_pps, _radio_perifs[0].time64))
+        .subscribe(boost::bind(&time_core_3000::set_time_next_pps, _radio_perifs[0].time64, _1))
+        .subscribe(boost::bind(&time_core_3000::set_time_next_pps, _radio_perifs[1].time64, _1));
     //setup time source props
     _tree->create<std::string>(mb_path / "time_source" / "value")
         .subscribe(boost::bind(&b200_impl::update_time_source, this, _1));
@@ -545,7 +496,7 @@ b200_impl::b200_impl(const device_addr_t &device_addr)
     ////////////////////////////////////////////////////////////////////
 
     //init the clock rate to something, but only when we have active chains
-    _tree->access<double>(mb_path / "tick_rate").set(61.44e6/8);
+    _tree->access<double>(mb_path / "tick_rate").set(61.44e6/2);
     _codec_ctrl->set_active_chains(false, false, false, false);
 
     //-- this block commented out because we want all chains off by default --//
@@ -578,21 +529,95 @@ b200_impl::~b200_impl(void)
     )
 }
 
+/***********************************************************************
+ * setup radio control objects
+ **********************************************************************/
+
+void b200_impl::setup_radio(const size_t dspno)
+{
+    radio_perifs_t &perif = _radio_perifs[dspno];
+    const fs_path mb_path = "/mboards/0";
+
+    ////////////////////////////////////////////////////////////////////
+    // radio control
+    ////////////////////////////////////////////////////////////////////
+    const boost::uint32_t sid = (dspno == 0)? B200_CTRL0_MSG_SID : B200_CTRL1_MSG_SID;
+    perif.ctrl = radio_ctrl_core_3000::make(vrt::if_packet_info_t::LINK_TYPE_CHDR, _ctrl_transport, zero_copy_if::sptr()/*null*/, sid);
+    perif.ctrl->hold_task(_async_task);
+    _tree->access<time_spec_t>(mb_path / "time" / "cmd")
+        .subscribe(boost::bind(&radio_ctrl_core_3000::set_time, perif.ctrl, _1));
+    this->register_loopback_self_test(perif.ctrl);
+    perif.atr = gpio_core_200_32wo::make(perif.ctrl, TOREG(SR_ATR));
+
+    ////////////////////////////////////////////////////////////////////
+    // create rx dsp control objects
+    ////////////////////////////////////////////////////////////////////
+    perif.framer = rx_vita_core_3000::make(perif.ctrl, TOREG(SR_RX_CTRL));
+    perif.ddc = rx_dsp_core_3000::make(perif.ctrl, TOREG(SR_RX_DSP));
+    perif.ddc->set_link_rate(10e9/8); //whatever
+    _tree->access<double>(mb_path / "tick_rate")
+        .subscribe(boost::bind(&rx_vita_core_3000::set_tick_rate, perif.framer, _1))
+        .subscribe(boost::bind(&rx_dsp_core_3000::set_tick_rate, perif.ddc, _1));
+    const fs_path rx_dsp_path = mb_path / "rx_dsps" / str(boost::format("%u") % dspno);
+    _tree->create<meta_range_t>(rx_dsp_path / "rate" / "range")
+        .publish(boost::bind(&rx_dsp_core_3000::get_host_rates, perif.ddc));
+    _tree->create<double>(rx_dsp_path / "rate" / "value")
+        .coerce(boost::bind(&rx_dsp_core_3000::set_host_rate, perif.ddc, _1))
+        .subscribe(boost::bind(&b200_impl::update_rx_samp_rate, this, dspno, _1))
+        .set(1e6);
+    _tree->create<double>(rx_dsp_path / "freq" / "value")
+        .coerce(boost::bind(&rx_dsp_core_3000::set_freq, perif.ddc, _1))
+        .set(0.0);
+    _tree->create<meta_range_t>(rx_dsp_path / "freq" / "range")
+        .publish(boost::bind(&rx_dsp_core_3000::get_freq_range, perif.ddc));
+    _tree->create<stream_cmd_t>(rx_dsp_path / "stream_cmd")
+        .subscribe(boost::bind(&rx_vita_core_3000::issue_stream_command, perif.framer, _1));
+
+    ////////////////////////////////////////////////////////////////////
+    // create tx dsp control objects
+    ////////////////////////////////////////////////////////////////////
+    perif.deframer = tx_vita_core_3000::make(perif.ctrl, TOREG(SR_TX_CTRL));
+    perif.duc = tx_dsp_core_3000::make(perif.ctrl, TOREG(SR_TX_DSP));
+    perif.duc->set_link_rate(10e9/8); //whatever
+    _tree->access<double>(mb_path / "tick_rate")
+        .subscribe(boost::bind(&tx_vita_core_3000::set_tick_rate, perif.deframer, _1))
+        .subscribe(boost::bind(&tx_dsp_core_3000::set_tick_rate, perif.duc, _1));
+    const fs_path tx_dsp_path = mb_path / "tx_dsps" / str(boost::format("%u") % dspno);
+    _tree->create<meta_range_t>(tx_dsp_path / "rate" / "range")
+        .publish(boost::bind(&tx_dsp_core_3000::get_host_rates, perif.duc));
+    _tree->create<double>(tx_dsp_path / "rate" / "value")
+        .coerce(boost::bind(&tx_dsp_core_3000::set_host_rate, perif.duc, _1))
+        .subscribe(boost::bind(&b200_impl::update_tx_samp_rate, this, dspno, _1))
+        .set(1e6);
+    _tree->create<double>(tx_dsp_path / "freq" / "value")
+        .coerce(boost::bind(&tx_dsp_core_3000::set_freq, perif.duc, _1))
+        .set(0.0);
+    _tree->create<meta_range_t>(tx_dsp_path / "freq" / "range")
+        .publish(boost::bind(&tx_dsp_core_3000::get_freq_range, perif.duc));
+
+    ////////////////////////////////////////////////////////////////////
+    // create time control objects
+    ////////////////////////////////////////////////////////////////////
+    time_core_3000::readback_bases_type time64_rb_bases;
+    time64_rb_bases.rb_now = RB64_TIME_NOW;
+    time64_rb_bases.rb_pps = RB64_TIME_PPS;
+    perif.time64 = time_core_3000::make(perif.ctrl, TOREG(SR_TIME), time64_rb_bases);
+}
 
 /***********************************************************************
  * loopback tests
  **********************************************************************/
  
-void b200_impl::register_loopback_self_test(void)
+void b200_impl::register_loopback_self_test(wb_iface::sptr iface)
 {
     bool test_fail = false;
     UHD_MSG(status) << "Performing register loopback test... " << std::flush;
-    size_t hash = size_t(time(NULL));
+    size_t hash = time(NULL);
     for (size_t i = 0; i < 100; i++)
     {
         boost::hash_combine(hash, i);
-        _ctrl->poke32(TOREG(SR_TEST), boost::uint32_t(hash));
-        test_fail = _ctrl->peek32(RB32_TEST) != boost::uint32_t(hash);
+        iface->poke32(TOREG(SR_TEST), boost::uint32_t(hash));
+        test_fail = iface->peek32(RB32_TEST) != boost::uint32_t(hash);
         if (test_fail) break; //exit loop on any failure
     }
     UHD_MSG(status) << ((test_fail)? " fail" : "pass") << std::endl;
@@ -600,6 +625,7 @@ void b200_impl::register_loopback_self_test(void)
 
 void b200_impl::codec_loopback_self_test(void)
 {
+    wb_iface::sptr iface = _radio_perifs[0].ctrl;
     bool test_fail = false;
     UHD_MSG(status) << "Performing CODEC loopback test... " << std::flush;
     size_t hash = size_t(time(NULL));
@@ -607,9 +633,9 @@ void b200_impl::codec_loopback_self_test(void)
     {
         boost::hash_combine(hash, i);
         const boost::uint32_t word32 = boost::uint32_t(hash) & 0xfff0fff0;
-        _ctrl->poke32(TOREG(SR_CODEC_IDLE), word32);
-        _ctrl->peek64(RB64_CODEC_READBACK); //enough idleness for loopback to propagate
-        const boost::uint64_t rb_word64 = _ctrl->peek64(RB64_CODEC_READBACK);
+        iface->poke32(TOREG(SR_CODEC_IDLE), word32);
+        iface->peek64(RB64_CODEC_READBACK); //enough idleness for loopback to propagate
+        const boost::uint64_t rb_word64 = iface->peek64(RB64_CODEC_READBACK);
         const boost::uint32_t rb_tx = boost::uint32_t(rb_word64 >> 32);
         const boost::uint32_t rb_rx = boost::uint32_t(rb_word64 & 0xffffffff);
         test_fail = word32 != rb_tx or word32 != rb_rx;
@@ -618,13 +644,13 @@ void b200_impl::codec_loopback_self_test(void)
     UHD_MSG(status) << ((test_fail)? " fail" : "pass") << std::endl;
 
     /* Zero out the idle data. */
-    _ctrl->poke32(TOREG(SR_CODEC_IDLE), 0);
+    iface->poke32(TOREG(SR_CODEC_IDLE), 0);
 }
 
 /***********************************************************************
  * Sample and tick rate comprehension below
  **********************************************************************/
-void b200_impl::set_tick_rate(const double raw_rate)
+double b200_impl::set_tick_rate(const double raw_rate)
 {
     //clip rate (which can be doubled by factor) to possible bounds
     const double rate = ad9361_ctrl::get_samp_rate_range().clip(raw_rate);
@@ -632,39 +658,16 @@ void b200_impl::set_tick_rate(const double raw_rate)
     //reset after clock rate change
     this->reset_codec_dcm();
 
-    const size_t factor = ((_fe_enb_map["RX1"] and _fe_enb_map["RX2"]) or (_fe_enb_map["TX1"] and _fe_enb_map["TX2"]))? 2:1;
-    //UHD_MSG(status) << "asking for clock rate " << rate/1e6 << " MHz\n";
-    _tick_rate = _codec_ctrl->set_clock_rate(rate/factor)*factor;
-    //UHD_MSG(status) << "actually got clock rate " << _tick_rate/1e6 << " MHz\n";
-    this->update_streamer_rates();
-    _time64->set_tick_rate(_tick_rate);
-    _time64->self_test();
-    _rx_framer->set_tick_rate(_tick_rate);
-    _tx_deframer->set_tick_rate(_tick_rate);
-}
+    UHD_MSG(status) << "asking for clock rate " << rate/1e6 << " MHz\n";
+    _tick_rate = _codec_ctrl->set_clock_rate(rate);
+    UHD_MSG(status) << "actually got clock rate " << _tick_rate/1e6 << " MHz\n";
 
-void b200_impl::set_rx_sample_rate(const double rate)
-{
-    const size_t factor = (_fe_enb_map["RX1"] and _fe_enb_map["RX2"])? 2:1;
-    this->set_tick_rate(rate*factor);
-}
-
-void b200_impl::set_tx_sample_rate(const double rate)
-{
-    const size_t factor = (_fe_enb_map["TX1"] and _fe_enb_map["TX2"])? 2:1;
-    this->set_tick_rate(rate*factor);
-}
-
-double b200_impl::get_rx_sample_rate(void)
-{
-    const size_t factor = (_fe_enb_map["RX1"] and _fe_enb_map["RX2"])? 2:1;
-    return _tick_rate/factor;
-}
-
-double b200_impl::get_tx_sample_rate(void)
-{
-    const size_t factor = (_fe_enb_map["TX1"] and _fe_enb_map["TX2"])? 2:1;
-    return _tick_rate/factor;
+    BOOST_FOREACH(radio_perifs_t &perif, _radio_perifs)
+    {
+        perif.time64->set_tick_rate(_tick_rate);
+        perif.time64->self_test();
+    }
+    return _tick_rate;
 }
 
 /***********************************************************************
@@ -743,7 +746,10 @@ void b200_impl::update_time_source(const std::string &source)
     else if (source == "external"){}
     else if (source == "gpsdo"){}
     else throw uhd::key_error("update_time_source: unknown source: " + source);
-    _time64->set_time_source((source == "external")? "external" : "internal");
+    for (size_t i = 0; i < _radio_perifs.size(); i++)
+    {
+        _radio_perifs[i].time64->set_time_source((source == "external")? "external" : "internal");
+    }
     this->update_gpio_state();
 }
 
@@ -821,10 +827,11 @@ void b200_impl::update_atrs(void)
         if (_fe_enb_map["RX1"] and _fe_enb_map["TX1"]) fd = STATE_FDX1_TXRX;
         if (_fe_enb_map["RX1"] and not _fe_enb_map["TX1"]) fd = rxonly;
         if (not _fe_enb_map["RX1"] and _fe_enb_map["TX1"]) fd = txonly;
-        _atr0->set_atr_reg(dboard_iface::ATR_REG_IDLE, STATE_OFF);
-        _atr0->set_atr_reg(dboard_iface::ATR_REG_RX_ONLY, rxonly);
-        _atr0->set_atr_reg(dboard_iface::ATR_REG_TX_ONLY, txonly);
-        _atr0->set_atr_reg(dboard_iface::ATR_REG_FULL_DUPLEX, fd);
+        gpio_core_200_32wo::sptr atr = _radio_perifs[0].atr;
+        atr->set_atr_reg(dboard_iface::ATR_REG_IDLE, STATE_OFF);
+        atr->set_atr_reg(dboard_iface::ATR_REG_RX_ONLY, rxonly);
+        atr->set_atr_reg(dboard_iface::ATR_REG_TX_ONLY, txonly);
+        atr->set_atr_reg(dboard_iface::ATR_REG_FULL_DUPLEX, fd);
     }
     {
         const bool is_rx2 = _fe_ant_map.get("RX2", "RX2") == "RX2";
@@ -834,10 +841,11 @@ void b200_impl::update_atrs(void)
         if (_fe_enb_map["RX2"] and _fe_enb_map["TX2"]) fd = STATE_FDX2_TXRX;
         if (_fe_enb_map["RX2"] and not _fe_enb_map["TX2"]) fd = rxonly;
         if (not _fe_enb_map["RX2"] and _fe_enb_map["TX2"]) fd = txonly;
-        _atr1->set_atr_reg(dboard_iface::ATR_REG_IDLE, STATE_OFF);
-        _atr1->set_atr_reg(dboard_iface::ATR_REG_RX_ONLY, rxonly);
-        _atr1->set_atr_reg(dboard_iface::ATR_REG_TX_ONLY, txonly);
-        _atr1->set_atr_reg(dboard_iface::ATR_REG_FULL_DUPLEX, fd);
+        gpio_core_200_32wo::sptr atr = _radio_perifs[1].atr;
+        atr->set_atr_reg(dboard_iface::ATR_REG_IDLE, STATE_OFF);
+        atr->set_atr_reg(dboard_iface::ATR_REG_RX_ONLY, rxonly);
+        atr->set_atr_reg(dboard_iface::ATR_REG_TX_ONLY, txonly);
+        atr->set_atr_reg(dboard_iface::ATR_REG_FULL_DUPLEX, fd);
     }
 }
 
@@ -850,15 +858,13 @@ void b200_impl::update_antenna_sel(const std::string& which, const std::string &
 void b200_impl::update_enables(void)
 {
     _codec_ctrl->set_active_chains(_fe_enb_map["TX1"], _fe_enb_map["TX2"], _fe_enb_map["RX1"], _fe_enb_map["RX2"]);
+    this->reset_codec_dcm(); //set_active_chains could cause a clock rate change - reset dcm
     this->update_atrs();
 
     //figure out if mimo is enabled based on new state
     const bool mimo = (_fe_enb_map["TX1"] and _fe_enb_map["TX2"]) or (_fe_enb_map["RX1"] and _fe_enb_map["RX2"]);
     _gpio_state.mimo = (mimo)? 1 : 0;
     update_gpio_state();
-
-    //this could cause a clock rate change - reset dcm
-    this->reset_codec_dcm();
 }
 
 sensor_value_t b200_impl::get_ref_locked(void)

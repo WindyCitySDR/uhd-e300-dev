@@ -27,6 +27,8 @@
 #include "time_core_3000.hpp"
 #include "gpio_core_200.hpp"
 #include "radio_ctrl_core_3000.hpp"
+#include "rx_dsp_core_3000.hpp"
+#include "tx_dsp_core_3000.hpp"
 #include <uhd/device.hpp>
 #include <uhd/property_tree.hpp>
 #include <uhd/utils/pimpl.hpp>
@@ -50,15 +52,28 @@ static const boost::uint8_t  B200_FW_COMPAT_NUM_MINOR = 0x00;
 static const boost::uint16_t B200_FPGA_COMPAT_NUM = 0x01;
 static const size_t          B200_MAX_PKT_BYTE_LIMIT = 2048*4;
 static const double          B200_LINK_RATE_BPS = (5e9)/8; //practical link rate (5 Gbps)
-static const boost::uint32_t B200_CTRL_MSG_SID = 0x00000010;
-static const boost::uint32_t B200_RESP_MSG_SID = (B200_CTRL_MSG_SID<<16)|(B200_CTRL_MSG_SID>>16);
-static const boost::uint32_t B200_TX_DATA_SID_BASE = 0x00020000;
-static const boost::uint32_t B200_TX_MSG_SID_BASE = 0x00000002;
-static const boost::uint32_t B200_RX_DATA_SID_BASE = 0x00040000;
+
+#define FLIP_SID(sid) (((sid)<<16)|((sid)>>16))
+
+static const boost::uint32_t B200_CTRL0_MSG_SID = 0x00000010;
+static const boost::uint32_t B200_RESP0_MSG_SID = FLIP_SID(B200_CTRL0_MSG_SID);
+
+static const boost::uint32_t B200_CTRL1_MSG_SID = 0x00000020;
+static const boost::uint32_t B200_RESP1_MSG_SID = FLIP_SID(B200_CTRL1_MSG_SID);
+
+static const boost::uint32_t B200_TX_DATA0_SID = 0x00000050;
+static const boost::uint32_t B200_TX_MSG0_SID = FLIP_SID(B200_TX_DATA0_SID);
+
+static const boost::uint32_t B200_TX_DATA1_SID = 0x00000060;
+static const boost::uint32_t B200_TX_MSG1_SID = FLIP_SID(B200_TX_DATA1_SID);
+
+static const boost::uint32_t B200_RX_DATA_SID = 0x00040000;
 static const boost::uint32_t B200_TX_GPS_UART_SID = 0x00000030;
-static const boost::uint32_t B200_RX_GPS_UART_SID = (B200_TX_GPS_UART_SID<<16)|(B200_TX_GPS_UART_SID>>16);
+static const boost::uint32_t B200_RX_GPS_UART_SID = FLIP_SID(B200_TX_GPS_UART_SID);
+
 static const boost::uint32_t B200_LOCAL_CTRL_SID = 0x00000040;
-static const boost::uint32_t B200_LOCAL_RESP_SID = (B200_LOCAL_CTRL_SID<<16)|(B200_LOCAL_CTRL_SID>>16);
+static const boost::uint32_t B200_LOCAL_RESP_SID = FLIP_SID(B200_LOCAL_CTRL_SID);
+
 static const double          B200_BUS_CLOCK_RATE = 100e6;
 static const size_t          B200_NUM_RX_FE = 2;
 static const size_t          B200_NUM_TX_FE = 2;
@@ -85,14 +100,8 @@ struct b200_impl : public uhd::device
     //controllers
     b200_iface::sptr _iface;
     b200_uart::sptr _gpsdo_uart;
-    radio_ctrl_core_3000::sptr _ctrl;
     radio_ctrl_core_3000::sptr _local_ctrl;
     ad9361_ctrl::sptr _codec_ctrl;
-    rx_vita_core_3000::sptr _rx_framer;
-    tx_vita_core_3000::sptr _tx_deframer;
-    time_core_3000::sptr _time64;
-    gpio_core_200_32wo::sptr _atr0;
-    gpio_core_200_32wo::sptr _atr1;
     spi_core_3000::sptr _spi_iface;
     boost::shared_ptr<uhd::usrp::adf4001_ctrl> _adf4001_iface;
     uhd::gps_ctrl::sptr _gps;
@@ -118,7 +127,7 @@ struct b200_impl : public uhd::device
 
     void issue_stream_cmd(const size_t dspno, const uhd::stream_cmd_t &);
 
-    void register_loopback_self_test(void);
+    void register_loopback_self_test(wb_iface::sptr iface);
     void codec_loopback_self_test(void);
     void set_mb_eeprom(const uhd::usrp::mboard_eeprom_t &);
     void check_fw_compat(void);
@@ -127,10 +136,25 @@ struct b200_impl : public uhd::device
     void update_tx_subdev_spec(const uhd::usrp::subdev_spec_t &);
     void update_time_source(const std::string &);
     void update_clock_source(const std::string &);
-    void update_streamer_rates(void);
     void update_bandsel(const std::string& which, double freq);
     void update_antenna_sel(const std::string& which, const std::string &ant);
     uhd::sensor_value_t get_ref_locked(void);
+
+    //perifs in the radio core
+    struct radio_perifs_t
+    {
+        radio_ctrl_core_3000::sptr ctrl;
+        gpio_core_200_32wo::sptr atr;
+        time_core_3000::sptr time64;
+        rx_vita_core_3000::sptr framer;
+        rx_dsp_core_3000::sptr ddc;
+        tx_vita_core_3000::sptr deframer;
+        tx_dsp_core_3000::sptr duc;
+        boost::weak_ptr<uhd::rx_streamer> rx_streamer;
+        boost::weak_ptr<uhd::tx_streamer> tx_streamer;
+    };
+    std::vector<radio_perifs_t> _radio_perifs;
+    void setup_radio(const size_t which_radio);
 
     struct gpio_state {
         boost::uint32_t  tx_bandsel_a, tx_bandsel_b, rx_bandsel_a, rx_bandsel_b, rx_bandsel_c, codec_arst, mimo, ref_sel;
@@ -155,18 +179,13 @@ struct b200_impl : public uhd::device
     void update_enables(void);
     void update_atrs(void);
 
-    //no dsp in fpga
-    double get_dsp_freq(void){return 0.0;}
-
-    uhd::meta_range_t get_dsp_freq_range(void){return uhd::meta_range_t(0.0, 0.0);};
+    void update_tick_rate(const double);
+    void update_rx_samp_rate(const size_t, const double);
+    void update_tx_samp_rate(const size_t, const double);
 
     double _tick_rate;
     double get_tick_rate(void){return _tick_rate;}
-    void set_tick_rate(const double rate);
-    void set_rx_sample_rate(const double rate);
-    void set_tx_sample_rate(const double rate);
-    double get_rx_sample_rate(void);
-    double get_tx_sample_rate(void);
+    double set_tick_rate(const double rate);
 };
 
 #endif /* INCLUDED_B200_IMPL_HPP */
