@@ -240,15 +240,6 @@ b200_impl::b200_impl(const device_addr_t &device_addr)
     _iface->reset_gpif();
 
     ////////////////////////////////////////////////////////////////////
-    // Init codec - turns on clocks
-    ////////////////////////////////////////////////////////////////////
-    _codec_ctrl = ad9361_ctrl::make(_iface);
-
-    //default some chains on -- needed for setup purposes
-    _codec_ctrl->set_active_chains(true, false, true, false);
-    _codec_ctrl->set_clock_rate(50e6);
-
-    ////////////////////////////////////////////////////////////////////
     // Create control transport
     ////////////////////////////////////////////////////////////////////
     boost::uint8_t usb_speed = _iface->get_usb_speed();
@@ -285,9 +276,6 @@ b200_impl::b200_impl(const device_addr_t &device_addr)
     _gpio_state = gpio_state();
     update_bandsel("RX", 800e6);
     update_bandsel("TX", 850e6);
-
-    //cause a radio clock domain reset once bus domain is up
-    this->reset_codec_dcm();
 
     ////////////////////////////////////////////////////////////////////
     // Create the GPSDO control
@@ -350,6 +338,16 @@ b200_impl::b200_impl(const device_addr_t &device_addr)
     while (_data_transport->get_recv_buff(0.0)){} //flush ctrl xport
 
     ////////////////////////////////////////////////////////////////////
+    // Init codec - turns on clocks
+    ////////////////////////////////////////////////////////////////////
+    UHD_MSG(status) << "Initialize CODEC control..." << std::endl;
+    _codec_ctrl = ad9361_ctrl::make(_iface);
+
+    //default some chains on -- needed for setup purposes
+    _codec_ctrl->set_active_chains(true, false, true, false);
+    this->reset_codec_dcm();
+
+    ////////////////////////////////////////////////////////////////////
     // create codec control objects
     ////////////////////////////////////////////////////////////////////
     static const std::vector<std::string> frontends = boost::assign::list_of
@@ -377,6 +375,7 @@ b200_impl::b200_impl(const device_addr_t &device_addr)
         .coerce(boost::bind(&b200_impl::set_tick_rate, this, _1))
         .publish(boost::bind(&b200_impl::get_tick_rate, this))
         .subscribe(boost::bind(&b200_impl::update_tick_rate, this, _1));
+    _tree->create<time_spec_t>(mb_path / "time" / "cmd");
 
     ////////////////////////////////////////////////////////////////////
     // and do the misc mboard sensors
@@ -394,9 +393,10 @@ b200_impl::b200_impl(const device_addr_t &device_addr)
         .set(subdev_spec_t())
         .subscribe(boost::bind(&b200_impl::update_tx_subdev_spec, this, _1));
 
-    ///////////////////////////////////////////////////////////////////
-    // setup radio goo
     ////////////////////////////////////////////////////////////////////
+    // setup radio control
+    ////////////////////////////////////////////////////////////////////
+    UHD_MSG(status) << "Initialize Radio control..." << std::endl;
     _radio_perifs.resize(2);
     this->setup_radio(0);
     this->setup_radio(1);
@@ -620,7 +620,7 @@ void b200_impl::register_loopback_self_test(wb_iface::sptr iface)
         test_fail = iface->peek32(RB32_TEST) != boost::uint32_t(hash);
         if (test_fail) break; //exit loop on any failure
     }
-    UHD_MSG(status) << ((test_fail)? " fail" : "pass") << std::endl;
+    UHD_MSG(status) << ((test_fail)? "fail" : "pass") << std::endl;
 }
 
 void b200_impl::codec_loopback_self_test(void)
@@ -641,7 +641,7 @@ void b200_impl::codec_loopback_self_test(void)
         test_fail = word32 != rb_tx or word32 != rb_rx;
         if (test_fail) break; //exit loop on any failure
     }
-    UHD_MSG(status) << ((test_fail)? " fail" : "pass") << std::endl;
+    UHD_MSG(status) << ((test_fail)? "fail" : "pass") << std::endl;
 
     /* Zero out the idle data. */
     iface->poke32(TOREG(SR_CODEC_IDLE), 0);
@@ -655,12 +655,12 @@ double b200_impl::set_tick_rate(const double raw_rate)
     //clip rate (which can be doubled by factor) to possible bounds
     const double rate = ad9361_ctrl::get_samp_rate_range().clip(raw_rate);
 
+    UHD_MSG(status) << "Asking for clock rate " << rate/1e6 << " MHz\n";
+    _tick_rate = _codec_ctrl->set_clock_rate(rate);
+    UHD_MSG(status) << "Actually got clock rate " << _tick_rate/1e6 << " MHz\n";
+
     //reset after clock rate change
     this->reset_codec_dcm();
-
-    UHD_MSG(status) << "asking for clock rate " << rate/1e6 << " MHz\n";
-    _tick_rate = _codec_ctrl->set_clock_rate(rate);
-    UHD_MSG(status) << "actually got clock rate " << _tick_rate/1e6 << " MHz\n";
 
     BOOST_FOREACH(radio_perifs_t &perif, _radio_perifs)
     {
