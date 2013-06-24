@@ -216,18 +216,12 @@ b200_impl::b200_impl(const device_addr_t &device_addr)
     // Load the FPGA image, then reset GPIF
     ////////////////////////////////////////////////////////////////////
     std::string default_file_name;
-    bool look_for_gpsdo = false;
-    size_t num_radio_chains = 1;
     if (not mb_eeprom["product"].empty())
     {
         switch (boost::lexical_cast<boost::uint16_t>(mb_eeprom["product"]))
         {
         case 0x0001: default_file_name = B200_FPGA_FILE_NAME; break;
-        case 0x0002:
-            look_for_gpsdo = true;
-            num_radio_chains = 2;
-            default_file_name = B210_FPGA_FILE_NAME;
-            break;
+        case 0x0002: default_file_name = B210_FPGA_FILE_NAME; break;
         default: throw uhd::runtime_error("b200 unknown product code: " + mb_eeprom["product"]);
         }
     }
@@ -287,7 +281,7 @@ b200_impl::b200_impl(const device_addr_t &device_addr)
     // Create the GPSDO control
     ////////////////////////////////////////////////////////////////////
 
-    if (look_for_gpsdo and (_local_ctrl->peek32(RB32_CORE_GPS) & 0xff) != B200_GPSDO_ST_NONE)
+    if ((_local_ctrl->peek32(RB32_CORE_STATUS) & 0xff) != B200_GPSDO_ST_NONE)
     {
         UHD_MSG(status) << "Detecting internal GPSDO.... " << std::flush;
         try
@@ -300,7 +294,7 @@ b200_impl::b200_impl(const device_addr_t &device_addr)
         }
         if (_gps and _gps->gps_detected())
         {
-            UHD_MSG(status) << "found" << std::endl;
+            //UHD_MSG(status) << "found" << std::endl;
             BOOST_FOREACH(const std::string &name, _gps->get_sensors())
             {
                 _tree->create<sensor_value_t>(mb_path / "sensors" / name)
@@ -401,6 +395,9 @@ b200_impl::b200_impl(const device_addr_t &device_addr)
     // setup radio control
     ////////////////////////////////////////////////////////////////////
     UHD_MSG(status) << "Initialize Radio control..." << std::endl;
+    const size_t num_radio_chains = ((_local_ctrl->peek32(RB32_CORE_STATUS) >> 8) & 0xff);
+    UHD_ASSERT_THROW(num_radio_chains > 0);
+    UHD_ASSERT_THROW(num_radio_chains <= 2);
     _radio_perifs.resize(num_radio_chains);
     for (size_t i = 0; i < _radio_perifs.size(); i++) this->setup_radio(i);
 

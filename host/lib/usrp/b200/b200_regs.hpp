@@ -30,7 +30,7 @@ localparam SR_CORE_COMPAT    = 24;
 localparam SR_CORE_GPSDO_ST  = 40;
 localparam RB32_CORE_SPI     = 8;
 localparam RB32_CORE_MISC    = 16;
-localparam RB32_CORE_GPS     = 20;
+localparam RB32_CORE_STATUS  = 20;
 
 localparam SR_SPI       = 8;
 localparam SR_ATR       = 12;
