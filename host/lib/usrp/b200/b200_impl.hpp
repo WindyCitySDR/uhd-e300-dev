@@ -136,7 +136,7 @@ struct b200_impl : public uhd::device
     void update_time_source(const std::string &);
     void update_clock_source(const std::string &);
     void update_bandsel(const std::string& which, double freq);
-    void update_antenna_sel(const std::string& which, const std::string &ant);
+    void update_antenna_sel(const size_t which, const std::string &ant);
     uhd::sensor_value_t get_ref_locked(void);
 
     //perifs in the radio core
@@ -151,6 +151,7 @@ struct b200_impl : public uhd::device
         tx_dsp_core_3000::sptr duc;
         boost::weak_ptr<uhd::rx_streamer> rx_streamer;
         boost::weak_ptr<uhd::tx_streamer> tx_streamer;
+        bool ant_rx2;
     };
     std::vector<radio_perifs_t> _radio_perifs;
     void setup_radio(const size_t which_radio);
@@ -173,8 +174,6 @@ struct b200_impl : public uhd::device
     void update_gpio_state(void);
     void reset_codec_dcm(void);
 
-    uhd::dict<std::string, std::string> _fe_ant_map;
-    uhd::dict<std::string, bool> _fe_enb_map;
     void update_enables(void);
     void update_atrs(void);
 

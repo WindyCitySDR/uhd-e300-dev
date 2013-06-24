@@ -340,21 +340,11 @@ b200_impl::b200_impl(const device_addr_t &device_addr)
     ////////////////////////////////////////////////////////////////////
     UHD_MSG(status) << "Initialize CODEC control..." << std::endl;
     _codec_ctrl = ad9361_ctrl::make(_iface);
-
-    //default some chains on -- needed for setup purposes
-    _codec_ctrl->set_active_chains(true, false, true, false);
     this->reset_codec_dcm();
 
     ////////////////////////////////////////////////////////////////////
     // create codec control objects
     ////////////////////////////////////////////////////////////////////
-    static const std::vector<std::string> frontends = boost::assign::list_of
-        ("TX1")("TX2")("RX1")("RX2");
-
-    BOOST_FOREACH(const std::string &fe_name, frontends)
-    {
-        _fe_enb_map[fe_name] = false;
-    }
     {
         const fs_path codec_path = mb_path / ("rx_codecs") / "A";
         _tree->create<std::string>(codec_path / "name").set("B200 RX dual ADC");
@@ -445,70 +435,26 @@ b200_impl::b200_impl(const device_addr_t &device_addr)
     _tree->create<dboard_eeprom_t>(mb_path / "dboards" / "A" / "gdb_eeprom").set(db_eeprom);
 
     ////////////////////////////////////////////////////////////////////
-    // create RF frontend interfacing
-    ////////////////////////////////////////////////////////////////////
-    BOOST_FOREACH(const std::string &fe_name, frontends)
-    {
-        const std::string x = std::string(1, tolower(fe_name[0]));
-        const fs_path rf_fe_path = mb_path / "dboards" / "A" / (x+"x_frontends") / fe_name;
-
-        _tree->create<std::string>(rf_fe_path / "name").set(fe_name);
-        _tree->create<int>(rf_fe_path / "sensors"); //empty TODO
-        BOOST_FOREACH(const std::string &name, ad9361_ctrl::get_gain_names(fe_name))
-        {
-            _tree->create<meta_range_t>(rf_fe_path / "gains" / name / "range")
-                .set(ad9361_ctrl::get_gain_range(fe_name));
-
-            _tree->create<double>(rf_fe_path / "gains" / name / "value")
-                .coerce(boost::bind(&ad9361_ctrl::set_gain, _codec_ctrl, fe_name, _1))
-                .set(0.0);
-        }
-        _tree->create<std::string>(rf_fe_path / "connection").set("IQ");
-        _tree->create<bool>(rf_fe_path / "enabled").set(true);
-        _tree->create<bool>(rf_fe_path / "use_lo_offset").set(false);
-        _tree->create<double>(rf_fe_path / "bandwidth" / "value")
-            .coerce(boost::bind(&ad9361_ctrl::set_bw_filter, _codec_ctrl, fe_name, _1))
-            .set(40e6);
-        _tree->create<meta_range_t>(rf_fe_path / "bandwidth" / "range")
-            .publish(boost::bind(&ad9361_ctrl::get_bw_filter_range, fe_name));
-        _tree->create<double>(rf_fe_path / "freq" / "value")
-            .set(0.0)
-            .coerce(boost::bind(&ad9361_ctrl::tune, _codec_ctrl, fe_name, _1))
-            .subscribe(boost::bind(&b200_impl::update_bandsel, this, fe_name, _1));
-        _tree->create<meta_range_t>(rf_fe_path / "freq" / "range")
-            .publish(boost::bind(&ad9361_ctrl::get_rf_freq_range));
-
-        //setup antenna stuff
-        if (fe_name[0] == 'R')
-        {
-            static const std::vector<std::string> ants = boost::assign::list_of("TX/RX")("RX2");
-            _tree->create<std::vector<std::string> >(rf_fe_path / "antenna" / "options").set(ants);
-            _tree->create<std::string>(rf_fe_path / "antenna" / "value")
-                .subscribe(boost::bind(&b200_impl::update_antenna_sel, this, fe_name, _1))
-                .set("RX2");
-        }
-        if (fe_name[0] == 'T')
-        {
-            static const std::vector<std::string> ants(1, "TX/RX");
-            _tree->create<std::vector<std::string> >(rf_fe_path / "antenna" / "options").set(ants);
-            _tree->create<std::string>(rf_fe_path / "antenna" / "value").set("TX/RX");
-        }
-
-    }
-
-    ////////////////////////////////////////////////////////////////////
     // do some post-init tasks
     ////////////////////////////////////////////////////////////////////
 
-    //init the clock rate to something, but only when we have active chains
+    //init the clock rate to something reasonable
     _tree->access<double>(mb_path / "tick_rate").set(61.44e6/2);
-    _codec_ctrl->set_active_chains(false, false, false, false);
 
-    //-- this block commented out because we want all chains off by default --//
-    //_tree->access<subdev_spec_t>(mb_path / "rx_subdev_spec").set(subdev_spec_t("A:RX2"));
-    //_tree->access<subdev_spec_t>(mb_path / "tx_subdev_spec").set(subdev_spec_t("A:TX2"));
-    //-- this block commented out because we want all chains off by default --//
+    //subdev spec contains full width of selections
+    subdev_spec_t rx_spec, tx_spec;
+    BOOST_FOREACH(const std::string &fe, _tree->list(mb_path / "dboards" / "A" / "rx_frontends"))
+    {
+        rx_spec.push_back(subdev_spec_pair_t("A", fe));
+    }
+    BOOST_FOREACH(const std::string &fe, _tree->list(mb_path / "dboards" / "A" / "tx_frontends"))
+    {
+        tx_spec.push_back(subdev_spec_pair_t("A", fe));
+    }
+    _tree->access<subdev_spec_t>(mb_path / "rx_subdev_spec").set(rx_spec);
+    _tree->access<subdev_spec_t>(mb_path / "tx_subdev_spec").set(tx_spec);
 
+    //init to internal clock and time source
     _tree->access<std::string>(mb_path / "clock_source/value").set("internal");
     _tree->access<std::string>(mb_path / "time_source/value").set("none");
 
@@ -607,6 +553,59 @@ void b200_impl::setup_radio(const size_t dspno)
     time64_rb_bases.rb_now = RB64_TIME_NOW;
     time64_rb_bases.rb_pps = RB64_TIME_PPS;
     perif.time64 = time_core_3000::make(perif.ctrl, TOREG(SR_TIME), time64_rb_bases);
+
+    ////////////////////////////////////////////////////////////////////
+    // create RF frontend interfacing
+    ////////////////////////////////////////////////////////////////////
+    for(size_t direction = 0; direction < 2; direction++)
+    {
+        const std::string x = direction? "rx" : "tx";
+        const std::string key = std::string((direction? "RX" : "TX")) + std::string((dspno? "2" : "1"));
+        const fs_path rf_fe_path = mb_path / "dboards" / "A" / (x+"_frontends") / (dspno? "B" : "A");
+
+        _tree->create<std::string>(rf_fe_path / "name").set(key);
+        _tree->create<int>(rf_fe_path / "sensors"); //empty TODO
+        BOOST_FOREACH(const std::string &name, ad9361_ctrl::get_gain_names(key))
+        {
+            _tree->create<meta_range_t>(rf_fe_path / "gains" / name / "range")
+                .set(ad9361_ctrl::get_gain_range(key));
+
+            _tree->create<double>(rf_fe_path / "gains" / name / "value")
+                .coerce(boost::bind(&ad9361_ctrl::set_gain, _codec_ctrl, key, _1))
+                .set(0.0);
+        }
+        _tree->create<std::string>(rf_fe_path / "connection").set("IQ");
+        _tree->create<bool>(rf_fe_path / "enabled").set(true);
+        _tree->create<bool>(rf_fe_path / "use_lo_offset").set(false);
+        _tree->create<double>(rf_fe_path / "bandwidth" / "value")
+            .coerce(boost::bind(&ad9361_ctrl::set_bw_filter, _codec_ctrl, key, _1))
+            .set(40e6);
+        _tree->create<meta_range_t>(rf_fe_path / "bandwidth" / "range")
+            .publish(boost::bind(&ad9361_ctrl::get_bw_filter_range, key));
+        _tree->create<double>(rf_fe_path / "freq" / "value")
+            .set(0.0)
+            .coerce(boost::bind(&ad9361_ctrl::tune, _codec_ctrl, key, _1))
+            .subscribe(boost::bind(&b200_impl::update_bandsel, this, key, _1));
+        _tree->create<meta_range_t>(rf_fe_path / "freq" / "range")
+            .publish(boost::bind(&ad9361_ctrl::get_rf_freq_range));
+
+        //setup antenna stuff
+        if (key[0] == 'R')
+        {
+            static const std::vector<std::string> ants = boost::assign::list_of("TX/RX")("RX2");
+            _tree->create<std::vector<std::string> >(rf_fe_path / "antenna" / "options").set(ants);
+            _tree->create<std::string>(rf_fe_path / "antenna" / "value")
+                .subscribe(boost::bind(&b200_impl::update_antenna_sel, this, dspno, _1))
+                .set("RX2");
+        }
+        if (key[0] == 'T')
+        {
+            static const std::vector<std::string> ants(1, "TX/RX");
+            _tree->create<std::vector<std::string> >(rf_fe_path / "antenna" / "options").set(ants);
+            _tree->create<std::string>(rf_fe_path / "antenna" / "value").set("TX/RX");
+        }
+
+    }
 }
 
 /***********************************************************************
@@ -826,13 +825,15 @@ void b200_impl::update_atrs(void)
 {
     if (_radio_perifs.size() > 0)
     {
-        const bool is_rx2 = _fe_ant_map.get("RX1", "RX2") == "RX2";
-        const size_t rxonly = (_fe_enb_map["RX1"])? ((is_rx2)? STATE_RX1_RX2 : STATE_RX1_TXRX) : STATE_OFF;
-        const size_t txonly = (_fe_enb_map["TX1"])? (STATE_TX1_TXRX) : STATE_OFF;
+        const bool enb_rx = bool(_radio_perifs[0].rx_streamer.lock());
+        const bool enb_tx = bool(_radio_perifs[0].tx_streamer.lock());
+        const bool is_rx2 = _radio_perifs[0].ant_rx2;
+        const size_t rxonly = (enb_rx)? ((is_rx2)? STATE_RX1_RX2 : STATE_RX1_TXRX) : STATE_OFF;
+        const size_t txonly = (enb_tx)? (STATE_TX1_TXRX) : STATE_OFF;
         size_t fd = STATE_OFF;
-        if (_fe_enb_map["RX1"] and _fe_enb_map["TX1"]) fd = STATE_FDX1_TXRX;
-        if (_fe_enb_map["RX1"] and not _fe_enb_map["TX1"]) fd = rxonly;
-        if (not _fe_enb_map["RX1"] and _fe_enb_map["TX1"]) fd = txonly;
+        if (enb_rx and enb_tx) fd = STATE_FDX1_TXRX;
+        if (enb_rx and not enb_tx) fd = rxonly;
+        if (not enb_rx and enb_tx) fd = txonly;
         gpio_core_200_32wo::sptr atr = _radio_perifs[0].atr;
         atr->set_atr_reg(dboard_iface::ATR_REG_IDLE, STATE_OFF);
         atr->set_atr_reg(dboard_iface::ATR_REG_RX_ONLY, rxonly);
@@ -841,13 +842,15 @@ void b200_impl::update_atrs(void)
     }
     if (_radio_perifs.size() > 1)
     {
-        const bool is_rx2 = _fe_ant_map.get("RX2", "RX2") == "RX2";
-        const size_t rxonly = (_fe_enb_map["RX2"])? ((is_rx2)? STATE_RX2_RX2 : STATE_RX2_TXRX) : STATE_OFF;
-        const size_t txonly = (_fe_enb_map["TX2"])? (STATE_TX2_TXRX) : STATE_OFF;
+        const bool enb_rx = bool(_radio_perifs[1].rx_streamer.lock());
+        const bool enb_tx = bool(_radio_perifs[1].tx_streamer.lock());
+        const bool is_rx2 = _radio_perifs[1].ant_rx2;
+        const size_t rxonly = (enb_rx)? ((is_rx2)? STATE_RX2_RX2 : STATE_RX2_TXRX) : STATE_OFF;
+        const size_t txonly = (enb_tx)? (STATE_TX2_TXRX) : STATE_OFF;
         size_t fd = STATE_OFF;
-        if (_fe_enb_map["RX2"] and _fe_enb_map["TX2"]) fd = STATE_FDX2_TXRX;
-        if (_fe_enb_map["RX2"] and not _fe_enb_map["TX2"]) fd = rxonly;
-        if (not _fe_enb_map["RX2"] and _fe_enb_map["TX2"]) fd = txonly;
+        if (enb_rx and enb_tx) fd = STATE_FDX2_TXRX;
+        if (enb_rx and not enb_tx) fd = rxonly;
+        if (not enb_rx and enb_tx) fd = txonly;
         gpio_core_200_32wo::sptr atr = _radio_perifs[1].atr;
         atr->set_atr_reg(dboard_iface::ATR_REG_IDLE, STATE_OFF);
         atr->set_atr_reg(dboard_iface::ATR_REG_RX_ONLY, rxonly);
@@ -856,22 +859,34 @@ void b200_impl::update_atrs(void)
     }
 }
 
-void b200_impl::update_antenna_sel(const std::string& which, const std::string &ant)
+void b200_impl::update_antenna_sel(const size_t which, const std::string &ant)
 {
-    _fe_ant_map[which] = ant;
+    _radio_perifs[which].ant_rx2 = (ant == "RX2");
     this->update_atrs();
 }
 
 void b200_impl::update_enables(void)
 {
-    _codec_ctrl->set_active_chains(_fe_enb_map["TX1"], _fe_enb_map["TX2"], _fe_enb_map["RX1"], _fe_enb_map["RX2"]);
+    //extract settings from state variables
+    const bool enb_tx1 = (_radio_perifs.size() > 0) and bool(_radio_perifs[0].tx_streamer.lock());
+    const bool enb_rx1 = (_radio_perifs.size() > 0) and bool(_radio_perifs[0].rx_streamer.lock());
+    const bool enb_tx2 = (_radio_perifs.size() > 1) and bool(_radio_perifs[1].tx_streamer.lock());
+    const bool enb_rx2 = (_radio_perifs.size() > 1) and bool(_radio_perifs[1].rx_streamer.lock());
+    const size_t num_rx = (enb_rx1?1:0) + (enb_rx2?1:0);
+    const size_t num_tx = (enb_tx1?1:0) + (enb_tx2?1:0);
+    const bool mimo = num_rx == 2 or num_tx == 2;
+
+    //setup the active chains in the codec
+    _codec_ctrl->set_active_chains(enb_tx1, enb_tx2, enb_rx1, enb_rx2);
+    if ((num_rx + num_tx) == 0) _codec_ctrl->set_active_chains(true, false, true, false); //enable something
     this->reset_codec_dcm(); //set_active_chains could cause a clock rate change - reset dcm
-    this->update_atrs();
 
     //figure out if mimo is enabled based on new state
-    const bool mimo = (_fe_enb_map["TX1"] and _fe_enb_map["TX2"]) or (_fe_enb_map["RX1"] and _fe_enb_map["RX2"]);
     _gpio_state.mimo = (mimo)? 1 : 0;
     update_gpio_state();
+
+    //atrs change based on enables
+    this->update_atrs();
 }
 
 sensor_value_t b200_impl::get_ref_locked(void)

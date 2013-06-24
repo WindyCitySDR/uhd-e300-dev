@@ -70,16 +70,11 @@ void b200_impl::update_rx_subdev_spec(const uhd::usrp::subdev_spec_t &spec)
 {
     //sanity checking
     if (spec.size()) validate_subdev_spec(_tree, spec, "rx");
-    UHD_ASSERT_THROW(spec.size() <= 2);
-
-    _fe_enb_map["RX1"] = false;
-    _fe_enb_map["RX2"] = false;
+    UHD_ASSERT_THROW(spec.size() <= _radio_perifs.size());
 
     if (spec.size() == 1)
     {
         UHD_ASSERT_THROW(spec[0].db_name == "A");
-        _fe_enb_map["RX1"] = spec[0].sd_name == "RX1";
-        _fe_enb_map["RX2"] = spec[0].sd_name == "RX2";
     }
     if (spec.size() == 2)
     {
@@ -88,8 +83,6 @@ void b200_impl::update_rx_subdev_spec(const uhd::usrp::subdev_spec_t &spec)
         UHD_ASSERT_THROW(spec[0].sd_name == "RX1");
         UHD_ASSERT_THROW(spec[1].db_name == "A");
         UHD_ASSERT_THROW(spec[1].sd_name == "RX2");
-        _fe_enb_map["RX1"] = true;
-        _fe_enb_map["RX2"] = true;
     }
 
     this->update_enables();
@@ -99,16 +92,11 @@ void b200_impl::update_tx_subdev_spec(const uhd::usrp::subdev_spec_t &spec)
 {
     //sanity checking
     if (spec.size()) validate_subdev_spec(_tree, spec, "tx");
-    UHD_ASSERT_THROW(spec.size() <= 2);
-
-    _fe_enb_map["TX1"] = false;
-    _fe_enb_map["TX2"] = false;
+    UHD_ASSERT_THROW(spec.size() <= _radio_perifs.size());
 
     if (spec.size() == 1)
     {
         UHD_ASSERT_THROW(spec[0].db_name == "A");
-        _fe_enb_map["TX1"] = spec[0].sd_name == "TX1";
-        _fe_enb_map["TX2"] = spec[0].sd_name == "TX2";
     }
     if (spec.size() == 2)
     {
@@ -117,8 +105,6 @@ void b200_impl::update_tx_subdev_spec(const uhd::usrp::subdev_spec_t &spec)
         UHD_ASSERT_THROW(spec[0].sd_name == "TX1");
         UHD_ASSERT_THROW(spec[1].db_name == "A");
         UHD_ASSERT_THROW(spec[1].sd_name == "TX2");
-        _fe_enb_map["TX1"] = true;
-        _fe_enb_map["TX2"] = true;
     }
 
     this->update_enables();
@@ -163,6 +149,7 @@ void b200_impl::handle_async_task(
     if (sid == B200_RESP0_MSG_SID or sid == B200_RESP1_MSG_SID)
     {
         const size_t i = (sid == B200_RESP0_MSG_SID)? 0 : 1;
+        UHD_ASSERT_THROW(_radio_perifs.size() > i);
         _radio_perifs[i].ctrl->push_response(buff->cast<const boost::uint32_t *>());
         return;
     }
@@ -280,6 +267,7 @@ rx_streamer::sptr b200_impl::get_rx_stream(const uhd::stream_args_t &args_)
         this->update_tick_rate(this->get_tick_rate());
         _tree->access<double>(str(boost::format("/mboards/0/rx_dsps/%u/rate/value") % chan)).update();
     }
+    this->update_enables();
 
     return my_streamer;
 }
@@ -347,6 +335,7 @@ tx_streamer::sptr b200_impl::get_tx_stream(const uhd::stream_args_t &args_)
         this->update_tick_rate(this->get_tick_rate());
         _tree->access<double>(str(boost::format("/mboards/0/tx_dsps/%u/rate/value") % chan)).update();
     }
+    this->update_enables();
 
     return my_streamer;
 }
