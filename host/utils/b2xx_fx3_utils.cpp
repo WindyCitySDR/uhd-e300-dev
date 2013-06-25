@@ -16,7 +16,6 @@
 //
 
 #include <cstdlib>
-#include <cstdint>
 #include <cstring>
 #include <iostream>
 #include <iomanip>
@@ -27,23 +26,20 @@
 #include <cmath>
 #include <cstring>
 
+#include <boost/cstdint.hpp>
 #include <boost/lexical_cast.hpp>
 #include <boost/format.hpp>
 #include <boost/program_options.hpp>
 
-#include <uhd/transport/usb_zero_copy.hpp>
 
-
-const static uint16_t FX3_VID = 0x04b4;
-const static uint16_t FX3_DEFAULT_PID = 0x00f3;
-const static uint16_t FX3_REENUM_PID = 0x00f0;
-const static uint16_t B2XX_VID = 0x2500;
-const static uint16_t B2XX_PID = 0x0020;
+const static boost::uint16_t FX3_VID = 0x04b4;
+const static boost::uint16_t FX3_DEFAULT_PID = 0x00f3;
+const static boost::uint16_t FX3_REENUM_PID = 0x00f0;
+const static boost::uint16_t B2XX_VID = 0x2500;
+const static boost::uint16_t B2XX_PID = 0x0020;
 
 namespace po = boost::program_options;
 
-using namespace uhd;
-using namespace uhd::transport;
 
 //used with lexical cast to parse a hex string
 template <class T> struct to_hex{
@@ -55,31 +51,31 @@ template <class T> struct to_hex{
     }
 };
 
-uint16_t atoh(const std::string &string){
+boost::uint16_t atoh(const std::string &string){
     if (string.substr(0, 2) == "0x"){
-        return boost::lexical_cast<to_hex<uint16_t> >(string);
+        return boost::lexical_cast<to_hex<boost::uint16_t> >(string);
     }
-    return boost::lexical_cast<uint16_t>(string);
+    return boost::lexical_cast<boost::uint16_t>(string);
 }
 
 
-int32_t main(int32_t argc, char *argv[]) {
-    uint16_t vid, pid, address;
+boost::int32_t main(boost::int32_t argc, char *argv[]) {
+    boost::uint16_t vid, pid, address;
     std::string pid_str, vid_str, readwrite;
     bool read = true;
 
     po::options_description desc("Allowed options");
     desc.add_options()
-        ("help, h", "help message")
-        ("vid", po::value<std::string>(&vid_str)->default_value("0x04b4"), "VID of device.")
-        ("pid", po::value<std::string>(&pid_str)->default_value("0x00f0"), "PID of device.")
-        ("speed, S", "Read back the USB mode currently in use")
-        ("reset-device, D", "Reset the B2xx Device")
-        ("reset-fpga, F", "Reset the FPGA (does not require re-programming")
-        ("reset-usb, U", "Reset the USB subsystem on your host computer")
-        ("init-device, I", "Initialize a B2xx device")
-        ("load-fw, W", "Load a firmware (hex) file into the FX3")
-        ("load-fpga, L", "Load a FPGA (bin) file into the FPGA")
+        ("help,h", "help message")
+        ("vid,v", po::value<std::string>(&vid_str)->default_value("0x2500"), "Specify VID of device to use.")
+        ("pid,p", po::value<std::string>(&pid_str)->default_value("0x0020"), "Specify PID of device to use.")
+        ("speed,S", "Read back the USB mode currently in use.")
+        ("reset-device,D", "Reset the B2xx Device.")
+        ("reset-fpga,F", "Reset the FPGA (does not require re-programming.")
+        ("reset-usb,U", "Reset the USB subsystem on your host computer.")
+        ("init-device,I", "Initialize a B2xx device.")
+        ("load-fw,W", "Load a firmware (hex) file into the FX3.")
+        ("load-fpga,L", "Load a FPGA (bin) file into the FPGA.")
     ;
 
     po::variables_map vm;
@@ -94,8 +90,6 @@ int32_t main(int32_t argc, char *argv[]) {
     vid = atoh(vid_str);
     pid = atoh(pid_str);
 
-    if(readwrite == "write") { read = false; }
-
     /* Pointer to pointer of device, used to retrieve a list of devices. */
     libusb_device **devs;
     libusb_device_handle *dev_handle;
@@ -104,11 +98,11 @@ int32_t main(int32_t argc, char *argv[]) {
     ssize_t num_devices;
 
     libusb_init(&ctx);
-    libusb_set_debug(ctx, 4);
+    libusb_set_debug(ctx, 3);
     libusb_get_device_list(ctx, &devs);
     dev_handle = libusb_open_device_with_vid_pid(ctx, vid, pid);
     if(dev_handle == NULL) {
-        std::cout << "Cannot open device with vid: " << vid << " and pid: "
+        std::cerr << "Cannot open device with vid: " << vid << " and pid: "
             << pid << std::endl;
     } else { std::cout << "Device Opened" << std::endl; }
     libusb_free_device_list(devs, 1);
@@ -126,8 +120,24 @@ int32_t main(int32_t argc, char *argv[]) {
     error_code = (libusb_error) libusb_claim_interface(dev_handle, 0);
     std::cout << "Claimed Interface" << std::endl;
 
-    uint32_t data_buffer[16];
 
+        /* ("speed, S", "Read back the USB mode currently in use") */
+        /* ("reset-device, D", "Reset the B2xx Device") */
+        /* ("reset-fpga, F", "Reset the FPGA (does not require re-programming") */
+        /* ("reset-usb, U", "Reset the USB subsystem on your host computer") */
+        /* ("init-device, I", "Initialize a B2xx device") */
+        /* ("load-fw, W", "Load a firmware (hex) file into the FX3") */
+        /* ("load-fpga, L", "Load a FPGA (bin) file into the FPGA") */
+
+    if (vm.count("speed")){
+
+    }
+
+    boost::uint32_t data_buffer[16];
+
+
+
+#if 0
     if(read) {
         memset(data_buffer, 0, sizeof(data_buffer));
 
@@ -177,6 +187,7 @@ int32_t main(int32_t argc, char *argv[]) {
                 << (int) ((uint8_t *) data_buffer)[i] << " ";
         } std::cout << std::endl;
     }
+#endif
 
     error_code = (libusb_error) libusb_release_interface(dev_handle, 0);
     std::cout << "Released Interface" << std::endl;
