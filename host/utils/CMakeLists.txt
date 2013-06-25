@@ -47,6 +47,7 @@ SET(util_share_sources
 IF(ENABLE_USB)
     LIST(APPEND util_share_sources
         fx2_init_eeprom.cpp
+        b2xx_fx3_utils.cpp
     )
 ENDIF(ENABLE_USB)
 
