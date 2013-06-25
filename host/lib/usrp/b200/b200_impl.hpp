@@ -100,7 +100,6 @@ struct b200_impl : public uhd::device
 
     //controllers
     b200_iface::sptr _iface;
-    b200_uart::sptr _gpsdo_uart;
     radio_ctrl_core_3000::sptr _local_ctrl;
     ad9361_ctrl::sptr _codec_ctrl;
     spi_core_3000::sptr _spi_iface;
@@ -123,8 +122,15 @@ struct b200_impl : public uhd::device
     //async ctrl + msgs
     uhd::task::sptr _async_task;
     typedef uhd::transport::bounded_buffer<uhd::async_metadata_t> async_md_type;
-    boost::shared_ptr<async_md_type> _async_md;
-    void handle_async_task(uhd::transport::zero_copy_if::sptr, boost::shared_ptr<async_md_type>, b200_uart::sptr);
+    struct AsyncTaskData
+    {
+        boost::shared_ptr<async_md_type> async_md;
+        boost::weak_ptr<radio_ctrl_core_3000> local_ctrl;
+        boost::weak_ptr<radio_ctrl_core_3000> radio_ctrl[2];
+        b200_uart::sptr gpsdo_uart;
+    };
+    boost::shared_ptr<AsyncTaskData> _async_task_data;
+    void handle_async_task(uhd::transport::zero_copy_if::sptr, boost::shared_ptr<AsyncTaskData>);
 
     void register_loopback_self_test(wb_iface::sptr iface);
     void codec_loopback_self_test(void);

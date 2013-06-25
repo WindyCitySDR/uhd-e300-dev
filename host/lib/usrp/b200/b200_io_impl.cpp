@@ -132,44 +132,43 @@ static void b200_if_hdr_pack_le(
 bool b200_impl::recv_async_msg(
     async_metadata_t &async_metadata, double timeout
 ){
-    return _async_md->pop_with_timed_wait(async_metadata, timeout);
+    return _async_task_data->async_md->pop_with_timed_wait(async_metadata, timeout);
 }
 
 void b200_impl::handle_async_task(
     uhd::transport::zero_copy_if::sptr xport,
-    boost::shared_ptr<async_md_type> async_md,
-    b200_uart::sptr gpsdo_uart
+    boost::shared_ptr<AsyncTaskData> data
 )
 {
     managed_recv_buffer::sptr buff = xport->get_recv_buff();
     if (not buff or buff->size() < 8) return;
     const boost::uint32_t sid = uhd::wtohx(buff->cast<const boost::uint32_t *>()[1]);
+    switch (sid)
+    {
 
     //if the packet is a control response
-    if (sid == B200_RESP0_MSG_SID or sid == B200_RESP1_MSG_SID)
+    case B200_RESP0_MSG_SID:
+    case B200_RESP1_MSG_SID:
+    case B200_LOCAL_RESP_SID:
     {
-        const size_t i = (sid == B200_RESP0_MSG_SID)? 0 : 1;
-        UHD_ASSERT_THROW(_radio_perifs.size() > i);
-        _radio_perifs[i].ctrl->push_response(buff->cast<const boost::uint32_t *>());
-        return;
-    }
-
-    //if the packet is a local control response
-    if (sid == B200_LOCAL_RESP_SID)
-    {
-        _local_ctrl->push_response(buff->cast<const boost::uint32_t *>());
-        return;
+        radio_ctrl_core_3000::sptr ctrl;
+        if (sid == B200_RESP0_MSG_SID) ctrl = data->radio_ctrl[0].lock();
+        if (sid == B200_RESP1_MSG_SID) ctrl = data->radio_ctrl[1].lock();
+        if (sid == B200_LOCAL_RESP_SID) ctrl = data->local_ctrl.lock();
+        if (ctrl) ctrl->push_response(buff->cast<const boost::uint32_t *>());
+        break;
     }
 
     //if the packet is a uart message
-    if (sid == B200_RX_GPS_UART_SID)
+    case B200_RX_GPS_UART_SID:
     {
-        gpsdo_uart->handle_uart_packet(buff);
-        return;
+        data->gpsdo_uart->handle_uart_packet(buff);
+        break;
     }
 
     //or maybe the packet is a TX async message
-    if (sid == B200_TX_MSG0_SID or sid == B200_TX_MSG1_SID)
+    case B200_TX_MSG0_SID:
+    case B200_TX_MSG1_SID:
     {
         const size_t i = (sid == B200_TX_MSG0_SID)? 0 : 1;
 
@@ -186,19 +185,21 @@ void b200_impl::handle_async_task(
         catch(const std::exception &ex)
         {
             UHD_MSG(error) << "Error parsing ctrl packet: " << ex.what() << std::endl;
-            return;
+            break;
         }
 
         //fill in the async metadata
         async_metadata_t metadata;
         load_metadata_from_buff(uhd::wtohx<boost::uint32_t>, metadata, if_packet_info, packet_buff, _tick_rate, i);
-        async_md->push_with_pop_on_full(metadata);
+        data->async_md->push_with_pop_on_full(metadata);
         standard_async_msg_prints(metadata);
-        return;
+        break;
     }
 
     //doh!
-    UHD_MSG(error) << "Got a ctrl packet with unknown SID " << sid << std::endl;
+    default:
+        UHD_MSG(error) << "Got a ctrl packet with unknown SID " << sid << std::endl;
+    }
 }
 
 /***********************************************************************
@@ -325,7 +326,7 @@ tx_streamer::sptr b200_impl::get_tx_stream(const uhd::stream_args_t &args_)
             &zero_copy_if::get_send_buff, _data_transport, _1
         ));
         my_streamer->set_async_receiver(boost::bind(
-            &bounded_buffer<async_metadata_t>::pop_with_timed_wait, _async_md, _1, _2
+            &async_md_type::pop_with_timed_wait, _async_task_data->async_md, _1, _2
         ));
         my_streamer->set_xport_chan_sid(stream_i, true, chan?B200_TX_DATA1_SID:B200_TX_DATA0_SID);
         my_streamer->set_enable_trailer(false); //TODO not implemented trailer support yet

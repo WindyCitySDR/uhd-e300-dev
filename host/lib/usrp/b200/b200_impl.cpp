@@ -259,16 +259,22 @@ b200_impl::b200_impl(const device_addr_t &device_addr)
         ctrl_xport_args
     );
     while (_ctrl_transport->get_recv_buff(0.0)){} //flush ctrl xport
-    _gpsdo_uart = b200_uart::make(_ctrl_transport, B200_TX_GPS_UART_SID);
-    _gpsdo_uart->set_baud_divider(B200_BUS_CLOCK_RATE/115200);
-    _async_md.reset(new async_md_type(1000/*messages deep*/));
-    _async_task = uhd::task::make(boost::bind(&b200_impl::handle_async_task, this, _ctrl_transport, _async_md, _gpsdo_uart));
+
+    ////////////////////////////////////////////////////////////////////
+    // Async task structure
+    ////////////////////////////////////////////////////////////////////
+    _async_task_data.reset(new AsyncTaskData());
+    _async_task_data->gpsdo_uart = b200_uart::make(_ctrl_transport, B200_TX_GPS_UART_SID);
+    _async_task_data->gpsdo_uart->set_baud_divider(B200_BUS_CLOCK_RATE/115200);
+    _async_task_data->async_md.reset(new async_md_type(1000/*messages deep*/));
+    _async_task = uhd::task::make(boost::bind(&b200_impl::handle_async_task, this, _ctrl_transport, _async_task_data));
 
     ////////////////////////////////////////////////////////////////////
     // Local control endpoint
     ////////////////////////////////////////////////////////////////////
     _local_ctrl = radio_ctrl_core_3000::make(vrt::if_packet_info_t::LINK_TYPE_CHDR, _ctrl_transport, zero_copy_if::sptr()/*null*/, B200_LOCAL_CTRL_SID);
     _local_ctrl->hold_task(_async_task);
+    _async_task_data->local_ctrl = _local_ctrl; //weak
     this->check_fpga_compat();
 
     /* Initialize the GPIOs, set the default bandsels to the lower range. Note
@@ -286,7 +292,7 @@ b200_impl::b200_impl(const device_addr_t &device_addr)
         UHD_MSG(status) << "Detecting internal GPSDO.... " << std::flush;
         try
         {
-            _gps = gps_ctrl::make(_gpsdo_uart);
+            _gps = gps_ctrl::make(_async_task_data->gpsdo_uart);
         }
         catch(std::exception &e)
         {
@@ -476,7 +482,6 @@ b200_impl::~b200_impl(void)
     UHD_SAFE_CALL
     (
         _async_task.reset();
-        _codec_ctrl->set_active_chains(false, false, false, false);
     )
 }
 
@@ -495,6 +500,7 @@ void b200_impl::setup_radio(const size_t dspno)
     const boost::uint32_t sid = (dspno == 0)? B200_CTRL0_MSG_SID : B200_CTRL1_MSG_SID;
     perif.ctrl = radio_ctrl_core_3000::make(vrt::if_packet_info_t::LINK_TYPE_CHDR, _ctrl_transport, zero_copy_if::sptr()/*null*/, sid);
     perif.ctrl->hold_task(_async_task);
+    _async_task_data->radio_ctrl[dspno] = perif.ctrl; //weak
     _tree->access<time_spec_t>(mb_path / "time" / "cmd")
         .subscribe(boost::bind(&radio_ctrl_core_3000::set_time, perif.ctrl, _1));
     this->register_loopback_self_test(perif.ctrl);
@@ -563,7 +569,7 @@ void b200_impl::setup_radio(const size_t dspno)
         const std::string key = std::string((direction? "RX" : "TX")) + std::string((dspno? "1" : "2"));
         const fs_path rf_fe_path = mb_path / "dboards" / "A" / (x+"_frontends") / (dspno? "B" : "A");
 
-        _tree->create<std::string>(rf_fe_path / "name").set(key);
+        _tree->create<std::string>(rf_fe_path / "name").set("FE-"+key);
         _tree->create<int>(rf_fe_path / "sensors"); //empty TODO
         BOOST_FOREACH(const std::string &name, ad9361_ctrl::get_gain_names(key))
         {
@@ -870,10 +876,10 @@ void b200_impl::update_antenna_sel(const size_t which, const std::string &ant)
 void b200_impl::update_enables(void)
 {
     //extract settings from state variables
-    const bool enb_tx1 = (_radio_perifs.size() > 0) and bool(_radio_perifs[0].tx_streamer.lock());
-    const bool enb_rx1 = (_radio_perifs.size() > 0) and bool(_radio_perifs[0].rx_streamer.lock());
-    const bool enb_tx2 = (_radio_perifs.size() > 1) and bool(_radio_perifs[1].tx_streamer.lock());
-    const bool enb_rx2 = (_radio_perifs.size() > 1) and bool(_radio_perifs[1].rx_streamer.lock());
+    const bool enb_tx2 = (_radio_perifs.size() > 0) and bool(_radio_perifs[0].tx_streamer.lock());
+    const bool enb_rx2 = (_radio_perifs.size() > 0) and bool(_radio_perifs[0].rx_streamer.lock());
+    const bool enb_tx1 = (_radio_perifs.size() > 1) and bool(_radio_perifs[1].tx_streamer.lock());
+    const bool enb_rx1 = (_radio_perifs.size() > 1) and bool(_radio_perifs[1].rx_streamer.lock());
     const size_t num_rx = (enb_rx1?1:0) + (enb_rx2?1:0);
     const size_t num_tx = (enb_tx1?1:0) + (enb_tx2?1:0);
     const bool mimo = num_rx == 2 or num_tx == 2;
