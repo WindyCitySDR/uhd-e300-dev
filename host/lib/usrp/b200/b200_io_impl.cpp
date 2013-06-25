@@ -218,7 +218,7 @@ rx_streamer::sptr b200_impl::get_rx_stream(const uhd::stream_args_t &args_)
     boost::shared_ptr<sph::recv_packet_streamer> my_streamer;
     for (size_t stream_i = 0; stream_i < args.channels.size(); stream_i++)
     {
-        const size_t chan = args.channels[0];
+        const size_t chan = args.channels[stream_i];
         radio_perifs_t &perif = _radio_perifs[chan];
 
         //calculate packet size
@@ -248,7 +248,7 @@ rx_streamer::sptr b200_impl::get_rx_stream(const uhd::stream_args_t &args_)
         my_streamer->set_converter(id);
 
         perif.framer->clear();
-        perif.framer->set_nsamps_per_packet(spp & ~1); //seems to be a good place to set this
+        perif.framer->set_nsamps_per_packet(spp);
         perif.framer->set_sid(chan?B200_RX_DATA1_SID:B200_RX_DATA0_SID);
         perif.framer->setup(args);
         my_streamer->set_xport_chan_get_buff(stream_i, boost::bind(
@@ -289,7 +289,7 @@ tx_streamer::sptr b200_impl::get_tx_stream(const uhd::stream_args_t &args_)
     boost::shared_ptr<sph::send_packet_streamer> my_streamer;
     for (size_t stream_i = 0; stream_i < args.channels.size(); stream_i++)
     {
-        const size_t chan = args.channels[0];
+        const size_t chan = args.channels[stream_i];
         radio_perifs_t &perif = _radio_perifs[chan];
 
         //calculate packet size
