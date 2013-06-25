@@ -72,17 +72,16 @@ void b200_impl::update_rx_subdev_spec(const uhd::usrp::subdev_spec_t &spec)
     if (spec.size()) validate_subdev_spec(_tree, spec, "rx");
     UHD_ASSERT_THROW(spec.size() <= _radio_perifs.size());
 
-    if (spec.size() == 1)
+    if (spec.size() > 0)
     {
         UHD_ASSERT_THROW(spec[0].db_name == "A");
+        UHD_ASSERT_THROW(spec[0].sd_name == "A");
     }
-    if (spec.size() == 2)
+    if (spec.size() > 1)
     {
         //TODO we can support swapping at a later date, only this combo is supported
-        UHD_ASSERT_THROW(spec[0].db_name == "A");
-        UHD_ASSERT_THROW(spec[0].sd_name == "RX1");
         UHD_ASSERT_THROW(spec[1].db_name == "A");
-        UHD_ASSERT_THROW(spec[1].sd_name == "RX2");
+        UHD_ASSERT_THROW(spec[1].sd_name == "B");
     }
 
     this->update_enables();
@@ -94,17 +93,16 @@ void b200_impl::update_tx_subdev_spec(const uhd::usrp::subdev_spec_t &spec)
     if (spec.size()) validate_subdev_spec(_tree, spec, "tx");
     UHD_ASSERT_THROW(spec.size() <= _radio_perifs.size());
 
-    if (spec.size() == 1)
+    if (spec.size() > 0)
     {
         UHD_ASSERT_THROW(spec[0].db_name == "A");
+        UHD_ASSERT_THROW(spec[0].sd_name == "A");
     }
-    if (spec.size() == 2)
+    if (spec.size() > 1)
     {
         //TODO we can support swapping at a later date, only this combo is supported
-        UHD_ASSERT_THROW(spec[0].db_name == "A");
-        UHD_ASSERT_THROW(spec[0].sd_name == "TX1");
         UHD_ASSERT_THROW(spec[1].db_name == "A");
-        UHD_ASSERT_THROW(spec[1].sd_name == "TX2");
+        UHD_ASSERT_THROW(spec[1].sd_name == "B");
     }
 
     this->update_enables();

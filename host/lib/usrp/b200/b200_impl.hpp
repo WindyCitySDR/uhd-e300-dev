@@ -78,8 +78,6 @@ static const boost::uint32_t B200_RX_GPS_UART_SID = FLIP_SID(B200_TX_GPS_UART_SI
 static const boost::uint32_t B200_LOCAL_CTRL_SID = 0x00000040;
 static const boost::uint32_t B200_LOCAL_RESP_SID = FLIP_SID(B200_LOCAL_CTRL_SID);
 
-
-
 /***********************************************************************
  * The B200 Capability Constants
  **********************************************************************/
