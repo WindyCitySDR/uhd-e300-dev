@@ -560,7 +560,7 @@ void b200_impl::setup_radio(const size_t dspno)
     for(size_t direction = 0; direction < 2; direction++)
     {
         const std::string x = direction? "rx" : "tx";
-        const std::string key = std::string((direction? "RX" : "TX")) + std::string((dspno? "2" : "1"));
+        const std::string key = std::string((direction? "RX" : "TX")) + std::string((dspno? "1" : "2"));
         const fs_path rf_fe_path = mb_path / "dboards" / "A" / (x+"_frontends") / (dspno? "B" : "A");
 
         _tree->create<std::string>(rf_fe_path / "name").set(key);
@@ -823,35 +823,37 @@ void b200_impl::reset_codec_dcm(void)
 
 void b200_impl::update_atrs(void)
 {
-    if (_radio_perifs.size() > 0)
+    if (_radio_perifs.size() > 1)
     {
-        const bool enb_rx = bool(_radio_perifs[0].rx_streamer.lock());
-        const bool enb_tx = bool(_radio_perifs[0].tx_streamer.lock());
-        const bool is_rx2 = _radio_perifs[0].ant_rx2;
+        radio_perifs_t &perif = _radio_perifs[1];
+        const bool enb_rx = bool(perif.rx_streamer.lock());
+        const bool enb_tx = bool(perif.tx_streamer.lock());
+        const bool is_rx2 = perif.ant_rx2;
         const size_t rxonly = (enb_rx)? ((is_rx2)? STATE_RX1_RX2 : STATE_RX1_TXRX) : STATE_OFF;
         const size_t txonly = (enb_tx)? (STATE_TX1_TXRX) : STATE_OFF;
         size_t fd = STATE_OFF;
         if (enb_rx and enb_tx) fd = STATE_FDX1_TXRX;
         if (enb_rx and not enb_tx) fd = rxonly;
         if (not enb_rx and enb_tx) fd = txonly;
-        gpio_core_200_32wo::sptr atr = _radio_perifs[0].atr;
+        gpio_core_200_32wo::sptr atr = perif.atr;
         atr->set_atr_reg(dboard_iface::ATR_REG_IDLE, STATE_OFF);
         atr->set_atr_reg(dboard_iface::ATR_REG_RX_ONLY, rxonly);
         atr->set_atr_reg(dboard_iface::ATR_REG_TX_ONLY, txonly);
         atr->set_atr_reg(dboard_iface::ATR_REG_FULL_DUPLEX, fd);
     }
-    if (_radio_perifs.size() > 1)
+    if (_radio_perifs.size() > 0)
     {
-        const bool enb_rx = bool(_radio_perifs[1].rx_streamer.lock());
-        const bool enb_tx = bool(_radio_perifs[1].tx_streamer.lock());
-        const bool is_rx2 = _radio_perifs[1].ant_rx2;
+        radio_perifs_t &perif = _radio_perifs[0];
+        const bool enb_rx = bool(perif.rx_streamer.lock());
+        const bool enb_tx = bool(perif.tx_streamer.lock());
+        const bool is_rx2 = perif.ant_rx2;
         const size_t rxonly = (enb_rx)? ((is_rx2)? STATE_RX2_RX2 : STATE_RX2_TXRX) : STATE_OFF;
         const size_t txonly = (enb_tx)? (STATE_TX2_TXRX) : STATE_OFF;
         size_t fd = STATE_OFF;
         if (enb_rx and enb_tx) fd = STATE_FDX2_TXRX;
         if (enb_rx and not enb_tx) fd = rxonly;
         if (not enb_rx and enb_tx) fd = txonly;
-        gpio_core_200_32wo::sptr atr = _radio_perifs[1].atr;
+        gpio_core_200_32wo::sptr atr = perif.atr;
         atr->set_atr_reg(dboard_iface::ATR_REG_IDLE, STATE_OFF);
         atr->set_atr_reg(dboard_iface::ATR_REG_RX_ONLY, rxonly);
         atr->set_atr_reg(dboard_iface::ATR_REG_TX_ONLY, txonly);
