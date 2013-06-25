@@ -37,6 +37,8 @@
 const static uint16_t FX3_VID = 0x04b4;
 const static uint16_t FX3_DEFAULT_PID = 0x00f3;
 const static uint16_t FX3_REENUM_PID = 0x00f0;
+const static uint16_t B2XX_VID = 0x2500;
+const static uint16_t B2XX_PID = 0x0020;
 
 namespace po = boost::program_options;
 
@@ -62,14 +64,13 @@ uint16_t atoh(const std::string &string){
 
 
 int32_t main(int32_t argc, char *argv[]) {
-
     uint16_t vid, pid, address;
     std::string pid_str, vid_str, readwrite;
     bool read = true;
 
     po::options_description desc("Allowed options");
     desc.add_options()
-        ("help", "help message")
+        ("help, h", "help message")
         ("vid", po::value<std::string>(&vid_str)->default_value("0x04b4"), "VID of device.")
         ("pid", po::value<std::string>(&pid_str)->default_value("0x00f0"), "PID of device.")
         ("speed, S", "Read back the USB mode currently in use")
@@ -85,9 +86,8 @@ int32_t main(int32_t argc, char *argv[]) {
     po::store(po::parse_command_line(argc, argv, desc), vm);
     po::notify(vm);
 
-    //print the help message
     if (vm.count("help")){
-        std::cout << boost::format("Slave Fifo Tests %s") % desc << std::endl;
+        std::cout << boost::format("B2xx Utilitiy Program %s") % desc << std::endl;
         return ~0;
     }
 
