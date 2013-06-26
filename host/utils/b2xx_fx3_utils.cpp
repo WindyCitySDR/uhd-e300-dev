@@ -60,9 +60,8 @@ boost::uint16_t atoh(const std::string &string){
 
 
 boost::int32_t main(boost::int32_t argc, char *argv[]) {
-    boost::uint16_t vid, pid, address;
-    std::string pid_str, vid_str, readwrite;
-    bool read = true;
+    boost::uint16_t vid, pid;
+    std::string pid_str, vid_str;
 
     po::options_description desc("Allowed options");
     desc.add_options()
@@ -104,21 +103,24 @@ boost::int32_t main(boost::int32_t argc, char *argv[]) {
     if(dev_handle == NULL) {
         std::cerr << "Cannot open device with vid: " << vid << " and pid: "
             << pid << std::endl;
-    } else { std::cout << "Device Opened" << std::endl; }
+    } else { std::cout << "Reactor Core Online..." << std::flush; }
     libusb_free_device_list(devs, 1);
 
     /* Find out if kernel driver is attached, and if so, detach it. */
     if(libusb_kernel_driver_active(dev_handle, 0) == 1) {
-        std::cout << "Kernel Driver Active... " << std::flush;
+        std::cout << " Competing Driver Identified... " << std::flush;
 
         if(libusb_detach_kernel_driver(dev_handle, 0) == 0) {
-            std::cout << "Kernel Driver Detached!" << std::endl;
+            std::cout << " Competing Driver Destroyed!" << std::flush;
         }
     }
 
     /* Claim interface 0 of device. */
     error_code = (libusb_error) libusb_claim_interface(dev_handle, 0);
-    std::cout << "Claimed Interface" << std::endl;
+    std::cout << " All Systems Nominal..." << std::endl << std::endl;
+
+    boost::uint8_t data_buffer[16];
+    memset(data_buffer, 0x0, sizeof(data_buffer));
 
 
         /* ("speed, S", "Read back the USB mode currently in use") */
@@ -130,10 +132,15 @@ boost::int32_t main(boost::int32_t argc, char *argv[]) {
         /* ("load-fpga, L", "Load a FPGA (bin) file into the FPGA") */
 
     if (vm.count("speed")){
+        error_code = (libusb_error) libusb_control_transfer(dev_handle, \
+            (LIBUSB_REQUEST_TYPE_VENDOR | LIBUSB_ENDPOINT_IN), 0x80, 0x00, \
+            0x00, data_buffer, 1, 5000);
 
+        boost::uint8_t speed = boost::lexical_cast<boost::uint8_t>(data_buffer[0]);
+
+        std::cout << "Currently operating at USB " << (int) speed << std::endl;
     }
 
-    boost::uint32_t data_buffer[16];
 
 
 
@@ -190,7 +197,7 @@ boost::int32_t main(boost::int32_t argc, char *argv[]) {
 #endif
 
     error_code = (libusb_error) libusb_release_interface(dev_handle, 0);
-    std::cout << "Released Interface" << std::endl;
+    std::cout << std::endl << "Reactor Shutting Down..." << std::endl;
 
     return 0;
 
