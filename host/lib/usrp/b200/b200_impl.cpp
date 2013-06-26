@@ -392,8 +392,12 @@ b200_impl::b200_impl(const device_addr_t &device_addr)
     _radio_perifs.resize(num_radio_chains);
     for (size_t i = 0; i < _radio_perifs.size(); i++) this->setup_radio(i);
 
+    //now test each radio module's connection to the codec interface
     _codec_ctrl->data_port_loopback(true);
-    this->codec_loopback_self_test();
+    BOOST_FOREACH(radio_perifs_t &perif, _radio_perifs)
+    {
+        this->codec_loopback_self_test(perif.ctrl);
+    }
     _codec_ctrl->data_port_loopback(false);
 
     ////////////////////////////////////////////////////////////////////
@@ -628,9 +632,8 @@ void b200_impl::register_loopback_self_test(wb_iface::sptr iface)
     UHD_MSG(status) << ((test_fail)? "fail" : "pass") << std::endl;
 }
 
-void b200_impl::codec_loopback_self_test(void)
+void b200_impl::codec_loopback_self_test(wb_iface::sptr iface)
 {
-    wb_iface::sptr iface = _radio_perifs[0].ctrl;
     bool test_fail = false;
     UHD_MSG(status) << "Performing CODEC loopback test... " << std::flush;
     size_t hash = size_t(time(NULL));
