@@ -43,6 +43,7 @@
 #include <uhd/transport/usb_zero_copy.hpp>
 #include <uhd/transport/bounded_buffer.hpp>
 #include <boost/weak_ptr.hpp>
+#include "recv_packet_demuxer_3000.hpp"
 
 static const std::string     B200_FW_FILE_NAME = "usrp_b200_fw.hex";
 static const std::string     B200_FPGA_FILE_NAME = "usrp_b200_fpga.bin";
@@ -107,6 +108,7 @@ struct b200_impl : public uhd::device
     //transports
     uhd::transport::zero_copy_if::sptr _data_transport;
     uhd::transport::zero_copy_if::sptr _ctrl_transport;
+    boost::shared_ptr<uhd::usrp::recv_packet_demuxer_3000> _demux;
 
     //device properties interface
     uhd::property_tree::sptr get_tree(void) const

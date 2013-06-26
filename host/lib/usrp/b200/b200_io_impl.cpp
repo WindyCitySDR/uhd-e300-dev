@@ -220,6 +220,7 @@ rx_streamer::sptr b200_impl::get_rx_stream(const uhd::stream_args_t &args_)
     {
         const size_t chan = args.channels[stream_i];
         radio_perifs_t &perif = _radio_perifs[chan];
+        const boost::uint32_t sid = chan?B200_RX_DATA1_SID:B200_RX_DATA0_SID;
 
         //calculate packet size
         static const size_t hdr_size = 0
@@ -249,10 +250,10 @@ rx_streamer::sptr b200_impl::get_rx_stream(const uhd::stream_args_t &args_)
 
         perif.framer->clear();
         perif.framer->set_nsamps_per_packet(spp);
-        perif.framer->set_sid(chan?B200_RX_DATA1_SID:B200_RX_DATA0_SID);
+        perif.framer->set_sid(sid);
         perif.framer->setup(args);
         my_streamer->set_xport_chan_get_buff(stream_i, boost::bind(
-            &zero_copy_if::get_recv_buff, _data_transport, _1
+            &recv_packet_demuxer_3000::get_recv_buff, _demux, sid, _1
         ), true /*flush*/);
         my_streamer->set_overflow_handler(stream_i, boost::bind(
             &rx_vita_core_3000::handle_overflow, perif.framer
