@@ -473,7 +473,7 @@ inline static nirio_status rio_ioctl(
 	void *read_buf,
 	size_t read_buf_len)
 {
-	nNIRIOSRV200::tRioIoctlBlock ioctl_block = {0};
+	nNIRIOSRV200::tRioIoctlBlock ioctl_block = {0,0,0,0,0,0};
 
 	// two-casts necessary to prevent pointer sign-extension
 	ioctl_block.inBuf        = static_cast<uint64_t>(reinterpret_cast<uintptr_t>(write_buf));

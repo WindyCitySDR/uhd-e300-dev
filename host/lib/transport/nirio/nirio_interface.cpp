@@ -28,6 +28,8 @@
 
 #define GET_FIFO_MEMORY_TYPE(fifo_inst) (static_cast<uint16_t>(0x0100 | static_cast<uint16_t>(fifo_inst)))
 
+//@TODO: Figure out a better way to suppress anonymous struct init warnings
+#pragma GCC diagnostic ignored "-Wmissing-field-initializers"
 namespace nirio_interface
 {
 	//-------------------------------------------------------
@@ -366,7 +368,7 @@ namespace nirio_interface
 
         if (nirio_status_fatal(status) || status == GLOB_NOMATCH) return status;
 
-        for (int i = 0; i < glob_instance.gl_pathc; i++) {
+        for (size_t i = 0; i < glob_instance.gl_pathc; i++) {
         	char* current_path = glob_instance.gl_pathv[i];
 
         	char path[PATH_MAX];
@@ -381,7 +383,7 @@ namespace nirio_interface
 			niriok_proxy temp_proxy;
 			status = temp_proxy.open(file_buffer);
 
-	        if (nirio_status_fatal(status)) return status;
+	        if (nirio_status_fatal(status) && num_read > 0) return status;
 
 	        if (filter(temp_proxy, filter_value)) {
 	        	proxy_vtr.push_back(temp_proxy);
@@ -389,6 +391,7 @@ namespace nirio_interface
 	        	temp_proxy.close();
 	        }
         }
+        return status;
 	}
 
 	bool niriok_proxy_factory::_filter_by_interface_num(
@@ -413,3 +416,4 @@ namespace nirio_interface
         return (nirio_status_not_fatal(status) && prod_num == filter_value && ven_num == NI_VENDOR_NUM);
 	}
 }
+#pragma GCC diagnostic pop

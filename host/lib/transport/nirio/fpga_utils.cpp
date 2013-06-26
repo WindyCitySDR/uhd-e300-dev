@@ -20,7 +20,7 @@ nirio_status fpga_utils::download_fpga(
 	const std::string& filename)
 {
     boost::scoped_array<uint8_t> buffer;
-    uint32_t bytes_read = _read_fpga_bitstream(driver_proxy, filename, mode == DOWNLOAD_TO_FLASH, buffer);
+    uint32_t bytes_read = _read_fpga_bitstream(filename, mode == DOWNLOAD_TO_FLASH, buffer);
     if (bytes_read > 0) {
     	switch (mode) {
 			case PROGRAM_FPGA:
@@ -32,6 +32,7 @@ nirio_status fpga_utils::download_fpga(
     } else {
     	return -1;
     }
+    return -1;
 }
 
 nirio_status fpga_utils::erase_fpga_from_flash(
@@ -46,7 +47,6 @@ nirio_status fpga_utils::configure_fpga_from_flash(
 	return driver_proxy.poke(0x58, (uint32_t)1);
 }
 uint32_t fpga_utils::_read_fpga_bitstream(
-	niriok_proxy& driver_proxy,
 	const std::string& filename,
 	bool reverse_bits,
 	boost::scoped_array<uint8_t>& buffer)

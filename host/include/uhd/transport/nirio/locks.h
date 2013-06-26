@@ -21,6 +21,7 @@ public:
 
 	nirio_status acquire(uint32_t timeout) {
 		//@TODO: The closed helper should implement the shared memory mutex operations.
+	    timeout++;
 		return NiRio_Status_Success;
 	}
 
@@ -48,6 +49,7 @@ public:
 
 	nirio_status acquire(uint32_t timeout) {
 		//@TODO: The closed helper should implement the shared memory mutex operations.
+        timeout++;
 		return NiRio_Status_Success;
 	}
 

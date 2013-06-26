@@ -75,12 +75,10 @@ int main(int argc, char *argv[])
 		uint32_t attr_val;
 		nirio_status_chain(dev_proxy.set_attribute(kBoardFlashAutoLoadMode, load_mode), status);
 		nirio_status_chain(dev_proxy.get_attribute(kBoardFlashAutoLoadMode, attr_val), status);
-		printf("%s\n", (load_mode==attr_val?"DONE":"ERROR!"));
+		printf("%s\n", (load_mode==(int32_t)attr_val?"DONE":"ERROR!"));
 	}
 
     boost::scoped_array<uint8_t> fpga_buffer, flash_buffer;
-    size_t fpga_bufsize, flash_bufsize;
-
     //Download BIN to FPGA
     if (fpga_bin_path != "") {
     	printf("Loading image %s to FPGA...", fpga_bin_path.c_str());
@@ -106,7 +104,7 @@ int main(int argc, char *argv[])
 
     //Start fly-by configuration
     if (vm.count("start-fly-by")){
-		printf("Starting fly-by FPGA configuration from flash...", flash_path.c_str());
+		printf("Starting fly-by FPGA configuration from flash...");
 		fflush(stdout);
 		nirio_status_chain(fpga_utils::configure_fpga_from_flash(dev_proxy), status);
 		printf("DONE\n");
@@ -117,7 +115,7 @@ int main(int argc, char *argv[])
 		printf("Configuring STC3 and FPGA to master the Chinch...");
 		fflush(stdout);
 
-		uint32_t cached_addr_space, reg_value;
+		uint32_t reg_value;
 		//nirio_status_chain(dev_proxy.get_attribute(kRioAddressSpace, cached_addr_space), status);
 
 		//Write HBRCR

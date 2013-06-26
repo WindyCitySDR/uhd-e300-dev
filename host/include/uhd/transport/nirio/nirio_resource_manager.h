@@ -127,9 +127,9 @@ private:
 	nirio_status _set_driver_config();
 	nirio_fifo_info_t* _lookup_fifo_info(const char* fifo_name);
 
+    niriok_proxy&           _kernel_proxy;
 	fifo_info_map_t			_fifo_info_map;
 	register_info_map_t		_reg_info_map;
-    niriok_proxy&			_kernel_proxy;
 };
 
 }

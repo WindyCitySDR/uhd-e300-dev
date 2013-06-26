@@ -33,7 +33,6 @@ public:
 	static nirio_status configure_fpga_from_flash(
 		niriok_proxy& driver_proxy);
 	static uint32_t _read_fpga_bitstream(
-		niriok_proxy& driver_proxy,
 		const std::string& filename,
 		bool reverse_bits,
 		boost::scoped_array<uint8_t>& buffer);
