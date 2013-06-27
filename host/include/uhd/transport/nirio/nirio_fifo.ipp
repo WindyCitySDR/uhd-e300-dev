@@ -5,6 +5,9 @@
  *      Author: ashish
  */
 
+//@TODO: Figure out a better way to suppress anonymous struct init warnings
+#pragma GCC diagnostic ignored "-Wmissing-field-initializers"
+
 template <typename data_t>
 nirio_fifo<data_t>::nirio_fifo() :
 	_datatype_info(_get_datatype_info()),
@@ -19,9 +22,9 @@ nirio_fifo<data_t>::nirio_fifo(
     fifo_direction_t direction,
 	const std::string& name,
     uint32_t fifo_instance) :
-    _fifo_channel(fifo_instance),
     _name(name),
     _fifo_direction(direction),
+    _fifo_channel(fifo_instance),
     _datatype_info(_get_datatype_info()),
     _started(false),
     _mem_map(),
@@ -261,3 +264,4 @@ nirio_status nirio_fifo<data_t>::write(
     _lock.release();
 	return status;
 }
+#pragma GCC diagnostic pop

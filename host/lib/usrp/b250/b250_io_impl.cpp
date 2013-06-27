@@ -325,14 +325,10 @@ rx_streamer::sptr b250_impl::get_rx_stream(const uhd::stream_args_t &args_)
         }
 
         //allocate sid and create transport
-        sid_config_t data_config;
-        data_config.router_addr_there = B250_DEVICE_THERE;
-        data_config.dst_prefix = B250_RADIO_DEST_PREFIX_RX;
-        data_config.router_dst_there = (chan == 0)? B250_XB_DST_R0 : B250_XB_DST_R1;
-        data_config.router_dst_here = B250_XB_DST_E0;
-        const boost::uint32_t data_sid = this->allocate_sid(data_config);
+        uint8_t dest = (chan == 0)? B250_XB_DST_R0 : B250_XB_DST_R1;
+        boost::uint32_t data_sid;
         UHD_LOG << "creating rx stream " << device_addr.to_string() << std::endl;
-        zero_copy_if::sptr data_xport = this->make_transport(_addr, data_sid, device_addr);
+        zero_copy_if::sptr data_xport = this->make_transport(_addr, _xport_path, dest, B250_RADIO_DEST_PREFIX_RX, device_addr, data_sid);
         UHD_LOG << boost::format("data_sid = 0x%08x\n") % data_sid << std::endl;
 
         //calculate packet size
@@ -421,14 +417,10 @@ tx_streamer::sptr b250_impl::get_tx_stream(const uhd::stream_args_t &args_)
         radio_perifs_t &perif = _radio_perifs[chan];
 
         //allocate sid and create transport
-        sid_config_t data_config;
-        data_config.router_addr_there = B250_DEVICE_THERE;
-        data_config.dst_prefix = B250_RADIO_DEST_PREFIX_TX;
-        data_config.router_dst_there = (chan == 0)? B250_XB_DST_R0 : B250_XB_DST_R1;
-        data_config.router_dst_here = B250_XB_DST_E0;
-        const boost::uint32_t data_sid = this->allocate_sid(data_config);
+        uint8_t dest = (chan == 0)? B250_XB_DST_R0 : B250_XB_DST_R1;
+        boost::uint32_t data_sid;
         UHD_LOG << "creating tx stream " << _send_args.to_string() << std::endl;
-        zero_copy_if::sptr data_xport = this->make_transport(_addr, data_sid, _send_args);
+        zero_copy_if::sptr data_xport = this->make_transport(_addr, _xport_path, dest, B250_RADIO_DEST_PREFIX_TX, _send_args, data_sid);
         UHD_LOG << boost::format("data_sid = 0x%08x\n") % data_sid << std::endl;
 
         //calculate packet size

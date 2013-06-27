@@ -11,6 +11,7 @@
 #include <uhd/transport/nirio/nirio_interface.h>
 #include <uhd/transport/nirio/nirio_resource_manager.h>
 #include <uhd/transport/nirio/locks.h>
+#include <boost/smart_ptr.hpp>
 #include <string>
 
 namespace nifpga_interface
@@ -19,6 +20,8 @@ namespace nifpga_interface
 class nifpga_session
 {
 public:
+    typedef boost::shared_ptr<nifpga_session> sptr;
+
 	static nirio_status load_lib();
 	static nirio_status unload_lib();
 
@@ -66,6 +69,11 @@ public:
 			_resource_manager.create_rx_fifo(fifo_name, fifo);
 		_lock.release();
 		return status;
+	}
+
+	nirio_interface::niriok_proxy& get_kernel_proxy()
+	{
+	    return _riok_proxy;
 	}
 
 	static const uint32_t OPEN_ATTR_SKIP_SIGNATURE_CHECK	= 1 << 31;

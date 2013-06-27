@@ -30,10 +30,16 @@
 #include <boost/functional/hash.hpp>
 #include <boost/assign/list_of.hpp>
 #include <fstream>
+#include <uhd/transport/udp_zero_copy.hpp>
+#include <uhd/transport/nirio_zero_copy.hpp>
+#include <uhd/transport/nirio/nifpga_interface.h>
+#include <uhd/transport/nirio/nifpga_image.h>
 
 using namespace uhd;
 using namespace uhd::usrp;
 using namespace uhd::transport;
+using namespace nifpga_interface;
+using namespace nirio_interface;
 namespace asio = boost::asio;
 
 /***********************************************************************
@@ -176,6 +182,20 @@ b250_impl::b250_impl(const uhd::device_addr_t &dev_addr)
     _tree = uhd::property_tree::make();
     _sid_framer = 0;
     _addr = dev_addr["addr"];
+    _xport_path = dev_addr.has_key("transport") ? dev_addr["transport"] : "eth";
+
+    if (_xport_path == "pcie") {
+        UHD_MSG(status) << "Loading NiFpga lib...\n";
+        nirio_status_not_fatal(nifpga_session::load_lib());
+
+        UHD_MSG(status) << "Opening nifpga session...\n";
+        _rio_fpga_interface.reset(new nifpga_session("RIO0"));
+        nirio_status status = 0;
+        nirio_status_chain(_rio_fpga_interface->open(nifpga_image::BITFILE, nifpga_image::SIGNATURE, 1<<31), status);
+
+        UHD_ASSERT_THROW(nirio_status_not_fatal(status));
+    }
+
     BOOST_FOREACH(const std::string &key, dev_addr.keys())
     {
         if (key[0] == 'r') _recv_args[key] = dev_addr[key];
@@ -194,11 +214,20 @@ b250_impl::b250_impl(const uhd::device_addr_t &dev_addr)
 
     const std::vector<std::string> DB_NAMES = boost::assign::list_of("A")("B");
 
+    UHD_MSG(status) << "Creating ZPU ctrl...\n";
     //create basic communication
-    _zpu_ctrl.reset(new b250_ctrl_iface(udp_simple::make_connected(_addr, BOOST_STRINGIZE(B250_FW_COMMS_UDP_PORT))));
+    if (_xport_path == "pcie")
+        _zpu_ctrl.reset(new b250_ctrl_iface_pcie(_rio_fpga_interface->get_kernel_proxy()));
+    else
+        _zpu_ctrl.reset(new b250_ctrl_iface_enet(udp_simple::make_connected(_addr, BOOST_STRINGIZE(B250_FW_COMMS_UDP_PORT))));
+
     _zpu_spi = spi_core_3000::make(_zpu_ctrl, SR_ADDR(SET0_BASE, ZPU_SR_SPI), SR_ADDR(SET0_BASE, ZPU_RB_SPI));
     _zpu_i2c = i2c_core_100_wb32::make(_zpu_ctrl, I2C1_BASE);
     _zpu_i2c->set_clock_rate(B250_BUS_CLOCK_RATE);
+
+    UHD_MSG(status) << _zpu_ctrl->peek32(0xa000) << "\n";
+    UHD_MSG(status) << _zpu_ctrl->peek32(0xa000) << "\n";
+    UHD_MSG(status) << _zpu_ctrl->peek32(0xa000) << "\n";
 
     ////////////////////////////////////////////////////////////////////
     // Initialize the properties tree
@@ -226,7 +255,7 @@ b250_impl::b250_impl(const uhd::device_addr_t &dev_addr)
     ////////////////////////////////////////////////////////////////////
     for (size_t i = 0; i < 8; i++)
     {
-        _db_eeproms[i].load(*_zpu_i2c, 0x50 | i);
+//        _db_eeproms[i].load(*_zpu_i2c, 0x50 | i);
     }
 
     ////////////////////////////////////////////////////////////////////
@@ -245,33 +274,33 @@ b250_impl::b250_impl(const uhd::device_addr_t &dev_addr)
     //otherwise if not disabled, look for the internal GPSDO
     //TODO if (_iface->peekfw(U2_FW_REG_HAS_GPSDO) != dont_look_for_gpsdo)
     //if (false)
-    {
-        UHD_MSG(status) << "Detecting internal GPSDO.... " << std::flush;
-        try
-        {
-            _gps = gps_ctrl::make(udp_simple::make_uart(udp_simple::make_connected(
-                _addr, BOOST_STRINGIZE(B250_GPSDO_UDP_PORT)
-            )));
-        }
-        catch(std::exception &e)
-        {
-            UHD_MSG(error) << "An error occurred making GPSDO control: " << e.what() << std::endl;
-        }
-        if (_gps and _gps->gps_detected())
-        {
-            UHD_MSG(status) << "found" << std::endl;
-            BOOST_FOREACH(const std::string &name, _gps->get_sensors())
-            {
-                _tree->create<sensor_value_t>(mb_path / "sensors" / name)
-                    .publish(boost::bind(&gps_ctrl::get_sensor, _gps, name));
-            }
-        }
-        else
-        {
-            UHD_MSG(status) << "not found" << std::endl;
-            //TODO _iface->pokefw(U2_FW_REG_HAS_GPSDO, dont_look_for_gpsdo);
-        }
-    }
+//    {
+//        UHD_MSG(status) << "Detecting internal GPSDO.... " << std::flush;
+//        try
+//        {
+//            _gps = gps_ctrl::make(udp_simple::make_uart(udp_simple::make_connected(
+//                _addr, BOOST_STRINGIZE(B250_GPSDO_UDP_PORT)
+//            )));
+//        }
+//        catch(std::exception &e)
+//        {
+//            UHD_MSG(error) << "An error occurred making GPSDO control: " << e.what() << std::endl;
+//        }
+//        if (_gps and _gps->gps_detected())
+//        {
+//            UHD_MSG(status) << "found" << std::endl;
+//            BOOST_FOREACH(const std::string &name, _gps->get_sensors())
+//            {
+//                _tree->create<sensor_value_t>(mb_path / "sensors" / name)
+//                    .publish(boost::bind(&gps_ctrl::get_sensor, _gps, name));
+//            }
+//        }
+//        else
+//        {
+//            UHD_MSG(status) << "not found" << std::endl;
+//            //TODO _iface->pokefw(U2_FW_REG_HAS_GPSDO, dont_look_for_gpsdo);
+//        }
+//    }
 
     ////////////////////////////////////////////////////////////////////
     //clear router?
@@ -356,6 +385,11 @@ b250_impl::~b250_impl(void)
     (
         _radio_perifs[0].ctrl->poke32(TOREG(SR_MISC_OUTS), (1 << 2)); //disable/reset ADC/DAC
         _radio_perifs[1].ctrl->poke32(TOREG(SR_MISC_OUTS), (1 << 2)); //disable/reset ADC/DAC
+
+        if (_xport_path == "pcie") {
+            _rio_fpga_interface->close(true);
+            nifpga_session::unload_lib();
+        }
     )
 }
 
@@ -369,14 +403,13 @@ void b250_impl::setup_radio(const size_t i, const std::string &db_name)
     // radio control
     ////////////////////////////////////////////////////////////////////
     UHD_HERE();
-    sid_config_t config;
-    config.router_addr_there = B250_DEVICE_THERE;
-    config.dst_prefix = B250_RADIO_DEST_PREFIX_CTRL;
-    config.router_dst_there = (i == 0)? B250_XB_DST_R0 : B250_XB_DST_R1;
-    config.router_dst_here = B250_XB_DST_E0;
-    const boost::uint32_t ctrl_sid = this->allocate_sid(config);
-    udp_zero_copy::sptr ctrl_xport = this->make_transport(_addr, ctrl_sid);
-    perif.ctrl = radio_ctrl_core_3000::make(vrt::if_packet_info_t::LINK_TYPE_VRLP, ctrl_xport, ctrl_xport, ctrl_sid, db_name);
+    uint8_t dest = (i == 0)? B250_XB_DST_R0 : B250_XB_DST_R1;
+    boost::uint32_t ctrl_sid;
+    zero_copy_if::sptr ctrl_xport = this->make_transport(_addr, _xport_path, dest, B250_RADIO_DEST_PREFIX_CTRL, device_addr_t(), ctrl_sid);
+    vrt::if_packet_info_t::link_type_t pkt_format = (_xport_path == "pcie") ?
+                                                   vrt::if_packet_info_t::LINK_TYPE_CHDR :
+                                                   vrt::if_packet_info_t::LINK_TYPE_VRLP;
+    perif.ctrl = radio_ctrl_core_3000::make(pkt_format, ctrl_xport, ctrl_xport, ctrl_sid, db_name);
     perif.ctrl->poke32(TOREG(SR_MISC_OUTS), (1 << 2)); //reset adc + dac
     perif.ctrl->poke32(TOREG(SR_MISC_OUTS),  (1 << 1) | (1 << 0)); //out of reset + dac enable
 
@@ -495,40 +528,59 @@ void b250_impl::setup_radio(const size_t i, const std::string &db_name)
     );
 }
 
-uhd::transport::udp_zero_copy::sptr b250_impl::make_transport(
-    const std::string &addr,
-    const boost::uint32_t sid,
-    const uhd::device_addr_t &device_addr
+
+uhd::transport::zero_copy_if::sptr b250_impl::make_transport(
+    const std::string& addr,
+    const std::string& xport_path,
+    const uint8_t& destination,
+    const uint8_t& prefix,
+    const uhd::device_addr_t& args,
+    boost::uint32_t& sid
 )
 {
-    //make a new transport - fpga has no idea how to talk to use on this yet
-    udp_zero_copy::sptr xport = udp_zero_copy::make(addr, BOOST_STRINGIZE(B250_VITA_UDP_PORT), device_addr);
+    zero_copy_if::sptr xport;
 
-    //clear the ethernet dispatcher's udp port
-    //NOT clearing this, the dispatcher is now intelligent
-    //_zpu_ctrl->poke32(SR_ADDR(SET0_BASE, (ZPU_SR_ETHINT0+8+3)), 0);
+    sid_config_t config;
+    config.router_addr_there    = B250_DEVICE_THERE;
+    config.dst_prefix           = prefix;
+    config.router_dst_there     = destination;
+    config.router_dst_here      = xport_path == "pcie" ? B250_XB_DST_PCI : B250_XB_DST_E0;
+    sid = this->allocate_sid(config, xport_path);
 
-    //send a mini packet with SID into the ZPU
-    //ZPU will reprogram the ethernet framer
-    UHD_LOG << "programming packet for new xport on "
-        << addr << std::hex << "sid 0x" << sid << std::dec << std::endl;
-    managed_send_buffer::sptr mb = xport->get_send_buff();
-    mb->cast<boost::uint32_t *>()[0] = uhd::htonx(sid);
-    mb->commit(4);
-    mb.reset();
+    if (xport_path == "pcie") {
+        uint32_t chan = (destination == B250_XB_DST_R0) ? 0 : 1;
+        uint32_t instance = prefix + (chan * 3);
+        xport = nirio_zero_copy::make(_rio_fpga_interface, instance, args);
+    } else {
+        //make a new transport - fpga has no idea how to talk to use on this yet
+        xport = udp_zero_copy::make(addr, BOOST_STRINGIZE(B250_VITA_UDP_PORT), args);
 
-    //reprogram the ethernet dispatcher's udp port (should be safe to always set)
-    UHD_LOG << "reprogram the ethernet dispatcher's udp port" << std::endl;
-    _zpu_ctrl->poke32(SR_ADDR(SET0_BASE, (ZPU_SR_ETHINT0+8+3)), B250_VITA_UDP_PORT);
+        //clear the ethernet dispatcher's udp port
+        //NOT clearing this, the dispatcher is now intelligent
+        //_zpu_ctrl->poke32(SR_ADDR(SET0_BASE, (ZPU_SR_ETHINT0+8+3)), 0);
 
-    //Do a peek to an arbitrary address to guarantee that the
-    //ethernet framer has been programmed before we return.
-    _zpu_ctrl->peek32(0);
+        //send a mini packet with SID into the ZPU
+        //ZPU will reprogram the ethernet framer
+        UHD_LOG << "programming packet for new xport on "
+            << addr << std::hex << "sid 0x" << sid << std::dec << std::endl;
+        managed_send_buffer::sptr mb = xport->get_send_buff();
+        mb->cast<boost::uint32_t *>()[0] = uhd::htonx(sid);
+        mb->commit(4);
+        mb.reset();
 
+        //reprogram the ethernet dispatcher's udp port (should be safe to always set)
+        UHD_LOG << "reprogram the ethernet dispatcher's udp port" << std::endl;
+        _zpu_ctrl->poke32(SR_ADDR(SET0_BASE, (ZPU_SR_ETHINT0+8+3)), B250_VITA_UDP_PORT);
+
+        //Do a peek to an arbitrary address to guarantee that the
+        //ethernet framer has been programmed before we return.
+        _zpu_ctrl->peek32(0);
+    }
     return xport;
 }
 
-boost::uint32_t b250_impl::allocate_sid(const sid_config_t &config)
+
+boost::uint32_t b250_impl::allocate_sid(const sid_config_t &config, std::string xport_path)
 {
     const boost::uint32_t stream = (config.dst_prefix | (config.router_dst_there << 2)) & 0xff;
 
@@ -546,9 +598,6 @@ boost::uint32_t b250_impl::allocate_sid(const sid_config_t &config)
         << " router_addr_there 0x" << int(config.router_addr_there)
         << std::dec << std::endl;
 
-    //increment for next setup
-    _sid_framer++;
-
     // Program the B250 to recognise it's own local address.
     _zpu_ctrl->poke32(SR_ADDR(SET0_BASE, ZPU_SR_XB_LOCAL), config.router_addr_there);
     // Program CAM entry for outgoing packets matching a B250 resource (for example a Radio)
@@ -558,9 +607,19 @@ boost::uint32_t b250_impl::allocate_sid(const sid_config_t &config)
     // This type of packet does not match the XB_LOCAL address and is looked up in the lower half of the CAM
     _zpu_ctrl->poke32(SR_ADDR(SETXB_BASE, 0 + (B250_DEVICE_HERE)), config.router_dst_here);
 
+    if (xport_path == "pcie") {
+        uint32_t chan = config.router_dst_there == B250_XB_DST_R0 ? 0 : 1;
+        uint32_t router_config_word = (_sid_framer << 16) | (config.dst_prefix + (chan * 3));
+        _rio_fpga_interface->get_kernel_proxy().poke(PCIE_ROUTER_REG(0), router_config_word);
+    }
+
     UHD_LOG << std::hex
         << "done router config for sid 0x" << sid
         << std::dec << std::endl;
+
+    //increment for next setup
+    _sid_framer++;
+
     return sid;
 }
 

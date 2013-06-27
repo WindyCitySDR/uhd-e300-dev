@@ -3,6 +3,7 @@
 #define LOCKS_H_
 
 #include <uhd/transport/nirio/status.h>
+#include <boost/thread/pthread/mutex.hpp>
 #include <unistd.h>
 
 namespace nifpga_interface
@@ -20,18 +21,21 @@ public:
 	}
 
 	nirio_status acquire(uint32_t timeout) {
-		//@TODO: The closed helper should implement the shared memory mutex operations.
-	    timeout++;
-		return NiRio_Status_Success;
+        //@TODO: The closed helper should implement the shared memory mutex operations.
+        _mutex.lock();
+        timeout++;
+        return NiRio_Status_Success;
 	}
 
 	void release() {
-		//@TODO: The closed helper should implement the shared memory mutex operations.
+        //@TODO: The closed helper should implement the shared memory mutex operations.
+        _mutex.unlock();
 	}
 
 private:
-	uint32_t 	_session;
-	pid_t 		_pid;
+	uint32_t 	    _session;
+	pid_t 		    _pid;
+    boost::mutex    _mutex;
 };
 
 }
@@ -48,18 +52,18 @@ public:
 	virtual ~nirio_fifo_lock() {}
 
 	nirio_status acquire(uint32_t timeout) {
-		//@TODO: The closed helper should implement the shared memory mutex operations.
+        //@TODO: The closed helper should implement the shared memory mutex operations.
         timeout++;
 		return NiRio_Status_Success;
 	}
 
 	void release() {
-		//@TODO: The closed helper should implement the shared memory mutex operations.
+        //@TODO: The closed helper should implement the shared memory mutex operations.
 	}
 
 private:
-	uint32_t _device_interface;
-	uint32_t _fifo_instance;
+	uint32_t        _device_interface;
+	uint32_t        _fifo_instance;
 };
 
 }

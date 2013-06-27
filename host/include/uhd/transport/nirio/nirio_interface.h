@@ -11,6 +11,7 @@
 
 #include <uhd/transport/nirio/RioConstants.h>
 #include <uhd/transport/nirio/nirio_transport.h>
+#include <boost/smart_ptr.hpp>
 #include <cstring>
 #include <glob.h>
 #include <vector>
@@ -19,7 +20,9 @@ namespace nirio_interface
 {
     class niriok_proxy {
     public:
-    	enum version_t { CURRENT, OLDEST_COMPATIBLE };
+        typedef boost::shared_ptr<niriok_proxy> sptr;
+
+        enum version_t { CURRENT, OLDEST_COMPATIBLE };
 
     	niriok_proxy();
     	virtual ~niriok_proxy();

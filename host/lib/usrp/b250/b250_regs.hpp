@@ -73,4 +73,26 @@ localparam ZPU_RB_SPI = 2;
 #define DB_RX_SEN (1 << 1)
 #define DB_TX_SEN (1 << 0)
 
+//-------------------------------------------------------------------
+// PCIe Registers
+//-------------------------------------------------------------------
+
+static const uint32_t PCIE_FPGA_ADDR_BASE   = 0x80000;
+#define PCIE_FPGA_REG(X)                    (PCIE_FPGA_ADDR_BASE + X)
+
+static const uint32_t FPGA_B250_SIG_REG     = PCIE_FPGA_REG(0x0000);
+static const uint32_t FPGA_CNTR_LO_REG      = PCIE_FPGA_REG(0x0004);
+static const uint32_t FPGA_CNTR_HI_REG      = PCIE_FPGA_REG(0x0008);
+static const uint32_t FPGA_CNTR_FREQ_REG    = PCIE_FPGA_REG(0x000C);
+
+static const uint32_t PCIE_ROUTER_REG_BASE  = PCIE_FPGA_REG(0x0100);
+#define PCIE_ROUTER_REG(X)                  (PCIE_FPGA_REG(PCIE_ROUTER_REG_BASE) + X)
+
+static const uint32_t PCIE_ZPU_DATA_BASE    = 0x70000;
+static const uint32_t PCIE_ZPU_READ_BASE    = 0x60000;
+
+#define PCIE_ZPU_DATA_REG(X)                (PCIE_FPGA_REG(PCIE_ZPU_DATA_BASE) + X)
+#define PCIE_ZPU_READ_REG(X)                (PCIE_FPGA_REG(PCIE_ZPU_READ_BASE) + X)
+
+
 #endif /* INCLUDED_B250_REGS_HPP */

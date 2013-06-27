@@ -28,7 +28,6 @@
 #include "b250_clock_ctrl.hpp"
 #include "b250_fw_common.h"
 #include "b250_fw_ctrl.hpp"
-#include <uhd/transport/udp_zero_copy.hpp>
 #include "spi_core_3000.hpp"
 #include "b250_adc_ctrl.hpp"
 #include "b250_dac_ctrl.hpp"
@@ -43,6 +42,7 @@
 #include <boost/weak_ptr.hpp>
 #include <uhd/usrp/gps_ctrl.hpp>
 #include <uhd/transport/bounded_buffer.hpp>
+#include <uhd/transport/nirio/nifpga_interface.h>
 
 static const size_t B250_TX_FC_PKT_WINDOW = 2048; //16MB/8Kpkts
 static const std::string B250_FW_FILE_NAME = "usrp_b250_fw.bin";
@@ -58,6 +58,7 @@ static const bool B250_ENABLE_RX_FC = false;
 #define B250_XB_DST_E1 1
 #define B250_XB_DST_R0 2
 #define B250_XB_DST_R1 3
+#define B250_XB_DST_PCI 7
 
 #define B250_DEVICE_THERE 2
 #define B250_DEVICE_HERE 0
@@ -110,12 +111,14 @@ struct b250_impl : public uhd::device
 
     boost::mutex _transport_setup_mutex;
 
-    uhd::transport::udp_zero_copy::sptr make_transport(const std::string &addr, const boost::uint32_t sid, const uhd::device_addr_t &device_addr = uhd::device_addr_t());
     void register_loopback_self_test(wb_iface::sptr iface);
 
     std::string _addr;
+    std::string _xport_path;
     uhd::device_addr_t _send_args;
     uhd::device_addr_t _recv_args;
+
+    nifpga_interface::nifpga_session::sptr  _rio_fpga_interface;
 
     //perifs in the zpu
     wb_iface::sptr _zpu_ctrl;
@@ -153,7 +156,14 @@ struct b250_impl : public uhd::device
         boost::uint8_t router_dst_there;
         boost::uint8_t router_dst_here;
     };
-    boost::uint32_t allocate_sid(const sid_config_t &config);
+    boost::uint32_t allocate_sid(const sid_config_t &config, std::string xport_path);
+    uhd::transport::zero_copy_if::sptr make_transport(
+        const std::string& addr,
+        const std::string& transport,
+        const uint8_t& destination,
+        const uint8_t& prefix,
+        const uhd::device_addr_t& args,
+        boost::uint32_t& sid);
 
     uhd::dict<size_t, boost::weak_ptr<uhd::rx_streamer> > _rx_streamers;
     uhd::dict<size_t, boost::weak_ptr<uhd::tx_streamer> > _tx_streamers;
