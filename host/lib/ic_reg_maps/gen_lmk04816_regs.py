@@ -27,10 +27,10 @@ CLKout0_1_DIV	         0[5:15]    25         div_25
 CLKout0_1_HS             0[16]      0          
 RESET                    0[17]      0          no_reset, reset
 CLKout0_1_DDLY	         0[18:27]   0          five
-CLKout0_ADLY_SEL         0[28]      0          
-CLKout1_ADLY_SEL	 0[29]      0          
+CLKout0_ADLY_SEL         0[28]      0          d_pd, d_ev_x, d_odd_y, d_both
+CLKout1_ADLY_SEL	 0[29]      0          d_pd, d_ev_x, d_odd_y, d_both
 Required		 0[30]      0         
-CLKout1_1_PD             0[31] 	    1	       normal, power_down 
+CLKout1_1_PD             0[31] 	    1	       power_up, power_down 
 ########################################################################
 ## address 1
 ########################################################################
@@ -39,10 +39,10 @@ CLKout0_1_DIV	         1[5:15]    25
 CLKout0_1_HS             1[16]      0          
 RESET                    1[17]      0          normal, disabled
 CLKout0_1_DDLY	         1[18:27]   0          
-CLKout0_ADLY_SEL         1[28]      0          
-CLKout1_ADLY_SEL	 1[29]      0          
+CLKout0_ADLY_SEL         1[28]      0          d_pd, d_ev_x, d_odd_y, d_both
+CLKout1_ADLY_SEL	 1[29]      0          d_pd, d_ev_x, d_odd_y, d_both
 Required		 1[30]      0         
-CLKout1_1_PD             1[31] 	    1	       normal, power_down
+CLKout1_1_PD             1[31] 	    1	       power_up, power_down
 ########################################################################
 ## address 2
 ########################################################################
@@ -51,10 +51,10 @@ CLKout0_1_DIV	         2[5:15]    25
 CLKout0_1_HS             2[16]      0          
 RESET                    2[17]      0          
 CLKout0_1_DDLY	         2[18:27]   0          
-CLKout0_ADLY_SEL         2[28]      0          
-CLKout1_ADLY_SEL	 2[29]      0          
+CLKout0_ADLY_SEL         2[28]      0          d_pd, d_ev_x, d_odd_y, d_both
+CLKout1_ADLY_SEL	 2[29]      0          d_pd, d_ev_x, d_odd_y, d_both
 Required		 2[30]      0         
-CLKout1_1_PD             2[31] 	    1	       normal, power_down
+CLKout1_1_PD             2[31] 	    1	       power_up, power_down
 ########################################################################
 ## address 3
 ########################################################################
@@ -63,10 +63,10 @@ CLKout0_1_DIV	         3[5:15]    1
 CLKout0_1_HS             3[16]      0         
 RESET                    3[17]      0         
 CLKout0_1_DDLY	         3[18:27]   0          
-CLKout0_ADLY_SEL         3[28]      0          
-CLKout1_ADLY_SEL	 3[29]      0          
-Required		 3[30]      1          VCO,OSCin
-CLKout1_1_PD             3[31] 	    0	       normal, power_down
+CLKout0_ADLY_SEL         3[28]      0          d_pd, d_ev_x, d_odd_y, d_both
+CLKout1_ADLY_SEL	 3[29]      0          d_pd, d_ev_x, d_odd_y, d_both
+CLKout6_7_OSCin_Sel      3[30]      1          VCO,OSCin
+CLKout1_1_PD             3[31] 	    0	       power_up, power_down
 ########################################################################
 ## address 4
 ########################################################################
@@ -75,31 +75,168 @@ CLKout0_1_DIV	         4[5:15]    25
 CLKout0_1_HS             4[16]      0          
 RESET                    4[17]      0          
 CLKout0_1_DDLY	         4[18:27]   0          
-CLKout0_ADLY_SEL         4[28]      0          
-CLKout1_ADLY_SEL	 4[29]      0          
-Required		 4[30]      0	       VCO, OSCin         
-CLKout1_1_PD             4[31] 	    0	       normal, power_down
+CLKout0_ADLY_SEL         4[28]      0          d_pd, d_ev_x, d_odd_y, d_both
+CLKout1_ADLY_SEL	 4[29]      0          d_pd, d_ev_x, d_odd_y, d_both
+CLKout8_9_OSCin_Sel      4[30]      0	       VCO, OSCin         
+CLKout1_1_PD             4[31] 	    0	       power_up, power_down
 ########################################################################
 ## address 5
 ########################################################################
 address5		 5[0:4]     5          
-CLKout0_1_DIV	         5[5:15]    0          
-CLKout0_1_HS             5[16]      0          3state, dld, ndiv, dvdd, rdiv, nchan_od_ld, sdo, dgnd
-RESET                    5[17]      0          neg, pos
-CLKout0_1_DDLY	         5[18:27]   0          normal, 3state
-CLKout0_ADLY_SEL         5[28]      0          set1, set2
-CLKout1_ADLY_SEL	 5[29]      0          
+CLKout0_1_DIV	         5[5:15]    25          
+CLKout0_1_HS             5[16]      0          
+RESET                    5[17]      0          
+CLKout0_1_DDLY	         5[18:27]   0          
+CLKout0_ADLY_SEL         5[28]      0          d_pd, d_ev_x, d_odd_y, d_both
+CLKout1_ADLY_SEL	 5[29]      0          d_pd, d_ev_x, d_odd_y, d_both
 Required		 5[30]      0         
 CLKout1_1_PD             5[31] 	    1	       normal, power_down
 ########################################################################
 ## address 6
 ########################################################################
-address1		 0[0:4]     6          
-CLKout0_1_DIV	         0[5:15]    0          normal, reset
-CLKout0_1_HS             0[16]      0          3state, dld, ndiv, dvdd, rdiv, nchan_od_ld, sdo, dgnd
-RESET                    0[17]      0          neg, pos
-CLKout0_1_DDLY	         0[18:27]   0          normal, 3state
-CLKout0_ADLY_SEL         0[28]      0          set1, set2
-CLKout1_ADLY_SEL	 0[29]      0          
-Required		 0[30]      0         
-CLKout1_1_PD             0[31] 	    1	       power_up,power_down
+address6		 6[0:4]     6          
+CLKout0_1_ADLY	         6[5:9]     0          
+Required	         6[10]      0          
+CLKout2_3_ADLY           6[11:15]   0         
+CLKout0_TYPE	         6[16:19]   0          
+CLKout1_TYPE             6[20:23]   0          
+CLKout2_TYPE	         6[24:27]   0          
+CLKout3_TYPE		 6[28:31]   0
+########################################################################
+## address 7
+########################################################################
+address7		 7[0:4]     7          
+CLKout0_1_ADLY	         7[5:9]     0          
+Required	         7[10]      0          
+CLKout2_3_ADLY           7[11:15]   0         
+CLKout0_TYPE	         7[16:19]   0          
+CLKout1_TYPE             7[20:23]   0          
+CLKout2_TYPE	         7[24:27]   0          
+CLKout3_TYPE		 7[28:31]   0 
+########################################################################
+## address 8
+########################################################################
+address8		 8[0:4]     8          
+CLKout0_1_ADLY	         8[5:9]     0          
+Required	         8[10]      0          
+CLKout2_3_ADLY           8[11:15]   0         
+CLKout0_TYPE	         8[16:19]   0          
+CLKout1_TYPE             8[20:23]   0          
+CLKout2_TYPE	         8[24:27]   0          
+CLKout3_TYPE		 8[28:31]   0 
+########################################################################
+## address 9
+########################################################################
+address9		 9[0:4]     9          
+Required	         9[5]       0          
+Required	         9[6]       1          
+Required                 9[7]       0         
+Required	         9[8]       1          
+Required                 9[9]       0          
+Required	         9[10]      1          
+Required		 9[11]      0
+Required		 9[12]      1
+Required		 9[13]      0
+Required		 9[14]      1
+Required                 9[15]      0
+Required                 9[16]      1
+Required                 9[17]      0
+Required                 9[18]      1          
+Required                 9[19]      0          
+Required                 9[20]      1         
+Required                 9[21]      0          
+Required                 9[22]      1          
+Required                 9[23]      0          
+Required                 9[24]      1
+Required                 9[25]      0
+Required                 9[26]      1
+Required                 9[27]      0
+Required                 9[28]      1
+Required                 9[29]      0
+Required                 9[30]      1
+Required                 9[31]      0
+########################################################################
+## address 10
+########################################################################
+address10                10[0:4]    10          
+FEEDBACK_MUX             10[5:7]    0          
+VCO_DIV                  10[8:10]   2          
+EN_FEEDBACK_MUX          10[11]     0           powered_down, enabled
+VCO_MUX                  10[12]     0           just_vco, vco_divider
+Required                 10[13]     0          
+Required                 10[14]     1          
+Required                 10[15]     0
+OSCout_DIV               10[16:18]  0		 
+PD_OSCin                 10[19]     0		 normal, power_down
+OSCout10_MUX             10[20]     0		 bypass_div, divided
+Required                 10[21]     0		 
+EN_OSCout0               10[22]     1		 disabled, enabled
+Required                 10[23]     0
+OSCout0_TYPE             10[24:27]  1
+Required                 10[28]     1
+Required                 10[29:31]  0
+########################################################################
+## address 11
+########################################################################
+address11		 11[0:4]    11
+EN_PLL2_XTAL 		 11[5]      0
+Required		 11[6:11]   0
+SYNC_TYPE                11[12:14]  0
+SYNC_EN_AUTO             11[15]     0
+SYNC_POL_INV             11[16]     0
+SYNC_QUAL                11[17]     0
+SYNC_CLKin2_MUX          11[18:19]  0
+NO_SYNC_CLKout0_1        11[20]     0
+NO_SYNC_CLKout2_3        11[21]     0
+NO_SYNC_CLKout4_5        11[22]     0
+NO_SYNC_CLKout6_7        11[23]     0
+NO_SYNC_CLKout8_9        11[24]     0
+NO_SYNC_CLKout10_11      11[25]     0
+EN_SYNC                  11[26]     0
+MODE                     11[27:31]  0
+########################################################################
+## address 12
+########################################################################
+address12		 12[0:4]    0
+HOLDOVER_MODE		 12[6:7]    0
+Required                 12[9:17]   0
+Required	         12[18:19]  1
+Required                 12[20]     0
+Required_LE              12[21]     0
+SYNC_PLL1_DLD            12[22]     0
+SYNC_PLL2_DLD            12[23]     0
+LD_TYPE                  12[24:26]  0
+LD_MUX                   12[27:31]  0
+########################################################################
+## address 13
+########################################################################
+address13		 13[0:4]    0
+EN_CLKin0		 13[5]      0
+EN_CLKin1                13[6]      0
+EN_CLKin2                13[7]      0
+CLKin_Sel_INV            13[8]      0
+CLKin_Select_MODE        13[8:11]   0
+Status_CLKin0_MUX        13[14:12]  0
+DISABLE_DLD1_DET         13[13]     0
+Status_CLKin0_TYPE       13[16:18]  0
+Required                 13[19]     0
+Status_CLKin1_MUX        13[20:22]  0
+Required                 13[23]     0
+HOLDOVER_TYPE            13[24:26]  0
+HOLDOVER_MUX             13[27:31]  0
+########################################################################
+## address 14
+########################################################################
+address13		 13[0:4]    0
+
+
+
+
+
+
+
+
+
+
+
+            
