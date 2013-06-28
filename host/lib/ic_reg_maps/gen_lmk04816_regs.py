@@ -99,20 +99,20 @@ CLKout0_1_ADLY	         6[5:9]     0
 Required	         6[10]      0          
 CLKout2_3_ADLY           6[11:15]   0         
 CLKout0_TYPE	         6[16:19]   0          
-CLKout1_TYPE             6[20:23]   0          
-CLKout2_TYPE	         6[24:27]   0          
-CLKout3_TYPE		 6[28:31]   0
+CLKout1_TYPE             6[20:23]   0		p_down=0, LVDS=1, LVPECL_700mVpp=2, LVPECL_1200mVpp=3, LVPECL_1600mVpp=4, LVPECL_200mVpp=5, LVCMOS=6, LVCMOS_IN=7, LVCMOS_NN=8, LVCMOS_II=9, LVCMOS_LN=10, LVCMOS_LI=11, LVCMOS_NL=12, LVCMOS_IL=13, LVCMOS_LL=14          
+CLKout2_TYPE	         6[24:27]   0           p_down=0, LVDS=1, LVPECL_700mVpp=2, LVPECL_1200mVpp=3, LVPECL_1600mVpp=4, LVPECL_200mVpp=5, LVCMOS=6, LVCMOS_IN=7, LVCMOS_NN=8, LVCMOS_II=9, LVCMOS_LN=10, LVCMOS_LI=11, LVCMOS_NL=12, LVCMOS_IL=13, LVCMOS_LL=1
+CLKout3_TYPE		 6[28:31]   0		p_down=0, LVDS=1, LVPECL_700mVpp=2, LVPECL_1200mVpp=3, LVPECL_1600mVpp=4, LVPECL_200mVpp=5, LVCMOS=6, LVCMOS_IN=7, LVCMOS_NN=8, LVCMOS_II=9, LVCMOS_LN=10, LVCMOS_LI=11, LVCMOS_NL=12, LVCMOS_IL=13, LVCMOS_LL=1
 ########################################################################
 ## address 7
 ########################################################################
-address7		 7[0:4]     7          
+adLMK	 7[0:4]     7          
 CLKout0_1_ADLY	         7[5:9]     0          
 Required	         7[10]      0          
 CLKout2_3_ADLY           7[11:15]   0         
 CLKout0_TYPE	         7[16:19]   0          
-CLKout1_TYPE             7[20:23]   0          
-CLKout2_TYPE	         7[24:27]   0          
-CLKout3_TYPE		 7[28:31]   0 
+CLKout1_TYPE             7[20:23]   0          p_down=0, LVDS=1, LVPECL_700mVpp=2, LVPECL_1200mVpp=3, LVPECL_1600mVpp=4, LVPECL_200mVpp=5, LVCMOS=6, LVCMOS_IN=7, LVCMOS_NN=8, LVCMOS_II=9, LVCMOS_LN=10, LVCMOS_LI=11, LVCMOS_NL=12, LVCMOS_IL=13, LVCMOS_LL=1
+CLKout2_TYPE	         7[24:27]   0          p_down=0, LVDS=1, LVPECL_700mVpp=2, LVPECL_1200mVpp=3, LVPECL_1600mVpp=4, LVPECL_200mVpp=5, LVCMOS=6, LVCMOS_IN=7, LVCMOS_NN=8, LVCMOS_II=9, LVCMOS_LN=10, LVCMOS_LI=11, LVCMOS_NL=12, LVCMOS_IL=13, LVCMOS_LL=1
+CLKout3_TYPE		 7[28:31]   0 	       p_down=0, LVDS=1, LVPECL_700mVpp=2, LVPECL_1200mVpp=3, LVPECL_1600mVpp=4, LVPECL_200mVpp=5, LVCMOS=6, LVCMOS_IN=7, LVCMOS_NN=8, LVCMOS_II=9, LVCMOS_LN=10, LVCMOS_LI=11, LVCMOS_NL=12, LVCMOS_IL=13, LVCMOS_LL=1
 ########################################################################
 ## address 8
 ########################################################################
@@ -121,9 +121,9 @@ CLKout0_1_ADLY	         8[5:9]     0
 Required	         8[10]      0          
 CLKout2_3_ADLY           8[11:15]   0         
 CLKout0_TYPE	         8[16:19]   0          
-CLKout1_TYPE             8[20:23]   0          
-CLKout2_TYPE	         8[24:27]   0          
-CLKout3_TYPE		 8[28:31]   0 
+CLKout1_TYPE             8[20:23]   0          p_down=0, LVDS=1, LVPECL_700mVpp=2, LVPECL_1200mVpp=3, LVPECL_1600mVpp=4, LVPECL_200mVpp=5, LVCMOS=6, LVCMOS_IN=7, LVCMOS_NN=8, LVCMOS_II=9, LVCMOS_LN=10, LVCMOS_LI=11, LVCMOS_NL=12, LVCMOS_IL=13, LVCMOS_LL=1
+CLKout2_TYPE	         8[24:27]   0          p_down=0, LVDS=1, LVPECL_700mVpp=2, LVPECL_1200mVpp=3, LVPECL_1600mVpp=4, LVPECL_200mVpp=5, LVCMOS=6, LVCMOS_IN=7, LVCMOS_NN=8, LVCMOS_II=9, LVCMOS_LN=10, LVCMOS_LI=11, LVCMOS_NL=12, LVCMOS_IL=13, LVCMOS_LL=1
+CLKout3_TYPE		 8[28:31]   0 	       p_down=0, LVDS=1, LVPECL_700mVpp=2, LVPECL_1200mVpp=3, LVPECL_1600mVpp=4, LVPECL_200mVpp=5, LVCMOS=6, LVCMOS_IN=7, LVCMOS_NN=8, LVCMOS_II=9, LVCMOS_LN=10, LVCMOS_LI=11, LVCMOS_NL=12, LVCMOS_IL=13, LVCMOS_LL=1
 ########################################################################
 ## address 9
 ########################################################################
@@ -207,7 +207,7 @@ Required_LE              12[21]     0
 SYNC_PLL1_DLD            12[22]     0		sync_mode_noforce=0,sync_mode_force=1
 SYNC_PLL2_DLD            12[23]     0		sync_mode_noforce=0,sync_mode_force=1
 LD_TYPE                  12[24:26]  3           out_push_pull=3,out_inverted=4,out_open_sources=5,out_open_drains=6
-LD_MUX                   12[27:31]  3		log_low=0,PLL1_DLD=1,PLL2_DLD=2,both_PLL=3,holdov_status=4,dac_locked=5,uWire_RB=7,dac_rail=8,dac_low=9,dac_high=10,pll1_n=11,pll1_halfn1=12,pll2_n=13,pll2_halfn2=14,pll1_r=15,pll1_halfr1=16,pll2_r2=17,pll2_halfr2=18
+LD_MUX                   12[27:31]  3		log_low=0,PLL1_DLD=1,PLL2_DLD=2,both_PLL=3,holdov_status=4,dac_locked=5,uWire_RB=7,dac_rail=8,dac_low=9,dac_high=10,pll1=11,pll1_halfn1=12,pll2_n=13,pll2_halfn2=14,pll1_r=15,pll1_halfr1=16,pll2_r2=17,pll2_halfr2=18
 ########################################################################
 ## address 13
 ########################################################################
@@ -238,9 +238,9 @@ CLKin0_BUF_TYPE          14[20]     0		bipolar=0,cmos=1
 CLKin1_BUF_TYPE          14[21]     0		bipolar=0,cmos=1
 CLKin2_BUF_TYPE          14[22]     0		bipolar=0,cmos=1
 Required                 14[23]     0		
-Status_CLKin1_TYPE       14[24:26]  0		input=0,in_pull_up=1,in_pull_down=2,out_push_pull=3,out_inverted=4,out_open_sources=5,out_open_drains=6
+Status_CLKin1_TYPE       14[24:26]  2		input=0,in_pull_up=1,in_pull_down=2,out_push_pull=3,out_inverted=4,out_open_sources=5,out_open_drains=6
 Required                 14[27]     0		
-EN_LOS                   14[28]     0		disable_timeout=0,enable_timeout=1
+EN_LOS                   14[28]     1		disable_timeout=0,enable_timeout=1
 Required                 14[29]     0
 LOS_TIMEOUT              14[30:31]  0		1200ns_at_4p2KHz=0,206ns_at_2p5MHz=1,52p9at10MHz=2,23p7_at_22MHz=3
 ########################################################################
@@ -248,10 +248,10 @@ LOS_TIMEOUT              14[30:31]  0		1200ns_at_4p2KHz=0,206ns_at_2p5MHz=1,52p9
 ########################################################################
 address15 		 15[0:4]    15
 FORCE_HOLDOVER           15[5]      0		disabled=0,enabled=1
-HOLDOVER_DLD_CNT         15[6:19]   0		
+HOLDOVER_DLD_CNT         15[6:19]   512		
 EN_MAN_DAC               15[20]     0		disabled=0,enabled=1
 Required                 15[21]     0
-MAN_DAC                  15[22:31]  0
+MAN_DAC                  15[22:31]  512
 ########################################################################
 ## address 16
 ########################################################################
@@ -286,7 +286,7 @@ XTAL_LVL		 16[30:31]   0		1p65VPP=0, 1p75VPP=1, 1p90VPP=2, 2p05VPP=3
 ## address 24
 ########################################################################
 address24		 24[0:4]     24
-PLL1_WND_SIZE		 24[6:7]     0		5p5ns=0, 10ns=1, 18p6=2, 40ns=3
+PLL1_WND_SIZE		 24[6:7]     3		5p5ns=0, 10ns=1, 18p6=2, 40ns=3
 PLL1_R_DLY               24[8:10]    0		0ps=0, 205ps=1, 410ps=2, 615ps=3, 820ps=4, 1025ps=5, 1230ps=6, 1345ps=7	
 Required                 24[11]      0
 PLL2_N_DLY		 24[12:14]   0		0ps=0, 205ps=1, 410ps=2, 615ps=3, 820ps=4, 1025ps=5, 1230ps=6, 1345ps=7
@@ -302,22 +302,22 @@ PLL2_C4_LF               24[28:31]   0		10pF=0, 15pF=1, 29pF=2, 34pF=3, 47pF=4, 
 #########################################################################
 addres25		 25[0:4]     25
 PLL2_CP_TRI		 25[5]       0
-PLL1_DLD_CNT             25[6:19]    0
+PLL1_DLD_CNT             25[6:19]    1024
 Required                 25[20:21]   0
-DAC_CLK_DIV		 25[22:31]   0
+DAC_CLK_DIV		 25[22:31]   4
 #########################################################################
 ## address 26
 #########################################################################
 address26		 26[0:4]     26
-PLL2_CP_TRI              26[5]       0		HI_Z=0, 100microA=0, 400microA=1, 1600microA=2, 3200microA=3
-PLL2_DLD_CNT		 26[6:19]    0
+PLL2_CP_TRI              26[5]       0		PLL2_cpout2_active=0,PLL2_cpout2_TRI=1
+PLL2_DLD_CNT		 26[6:19]    81
 Required                 26[20]      0
 Required                 26[21]      1
 Required                 26[22]      0
 Required                 26[23]      1
-Required                 26[24]      1
+Required                 26[24]      192
 Required                 26[25]      1
-PLL2_CP_GAIN             26[26:27]   0		100microA=0, 400microA=1, 1600microA=2, 3200microA=3
+PLL2_CP_GAIN             26[26:27]   3		100microA=0, 400microA=1, 1600microA=2, 3200microA=3
 PLL2_CP_POL              26[28]      0		neg_slove=0, pos_slope=1
 EN_PLL2_REF_2X           26[29]      0		normal_freq_ref=0, doubled_freq_ref=1
 PLL2_WND_SIZE            26[30:31]   2		3p7ns=2
@@ -325,45 +325,48 @@ PLL2_WND_SIZE            26[30:31]   2		3p7ns=2
 ## address 27
 #########################################################################
 address27		 27[0:4]     27
-PLL1_CP_TRI              27[5]       0
-PLL1_R                   27[6:19]    0
-CLKin0_PreR_DIV		 27[20:21]   0
-CLKin1_PreR_DIV          27[22:23]   0
-CLKin2_PreR_DIV          27[24:25]   0
-PLL1_CP_GAIN             27[26:27]   0
-PLL1_CP_POL              27[28]      0
+PLL1_CP_TRI              27[5]       0	       PLL2_cpout2_active=0,PLL2_cpout2
+_TRI=1
+PLL1_R                   27[6:19]    96
+CLKin0_PreR_DIV		 27[20:21]   0         div_1=0,div_2=1,div_3=2,div_4=3,d
+iv_8=4
+CLKin1_PreR_DIV          27[22:23]   0         div_1=0,div_2=1,div_3=2,div_4=3,d
+iv_8=4
+CLKin2_PreR_DIV          27[24:25]   0         div_1=0,div_2=1,div_3=2,div_4=3,div_8=4
+PLL1_CP_GAIN             27[26:27]   0	       100microA=0, 400microA=1, 1600microA=2, 3200microA=3	
+PLL1_CP_POL              27[28]      1	       neg_slove=0, pos_slope=1
 Reqiured                 27[29:31]   0
 #########################################################################
 ## address 28
 #########################################################################
 address28                28[0:4]     28
 Required                 28[5]       0
-PLL1_N                   28[6:19]    0
-PLL2_R                   28[20:31]   0
+PLL1_N                   28[6:19]    192
+PLL2_R                   28[20:31]   4
 #########################################################################
 ## address 29
 #########################################################################
 address29                29[0:4]     29
-PLL2_N_CAL               29[5:22]    0
-PLL2_FAST_PDF            29[23]      0
-OSCin_FREQ               29[24:26]   0
+PLL2_N_CAL               29[5:22]    48
+PLL2_FAST_PDF            29[23]      1		100MHz_less=0, 100MHz_more=1
+OSCin_FREQ               29[24:26]   7		zero_to_63MHz=0, 63_to_127MHz=1, 127_to_255MHz=2, 255_to_400MHz=4
 Required                 29[27:31]   0
 #########################################################################
 ## address 30
 #########################################################################
 address30		 30[0:4]     30
-PLL2_N			 30[5:22]    0
-Required                 30[23]      0
-PLL2_P                   30[24:26]   0
+PLL2_N			 30[5:22]    48
+Required                 30[23]      0		
+PLL2_P                   30[24:26]   2		div_8=0, div_2=1, div_2a=2, div_3=3, div_4=4, div_5=5, div_6=6, div_7=7
 Required                 30[27:31]   0
 #########################################################################
 ## address 31
 #########################################################################
 address31                31[0:4]     0
-uWire_LOCK               31[5]       0
+uWire_LOCK               31[5]       0		reg_locked=0, reg_unlocked=1
 Required                 31[6:15]    0
-READBACk_ADDR            31[16:20]   0
-READBACK_LE              31[21]      0
+READBACK_ADDR            31[16:20]   31		R0=0, R1=1, R2=2, R3=3, R4=4, R5=5, R6=6, R7=7, R8=8, R10=10, R11=11, R12=12, R13=13, R14=14, R15=15, R24=24, R25=25, R26=26, R27=27, R28=28, R29=29, R30=30, R31=31
+READBACK_LE              31[21]      0		LE_low=0, LE_high=1
 Required                 31[22:31]   0
 """ 
 ########################################################################
@@ -372,14 +375,11 @@ Required                 31[22:31]   0
 
 BODY_TMPL = """\
 
-enum_addr_t{
 
 
-};
 
-
-boost::uint32_t get_reg(addr_t addr){
-    boost::uint32_t reg = addr & 0x3;
+boost::uint32_t get_reg(int addr){
+    boost::uint32_t reg = 0;
     switch(addr){
     #for $addr in sorted(set(map(lambda r: r.get_addr(), $regs)))
     case $addr:
@@ -397,6 +397,13 @@ boost::uint32_t get_reg(addr_t addr){
 
 
 
+if __name__ == '__main__':
+    import common; common.generate(
+        name='LMK_regs',
+        regs_tmpl=REGS_TMPL,
+        body_tmpl=BODY_TMPL,
+        file=__file__,
+    )
 
 
 
