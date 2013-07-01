@@ -1,5 +1,5 @@
 #
-# Copyright 2010-2011 Ettus Research LLC
+# Copyright 2010-2013 Ettus Research LLC
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -37,3 +37,7 @@ INCLUDE_SUBDIRECTORY(usrp1)
 INCLUDE_SUBDIRECTORY(usrp2)
 INCLUDE_SUBDIRECTORY(b100)
 INCLUDE_SUBDIRECTORY(e100)
+INCLUDE_SUBDIRECTORY(e200)
+INCLUDE_SUBDIRECTORY(b250)
+INCLUDE_SUBDIRECTORY(b200)
+INCLUDE_SUBDIRECTORY(ad9361_ctrl)
