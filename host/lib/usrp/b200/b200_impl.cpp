@@ -258,8 +258,6 @@ b200_impl::b200_impl(const device_addr_t &device_addr)
     // Async task structure
     ////////////////////////////////////////////////////////////////////
     _async_task_data.reset(new AsyncTaskData());
-    _async_task_data->gpsdo_uart = b200_uart::make(_ctrl_transport, B200_TX_GPS_UART_SID);
-    _async_task_data->gpsdo_uart->set_baud_divider(B200_BUS_CLOCK_RATE/115200);
     _async_task_data->async_md.reset(new async_md_type(1000/*messages deep*/));
     _async_task = uhd::task::make(boost::bind(&b200_impl::handle_async_task, this, _ctrl_transport, _async_task_data));
 
@@ -280,6 +278,10 @@ b200_impl::b200_impl(const device_addr_t &device_addr)
     ////////////////////////////////////////////////////////////////////
     // Create the GPSDO control
     ////////////////////////////////////////////////////////////////////
+    _async_task_data->gpsdo_uart = b200_uart::make(_ctrl_transport, B200_TX_GPS_UART_SID);
+    _async_task_data->gpsdo_uart->set_baud_divider(B200_BUS_CLOCK_RATE/115200);
+    _async_task_data->gpsdo_uart->write_uart("\n"); //cause the baud and response to be setup
+    boost::this_thread::sleep(boost::posix_time::seconds(1)); //allow for a little propagation
 
     if ((_local_ctrl->peek32(RB32_CORE_STATUS) & 0xff) != B200_GPSDO_ST_NONE)
     {
@@ -464,7 +466,7 @@ b200_impl::b200_impl(const device_addr_t &device_addr)
     _tree->access<std::string>(mb_path / "time_source/value").set("none");
 
     //GPS installed: use external ref, time, and init time spec
-    if (false and _gps and _gps->gps_detected())
+    if (_gps and _gps->gps_detected())
     {
         UHD_MSG(status) << "Setting references to the internal GPSDO" << std::endl;
         _tree->access<std::string>(mb_path / "time_source" / "value").set("gpsdo");
@@ -867,6 +869,7 @@ void b200_impl::update_atrs(void)
 
 void b200_impl::update_antenna_sel(const size_t which, const std::string &ant)
 {
+    if (ant != "TX/RX" and ant != "RX2") throw uhd::value_error("b200: unknown RX antenna option: " + ant);
     _radio_perifs[which].ant_rx2 = (ant == "RX2");
     this->update_atrs();
 }
