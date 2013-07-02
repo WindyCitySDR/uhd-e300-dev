@@ -24,7 +24,7 @@ struct b250_clock_ctrl_impl : b250_clock_ctrl	{
 		this->write_regs(1);
 //register 2
 		//set divide value for ADC
-		_lmk04816_regs.CLKout_4_5_div = 1;
+		_lmk04816_regs.CLKout_4_5_div = 12;
 		this->write_regs(3);
 //register 3
 		//set divide value for FPGA
@@ -40,23 +40,23 @@ struct b250_clock_ctrl_impl : b250_clock_ctrl	{
 		this->write_regs(5);
 //register 6
 		//sets clock type to LVPECL
-		_lmk04816_regs.CLKout0_TYPE = 2; //DAC
-		_lmk04816_regs.CLKout1_TYPE = 2; //DAC
-		_lmk04816_regs.CLKout2_TYPE = 2; //ADC
-		_lmk04816_regs.CLKout3_TYPE = 2; //ADC
+		_lmk04816_regs.CLKout0_TYPE = 1; //FPGA
+		_lmk04816_regs.CLKout2_TYPE = 2; //DB_0_RX
+		_lmk04816_regs.CLKout3_TYPE = 2; //DB_1_RX
 		this->write_regs(6);
 //register 7
 		//sets clock type to LVPECL
-		_lmk04816_regs.CLKout4_TYPE = 2; //ADC
-		_lmk04816_regs.CLKout5_TYPE = 2; //ADC
+		_lmk04816_regs.CLKout4_TYPE = 2; //DB_1_TX
+		_lmk04816_regs.CLKout5_TYPE = 2; //REF_CLKOUT
 		//sets clock type to LVDS
-		_lmk04816_regs.CLKout6_TYPE = 1; // FPGA
-		_lmk04816_regs.CLKout7_TYPE = 1; // FPGA
-		_lmk04816_regs.CLKout8_TYPE = 1; // FPGA
+		_lmk04816_regs.CLKout6_TYPE = 2; // DB1_DAC
+		_lmk04816_regs.CLKout7_TYPE = 2; // DB1_DAC
+		_lmk04816_regs.CLKout8_TYPE = 2; // DB0_ADC
 		this->write_regs(7);
 //register 8 
-		//sets clock type to LVDS
-		_lmk04816_regs.CLKout10_TYPE = 1; //Low frequency system synch
+		//sets clock type to LVPECL
+		_lmk04816_regs.CLKout9_TYPE = 2; //DB1_ADC
+		_lmk04816_regs.CLKout10_TYPE = 2; //DB_0_TX
 		this->write_regs(8);
 		
  
@@ -98,6 +98,7 @@ struct b250_clock_ctrl_impl : b250_clock_ctrl	{
 		boost::uint32_t data = _lmk04816_regs.get_write_reg(addr);
 		_spiface->write_spi(_slaveno, spi_config_t::EDGE_RISE, data,32);
 	}
+/*
 //read_reg: read a single register to the spi regs.
 
 	void read_reg(boost::uint8_t addr)	{
@@ -105,7 +106,7 @@ struct b250_clock_ctrl_impl : b250_clock_ctrl	{
 		boost::unint32_t data = _lmk04816_regs.get_read_reg(addr);
 		_spiface->read_spi(_slaveno, spi_config_t::EDGE_RISE, data , 32);
 	}
-	
+*/	
 //future implementations for modularity
 
 
