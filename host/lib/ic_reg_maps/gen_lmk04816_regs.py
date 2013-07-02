@@ -23,7 +23,7 @@ REGS_TMPL="""\
 ## address 0
 ########################################################################
 address0		 0[0:4]     0          
-CLKout0_1_DIV	         0[5:15]    25         div_25=25 
+CLKout0_1_DIV	         0[5:15]    25          
 CLKout0_1_HS             0[16]      0          
 RESET                    0[17]      0          no_reset, reset
 CLKout0_1_DDLY	         0[18:27]   0          five
@@ -35,7 +35,7 @@ CLKout0_1_PD             0[31] 	    1	       power_up, power_down
 ## address 1
 ########################################################################
 address1		 1[0:4]     1          
-CLKout2_3_DIV	         1[5:15]    25         div_25=25
+CLKout2_3_DIV	         1[5:15]    25         
 CLKout2_3_HS             1[16]      0          
 Powerdown                1[17]      0          normal, disabled
 CLKout2_3_DDLY	         1[18:27]   0          
@@ -47,7 +47,7 @@ CLKout2_3_PD             1[31] 	    1	       power_up, power_down
 ## address 2
 ########################################################################
 address2		 2[0:4]     2          
-CLKout4_5_DIV	         2[5:15]    25         div_25=25
+CLKout4_5_DIV	         2[5:15]    25         
 CLKout4_5_HS             2[16]      0          
 Required_2_17            2[17]      0          
 CLKout4_5_DDLY	         2[18:27]   0          
@@ -59,7 +59,7 @@ CLKout4_5_PD             2[31] 	    1	       power_up, power_down
 ## address 3
 ########################################################################
 address3		 3[0:4]     3          
-CLKout6_7_DIV	         3[5:15]    1          div_1=1
+CLKout6_7_DIV	         3[5:15]    1          
 CLKout6_7_HS             3[16]      0         
 Required_3_17            3[17]      0         
 CLKout6_7_DDLY	         3[18:27]   0          
@@ -71,7 +71,7 @@ CLKout6_7_PD             3[31] 	    0	       power_up, power_down
 ## address 4
 ########################################################################
 address4		 4[0:4]     4          
-CLKout8_9_DIV	         4[5:15]    25         div_25=25
+CLKout8_9_DIV	         4[5:15]    25         
 CLKout8_9_HS             4[16]      0          
 Required_4_17            4[17]      0          
 CLKout8_9_DDLY	         4[18:27]   0          
@@ -83,7 +83,7 @@ CLKout8_9_PD             4[31] 	    0	       power_up, power_down
 ## address 5
 ########################################################################
 address5		 5[0:4]     5          
-CLKout10_11_DIV	         5[5:15]    25          div_25=25
+CLKout10_11_DIV	         5[5:15]    25
 CLKout10_11_HS           5[16]      0          
 Required_5_17            5[17]      0          
 CLKout10_11_DDLY	 5[18:27]   0          
