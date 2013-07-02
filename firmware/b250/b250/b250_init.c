@@ -224,7 +224,7 @@ void set_si570_freq(const dco_freq_t new_freq)
   dco_write(0x0A, (rfreq>>16)&0xFF);
   dco_write(0x0B, (rfreq>>8)&0xFF);
   dco_write(0x0C, (rfreq)&0xFF);
-  // Re-Enbale DCO
+  // Re-Enable DCO
   dco_write(0x89, 0 << 4);
   dco_write(0x87, 1 << 6);
     
@@ -256,34 +256,36 @@ void b250_init(void)
 
     printf("DEBUG: Version reports %8x\n",wb_peek32(SR_ADDR(RB0_BASE, RB_VERSION)));
 
-    if (wb_peek32(SR_ADDR(RB0_BASE, RB_VERSION)) == 0) {
-      /* // 125MHZ */
-      //  set_si570_freq(DCO_125);
-      dco_write(0x89, 1 << 4);
-      dco_write(0x07, 0xe0);
-      dco_write(0x08, 0xc3);
-      dco_write(0x09, 0x02);
-      dco_write(0x0a, 0x01);
-      dco_write(0x0b, 0x3b);
-      dco_write(0x0c, 0x64);
-      dco_write(0x89, 0 << 4);
-      dco_write(0x87, 1 << 6);
-      //    } else if (wb_peek32(SR_ADDR(RB0_BASE, RB_VERSION)) == 1) {
+    // NO Silabs programable clock on RevB board.
 
-    } else {    // 156.25MHz
-      // Do nothing. 10GE image currently uses dedicated 156.25MHz clock source from U509
-      //  set_si570_freq(DCO_156p25);
-      /* dco_write(0x89, 1 << 4); */
-      /* dco_write(0x07, 0xA0); */
-      /* dco_write(0x08, 0xC3);  */
-      /* dco_write(0x09, 0x13);   */
-      /* dco_write(0x0a, 0x1F);   */
-      /* dco_write(0x0b, 0x3D);   */
-      /* dco_write(0x0c, 0x66);   */
-      /* dco_write(0x89, 0 << 4);   */
-      /* dco_write(0x87, 1 << 6);   */
-      //    } else printf("ERROR: Version %8x is unrecognized.\n",wb_peek32(SR_ADDR(RB0_BASE, RB_VERSION)));
-    }    
+    /* if (wb_peek32(SR_ADDR(RB0_BASE, RB_VERSION)) == 0) { */
+    /*   /\* // 125MHZ *\/ */
+    /*   //  set_si570_freq(DCO_125); */
+    /*   dco_write(0x89, 1 << 4); */
+    /*   dco_write(0x07, 0xe0); */
+    /*   dco_write(0x08, 0xc3); */
+    /*   dco_write(0x09, 0x02); */
+    /*   dco_write(0x0a, 0x01); */
+    /*   dco_write(0x0b, 0x3b); */
+    /*   dco_write(0x0c, 0x64); */
+    /*   dco_write(0x89, 0 << 4); */
+    /*   dco_write(0x87, 1 << 6); */
+    /*   //    } else if (wb_peek32(SR_ADDR(RB0_BASE, RB_VERSION)) == 1) { */
+
+    /* } else {    // 156.25MHz */
+    /*   // Do nothing. 10GE image currently uses dedicated 156.25MHz clock source from U509 */
+    /*   //  set_si570_freq(DCO_156p25); */
+    /*   /\* dco_write(0x89, 1 << 4); *\/ */
+    /*   /\* dco_write(0x07, 0xA0); *\/ */
+    /*   /\* dco_write(0x08, 0xC3);  *\/ */
+    /*   /\* dco_write(0x09, 0x13);   *\/ */
+    /*   /\* dco_write(0x0a, 0x1F);   *\/ */
+    /*   /\* dco_write(0x0b, 0x3D);   *\/ */
+    /*   /\* dco_write(0x0c, 0x66);   *\/ */
+    /*   /\* dco_write(0x89, 0 << 4);   *\/ */
+    /*   /\* dco_write(0x87, 1 << 6);   *\/ */
+    /*   //    } else printf("ERROR: Version %8x is unrecognized.\n",wb_peek32(SR_ADDR(RB0_BASE, RB_VERSION))); */
+    /* }  */   
     //setup net stack and eth state machines
     init_network();
   
