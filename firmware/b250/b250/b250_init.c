@@ -243,6 +243,8 @@ void b250_init(void)
 
     //i2c rate init
     wb_i2c_init(I2C0_BASE, CPU_CLOCK);
+    wb_i2c_init(I2C2_BASE, CPU_CLOCK);
+    
 
     //hold phy in reset
     wb_poke32(SR_ADDR(SET0_BASE, SR_SW_RST), SW_RST_PHY);
@@ -254,7 +256,8 @@ void b250_init(void)
     // Show power-on or after reset value of DCO.
     // dco_show_config();
 
-    printf("DEBUG: Version reports %8x\n",wb_peek32(SR_ADDR(RB0_BASE, RB_VERSION)));
+    printf("DEBUG: eth0 is %2dG\n",(wb_peek32(SR_ADDR(RB0_BASE, RB_ETH_TYPE0))==1) ? 10 : 1);
+    printf("DEBUG: eth1 is %2dG\n",(wb_peek32(SR_ADDR(RB0_BASE, RB_ETH_TYPE1))==1) ? 10 : 1);
 
     // NO Silabs programable clock on RevB board.
 
@@ -291,10 +294,13 @@ void b250_init(void)
   
     //phy reset release
     wb_poke32(SR_ADDR(SET0_BASE, SR_SW_RST), 0);
-    // Run only for 10GE
-    if (wb_peek32(SR_ADDR(RB0_BASE, RB_VERSION)) != 0) {
-	 mdelay(100);
-	 xge_ethernet_init(0);
+    // For 10GE interfaces only, initialize the PHY's
+    mdelay(100);
+    if (wb_peek32(SR_ADDR(RB0_BASE, RB_ETH_TYPE0)) != 0) {
+      xge_ethernet_init(0);
+    }
+    if (wb_peek32(SR_ADDR(RB0_BASE, RB_ETH_TYPE1)) != 0) {
+      xge_ethernet_init(1);
     }
 
 
