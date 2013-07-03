@@ -27,6 +27,7 @@
 #include <cstring>
 
 #include <boost/cstdint.hpp>
+#include <boost/filesystem.hpp>
 #include <boost/lexical_cast.hpp>
 #include <boost/format.hpp>
 #include <boost/program_options.hpp>
@@ -65,6 +66,7 @@ typedef std::vector<boost::uint8_t> byte_vector_t;
 
 
 namespace po = boost::program_options;
+namespace fs = boost::filesystem;
 
 
 //!used with lexical cast to parse a hex string
@@ -496,6 +498,55 @@ boost::int32_t main(boost::int32_t argc, char *argv[]) {
         std::cout << boost::format("B2xx Utilitiy Program %s") % desc << std::endl;
         return ~0;
     } else if (vm.count("reset-usb")) {
+        /* Okay, first, we need to discover what the path is to the ehci and
+         * xhci device files. */
+        std::set<fs::path> path_list;
+        path_list.insert("/sys/bus/pci/drivers/ehci-pci/");
+        path_list.insert("/sys/bus/pci/drivers/xhci_hcd/");
+
+        /* Check each of the possible paths above to find which ones this system
+         * uses. */
+        for(std::set<fs::path>::iterator found = path_list.begin();
+                found != path_list.end(); ++found) {
+
+            if(fs::exists(*found)) {
+
+                fs::path devpath = *found;
+
+                std::set<fs::path> globbed;
+
+                /* Now, glob all of the files in the directory. */
+                fs::directory_iterator end_itr;
+                for(fs::directory_iterator itr(devpath); itr != end_itr; ++itr) {
+                    globbed.insert((*itr).path());
+                }
+
+                /* Check each file path string to see if it is a device file. */
+                for(std::set<fs::path>::iterator it = globbed.begin();
+                        it != globbed.end(); ++it) {
+
+                    std::string file = (*it).filename().string();
+
+                    if(file.compare(0, 5, "0000:") == 0) {
+                        /* Un-bind the device. */
+                        std::fstream unbind((devpath.string() + "unbind").c_str(),
+                                std::fstream::out);
+                        unbind << file;
+                        unbind.close();
+
+                        /* Re-bind the device. */
+                        std::cout << "Re-binding: " << file << " in "
+                            << devpath.string() << std::endl;
+                        std::fstream bind((devpath.string() + "bind").c_str(),
+                                std::fstream::out);
+                        bind << file;
+                        bind.close();
+                    }
+                }
+            }
+        }
+
+        return 0;
     }
 
     vid = atoh(vid_str);
