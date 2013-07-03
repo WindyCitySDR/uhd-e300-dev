@@ -144,7 +144,7 @@ struct b250_clock_ctrl_impl : b250_clock_ctrl	{
 		//this->write_regs(28);
 //register 29
 		//set the PLL_2_N value (calibration divider)
-		//_lmk04816_regs.PLL2_N_CAL = 10;
+		_lmk04816_regs.PLL2_N_CAL_29 = 10;
 		//this->write_regs(29);
 //register 30
 		//sets PLL_2_N divider prescaler
