@@ -36,6 +36,7 @@ struct b250_clock_ctrl_impl : b250_clock_ctrl	{
 //register 3
 		//set divide value for FPGA
 		_lmk04816_regs.CLKout6_7_DIV = 20;
+		_lmk04816_regs.CLKout6_7_OSCin_Sel = lmk04816_regs_t::CLKOUT6_7_OSCIN_SEL_VCO;
 		//this->write_regs(3);
 //register 4
 		//set divide value for FPGA
@@ -69,27 +70,50 @@ struct b250_clock_ctrl_impl : b250_clock_ctrl	{
 		_lmk04816_regs.CLKout9_TYPE = lmk04816_regs_t::CLKOUT9_TYPE_LVPECL_700MVPP; //DB1_ADC
 		_lmk04816_regs.CLKout10_TYPE = lmk04816_regs_t::CLKOUT10_TYPE_LVPECL_700MVPP; //DB_0_TX
 		//this->write_regs(8);
-while(1) {
-	for (size_t i = 1; i <= 8; ++i) {
+/*
+	for (size_t i = 1; i <= 8; ++i)	{ 
 		this->write_regs(i);
 		}
-}
-	
+*/
+
+//register 10
+
+		_lmk04816_regs.EN_OSCout0 = lmk04816_regs_t::EN_OSCOUT0_DISABLED;
+
+//register 11
+
+		//register 11 sync disabled for testing
+		_lmk04816_regs.EN_SYNC = lmk04816_regs_t::EN_SYNC_SYNC_DISABLE;
+		_lmk04816_regs.NO_SYNC_CLKout0_1 = lmk04816_regs_t::NO_SYNC_CLKOUT0_1_CLOCK_XY_NOSYNC;
+		_lmk04816_regs.NO_SYNC_CLKout2_3 = lmk04816_regs_t::NO_SYNC_CLKOUT2_3_CLOCK_XY_NOSYNC;
+		_lmk04816_regs.NO_SYNC_CLKout8_9 = lmk04816_regs_t::NO_SYNC_CLKOUT8_9_CLOCK_XY_NOSYNC;
+		_lmk04816_regs.NO_SYNC_CLKout10_11 = lmk04816_regs_t::NO_SYNC_CLKOUT10_11_CLOCK_XY_NOSYNC;
+		_lmk04816_regs.SYNC_POL_INV = lmk04816_regs_t::SYNC_POL_INV_SYNC_HIGH;
+		_lmk04816_regs.SYNC_TYPE = lmk04816_regs_t::SYNC_TYPE_INPUT;
+//register 12
+
+		//enabling LD_MUX
+		_lmk04816_regs.LD_MUX = lmk04816_regs_t::LD_MUX_PLL2_R;
 
 /* Input Clock Configurations */
 
 //register 13
 
 		//disable clockin0 and clockin2 for testing
-		//_lmk04816_regs.EN_CLKin0 = lmk04816_regs_t::EN_CLKIN0_NO_VALID_USE;
-		//_lmk04816_regs.EN_CLKin2 = lmk04816_regs_t::EN_CLKIN2_NO_VALID_USE;
+		_lmk04816_regs.EN_CLKin0 = lmk04816_regs_t::EN_CLKIN0_NO_VALID_USE;
+		_lmk04816_regs.EN_CLKin2 = lmk04816_regs_t::EN_CLKIN2_NO_VALID_USE;
 		_lmk04816_regs.Status_CLKin1_MUX = lmk04816_regs_t::STATUS_CLKIN1_MUX_UWIRE_RB;
-		this->write_regs(13);
+		//this->write_regs(13);
+		//manual select for Clk 1
+		_lmk04816_regs.CLKin_Select_MODE = lmk04816_regs_t::CLKIN_SELECT_MODE_CLKIN1_MAN;
+		//this->write_regs(13);
+		_lmk04816_regs.HOLDOVER_MUX = lmk04816_regs_t::HOLDOVER_MUX_PLL2_NHALF;
 		//sleep(1000);
 
 //register 14
 		_lmk04816_regs.Status_CLKin1_TYPE = lmk04816_regs_t::STATUS_CLKIN1_TYPE_OUT_PUSH_PULL;
-		this->write_regs(14);
+		//this->write_regs(14);
+		_lmk04816_regs.Status_CLKin0_TYPE = lmk04816_regs_t::STATUS_CLKIN0_TYPE_OUT_PUSH_PULL;
 
 		//
 
@@ -99,18 +123,22 @@ while(1) {
  
 /* Divider value setting*/
 
+//Register 26
+
+		_lmk04816_regs.PLL2_CP_POL_26 = lmk04816_regs_t::PLL2_CP_POL_26_NEG_SLOPE;
+
 //register 27
 
 		
-		//_lmk04816_regs.CLKin0_PreR_DIV = 1;
-		_lmk04816_regs.CLKin1_PreR_DIV = lmk04816_regs_t::CLKIN1_PRER_DIV_DIV2;
+		//_lmk04816_regs.CLKin1_PreR_DIV = 1;
+		//_lmk04816_regs.CLKin1_PreR_DIV = lmk04816_regs_t::CLKIN1_PRER_DIV_DIV2;
 		//sets PLL1_R value
-		_lmk04816_regs.PLL1_R_27 = 3;
+		_lmk04816_regs.PLL1_R_27 = 1;
 		//_lmk04816_regs.CLKin2_PreR_DIV = 1;
 		//this->write_regs(27);
 //register 28
 		//set PLL_1_N value
-		_lmk04816_regs.PLL1_N_28 = 3;
+		_lmk04816_regs.PLL1_N_28 = 12;
 		//set PLL_2_R value
 		_lmk04816_regs.PLL2_R_28 = 1;
 		//this->write_regs(28);
@@ -122,12 +150,15 @@ while(1) {
 		//sets PLL_2_N divider prescaler
 		_lmk04816_regs.PLL2_P_30 = lmk04816_regs_t::PLL2_P_30_DIV_2A;
 		//sets PLL2_N_divider
-		_lmk04816_regs.PLL2_N_3 = 10;
+		_lmk04816_regs.PLL2_N_30 = 10;
 		//this->write_regs(30);
 		
-		for (size_t i = 27; i <= 31; ++i) { 
+		for (size_t i = 1; i <= 16; ++i) { 
 			this->write_regs(i);
 		}
+		for (size_t i = 24; i <= 31; ++i) {
+                        this->write_regs(i);
+                }
 
 		sleep(1000000);
 		

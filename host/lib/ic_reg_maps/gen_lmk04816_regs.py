@@ -172,7 +172,7 @@ OSCout10_MUX             10[20]     0		 bypass_div, divided
 Required_10_21           10[21]     0		 
 EN_OSCout0               10[22]     1		 disabled, enabled
 Required_10_23           10[23]     0
-OSCout0_TYPE             10[24:27]  1
+OSCout0_TYPE             10[24:27]  0
 Required_10_28           10[28]     1
 Required_10_range        10[29:31]  0
 ########################################################################
@@ -197,7 +197,7 @@ MODE                     11[27:31]  0		dual_int=0, dual_int_zer_delay=2,dual_ext
 ########################################################################
 ## address 12
 ########################################################################
-address12		 12[0:4]    0
+address12		 12[0:4]    12
 HOLDOVER_MODE		 12[6:7]    2		disabled=1,enabled=2
 EN_TRACK		 12[8]      1		disabled=0,enabled=1
 Required_12_range917     12[9:17]   0
@@ -211,12 +211,12 @@ LD_MUX                   12[27:31]  3		log_low=0,pll1_dld=1,pll2_dld=2,both=3,ho
 ########################################################################
 ## address 13
 ########################################################################
-address13		 13[0:4]    0
+address13		 13[0:4]    13
 EN_CLKin0		 13[5]      1		no_valid_use=0,valid_use=1 
 EN_CLKin1                13[6]      1		no_valid_use=0,valid_use=1 
 EN_CLKin2                13[7]      1		no_valid_use=0,valid_use=1		
 CLKin_Sel_INV            13[8]      0		active_high=0,active_low=1
-CLKin_Select_MODE        13[9:11]   3		CLKin0_man=0,CLKin1_man=1,CLKin2_man=2,pin_sel_mode=3,auto_mode=4,auto_mode_w_next_block_sel=5
+CLKin_Select_MODE        13[9:11]   3		CLKin0_man=0,CLKin1_man=1,CLKin2_man=2,pin_sel_mode=3,auto_mode=4,auto_mode_w_next_block_sel=6
 Status_CLKin0_MUX        13[14:12]  0		log_low=0,CLKin0_LOS=1,CLKin0_Selected=2,dac_lock=3,dac_low=4,dac_high=5,uWire_RB=6
 DISABLE_DLD1_DET         13[15]     0		pll1_dld_cause_event=0,pll1_dld_not_cause=1
 Status_CLKin0_TYPE       13[16:18]  2		input=0,in_pull_up=1,in_pull_down=2,out_push_pull=3,out_inverted=4,out_open_sources=5,out_open_drains=6
@@ -254,7 +254,7 @@ MAN_DAC                  15[22:31]  512
 ########################################################################
 ## address 16
 ########################################################################
-address16                16[0:4]     0
+address16                16[0:4]     16
 Required_16_5            16[5]       0          
 Required_16_6            16[6]       0          
 Required_16_7            16[7]       0         
@@ -314,10 +314,10 @@ Required_26_20           26[20]      0
 Required_26_21           26[21]      1
 Required_26_22           26[22]      0
 Required_26_23           26[23]      1
-Required_26_24           26[24]      192
-Required_26_25           6[25]       1
+Required_26_24           26[24]      1
+Required_26_25           26[25]       1
 PLL2_CP_GAIN_26          26[26:27]   3		100microA=0, 400microA=1, 1600microA=2, 3200microA=3
-PLL2_CP_POL_26           26[28]      0		neg_slove=0, pos_slope=1
+PLL2_CP_POL_26           26[28]      0		neg_slope=0, pos_slope=1
 EN_PLL2_REF_2X           26[29]      0		normal_freq_ref=0, doubled_freq_ref=1
 PLL2_WND_SIZE            26[30:31]   2		3p7ns=2
 #########################################################################
@@ -326,9 +326,9 @@ PLL2_WND_SIZE            26[30:31]   2		3p7ns=2
 address27		 27[0:4]     27
 PLL1_CP_TRI_27           27[5]       0	       PLL2_cpout2_active=0,PLL2_cpout2TRI=1
 PLL1_R_27                27[6:19]    96
-CLKin0_PreR_DIV		 27[20:21]   0         div1=0,div2=1,div3=2,div4=3,div8=4
-CLKin1_PreR_DIV          27[22:23]   0         div1=0,div2=1,div3=2,div4=3,div8=4
-CLKin2_PreR_DIV          27[24:25]   0         div1=0,div2=1,div3=2,div4=3,div8=4
+CLKin0_PreR_DIV		 27[20:21]   0         div1=0,div2=1,div4=2,div8=3
+CLKin1_PreR_DIV          27[22:23]   0         div1=0,div2=1,div4=2,div8=3
+CLKin2_PreR_DIV          27[24:25]   0         div1=0,div2=1,div4=2,div8=3
 PLL1_CP_GAIN_27          27[26:27]   0	       100microA=0, 400microA=1, 1600microA=2, 3200microA=3	
 PLL1_CP_POL_27           27[28]      1	       neg_slove=0, pos_slope=1
 Reqiured_27              27[29:31]   0
@@ -351,14 +351,14 @@ Required29               29[27:31]   0
 ## address 30
 #########################################################################
 address30		 30[0:4]     30
-PLL2_N_3                 30[5:22]    48
+PLL2_N_30                30[5:22]    48
 Required_30_522          30[23]      0		
 PLL2_P_30                30[24:26]   2		div_8=0, div_2=1, div_2a=2, div_3=3, div_4=4, div_5=5, div_6=6, div_7=7
 Required_2731            30[27:31]   0
 #########################################################################
 ## address 31
 #########################################################################
-address31                31[0:4]     0
+address31                31[0:4]     31
 uWire_LOCK               31[5]       0		reg_locked=0, reg_unlocked=1
 Required_615             31[6:15]    0
 READBACK_ADDR            31[16:20]   31		R0=0, R1=1, R2=2, R3=3, R4=4, R5=5, R6=6, R7=7, R8=8, R10=10, R11=11, R12=12, R13=13, R14=14, R15=15, R24=24, R25=25, R26=26, R27=27, R28=28, R29=29, R30=30, R31=31
