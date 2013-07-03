@@ -1,12 +1,11 @@
 
-
+#include <cstdio>
 #include "b250_clock_ctrl.hpp"
 #include "b250_impl.hpp"
 #include <uhd/utils/safe_call.hpp>
 #include <boost/cstdint.hpp>
 #include <lmk04816_regs.hpp>
 using namespace uhd;
-
 struct b250_clock_ctrl_impl : b250_clock_ctrl	{
 
 	b250_clock_ctrl_impl(uhd::spi_iface::sptr spiface, const size_t slaveno): _spiface(spiface), _slaveno(slaveno)	{
@@ -14,30 +13,39 @@ struct b250_clock_ctrl_impl : b250_clock_ctrl	{
 /* Individual Clock Output Configurations */		
 //register 0
 
-		//set divide value for DAC
+		
+		_lmk04816_regs.RESET = lmk04816_regs_t::RESET_RESET;
+		this->write_regs(0);
+		_lmk04816_regs.RESET = lmk04816_regs_t::RESET_NO_RESET;
+		this->write_regs(0);
+		_lmk04816_regs.CLKout0_1_PD = lmk04816_regs_t::CLKOUT0_1_PD_POWER_UP;
+		this->write_regs(0);
 		_lmk04816_regs.CLKout0_1_DIV = 20;
 		this->write_regs(0);
 		
 //register 1
+		_lmk04816_regs.CLKout2_3_PD = lmk04816_regs_t::CLKOUT2_3_PD_POWER_UP;
 		//set divide value for ADC
 		_lmk04816_regs.CLKout2_3_DIV = 20;
-		this->write_regs(1);
+		//this->write_regs(1);
 //register 2
+		_lmk04816_regs.CLKout4_5_PD = lmk04816_regs_t::CLKOUT4_5_PD_POWER_UP;
 		//set divide value for ADC
 		_lmk04816_regs.CLKout4_5_DIV = 20;
-		this->write_regs(3);
+		//this->write_regs(2);
 //register 3
 		//set divide value for FPGA
 		_lmk04816_regs.CLKout6_7_DIV = 20;
-		this->write_regs(3);
+		//this->write_regs(3);
 //register 4
 		//set divide value for FPGA
 		_lmk04816_regs.CLKout8_9_DIV = 20;
-		this->write_regs(4);
+		//this->write_regs(4);
 //register 5
+		_lmk04816_regs.CLKout10_11_PD = lmk04816_regs_t::CLKOUT10_11_PD_NORMAL;
 		//set divide value for LVDS low frequency system synch clock
 		_lmk04816_regs.CLKout10_11_DIV = 20;
-		this->write_regs(5);
+		//this->write_regs(5);
 
 /* Output Clock Type Configurations */
 
@@ -46,30 +54,44 @@ struct b250_clock_ctrl_impl : b250_clock_ctrl	{
 		_lmk04816_regs.CLKout0_TYPE = 1; //FPGA
 		_lmk04816_regs.CLKout2_TYPE = lmk04816_regs_t::CLKOUT2_TYPE_LVPECL_700MVPP; //DB_0_RX
 		_lmk04816_regs.CLKout3_TYPE = lmk04816_regs_t::CLKOUT3_TYPE_LVPECL_700MVPP; //DB_1_RX
-		this->write_regs(6);
+		
 //register 7
 		//sets clock type to LVPECL
 		_lmk04816_regs.CLKout4_TYPE = 2; //DB_1_TX
-		_lmk04816_regs.CLKout5_TYPE = lmk04816_regs_t::CLKOUT5_TYPE_LVPECL_700MVPP; //REF_CLKOUT
+		_lmk04816_regs.CLKout5_TYPE = lmk04816_regs_t::CLKOUT5_TYPE_LVDS; //REF_CLKOUT
 		//sets clock type to LVDS
 		_lmk04816_regs.CLKout6_TYPE = lmk04816_regs_t::CLKOUT6_TYPE_LVPECL_700MVPP; // DB1_DAC
 		_lmk04816_regs.CLKout7_TYPE = lmk04816_regs_t::CLKOUT7_TYPE_LVPECL_700MVPP; // DB1_DAC
 		_lmk04816_regs.CLKout8_TYPE = 2; // DB0_ADC
-		this->write_regs(7);
+		//this->write_regs(7);
 //register 8 
 		//sets clock type to LVPECL
 		_lmk04816_regs.CLKout9_TYPE = lmk04816_regs_t::CLKOUT9_TYPE_LVPECL_700MVPP; //DB1_ADC
 		_lmk04816_regs.CLKout10_TYPE = lmk04816_regs_t::CLKOUT10_TYPE_LVPECL_700MVPP; //DB_0_TX
-		this->write_regs(8);
+		//this->write_regs(8);
+while(1) {
+	for (size_t i = 1; i <= 8; ++i) {
+		this->write_regs(i);
+		}
+}
+	
 
 /* Input Clock Configurations */
 
 //register 13
 
 		//disable clockin0 and clockin2 for testing
-		_lmk04816_regs.EN_CLKin0 = lmk04816_regs_t::EN_CLKIN0_NO_VALID_USE;
-		_lmk04816_regs.EN_CLKin2 = lmk04816_regs_t::EN_CLKIN2_NO_VALID_USE;
+		//_lmk04816_regs.EN_CLKin0 = lmk04816_regs_t::EN_CLKIN0_NO_VALID_USE;
+		//_lmk04816_regs.EN_CLKin2 = lmk04816_regs_t::EN_CLKIN2_NO_VALID_USE;
+		_lmk04816_regs.Status_CLKin1_MUX = lmk04816_regs_t::STATUS_CLKIN1_MUX_UWIRE_RB;
 		this->write_regs(13);
+		//sleep(1000);
+
+//register 14
+		_lmk04816_regs.Status_CLKin1_TYPE = lmk04816_regs_t::STATUS_CLKIN1_TYPE_OUT_PUSH_PULL;
+		this->write_regs(14);
+
+		//
 
 /*Loop Filter settings*/
 
@@ -85,24 +107,29 @@ struct b250_clock_ctrl_impl : b250_clock_ctrl	{
 		//sets PLL1_R value
 		_lmk04816_regs.PLL1_R_27 = 3;
 		//_lmk04816_regs.CLKin2_PreR_DIV = 1;
-		this->write_regs(27);
+		//this->write_regs(27);
 //register 28
 		//set PLL_1_N value
 		_lmk04816_regs.PLL1_N_28 = 3;
 		//set PLL_2_R value
 		_lmk04816_regs.PLL2_R_28 = 1;
-		this->write_regs(28);
+		//this->write_regs(28);
 //register 29
 		//set the PLL_2_N value (calibration divider)
 		//_lmk04816_regs.PLL2_N_CAL = 10;
-		this->write_regs(29);
+		//this->write_regs(29);
 //register 30
 		//sets PLL_2_N divider prescaler
 		_lmk04816_regs.PLL2_P_30 = lmk04816_regs_t::PLL2_P_30_DIV_2A;
 		//sets PLL2_N_divider
 		_lmk04816_regs.PLL2_N_3 = 10;
-		this->write_regs(30);
+		//this->write_regs(30);
+		
+		for (size_t i = 27; i <= 31; ++i) { 
+			this->write_regs(i);
+		}
 
+		sleep(1000000);
 		
 
 	}
@@ -137,6 +164,8 @@ struct b250_clock_ctrl_impl : b250_clock_ctrl	{
 
 		boost::uint32_t data = _lmk04816_regs.get_reg(addr);
 		_spiface->write_spi(_slaveno, spi_config_t::EDGE_RISE, data,32);
+		//for testing purposes
+		printf("%u %08x\n", addr, data);
 	}
 
 	const spi_iface::sptr _spiface;
