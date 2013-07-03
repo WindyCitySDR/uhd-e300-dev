@@ -160,7 +160,7 @@ struct b250_clock_ctrl_impl : b250_clock_ctrl	{
                         this->write_regs(i);
                 }
 
-		sleep(1000000);
+		//sleep(1000000);
 		
 
 	}
