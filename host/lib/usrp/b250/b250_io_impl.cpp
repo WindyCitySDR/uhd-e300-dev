@@ -57,6 +57,8 @@ void b250_impl::update_rx_samp_rate(const size_t dspno, const double rate)
     boost::shared_ptr<sph::recv_packet_streamer> my_streamer =
         boost::dynamic_pointer_cast<sph::recv_packet_streamer>(_rx_streamers[dspno].lock());
     if (my_streamer) my_streamer->set_samp_rate(rate);
+    const double adj = _radio_perifs[dspno].ddc->get_scaling_adjustment();
+    my_streamer->set_scale_factor(adj);
 }
 
 void b250_impl::update_tx_samp_rate(const size_t dspno, const double rate)
@@ -65,6 +67,8 @@ void b250_impl::update_tx_samp_rate(const size_t dspno, const double rate)
     boost::shared_ptr<sph::send_packet_streamer> my_streamer =
         boost::dynamic_pointer_cast<sph::send_packet_streamer>(_tx_streamers[dspno].lock());
     if (my_streamer) my_streamer->set_samp_rate(rate);
+    const double adj = _radio_perifs[dspno].duc->get_scaling_adjustment();
+    my_streamer->set_scale_factor(adj);
 }
 
 /***********************************************************************
