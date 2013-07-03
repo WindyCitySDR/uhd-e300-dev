@@ -53,6 +53,7 @@ const static boost::uint8_t B2XX_VREQ_FPGA_RESET = 0x62;
 const static boost::uint8_t B2XX_VREQ_GET_USB = 0x80;
 const static boost::uint8_t B2XX_VREQ_GET_STATUS = 0x83;
 const static boost::uint8_t B2XX_VREQ_FX3_RESET = 0x99;
+const static boost::uint8_t B2XX_VREQ_EEPROM_WRITE = 0xBA;
 
 const static boost::uint8_t FX3_STATE_FPGA_READY = 0x00;
 const static boost::uint8_t FX3_STATE_CONFIGURING_FPGA = 0x01;
@@ -60,6 +61,7 @@ const static boost::uint8_t FX3_STATE_BUSY = 0x02;
 const static boost::uint8_t FX3_STATE_RUNNING = 0x03;
 
 typedef boost::uint32_t hash_type;
+typedef std::vector<boost::uint8_t> byte_vector_t;
 
 
 namespace po = boost::program_options;
@@ -239,6 +241,15 @@ libusb_error fx3_control_read(libusb_device_handle *dev_handle, boost::uint8_t r
 
     return (libusb_error) libusb_control_transfer(dev_handle, VRT_VENDOR_IN, request, \
                value, index, buff, length, timeout);
+}
+
+
+void write_eeprom(libusb_device_handle *dev_handle, boost::uint8_t addr,
+        boost::uint8_t offset, const byte_vector_t &bytes) {
+    fx3_control_write(dev_handle, B2XX_VREQ_EEPROM_WRITE,
+                        0, offset | (boost::uint16_t(addr) << 8),
+                        (unsigned char *) &bytes[0],
+                        bytes.size());
 }
 
 
@@ -484,6 +495,7 @@ boost::int32_t main(boost::int32_t argc, char *argv[]) {
     if (vm.count("help")){
         std::cout << boost::format("B2xx Utilitiy Program %s") % desc << std::endl;
         return ~0;
+    } else if (vm.count("reset-usb")) {
     }
 
     vid = atoh(vid_str);
@@ -498,6 +510,83 @@ boost::int32_t main(boost::int32_t argc, char *argv[]) {
     libusb_init(&ctx);
     libusb_set_debug(ctx, 3);
     libusb_get_device_list(ctx, &devs);
+
+    /* If we are initializing the device, the VID/PID will default to the
+     * Cypress VID/PID for the initial FW load. */
+    if (vm.count("init-device")) {
+        dev_handle = libusb_open_device_with_vid_pid(ctx, FX3_VID,
+                FX3_DEFAULT_PID);
+        if(dev_handle == NULL) {
+            std::cerr << "Cannot open device with vid: " << vid << " and pid: "
+                << pid << std::endl;
+        } else { std::cout << "Uninitialized B2xx detected..." << std::flush; }
+        libusb_free_device_list(devs, 1);
+
+        /* Find out if kernel driver is attached, and if so, detach it. */
+        if(libusb_kernel_driver_active(dev_handle, 0) == 1) {
+            std::cout << " Competing Driver Identified... " << std::flush;
+
+            if(libusb_detach_kernel_driver(dev_handle, 0) == 0) {
+                std::cout << " Competing Driver Destroyed!" << std::flush;
+            }
+        }
+        libusb_claim_interface(dev_handle, 0);
+        std::cout << " Control of B2xx granted..." << std::endl << std::endl;
+
+        /* Load the FW. */
+        error_code = (libusb_error) fx3_load_firmware(dev_handle, fw_file);
+        if(error_code != 0) {
+            std::cerr << std::flush << "Error loading firmware. Error code: "
+                << error_code << std::endl;
+            libusb_release_interface(dev_handle, 0);
+            libusb_close(dev_handle);
+            libusb_exit(ctx);
+            return ~0;
+        }
+
+        /* Let the device re-enumerate. */
+        libusb_release_interface(dev_handle, 0);
+        libusb_close(dev_handle);
+        dev_handle = libusb_open_device_with_vid_pid(ctx, FX3_VID,
+                FX3_REENUM_PID);
+        if(dev_handle == NULL) {
+            std::cerr << "Cannot open device with vid: " << vid << " and pid: "
+                << pid << std::endl;
+        } else {
+            std::cout << "Detected in-progress init of B2xx..." << std::flush;
+        }
+        libusb_free_device_list(devs, 1);
+        libusb_claim_interface(dev_handle, 0);
+        std::cout << " Reenumeration complete, Device claimed..."
+            << std::endl;
+
+        /* Now, initialize the device. */
+        byte_vector_t bytes(8);
+        bytes[0] = 0x43;
+        bytes[1] = 0x59;
+        bytes[2] = 0x14;
+        bytes[3] = 0xB2;
+        bytes[4] = (B2XX_PID & 0xff);
+        bytes[5] = (B2XX_PID >> 8);
+        bytes[6] = (B2XX_VID & 0xff);
+        bytes[7] = (B2XX_VID >> 8);
+        write_eeprom(dev_handle, 0x0, 0x0, bytes);
+        std::cout << "EEPROM initialized, resetting device..."
+            << std::endl << std::endl;
+
+        /* Reset the device! */
+        boost::uint8_t data_buffer[1];
+        fx3_control_write(dev_handle, B2XX_VREQ_FX3_RESET,
+                0x00, 0x00, data_buffer, 1, 5000);
+
+        std::cout << "Initialization Process Complete."
+            << std::endl << std::endl;
+        libusb_release_interface(dev_handle, 0);
+        libusb_close(dev_handle);
+        libusb_exit(ctx);
+        return 0;
+    }
+
     dev_handle = libusb_open_device_with_vid_pid(ctx, vid, pid);
     if(dev_handle == NULL) {
         std::cerr << "Cannot open device with vid: " << vid << " and pid: "
@@ -537,8 +626,6 @@ boost::int32_t main(boost::int32_t argc, char *argv[]) {
         error_code = fx3_control_write(dev_handle, B2XX_VREQ_FPGA_RESET,
                 0x00, 0x00, data_buffer, 1, 5000);
 
-    } else if (vm.count("reset-usb")) {
-    } else if (vm.count("init-device")) {
     } else if (vm.count("load-fw")) {
         error_code = (libusb_error) fx3_load_firmware(dev_handle, fw_file);
 
