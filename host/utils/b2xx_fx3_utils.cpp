@@ -32,6 +32,7 @@
 #include <boost/format.hpp>
 #include <boost/program_options.hpp>
 #include <boost/thread/thread.hpp>
+#include <boost/functional/hash.hpp>
 
 
 const static boost::uint16_t FX3_VID = 0x04b4;
