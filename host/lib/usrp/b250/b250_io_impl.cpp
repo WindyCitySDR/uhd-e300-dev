@@ -372,6 +372,7 @@ rx_streamer::sptr b250_impl::get_rx_stream(const uhd::stream_args_t &args_)
         perif.framer->set_nsamps_per_packet(spp); //seems to be a good place to set this
         perif.framer->set_sid((data_sid << 16) | (data_sid >> 16));
         perif.framer->setup(args);
+        perif.ddc->setup(args);
 
         //flow control setup
         const size_t max_buffering = size_t(device_addr.cast<double>("recv_buff_size", 1e6));
@@ -466,6 +467,7 @@ tx_streamer::sptr b250_impl::get_tx_stream(const uhd::stream_args_t &args_)
 
         perif.deframer->clear();
         perif.deframer->setup(args);
+        perif.duc->setup(args);
 
         //flow control setup
         perif.deframer->configure_flow_control(0/*cycs off*/, B250_TX_FC_PKT_WINDOW/8/*pkts*/);

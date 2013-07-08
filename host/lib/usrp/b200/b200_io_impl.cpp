@@ -258,6 +258,7 @@ rx_streamer::sptr b200_impl::get_rx_stream(const uhd::stream_args_t &args_)
         perif.framer->set_nsamps_per_packet(spp);
         perif.framer->set_sid(sid);
         perif.framer->setup(args);
+        perif.ddc->setup(args);
         my_streamer->set_xport_chan_get_buff(stream_i, boost::bind(
             &recv_packet_demuxer_3000::get_recv_buff, _demux, sid, _1
         ), true /*flush*/);
@@ -326,6 +327,7 @@ tx_streamer::sptr b200_impl::get_tx_stream(const uhd::stream_args_t &args_)
 
         perif.deframer->clear();
         perif.deframer->setup(args);
+        perif.duc->setup(args);
 
         my_streamer->set_xport_chan_get_buff(stream_i, boost::bind(
             &zero_copy_if::get_send_buff, _data_transport, _1
