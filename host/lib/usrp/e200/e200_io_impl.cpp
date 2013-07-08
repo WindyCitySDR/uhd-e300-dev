@@ -326,6 +326,7 @@ rx_streamer::sptr e200_impl::get_rx_stream(const uhd::stream_args_t &args_)
     perif.framer->set_nsamps_per_packet(spp); //seems to be a good place to set this
     perif.framer->set_sid((data_sid << 16) | (data_sid >> 16));
     perif.framer->setup(args);
+    perif.ddc->setup(args);
     my_streamer->set_xport_chan_get_buff(0, boost::bind(
         &zero_copy_if::get_recv_buff, perif.rx_data_xport, _1
     ), true /*flush*/);
@@ -400,6 +401,7 @@ tx_streamer::sptr e200_impl::get_tx_stream(const uhd::stream_args_t &args_)
     my_streamer->set_converter(id);
 
     perif.deframer->setup(args);
+    perif.duc->setup(args);
 
     //flow control setup
     const size_t fc_window = perif.tx_data_xport->get_num_send_frames();
