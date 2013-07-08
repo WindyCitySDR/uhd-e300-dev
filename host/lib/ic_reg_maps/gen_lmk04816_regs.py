@@ -160,7 +160,7 @@ Required_9_31            9[31]      0
 ########################################################################
 address10                10[0:4]    10          
 FEEDBACK_MUX             10[5:7]    0          
-VCO_DIV                  10[8:10]   2          
+VCO_DIV                  10[8:10]   2           
 EN_FEEDBACK_MUX          10[11]     0           powered_down, enabled
 VCO_MUX                  10[12]     0           just_vco, vco_divider
 Required_10_13           10[13]     0          
