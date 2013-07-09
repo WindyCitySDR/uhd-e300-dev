@@ -374,11 +374,12 @@ void b250_impl::setup_radio(const size_t i, const std::string &db_name)
     this->register_loopback_self_test(perif.ctrl);
 
     perif.spi = spi_core_3000::make(perif.ctrl, TOREG(SR_SPI), RB32_SPI);
+    //1) setup the ADC
     perif.adc = b250_adc_ctrl::make(perif.spi, DB_ADC_SEN);
-    perif.dac = b250_dac_ctrl::make(perif.spi, DB_DAC_SEN);
-
-    //pull adc and dac out of reset after configuration above
+    //2) pull adc and dac out of reset after configuration above
     perif.ctrl->poke32(TOREG(SR_MISC_OUTS),  (1 << 1) | (1 << 0)); //out of reset + dac enable
+    //3) setup the DAC
+    perif.dac = b250_dac_ctrl::make(perif.spi, DB_DAC_SEN);
 
     ////////////////////////////////////////////////////////////////
     // create codec control objects
