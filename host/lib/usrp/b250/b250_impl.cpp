@@ -351,13 +351,10 @@ b250_impl::~b250_impl(void)
     )
 }
 
-static void check_adc(wb_iface::sptr iface, boost::uint32_t val)
+static void check_adc(wb_iface::sptr iface, const boost::uint32_t val)
 {
     boost::uint32_t adc_rb = iface->peek32(RB32_RX);
-    adc_rb ^= 0xfffc0000;
-    adc_rb = ~adc_rb; //TEMP REMOVE ME
-    adc_rb &= 0xfffcfffc;
-    val &= 0xfffcfffc;
+    adc_rb ^= 0xfffc0000; //adapt for I inversion in FPGA
     UHD_ASSERT_THROW(adc_rb == val);
 }
 
@@ -390,10 +387,10 @@ void b250_impl::setup_radio(const size_t i, const std::string &db_name)
     ////////////////////////////////////////////////////////////////
     // ADC self test
     ////////////////////////////////////////////////////////////////
-    perif.adc->set_test_word("ones", "ones"); check_adc(perif.ctrl, 0xffffffff);
+    perif.adc->set_test_word("ones", "ones"); check_adc(perif.ctrl, 0xfffcfffc);
     perif.adc->set_test_word("zeros", "zeros"); check_adc(perif.ctrl, 0x00000000);
-    perif.adc->set_test_word("ones", "zeros"); check_adc(perif.ctrl, 0xffff0000);
-    perif.adc->set_test_word("zeros", "ones"); check_adc(perif.ctrl, 0x0000ffff);
+    perif.adc->set_test_word("ones", "zeros"); check_adc(perif.ctrl, 0xfffc0000);
+    perif.adc->set_test_word("zeros", "ones"); check_adc(perif.ctrl, 0x0000fffc);
     for (size_t k = 0; k < 14; k++)
     {
         perif.adc->set_test_word("zeros", "custom", 1 << k);
