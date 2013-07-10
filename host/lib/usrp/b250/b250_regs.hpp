@@ -48,7 +48,7 @@ localparam BL_DATA        = 1;
 //wishbone settings map - relevant to host code
 #define SET0_BASE 0xa000
 #define SETXB_BASE 0xb000
-#define BOOT_LDR_BASE 0xFC00
+#define BOOT_LDR_BASE 0xFA00
 #define I2C0_BASE 0xfe00
 #define I2C1_BASE 0xff00
 #define SR_ADDR(base, offset) ((base) + (offset)*4)
