@@ -24,23 +24,33 @@
 
 #define localparam static const int
 
-localparam SR_SPI           = 8;
-localparam SR_ATR0          = 12;
-localparam SR_LEDS          = 20;
-localparam SR_TEST          = 21;
-localparam SR_CODEC_IDLE    = 22;
-localparam SR_MISC_OUTS     = 24;
-localparam SR_READBACK      = 32;
-localparam SR_TX_CTRL       = 64;
-localparam SR_RX_CTRL       = 96;
-localparam SR_TIME          = 128;
-localparam SR_ATR1          = 144;
+localparam SR_CORE_SPI       = 8;
+localparam SR_CORE_MISC      = 16;
+localparam SR_CORE_COMPAT    = 24;
+localparam SR_CORE_GPSDO_ST  = 40;
+localparam RB32_CORE_SPI     = 8;
+localparam RB32_CORE_MISC    = 16;
+localparam RB32_CORE_STATUS  = 20;
+
+localparam SR_SPI       = 8;
+localparam SR_ATR       = 12;
+localparam SR_TEST      = 21;
+localparam SR_CODEC_IDLE = 22;
+localparam SR_READBACK  = 32;
+localparam SR_TX_CTRL   = 64;
+localparam SR_RX_CTRL   = 96;
+localparam SR_RX_DSP    = 144;
+localparam SR_TX_DSP    = 184;
+localparam SR_TIME      = 128;
 
 localparam RB32_TEST            = 0;
-localparam RB32_SPI             = 4;
 localparam RB64_TIME_NOW        = 8;
 localparam RB64_TIME_PPS        = 16;
 localparam RB64_CODEC_READBACK  = 24;
+
+//pll constants
+static const int ADF4001_SLAVENO = (1 << 1);
+static const double ADF4001_SPI_RATE = 5e6;
 
 /* ATR Control Bits */
 static const boost::uint32_t TX_ENABLE1 = (1 << 7);

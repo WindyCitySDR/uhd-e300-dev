@@ -359,6 +359,13 @@ b250_impl::~b250_impl(void)
     )
 }
 
+static void check_adc(wb_iface::sptr iface, const boost::uint32_t val)
+{
+    boost::uint32_t adc_rb = iface->peek32(RB32_RX);
+    adc_rb ^= 0xfffc0000; //adapt for I inversion in FPGA
+    UHD_ASSERT_THROW(adc_rb == val);
+}
+
 void b250_impl::setup_radio(const size_t i, const std::string &db_name)
 {
     const fs_path mb_path = "/mboards/0";
@@ -377,7 +384,6 @@ void b250_impl::setup_radio(const size_t i, const std::string &db_name)
     const boost::uint32_t ctrl_sid = this->allocate_sid(config);
     udp_zero_copy::sptr ctrl_xport = this->make_transport(_addr, ctrl_sid);
     perif.ctrl = radio_ctrl_core_3000::make(vrt::if_packet_info_t::LINK_TYPE_VRLP, ctrl_xport, ctrl_xport, ctrl_sid, db_name);
-    perif.ctrl->poke32(TOREG(SR_MISC_OUTS), (1 << 2)); //reset adc + dac
     perif.ctrl->poke32(TOREG(SR_MISC_OUTS),  (1 << 1) | (1 << 0)); //out of reset + dac enable
 
     this->register_loopback_self_test(perif.ctrl);
@@ -387,20 +393,35 @@ void b250_impl::setup_radio(const size_t i, const std::string &db_name)
     perif.dac = b250_dac_ctrl::make(perif.spi, DB_DAC_SEN);
 
     ////////////////////////////////////////////////////////////////
+    // ADC self test
+    ////////////////////////////////////////////////////////////////
+    perif.adc->set_test_word("ones", "ones"); check_adc(perif.ctrl, 0xfffcfffc);
+    perif.adc->set_test_word("zeros", "zeros"); check_adc(perif.ctrl, 0x00000000);
+    perif.adc->set_test_word("ones", "zeros"); check_adc(perif.ctrl, 0xfffc0000);
+    perif.adc->set_test_word("zeros", "ones"); check_adc(perif.ctrl, 0x0000fffc);
+    for (size_t k = 0; k < 14; k++)
+    {
+        perif.adc->set_test_word("zeros", "custom", 1 << k);
+        check_adc(perif.ctrl, 1 << (k+2));
+    }
+    for (size_t k = 0; k < 14; k++)
+    {
+        perif.adc->set_test_word("custom", "zeros", 1 << k);
+        check_adc(perif.ctrl, 1 << (k+18));
+    }
+    perif.adc->set_test_word("normal", "normal");
+
+    ////////////////////////////////////////////////////////////////
     // create codec control objects
     ////////////////////////////////////////////////////////////////
     _tree->create<int>(mb_path / "rx_codecs" / db_name / "gains"); //phony property so this dir exists
     _tree->create<int>(mb_path / "tx_codecs" / db_name / "gains"); //phony property so this dir exists
-    _tree->create<std::string>(mb_path / "rx_codecs" / db_name / "name").set("ads62p44");
+    _tree->create<std::string>(mb_path / "rx_codecs" / db_name / "name").set("ads62p48");
     _tree->create<std::string>(mb_path / "tx_codecs" / db_name / "name").set("ad9146");
 
     _tree->create<meta_range_t>(mb_path / "rx_codecs" / db_name / "gains" / "digital" / "range").set(meta_range_t(0, 6.0, 0.5));
-    _tree->create<double>(mb_path / "rx_codecs" / db_name / "gains" / "digital/value")
-        .subscribe(boost::bind(&b250_adc_ctrl::set_rx_digital_gain, perif.adc, _1)).set(0);
-
-    _tree->create<meta_range_t>(mb_path / "rx_codecs" / db_name / "gains" / "fine" / "range").set(meta_range_t(0, 0.5, 0.05));
-    _tree->create<double>(mb_path / "rx_codecs" / db_name / "gains" / "fine" / "value")
-        .subscribe(boost::bind(&b250_adc_ctrl::set_rx_digital_fine_gain, perif.adc, _1)).set(0);
+    _tree->create<double>(mb_path / "rx_codecs" / db_name / "gains" / "digital" / "value")
+        .subscribe(boost::bind(&b250_adc_ctrl::set_gain, perif.adc, _1)).set(0);
 
     ////////////////////////////////////////////////////////////////////
     // create rx dsp control objects

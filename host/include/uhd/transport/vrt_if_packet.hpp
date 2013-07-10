@@ -53,8 +53,8 @@ namespace vrt{
         enum packet_type_t
         {
             PACKET_TYPE_DATA      = 0x0,
-            PACKET_TYPE_EXTENSION = 0x1,
-            PACKET_TYPE_CONTEXT   = 0x2,
+            PACKET_TYPE_IF_EXT    = 0x1,
+            PACKET_TYPE_CONTEXT   = 0x2, //extension context: has_sid = true
         } packet_type;
 
         //size fields

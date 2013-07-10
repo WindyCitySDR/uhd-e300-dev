@@ -83,7 +83,7 @@ UHD_INLINE static boost::uint32_t chdr_to_vrt(const boost::uint32_t chdr, size_t
 {
     boost::uint32_t vrt = chdr & 0xffff; //words32
     packet_count = (chdr >> 16) & 0xfff;
-    vrt |= ((chdr >> 31) & 0x1) << 29; //context packet
+    vrt |= ((chdr >> 31) & 0x1) << 30; //context packet
     vrt |= ((chdr >> 30) & 0x1) << 26; //has tlr
     vrt |= ((chdr >> 29) & 0x1) << 20; //has tsf
     vrt |= ((chdr >> 28) & 0x1) << 24; //has eob
@@ -95,7 +95,7 @@ UHD_INLINE static boost::uint32_t vrt_to_chdr(const boost::uint32_t vrt, const s
 {
     boost::uint32_t chdr = vrt & 0xffff; //words32
     chdr |= (packet_count & 0xfff) << 16;
-    chdr |= ((vrt >> 29) & 0x1) << 31; //context packet
+    chdr |= ((vrt >> 30) & 0x1) << 31; //context packet
     chdr |= ((vrt >> 26) & 0x1) << 30; //has tlr
     chdr |= ((vrt >> 20) & 0x1) << 29; //has tsf
     chdr |= ((vrt >> 24) & 0x1) << 28; //has eob

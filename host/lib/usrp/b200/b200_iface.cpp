@@ -88,8 +88,14 @@ static hash_type generate_hash(const char *filename)
     size_t hash = 0;
 
     char ch;
+    long long count = 0;
     while (file.get(ch)) {
+        count++;
         boost::hash_combine(hash, ch);
+    }
+
+    if (count == 0){
+        throw uhd::io_error(std::string("empty input file ") + filename);
     }
 
     if (not file.eof()){

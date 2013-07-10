@@ -14,6 +14,7 @@
 #define UART0_BAUD 115200
 #define I2C0_BASE 0xfe00
 #define I2C1_BASE 0xff00
+#define I2C2_BASE 0xfc00
 #define SET0_BASE 0xa000
 #define RB0_BASE 0xa000 //same as set
 
@@ -31,11 +32,13 @@ static const int SR_ETHINT0    = 40;
 static const int SR_ETHINT1    = 56;
 
 // Readback Memory Map
-static const int RB_COUNTER     = 0;
-static const int RB_SPI_RDY     = 1;
-static const int RB_SPI_DATA    = 2;
-static const int RB_SFPP_STATUS = 3;
-static const int RB_VERSION     = 4;
+static const int RB_COUNTER      = 0;
+static const int RB_SPI_RDY      = 1;
+static const int RB_SPI_DATA     = 2;
+static const int RB_ETH_TYPE0    = 4;
+static const int RB_ETH_TYPE1    = 5;
+static const int RB_SFPP_STATUS0 = 8;
+static const int RB_SFPP_STATUS1 = 9;
 
 // Bootloader Memory Map
 static const int BL_ADDRESS     = 0;

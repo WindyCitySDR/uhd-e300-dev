@@ -56,7 +56,10 @@ void b250_impl::update_rx_samp_rate(const size_t dspno, const double rate)
     if (not _rx_streamers.has_key(dspno)) return;
     boost::shared_ptr<sph::recv_packet_streamer> my_streamer =
         boost::dynamic_pointer_cast<sph::recv_packet_streamer>(_rx_streamers[dspno].lock());
-    if (my_streamer) my_streamer->set_samp_rate(rate);
+    if (not my_streamer) return;
+    my_streamer->set_samp_rate(rate);
+    const double adj = _radio_perifs[dspno].ddc->get_scaling_adjustment();
+    my_streamer->set_scale_factor(adj);
 }
 
 void b250_impl::update_tx_samp_rate(const size_t dspno, const double rate)
@@ -64,7 +67,10 @@ void b250_impl::update_tx_samp_rate(const size_t dspno, const double rate)
     if (not _tx_streamers.has_key(dspno)) return;
     boost::shared_ptr<sph::send_packet_streamer> my_streamer =
         boost::dynamic_pointer_cast<sph::send_packet_streamer>(_tx_streamers[dspno].lock());
-    if (my_streamer) my_streamer->set_samp_rate(rate);
+    if (not my_streamer) return;
+    my_streamer->set_samp_rate(rate);
+    const double adj = _radio_perifs[dspno].duc->get_scaling_adjustment();
+    my_streamer->set_scale_factor(adj);
 }
 
 /***********************************************************************
@@ -366,6 +372,7 @@ rx_streamer::sptr b250_impl::get_rx_stream(const uhd::stream_args_t &args_)
         perif.framer->set_nsamps_per_packet(spp); //seems to be a good place to set this
         perif.framer->set_sid((data_sid << 16) | (data_sid >> 16));
         perif.framer->setup(args);
+        perif.ddc->setup(args);
 
         //flow control setup
         const size_t max_buffering = size_t(device_addr.cast<double>("recv_buff_size", 1e6));
@@ -460,6 +467,7 @@ tx_streamer::sptr b250_impl::get_tx_stream(const uhd::stream_args_t &args_)
 
         perif.deframer->clear();
         perif.deframer->setup(args);
+        perif.duc->setup(args);
 
         //flow control setup
         perif.deframer->configure_flow_control(0/*cycs off*/, B250_TX_FC_PKT_WINDOW/8/*pkts*/);
