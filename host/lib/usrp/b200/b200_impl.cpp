@@ -446,7 +446,7 @@ b200_impl::b200_impl(const device_addr_t &device_addr)
     ////////////////////////////////////////////////////////////////////
 
     //init the clock rate to something reasonable
-    _tree->access<double>(mb_path / "tick_rate").set(61.44e6/2);
+    _tree->access<double>(mb_path / "tick_rate").set(32e6);
 
     //subdev spec contains full width of selections
     subdev_spec_t rx_spec, tx_spec;
