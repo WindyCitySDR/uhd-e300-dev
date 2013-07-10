@@ -37,6 +37,8 @@ public:
 
     virtual double set_gain(const double &) = 0;
 
+    virtual void set_test_word(const std::string &patterna, const std::string &patternb, const boost::uint32_t = 0) = 0;
+
 };
 
 #endif /* INCLUDED_B250_ADC_CTRL_HPP */

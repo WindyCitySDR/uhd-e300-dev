@@ -31,7 +31,7 @@ lvds_cmos               0x41[7]       0       parallel_cmos, ddr_lvds
 clk_out_pos_edge        0x44[7:5]     0
 clk_out_ned_edge        0x44[4:2]     0
 channel_control         0x50[6]       0                common, independent
-data_format                    0x50[2]         0       2s_compliment, offset_binary
+data_format                    0x50[2:1]       2       2s_compliment=2, offset_binary=3
 custom_pattern_low             0x51[7:0]       0
 custom_pattern_high            0x52[5:0]       0
 enable_offset_corr_chA         0x53[6]         0

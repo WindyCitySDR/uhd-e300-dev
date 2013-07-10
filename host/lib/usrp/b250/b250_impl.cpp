@@ -351,6 +351,16 @@ b250_impl::~b250_impl(void)
     )
 }
 
+static void check_adc(wb_iface::sptr iface, boost::uint32_t val)
+{
+    boost::uint32_t adc_rb = iface->peek32(RB32_RX);
+    adc_rb ^= 0xfffc0000;
+    adc_rb = ~adc_rb; //TEMP REMOVE ME
+    adc_rb &= 0xfffcfffc;
+    val &= 0xfffcfffc;
+    UHD_ASSERT_THROW(adc_rb == val);
+}
+
 void b250_impl::setup_radio(const size_t i, const std::string &db_name)
 {
     const fs_path mb_path = "/mboards/0";
@@ -369,17 +379,32 @@ void b250_impl::setup_radio(const size_t i, const std::string &db_name)
     const boost::uint32_t ctrl_sid = this->allocate_sid(config);
     udp_zero_copy::sptr ctrl_xport = this->make_transport(_addr, ctrl_sid);
     perif.ctrl = radio_ctrl_core_3000::make(vrt::if_packet_info_t::LINK_TYPE_VRLP, ctrl_xport, ctrl_xport, ctrl_sid, db_name);
-    perif.ctrl->poke32(TOREG(SR_MISC_OUTS), (1 << 2)); //reset adc + dac
+    perif.ctrl->poke32(TOREG(SR_MISC_OUTS),  (1 << 1) | (1 << 0)); //out of reset + dac enable
 
     this->register_loopback_self_test(perif.ctrl);
 
     perif.spi = spi_core_3000::make(perif.ctrl, TOREG(SR_SPI), RB32_SPI);
-    //1) setup the ADC
     perif.adc = b250_adc_ctrl::make(perif.spi, DB_ADC_SEN);
-    //2) pull adc and dac out of reset after configuration above
-    perif.ctrl->poke32(TOREG(SR_MISC_OUTS),  (1 << 1) | (1 << 0)); //out of reset + dac enable
-    //3) setup the DAC
     perif.dac = b250_dac_ctrl::make(perif.spi, DB_DAC_SEN);
+
+    ////////////////////////////////////////////////////////////////
+    // ADC self test
+    ////////////////////////////////////////////////////////////////
+    perif.adc->set_test_word("ones", "ones"); check_adc(perif.ctrl, 0xffffffff);
+    perif.adc->set_test_word("zeros", "zeros"); check_adc(perif.ctrl, 0x00000000);
+    perif.adc->set_test_word("ones", "zeros"); check_adc(perif.ctrl, 0xffff0000);
+    perif.adc->set_test_word("zeros", "ones"); check_adc(perif.ctrl, 0x0000ffff);
+    for (size_t k = 0; k < 14; k++)
+    {
+        perif.adc->set_test_word("zeros", "custom", 1 << k);
+        check_adc(perif.ctrl, 1 << (k+2));
+    }
+    for (size_t k = 0; k < 14; k++)
+    {
+        perif.adc->set_test_word("custom", "zeros", 1 << k);
+        check_adc(perif.ctrl, 1 << (k+18));
+    }
+    perif.adc->set_test_word("normal", "normal");
 
     ////////////////////////////////////////////////////////////////
     // create codec control objects

@@ -44,7 +44,7 @@ public:
         _ads62p48_regs.standby = ads62p48_regs_t::STANDBY_NORMAL;
         _ads62p48_regs.power_down = ads62p48_regs_t::POWER_DOWN_NORMAL;
         _ads62p48_regs.lvds_cmos = ads62p48_regs_t::LVDS_CMOS_DDR_LVDS;
-        _ads62p48_regs.channel_control = ads62p48_regs_t::CHANNEL_CONTROL_COMMON;
+        _ads62p48_regs.channel_control = ads62p48_regs_t::CHANNEL_CONTROL_INDEPENDENT;
         _ads62p48_regs.data_format = ads62p48_regs_t::DATA_FORMAT_2S_COMPLIMENT;
 
         this->send_ads62p48_reg(0);
@@ -78,6 +78,24 @@ public:
         this->send_ads62p48_reg(0x55);
         this->send_ads62p48_reg(0x68);
         return gain_bits/2;
+    }
+
+    void set_test_word(const std::string &patterna, const std::string &patternb, const boost::uint32_t num)
+    {
+        _ads62p48_regs.custom_pattern_low = num & 0xff;
+        _ads62p48_regs.custom_pattern_high = num >> 8;
+        if (patterna == "ones") _ads62p48_regs.test_patterns_chA = ads62p48_regs_t::TEST_PATTERNS_CHA_ONES;
+        if (patterna == "zeros") _ads62p48_regs.test_patterns_chA = ads62p48_regs_t::TEST_PATTERNS_CHA_ZEROS;
+        if (patterna == "custom") _ads62p48_regs.test_patterns_chA = ads62p48_regs_t::TEST_PATTERNS_CHA_CUSTOM;
+        if (patterna == "normal") _ads62p48_regs.test_patterns_chA = ads62p48_regs_t::TEST_PATTERNS_CHA_NORMAL;
+        if (patternb == "ones") _ads62p48_regs.test_patterns_chB = ads62p48_regs_t::TEST_PATTERNS_CHB_ONES;
+        if (patternb == "zeros") _ads62p48_regs.test_patterns_chB = ads62p48_regs_t::TEST_PATTERNS_CHB_ZEROS;
+        if (patternb == "custom") _ads62p48_regs.test_patterns_chB = ads62p48_regs_t::TEST_PATTERNS_CHB_CUSTOM;
+        if (patterna == "normal") _ads62p48_regs.test_patterns_chB = ads62p48_regs_t::TEST_PATTERNS_CHB_NORMAL;
+        this->send_ads62p48_reg(0x51);
+        this->send_ads62p48_reg(0x52);
+        this->send_ads62p48_reg(0x62);
+        this->send_ads62p48_reg(0x75);
     }
 
     ~b250_adc_ctrl_impl(void)

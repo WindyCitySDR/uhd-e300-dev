@@ -41,6 +41,7 @@ localparam RB32_SPI             = 4;
 localparam RB64_TIME_NOW        = 8;
 localparam RB64_TIME_PPS        = 16;
 localparam RB32_TEST            = 24;
+localparam RB32_RX              = 28;
 
 //wishbone settings map - relevant to host code
 #define SET0_BASE 0xa000
