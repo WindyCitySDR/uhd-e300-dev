@@ -1,14 +1,23 @@
 
 #include <cstdio>
 #include "b250_clock_ctrl.hpp"
-#include "b250_impl.hpp"
 #include <uhd/utils/safe_call.hpp>
 #include <boost/cstdint.hpp>
+#include <boost/format.hpp>
 #include <lmk04816_regs.hpp>
+#include <stdexcept>
+
 using namespace uhd;
 struct b250_clock_ctrl_impl : b250_clock_ctrl	{
 
-	b250_clock_ctrl_impl(uhd::spi_iface::sptr spiface, const size_t slaveno): _spiface(spiface), _slaveno(slaveno)	{
+	b250_clock_ctrl_impl(uhd::spi_iface::sptr spiface, const size_t slaveno, const double clock_rate):
+		_spiface(spiface), _slaveno(slaveno), _clock_rate(clock_rate)
+	{
+
+		int div = 0;
+		if (clock_rate == 120e6) div = 20;
+		else if (clock_rate == 200e6) div = 12;
+		else throw uhd::runtime_error(str(boost::format("b250_clock_ctrl: cant handle rate %f") % clock_rate));
 
 /* Individual Clock Output Configurations */		
 //register 0
@@ -20,32 +29,32 @@ struct b250_clock_ctrl_impl : b250_clock_ctrl	{
 		this->write_regs(0);
 		_lmk04816_regs.CLKout0_1_PD = lmk04816_regs_t::CLKOUT0_1_PD_POWER_UP;
 		this->write_regs(0);
-		_lmk04816_regs.CLKout0_1_DIV = 20;
+		_lmk04816_regs.CLKout0_1_DIV = div;
 		this->write_regs(0);
 		
 //register 1
 		_lmk04816_regs.CLKout2_3_PD = lmk04816_regs_t::CLKOUT2_3_PD_POWER_UP;
 		//set divide value for ADC
-		_lmk04816_regs.CLKout2_3_DIV = 20;
+		_lmk04816_regs.CLKout2_3_DIV = div;
 		//this->write_regs(1);
 //register 2
 		_lmk04816_regs.CLKout4_5_PD = lmk04816_regs_t::CLKOUT4_5_PD_POWER_UP;
 		//set divide value for ADC
-		_lmk04816_regs.CLKout4_5_DIV = 20;
+		_lmk04816_regs.CLKout4_5_DIV = div;
 		//this->write_regs(2);
 //register 3
 		//set divide value for FPGA
-		_lmk04816_regs.CLKout6_7_DIV = 20;
+		_lmk04816_regs.CLKout6_7_DIV = div;
 		_lmk04816_regs.CLKout6_7_OSCin_Sel = lmk04816_regs_t::CLKOUT6_7_OSCIN_SEL_VCO;
 		//this->write_regs(3);
 //register 4
 		//set divide value for FPGA
-		_lmk04816_regs.CLKout8_9_DIV = 20;
+		_lmk04816_regs.CLKout8_9_DIV = div;
 		//this->write_regs(4);
 //register 5
 		_lmk04816_regs.CLKout10_11_PD = lmk04816_regs_t::CLKOUT10_11_PD_NORMAL;
 		//set divide value for LVDS low frequency system synch clock
-		_lmk04816_regs.CLKout10_11_DIV = 20;
+		_lmk04816_regs.CLKout10_11_DIV = div;
 		//this->write_regs(5);
 
 /* Output Clock Type Configurations */
@@ -171,7 +180,7 @@ struct b250_clock_ctrl_impl : b250_clock_ctrl	{
 //master rate
 	double get_master_clock_rate(void) {
 		
-		return B250_RADIO_CLOCK_RATE;
+		return _clock_rate;
 	}
 //empty
 	void enable_clock(const b250_clock_which_t which, const bool enb) {}
@@ -196,14 +205,15 @@ struct b250_clock_ctrl_impl : b250_clock_ctrl	{
 		boost::uint32_t data = _lmk04816_regs.get_reg(addr);
 		_spiface->write_spi(_slaveno, spi_config_t::EDGE_RISE, data,32);
 		//for testing purposes
-		printf("%u %08x\n", addr, data);
+		//printf("%u %08x\n", addr, data);
 	}
 
 	const spi_iface::sptr _spiface;
 	const size_t _slaveno;
+	const double _clock_rate;
 	lmk04816_regs_t _lmk04816_regs;
-	uhd::dict<b250_clock_which_t, bool> _enables;
-	uhd::dict<b250_clock_which_t, double> _rates;
+	//uhd::dict<b250_clock_which_t, bool> _enables;
+	//uhd::dict<b250_clock_which_t, double> _rates;
 /*
 //read_reg: read a single register to the spi regs.
 
@@ -218,8 +228,8 @@ struct b250_clock_ctrl_impl : b250_clock_ctrl	{
 
 };
 
-b250_clock_ctrl::sptr b250_clock_ctrl::make(uhd::spi_iface::sptr spiface, const size_t slaveno)	{
-	return sptr(new b250_clock_ctrl_impl(spiface,slaveno));
+b250_clock_ctrl::sptr b250_clock_ctrl::make(uhd::spi_iface::sptr spiface, const size_t slaveno, const double clock_rate)	{
+	return sptr(new b250_clock_ctrl_impl(spiface,slaveno,clock_rate));
 }
 
 
