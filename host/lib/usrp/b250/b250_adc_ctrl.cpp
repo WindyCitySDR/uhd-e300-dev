@@ -87,10 +87,12 @@ public:
         if (patterna == "ones") _ads62p48_regs.test_patterns_chA = ads62p48_regs_t::TEST_PATTERNS_CHA_ONES;
         if (patterna == "zeros") _ads62p48_regs.test_patterns_chA = ads62p48_regs_t::TEST_PATTERNS_CHA_ZEROS;
         if (patterna == "custom") _ads62p48_regs.test_patterns_chA = ads62p48_regs_t::TEST_PATTERNS_CHA_CUSTOM;
+        if (patterna == "ramp") _ads62p48_regs.test_patterns_chA = ads62p48_regs_t::TEST_PATTERNS_CHA_RAMP;
         if (patterna == "normal") _ads62p48_regs.test_patterns_chA = ads62p48_regs_t::TEST_PATTERNS_CHA_NORMAL;
         if (patternb == "ones") _ads62p48_regs.test_patterns_chB = ads62p48_regs_t::TEST_PATTERNS_CHB_ONES;
         if (patternb == "zeros") _ads62p48_regs.test_patterns_chB = ads62p48_regs_t::TEST_PATTERNS_CHB_ZEROS;
         if (patternb == "custom") _ads62p48_regs.test_patterns_chB = ads62p48_regs_t::TEST_PATTERNS_CHB_CUSTOM;
+        if (patterna == "ramp") _ads62p48_regs.test_patterns_chB = ads62p48_regs_t::TEST_PATTERNS_CHB_RAMP;
         if (patterna == "normal") _ads62p48_regs.test_patterns_chB = ads62p48_regs_t::TEST_PATTERNS_CHB_NORMAL;
         this->send_ads62p48_reg(0x51);
         this->send_ads62p48_reg(0x52);
