@@ -390,7 +390,7 @@ void b250_impl::setup_radio(const size_t i, const std::string &db_name)
 
     perif.spi = spi_core_3000::make(perif.ctrl, TOREG(SR_SPI), RB32_SPI);
     perif.adc = b250_adc_ctrl::make(perif.spi, DB_ADC_SEN);
-    perif.dac = b250_dac_ctrl::make(perif.spi, DB_DAC_SEN);
+    perif.dac = b250_dac_ctrl::make(perif.spi, DB_DAC_SEN, _clock->get_master_clock_rate());
 
     ////////////////////////////////////////////////////////////////
     // ADC self test
