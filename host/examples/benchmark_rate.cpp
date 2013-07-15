@@ -61,12 +61,13 @@ void benchmark_rx_rate(uhd::usrp::multi_usrp::sptr usrp, const std::string &rx_c
     uhd::time_spec_t last_time;
     const double rate = usrp->get_rx_rate();
 
+    issue_new_stream_cmd:
     uhd::stream_cmd_t cmd(uhd::stream_cmd_t::STREAM_MODE_START_CONTINUOUS);
     cmd.time_spec = usrp->get_time_now() + uhd::time_spec_t(0.05);
     cmd.stream_now = (buffs.size() == 1);
     rx_stream->issue_stream_cmd(cmd);
     while (not boost::this_thread::interruption_requested()){
-        num_rx_samps += rx_stream->recv(buffs, max_samps_per_packet, md);
+        num_rx_samps += rx_stream->recv(buffs, max_samps_per_packet, md)*rx_stream->get_num_channels();
 
         //handle the error codes
         switch(md.error_code){
@@ -81,6 +82,8 @@ void benchmark_rx_rate(uhd::usrp::multi_usrp::sptr usrp, const std::string &rx_c
             had_an_overflow = true;
             last_time = md.time_spec;
             num_overflows++;
+            rx_stream->issue_stream_cmd(uhd::stream_cmd_t::STREAM_MODE_STOP_CONTINUOUS);
+            goto issue_new_stream_cmd;
             break;
 
         default:
@@ -115,7 +118,7 @@ void benchmark_tx_rate(uhd::usrp::multi_usrp::sptr usrp, const std::string &tx_c
     md.has_time_spec = (buffs.size() != 1);
 
     while (not boost::this_thread::interruption_requested()){
-        num_tx_samps += tx_stream->send(buffs, max_samps_per_packet, md);
+        num_tx_samps += tx_stream->send(buffs, max_samps_per_packet, md)*tx_stream->get_num_channels();;
         md.has_time_spec = false;
     }
 
@@ -222,7 +225,7 @@ int UHD_SAFE_MAIN(int argc, char *argv[]){
         usrp->set_rx_rate(rx_rate);
         //create a receive streamer
         uhd::stream_args_t stream_args(rx_cpu, rx_otw);
-        for (size_t ch = 0; ch < usrp->get_num_mboards(); ch++) //linear channel mapping
+        for (size_t ch = 0; ch < usrp->get_rx_num_channels(); ch++) //linear channel mapping
             stream_args.channels.push_back(ch);
         uhd::rx_streamer::sptr rx_stream = usrp->get_rx_stream(stream_args);
         thread_group.create_thread(boost::bind(&benchmark_rx_rate, usrp, rx_cpu, rx_stream));
@@ -233,7 +236,7 @@ int UHD_SAFE_MAIN(int argc, char *argv[]){
         usrp->set_tx_rate(tx_rate);
         //create a transmit streamer
         uhd::stream_args_t stream_args(tx_cpu, tx_otw);
-        for (size_t ch = 0; ch < usrp->get_num_mboards(); ch++) //linear channel mapping
+        for (size_t ch = 0; ch < usrp->get_tx_num_channels(); ch++) //linear channel mapping
             stream_args.channels.push_back(ch);
         uhd::tx_streamer::sptr tx_stream = usrp->get_tx_stream(stream_args);
         thread_group.create_thread(boost::bind(&benchmark_tx_rate, usrp, tx_cpu, tx_stream));
