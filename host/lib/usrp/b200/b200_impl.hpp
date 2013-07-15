@@ -54,6 +54,7 @@ static const boost::uint16_t B200_FPGA_COMPAT_NUM = 0x01;
 static const size_t          B200_MAX_PKT_BYTE_LIMIT = 2048*4;
 static const double          B200_LINK_RATE_BPS = (5e9)/8; //practical link rate (5 Gbps)
 static const double          B200_BUS_CLOCK_RATE = 100e6;
+static const double          B200_DEFAULT_TICK_RATE = 32e6;
 static const boost::uint32_t B200_GPSDO_ST_NONE = 0x83;
 
 #define FLIP_SID(sid) (((sid)<<16)|((sid)>>16))
