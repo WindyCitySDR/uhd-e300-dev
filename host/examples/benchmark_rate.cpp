@@ -47,8 +47,8 @@ void benchmark_rx_rate(uhd::usrp::multi_usrp::sptr usrp, const std::string &rx_c
 
     //print pre-test summary
     std::cout << boost::format(
-        "Testing receive rate %f Msps"
-    ) % (usrp->get_rx_rate()/1e6) << std::endl;
+        "Testing receive rate %f Msps on %u channels"
+    ) % (usrp->get_rx_rate()/1e6) % rx_stream->get_num_channels() << std::endl;
 
     //setup variables and allocate buffer
     uhd::rx_metadata_t md;
@@ -82,8 +82,11 @@ void benchmark_rx_rate(uhd::usrp::multi_usrp::sptr usrp, const std::string &rx_c
             had_an_overflow = true;
             last_time = md.time_spec;
             num_overflows++;
-            rx_stream->issue_stream_cmd(uhd::stream_cmd_t::STREAM_MODE_STOP_CONTINUOUS);
-            goto issue_new_stream_cmd;
+            if (rx_stream->get_num_channels() > 1)
+            {
+                rx_stream->issue_stream_cmd(uhd::stream_cmd_t::STREAM_MODE_STOP_CONTINUOUS);
+                goto issue_new_stream_cmd;
+            }
             break;
 
         default:
@@ -104,8 +107,8 @@ void benchmark_tx_rate(uhd::usrp::multi_usrp::sptr usrp, const std::string &tx_c
 
     //print pre-test summary
     std::cout << boost::format(
-        "Testing transmit rate %f Msps"
-    ) % (usrp->get_tx_rate()/1e6) << std::endl;
+        "Testing transmit rate %f Msps on %u channels"
+    ) % (usrp->get_tx_rate()/1e6) % tx_stream->get_num_channels() << std::endl;
 
     //setup variables and allocate buffer
     uhd::tx_metadata_t md;
