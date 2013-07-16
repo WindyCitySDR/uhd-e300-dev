@@ -51,7 +51,6 @@ static const std::string     B210_FPGA_FILE_NAME = "usrp_b210_fpga.bin";
 static const boost::uint8_t  B200_FW_COMPAT_NUM_MAJOR = 0x02;
 static const boost::uint8_t  B200_FW_COMPAT_NUM_MINOR = 0x00;
 static const boost::uint16_t B200_FPGA_COMPAT_NUM = 0x01;
-static const size_t          B200_MAX_PKT_BYTE_LIMIT = 2048*4;
 static const double          B200_LINK_RATE_BPS = (5e9)/8; //practical link rate (5 Gbps)
 static const double          B200_BUS_CLOCK_RATE = 100e6;
 static const double          B200_DEFAULT_TICK_RATE = 32e6;
