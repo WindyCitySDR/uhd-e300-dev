@@ -226,7 +226,7 @@ struct b250_tx_fc_guts_t
     boost::shared_ptr<b250_impl::async_md_type> old_async_queue;
 };
 
-static void handle_tx_async_msgs(boost::shared_ptr<b250_tx_fc_guts_t> guts, zero_copy_if::sptr xport)
+static void handle_tx_async_msgs(boost::shared_ptr<b250_tx_fc_guts_t> guts, zero_copy_if::sptr xport, b250_clock_ctrl::sptr clock)
 {
     managed_recv_buffer::sptr buff = xport->get_recv_buff();
     if (not buff) return;
@@ -259,7 +259,7 @@ static void handle_tx_async_msgs(boost::shared_ptr<b250_tx_fc_guts_t> guts, zero
     async_metadata_t metadata;
     load_metadata_from_buff(
         uhd::ntohx<boost::uint32_t>, metadata, if_packet_info, packet_buff,
-        B250_RADIO_CLOCK_RATE/*FIXME set from rate update*/, guts->stream_channel);
+        clock->get_master_clock_rate(), guts->stream_channel);
     guts->async_queue->push_with_pop_on_full(metadata);
     metadata.channel = guts->device_channel;
     guts->old_async_queue->push_with_pop_on_full(metadata);
@@ -476,7 +476,7 @@ tx_streamer::sptr b250_impl::get_tx_stream(const uhd::stream_args_t &args_)
         guts->device_channel = chan;
         guts->async_queue = async_md;
         guts->old_async_queue = _async_md;
-        task::sptr task = task::make(boost::bind(&handle_tx_async_msgs, guts, data_xport));
+        task::sptr task = task::make(boost::bind(&handle_tx_async_msgs, guts, data_xport, _clock));
 
         my_streamer->set_xport_chan_get_buff(stream_i, boost::bind(
             &get_tx_buff_with_flowctrl, task, guts, data_xport, _1

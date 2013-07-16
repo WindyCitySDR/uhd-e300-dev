@@ -111,8 +111,8 @@ b250_dboard_iface::b250_dboard_iface(const b250_dboard_iface_config_t &config):
     this->set_clock_enabled(UNIT_RX, false);
     this->set_clock_enabled(UNIT_TX, false);
 
-    this->set_clock_rate(UNIT_RX, B250_RADIO_CLOCK_RATE);
-    this->set_clock_rate(UNIT_TX, B250_RADIO_CLOCK_RATE);
+    this->set_clock_rate(UNIT_RX, _config.clock->get_master_clock_rate());
+    this->set_clock_rate(UNIT_TX, _config.clock->get_master_clock_rate());
 
 
     //some test code
@@ -184,7 +184,7 @@ void b250_dboard_iface::set_clock_enabled(unit_t unit, bool enb)
 
 double b250_dboard_iface::get_codec_rate(unit_t)
 {
-    return B250_RADIO_CLOCK_RATE;
+    return _config.clock->get_master_clock_rate();
 }
 
 /***********************************************************************

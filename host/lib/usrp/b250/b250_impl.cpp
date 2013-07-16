@@ -234,7 +234,7 @@ b250_impl::b250_impl(const uhd::device_addr_t &dev_addr)
     ////////////////////////////////////////////////////////////////////
     UHD_HERE();
     _clock = b250_clock_ctrl::make(_zpu_spi, 1/*slaveno*/,
-        dev_addr.cast<double>("master_clock_rate", B250_RADIO_CLOCK_RATE));
+        dev_addr.cast<double>("master_clock_rate", B250_DEFAULT_TICK_RATE));
     _tree->create<double>(mb_path / "tick_rate")
         .publish(boost::bind(&b250_clock_ctrl::get_master_clock_rate, _clock));
 
@@ -326,7 +326,7 @@ b250_impl::b250_impl(const uhd::device_addr_t &dev_addr)
     ////////////////////////////////////////////////////////////////////
     _tree->access<double>(mb_path / "tick_rate") //now subscribe the clock rate setter
         .subscribe(boost::bind(&b250_impl::update_tick_rate, this, _1))
-        .set(B250_RADIO_CLOCK_RATE);
+        .set(_clock->get_master_clock_rate());
 
     subdev_spec_t rx_fe_spec, tx_fe_spec;
     rx_fe_spec.push_back(subdev_spec_pair_t("A", _tree->list(mb_path / "dboards" / "A" / "rx_frontends").at(0)));
@@ -428,11 +428,11 @@ void b250_impl::setup_radio(const size_t i, const std::string &db_name)
     // create rx dsp control objects
     ////////////////////////////////////////////////////////////////////
     perif.framer = rx_vita_core_3000::make(perif.ctrl, TOREG(SR_RX_CTRL));
-    perif.framer->set_tick_rate(B250_RADIO_CLOCK_RATE);
     perif.ddc = rx_dsp_core_3000::make(perif.ctrl, TOREG(SR_RX_DSP));
     perif.ddc->set_link_rate(10e9/8); //whatever
-    perif.ddc->set_tick_rate(B250_RADIO_CLOCK_RATE);
-
+    _tree->access<double>(mb_path / "tick_rate")
+        .subscribe(boost::bind(&rx_vita_core_3000::set_tick_rate, perif.framer, _1))
+        .subscribe(boost::bind(&rx_dsp_core_3000::set_tick_rate, perif.ddc, _1));
     const fs_path rx_dsp_path = mb_path / "rx_dsps" / str(boost::format("%u") % dspno);
     _tree->create<meta_range_t>(rx_dsp_path / "rate" / "range")
         .publish(boost::bind(&rx_dsp_core_3000::get_host_rates, perif.ddc));
@@ -452,11 +452,11 @@ void b250_impl::setup_radio(const size_t i, const std::string &db_name)
     // create tx dsp control objects
     ////////////////////////////////////////////////////////////////////
     perif.deframer = tx_vita_core_3000::make(perif.ctrl, TOREG(SR_TX_CTRL));
-    perif.deframer->set_tick_rate(B250_RADIO_CLOCK_RATE);
     perif.duc = tx_dsp_core_3000::make(perif.ctrl, TOREG(SR_TX_DSP));
     perif.duc->set_link_rate(10e9/8); //whatever
-    perif.duc->set_tick_rate(B250_RADIO_CLOCK_RATE);
-
+    _tree->access<double>(mb_path / "tick_rate")
+        .subscribe(boost::bind(&tx_vita_core_3000::set_tick_rate, perif.deframer, _1))
+        .subscribe(boost::bind(&tx_dsp_core_3000::set_tick_rate, perif.duc, _1));
     const fs_path tx_dsp_path = mb_path / "tx_dsps" / str(boost::format("%u") % dspno);
     _tree->create<meta_range_t>(tx_dsp_path / "rate" / "range")
         .publish(boost::bind(&tx_dsp_core_3000::get_host_rates, perif.duc));
@@ -477,8 +477,8 @@ void b250_impl::setup_radio(const size_t i, const std::string &db_name)
     time64_rb_bases.rb_now = RB64_TIME_NOW;
     time64_rb_bases.rb_pps = RB64_TIME_PPS;
     perif.time64 = time_core_3000::make(perif.ctrl, TOREG(SR_TIME), time64_rb_bases);
-    perif.time64->set_tick_rate(B250_RADIO_CLOCK_RATE);
-    perif.time64->self_test();
+    _tree->access<double>(mb_path / "tick_rate")
+        .subscribe(boost::bind(&b250_impl::set_tick_rate, this, _1));
 
     ////////////////////////////////////////////////////////////////////
     // create RF frontend interfacing
@@ -584,6 +584,15 @@ boost::uint32_t b250_impl::allocate_sid(const sid_config_t &config)
         << "done router config for sid 0x" << sid
         << std::dec << std::endl;
     return sid;
+}
+
+void b250_impl::set_tick_rate(const double rate)
+{
+    BOOST_FOREACH(radio_perifs_t &perif, _radio_perifs)
+    {
+        perif.time64->set_tick_rate(rate);
+        perif.time64->self_test();
+    }
 }
 
 void b250_impl::register_loopback_self_test(wb_iface::sptr iface)

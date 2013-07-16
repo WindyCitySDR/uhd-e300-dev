@@ -46,7 +46,7 @@
 
 static const size_t B250_TX_FC_PKT_WINDOW = 2048; //16MB/8Kpkts
 static const std::string B250_FW_FILE_NAME = "usrp_b250_fw.bin";
-static const double B250_RADIO_CLOCK_RATE = 120e6;
+static const double B250_DEFAULT_TICK_RATE = 120e6;
 static const double B250_BUS_CLOCK_RATE = 175000000;
 static const bool B250_ENABLE_RX_FC = false;
 
@@ -164,6 +164,7 @@ struct b250_impl : public uhd::device
     void update_rx_subdev_spec(const uhd::usrp::subdev_spec_t &spec);
     void update_tx_subdev_spec(const uhd::usrp::subdev_spec_t &spec);
 
+    void set_tick_rate(const double);
     void update_tick_rate(const double);
     void update_rx_samp_rate(const size_t, const double);
     void update_tx_samp_rate(const size_t, const double);
