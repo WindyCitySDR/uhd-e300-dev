@@ -233,7 +233,8 @@ b250_impl::b250_impl(const uhd::device_addr_t &dev_addr)
     // create clock control objects
     ////////////////////////////////////////////////////////////////////
     UHD_HERE();
-    _clock = b250_clock_ctrl::make(_zpu_spi, 1/*slaveno*/, B250_RADIO_CLOCK_RATE);
+    _clock = b250_clock_ctrl::make(_zpu_spi, 1/*slaveno*/,
+        dev_addr.cast<double>("master_clock_rate", B250_RADIO_CLOCK_RATE));
     _tree->create<double>(mb_path / "tick_rate")
         .publish(boost::bind(&b250_clock_ctrl::get_master_clock_rate, _clock));
 
