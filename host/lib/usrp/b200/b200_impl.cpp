@@ -107,11 +107,6 @@ static device_addrs_t b200_find(const device_addr_t &hint)
         found++;
     }
 
-    //get descriptors again with serial number, but using the initialized VID/PID now since we have firmware
-    const bool init = hint.has_key("vid") and hint.has_key("pid");
-    if (init) pid = INIT_PRODUCT_ID;
-    //TODO sleep after fw load ?
-
     const boost::system_time timeout_time = boost::get_system_time() + REENUMERATION_TIMEOUT_MS;
 
     //search for the device until found or timeout
@@ -124,22 +119,6 @@ static device_addrs_t b200_find(const device_addr_t &hint)
             catch(const uhd::exception &){continue;} //ignore claimed
 
             b200_iface::sptr iface = b200_iface::make(control);
-            if (init)
-            {
-                UHD_HERE();
-                byte_vector_t bytes(8);
-                bytes[0] = 0x43;
-                bytes[1] = 0x59;
-                bytes[2] = 0x14;
-                bytes[3] = 0xB2;
-                bytes[4] = (B200_PRODUCT_ID & 0xff);
-                bytes[5] = (B200_PRODUCT_ID >> 8);
-                bytes[6] = (B200_VENDOR_ID & 0xff);
-                bytes[7] = (B200_VENDOR_ID >> 8);
-                iface->write_eeprom(0x0, 0x0, bytes);
-                iface->reset_fx3();
-                return b200_addrs;
-            }
             const mboard_eeprom_t mb_eeprom = mboard_eeprom_t(*iface, "B200");
 
             device_addr_t new_addr;
