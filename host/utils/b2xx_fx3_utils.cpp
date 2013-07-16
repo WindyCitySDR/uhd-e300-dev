@@ -278,6 +278,12 @@ void usrp_set_fpga_hash(libusb_device_handle *dev_handle, hash_type hash) {
 boost::int32_t load_fpga(libusb_device_handle *dev_handle,
         const std::string filestring) {
 
+    if (filestring.empty())
+    {
+        std::cerr << "load_fpga: input file is empty." << std::endl;
+        exit(-1);
+    }
+
     boost::uint8_t fx3_state = 0;
 
     const char *filename = filestring.c_str();
@@ -297,7 +303,7 @@ boost::int32_t load_fpga(libusb_device_handle *dev_handle,
 
     if(!file.good()) {
         std::cerr << "load_fpga: cannot open FPGA input file." << std::endl;
-        return ~0;
+        exit(-1);
     }
 
     do {
@@ -365,6 +371,12 @@ boost::int32_t load_fpga(libusb_device_handle *dev_handle,
 boost::int32_t fx3_load_firmware(libusb_device_handle *dev_handle, \
         std::string filestring) {
 
+    if (filestring.empty())
+    {
+        std::cerr << "fx3_load_firmware: input file is empty." << std::endl;
+        exit(-1);
+    }
+
     const char *filename = filestring.c_str();
 
     /* Fields used in each USB control transfer. */
@@ -384,6 +396,7 @@ boost::int32_t fx3_load_firmware(libusb_device_handle *dev_handle, \
     if(!file.good()) {
         std::cerr << "fx3_load_firmware: cannot open firmware input file"
             << std::endl;
+        exit(-1);
     }
 
     std::cout << "Loading firmware image: " \
@@ -607,7 +620,7 @@ boost::int32_t main(boost::int32_t argc, char *argv[]) {
         } else {
             std::cout << "Detected in-progress init of B2xx..." << std::flush;
         }
-        libusb_free_device_list(devs, 1);
+        //libusb_free_device_list(devs, 1);
         libusb_claim_interface(dev_handle, 0);
         std::cout << " Reenumeration complete, Device claimed..."
             << std::endl;
