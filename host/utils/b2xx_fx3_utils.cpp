@@ -34,6 +34,7 @@
 #include <boost/thread/thread.hpp>
 #include <boost/functional/hash.hpp>
 
+#include <uhd/config.hpp>
 
 const static boost::uint16_t FX3_VID = 0x04b4;
 const static boost::uint16_t FX3_DEFAULT_PID = 0x00f3;
