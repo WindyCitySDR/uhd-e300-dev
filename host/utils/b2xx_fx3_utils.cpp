@@ -20,7 +20,7 @@
 #include <iostream>
 #include <iomanip>
 #include <fstream>
-#include <libusb-1.0/libusb.h>
+#include <libusb.h>
 #include <sstream>
 #include <string>
 #include <cmath>
