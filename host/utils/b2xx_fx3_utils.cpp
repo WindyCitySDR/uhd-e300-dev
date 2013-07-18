@@ -587,6 +587,7 @@ boost::int32_t main(boost::int32_t argc, char *argv[]) {
         if(dev_handle == NULL) {
             std::cerr << "Cannot open device with vid: " << vid << " and pid: "
                 << pid << std::endl;
+            return -1;
         } else { std::cout << "Uninitialized B2xx detected..." << std::flush; }
         libusb_free_device_list(devs, 1);
 
@@ -620,6 +621,7 @@ boost::int32_t main(boost::int32_t argc, char *argv[]) {
         if(dev_handle == NULL) {
             std::cerr << "Cannot open device with vid: " << vid << " and pid: "
                 << pid << std::endl;
+            return -1;
         } else {
             std::cout << "Detected in-progress init of B2xx..." << std::flush;
         }
@@ -659,6 +661,7 @@ boost::int32_t main(boost::int32_t argc, char *argv[]) {
     if(dev_handle == NULL) {
         std::cerr << "Cannot open device with vid: " << vid << " and pid: "
             << pid << std::endl;
+            return -1;
     } else { std::cout << "Reactor Core Online..." << std::flush; }
     libusb_free_device_list(devs, 1);
 
