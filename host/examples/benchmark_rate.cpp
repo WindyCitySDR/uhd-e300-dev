@@ -62,7 +62,6 @@ void benchmark_rx_rate(uhd::usrp::multi_usrp::sptr usrp, const std::string &rx_c
     uhd::time_spec_t last_time;
     const double rate = usrp->get_rx_rate();
 
-    issue_new_stream_cmd:
     uhd::stream_cmd_t cmd(uhd::stream_cmd_t::STREAM_MODE_START_CONTINUOUS);
     cmd.time_spec = usrp->get_time_now() + uhd::time_spec_t(0.05);
     cmd.stream_now = (buffs.size() == 1);
@@ -83,11 +82,6 @@ void benchmark_rx_rate(uhd::usrp::multi_usrp::sptr usrp, const std::string &rx_c
             had_an_overflow = true;
             last_time = md.time_spec;
             num_overflows++;
-            if (rx_stream->get_num_channels() > 1)
-            {
-                rx_stream->issue_stream_cmd(uhd::stream_cmd_t::STREAM_MODE_STOP_CONTINUOUS);
-                goto issue_new_stream_cmd;
-            }
             break;
 
         default:
