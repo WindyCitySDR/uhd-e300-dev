@@ -50,6 +50,10 @@ static const size_t DEFAULT_XFER_SIZE = 32*512; //bytes
         str(boost::format("LIBUSB_ERROR_CODE %d") % code)
 #endif
 
+//! type for sharing the release queue with managed buffers
+class libusb_zero_copy_mb;
+typedef boost::shared_ptr<bounded_buffer<libusb_zero_copy_mb *> > mb_queue_sptr;
+
 /*!
  * The libusb docs state that status and actual length can only be read in the callback.
  * Therefore, this struct is intended to store data seen from the callback function.
@@ -121,86 +125,46 @@ UHD_INLINE bool wait_for_completion(libusb_context *ctx, const double timeout, i
 }
 
 /***********************************************************************
- * Reusable managed receiver buffer:
+ * Reusable managed buffer:
  *  - Associated with a particular libusb transfer struct.
  *  - Submits the transfer to libusb in the release method.
  **********************************************************************/
-class libusb_zero_copy_mrb : public managed_recv_buffer
+class libusb_zero_copy_mb : public managed_buffer
 {
 public:
-    libusb_zero_copy_mrb(libusb_transfer *lut, const size_t frame_size, boost::shared_ptr<bounded_buffer<libusb_zero_copy_mrb *> > release_queue):
-        _release_queue(release_queue),
+    libusb_zero_copy_mb(libusb_transfer *lut, const size_t frame_size, mb_queue_sptr release_queue, const bool is_recv, const std::string &name):
+        _release_queue(release_queue), _is_recv(is_recv), _name(name),
         _ctx(libusb::session::get_global_session()->get_context()),
         _lut(lut), _frame_size(frame_size) { /* NOP */ }
 
     void release(void)
     {
-        _lut->length = _frame_size; //always reset length
+        _lut->length = (_is_recv)? _frame_size : size(); //always set length
         const int ret = libusb_submit_transfer(_lut);
-        if (ret != 0) throw uhd::runtime_error(
-            "usb rx submit failed: " + std::string(libusb_error_name(ret)));
+        if (ret != 0) throw uhd::runtime_error(str(boost::format(
+            "usb %s submit failed: %s") % _name % libusb_error_name(ret)));
         _release_queue->push_with_haste(this);
     }
 
-    sptr get_new(const double timeout, libusb_zero_copy_mrb **p)
+    template <typename buffer_type>
+    UHD_INLINE typename buffer_type::sptr get_new(const double timeout, libusb_zero_copy_mb **p)
     {
         if (wait_for_completion(_ctx, timeout, result.completed))
         {
-            if (result.status != LIBUSB_TRANSFER_COMPLETED) throw uhd::runtime_error(
-                str(boost::format("usb rx transfer status: %d") % int(result.status)));
+            if (result.status != LIBUSB_TRANSFER_COMPLETED) throw uhd::runtime_error(str(boost::format(
+                "usb %s transfer status: %d") % _name % int(result.status)));
             result.completed = 0; *p = NULL;
-            return make(this, _lut->buffer, result.actual_length);
+            return make(reinterpret_cast<buffer_type *>(this), _lut->buffer, (_is_recv)? result.actual_length : _frame_size);
         }
-        return managed_recv_buffer::sptr();
+        return typename buffer_type::sptr();
     }
 
     lut_result_t result;
 
 private:
-    boost::shared_ptr<bounded_buffer<libusb_zero_copy_mrb *> > _release_queue;
-    libusb_context *_ctx;
-    libusb_transfer *_lut;
-    const size_t _frame_size;
-};
-
-/***********************************************************************
- * Reusable managed send buffer:
- *  - Associated with a particular libusb transfer struct.
- *  - Submits the transfer to libusb in the commit method.
- **********************************************************************/
-class libusb_zero_copy_msb : public managed_send_buffer
-{
-public:
-    libusb_zero_copy_msb(libusb_transfer *lut, const size_t frame_size, boost::shared_ptr<bounded_buffer<libusb_zero_copy_msb *> > release_queue):
-        _release_queue(release_queue),
-        _ctx(libusb::session::get_global_session()->get_context()),
-        _lut(lut), _frame_size(frame_size) { /* NOP */ }
-
-    void release(void)
-    {
-        _lut->length = size();
-        const int ret = libusb_submit_transfer(_lut);
-        if (ret != 0) throw uhd::runtime_error(
-            "usb tx submit failed: " + std::string(libusb_error_name(ret)));
-        _release_queue->push_with_haste(this);
-    }
-
-    sptr get_new(const double timeout, libusb_zero_copy_msb **p)
-    {
-        if (wait_for_completion(_ctx, timeout, result.completed))
-        {
-            if (result.status != LIBUSB_TRANSFER_COMPLETED) throw uhd::runtime_error(
-                str(boost::format("usb tx transfer status: %d") % int(result.status)));
-            result.completed = 0; *p = NULL;
-            return make(this, _lut->buffer, _frame_size);
-        }
-        return managed_send_buffer::sptr();
-    }
-
-    lut_result_t result;
-
-private:
-    boost::shared_ptr<bounded_buffer<libusb_zero_copy_msb *> > _release_queue;
+    mb_queue_sptr _release_queue;
+    const bool _is_recv;
+    const std::string _name;
     libusb_context *_ctx;
     libusb_transfer *_lut;
     const size_t _frame_size;
@@ -209,41 +173,34 @@ private:
 /***********************************************************************
  * USB zero_copy device class
  **********************************************************************/
-class libusb_zero_copy_impl : public usb_zero_copy
+class libusb_zero_copy_single
 {
 public:
-
-    libusb_zero_copy_impl(
+    libusb_zero_copy_single(
         libusb::device_handle::sptr handle,
-        const size_t recv_interface,
-        const size_t recv_endpoint,
-        const size_t send_interface,
-        const size_t send_endpoint,
-        const device_addr_t &hints
+        const size_t interface, const size_t endpoint,
+        const size_t num_frames, const size_t frame_size
     ):
         _handle(handle),
-        _recv_frame_size(size_t(hints.cast<double>("recv_frame_size", DEFAULT_XFER_SIZE))),
-        _num_recv_frames(size_t(hints.cast<double>("num_recv_frames", DEFAULT_NUM_XFERS))),
-        _send_frame_size(size_t(hints.cast<double>("send_frame_size", DEFAULT_XFER_SIZE))),
-        _num_send_frames(size_t(hints.cast<double>("num_send_frames", DEFAULT_NUM_XFERS))),
-        _recv_buffer_pool(buffer_pool::make(_num_recv_frames, _recv_frame_size)),
-        _send_buffer_pool(buffer_pool::make(_num_send_frames, _send_frame_size)),
-        _mrb_released(new bounded_buffer<libusb_zero_copy_mrb *>(_num_recv_frames)),
-        _msb_released(new bounded_buffer<libusb_zero_copy_msb *>(_num_send_frames)),
-        _front_mrb(NULL), _front_msb(NULL)
+        _num_frames(num_frames),
+        _frame_size(frame_size),
+        _buffer_pool(buffer_pool::make(_num_frames, _frame_size)),
+        _mb_released(new bounded_buffer<libusb_zero_copy_mb *>(_num_frames)),
+        _front_mb(NULL)
     {
-        _handle->claim_interface(recv_interface);
-        _handle->claim_interface(send_interface);
+        const bool is_recv = (endpoint & 0x80) != 0;
+        const std::string name = str(boost::format("%s%d") % ((is_recv)? "rx" : "tx") % int(endpoint & 0x7f));
+        _handle->claim_interface(interface);
 
         //flush the buffers out of the recv endpoint
         //limit the flushing to at most one second
-        for (size_t i = 0; i < 100; i++)
+        if (is_recv) for (size_t i = 0; i < 100; i++)
         {
             unsigned char buff[512];
             int transfered = 0;
             const int status = libusb_bulk_transfer(
                 _handle->get(), // dev_handle
-                (recv_endpoint & 0x7f) | 0x80, // endpoint
+                endpoint, // endpoint
                 static_cast<unsigned char *>(buff),
                 sizeof(buff),
                 &transfered, //bytes xfered
@@ -252,70 +209,44 @@ public:
             if (status == LIBUSB_ERROR_TIMEOUT) break;
         }
 
-        //allocate libusb transfer structs and managed receive buffers
-        for (size_t i = 0; i < get_num_recv_frames(); i++)
+        //allocate libusb transfer structs and managed buffers
+        for (size_t i = 0; i < get_num_frames(); i++)
         {
             libusb_transfer *lut = libusb_alloc_transfer(0);
             UHD_ASSERT_THROW(lut != NULL);
 
-            _mrb_pool.push_back(boost::make_shared<libusb_zero_copy_mrb>(
-                lut, this->get_recv_frame_size(), _mrb_released
+            _mb_pool.push_back(boost::make_shared<libusb_zero_copy_mb>(
+                lut, this->get_frame_size(), _mb_released, is_recv, name
             ));
 
             libusb_fill_bulk_transfer(
                 lut,                                                    // transfer
                 _handle->get(),                                         // dev_handle
-                (recv_endpoint & 0x7f) | 0x80,                          // endpoint
-                static_cast<unsigned char *>(_recv_buffer_pool->at(i)), // buffer
-                this->get_recv_frame_size(),                            // length
+                endpoint,                                               // endpoint
+                static_cast<unsigned char *>(_buffer_pool->at(i)),      // buffer
+                this->get_frame_size(),                                 // length
                 libusb_transfer_cb_fn(&libusb_async_cb),                // callback
-                static_cast<void *>(&_mrb_pool.back()->result),         // user_data
+                static_cast<void *>(&_mb_pool.back()->result),          // user_data
                 0                                                       // timeout (ms)
             );
 
             _all_luts.push_back(lut);
         }
 
-        //allocate libusb transfer structs and managed send buffers
-        for (size_t i = 0; i < get_num_send_frames(); i++)
+        //initial release for all buffers
+        for (size_t i = 0; i < get_num_frames(); i++)
         {
-            libusb_transfer *lut = libusb_alloc_transfer(0);
-            UHD_ASSERT_THROW(lut != NULL);
-
-            _msb_pool.push_back(boost::make_shared<libusb_zero_copy_msb>(
-                lut, this->get_send_frame_size(), _msb_released
-            ));
-
-            libusb_fill_bulk_transfer(
-                lut,                                                    // transfer
-                _handle->get(),                                         // dev_handle
-                (send_endpoint & 0x7f) | 0x00,                          // endpoint
-                static_cast<unsigned char *>(_send_buffer_pool->at(i)), // buffer
-                this->get_send_frame_size(),                            // length
-                libusb_transfer_cb_fn(&libusb_async_cb),                // callback
-                static_cast<void *>(&_msb_pool.back()->result),         // user_data
-                0                                                       // timeout
-            );
-
-            _all_luts.push_back(lut);
-        }
-
-        //initial release for all recv buffers
-        for (size_t i = 0; i < get_num_recv_frames(); i++)
-        {
-            _mrb_pool[i]->release();
-        }
-
-        //initial fake complete for all send buffers
-        for (size_t i = 0; i < get_num_send_frames(); i++)
-        {
-            libusb_zero_copy_msb &msb = *(_msb_pool[i]);
-            msb.result.completed = 1;
-            _msb_released->push_with_haste(&msb);
+            libusb_zero_copy_mb &mb = *(_mb_pool[i]);
+            if (is_recv) mb.release();
+            else
+            {
+                mb.result.completed = 1;
+                _mb_released->push_with_haste(&mb);
+            }
         }
     }
 
-    ~libusb_zero_copy_impl(void)
+    ~libusb_zero_copy_single(void)
     {
         libusb_context *ctx = libusb::session::get_global_session()->get_context();
 
@@ -336,49 +267,74 @@ public:
         }
     }
 
+    template <typename buffer_type>
+    UHD_INLINE typename buffer_type::sptr get_buff(double timeout)
+    {
+        if (_front_mb == NULL) _mb_released->pop_with_timed_wait(_front_mb, timeout);
+        if (_front_mb == NULL) return typename buffer_type::sptr();
+        return _front_mb->get_new<buffer_type>(timeout, &_front_mb);
+    }
+
+    UHD_INLINE size_t get_num_frames(void) const { return _num_frames; }
+    UHD_INLINE size_t get_frame_size(void) const { return _frame_size; }
+
+private:
+    libusb::device_handle::sptr _handle;
+    const size_t _num_frames, _frame_size;
+
+    //! Storage for transfer related objects
+    buffer_pool::sptr _buffer_pool;
+    std::vector<boost::shared_ptr<libusb_zero_copy_mb> > _mb_pool;
+    mb_queue_sptr _mb_released;
+    libusb_zero_copy_mb *_front_mb;
+
+    //! a list of all transfer structs we allocated
+    std::list<libusb_transfer *> _all_luts;
+};
+
+/***********************************************************************
+ * USB zero_copy device class
+ **********************************************************************/
+struct libusb_zero_copy_impl : usb_zero_copy
+{
+    libusb_zero_copy_impl(
+        libusb::device_handle::sptr handle,
+        const size_t recv_interface,
+        const size_t recv_endpoint,
+        const size_t send_interface,
+        const size_t send_endpoint,
+        const device_addr_t &hints
+    ){
+        _recv_impl.reset(new libusb_zero_copy_single(
+            handle, recv_interface, (recv_endpoint & 0x7f) | 0x80,
+            size_t(hints.cast<double>("num_recv_frames", DEFAULT_NUM_XFERS)),
+            size_t(hints.cast<double>("recv_frame_size", DEFAULT_XFER_SIZE))));
+        _send_impl.reset(new libusb_zero_copy_single(
+            handle, send_interface, (send_endpoint & 0x7f) | 0x00,
+            size_t(hints.cast<double>("num_send_frames", DEFAULT_NUM_XFERS)),
+            size_t(hints.cast<double>("send_frame_size", DEFAULT_XFER_SIZE))));
+    }
+
     managed_recv_buffer::sptr get_recv_buff(double timeout)
     {
         boost::mutex::scoped_lock l(_recv_mutex);
-        if (_front_mrb == NULL) _mrb_released->pop_with_timed_wait(_front_mrb, timeout);
-        if (_front_mrb == NULL) return managed_recv_buffer::sptr();
-        return _front_mrb->get_new(timeout, &_front_mrb);
+        return _recv_impl->get_buff<managed_recv_buffer>(timeout);
     }
 
     managed_send_buffer::sptr get_send_buff(double timeout)
     {
         boost::mutex::scoped_lock l(_send_mutex);
-        if (_front_msb == NULL) _msb_released->pop_with_timed_wait(_front_msb, timeout);
-        if (_front_msb == NULL) return managed_send_buffer::sptr();
-        return _front_msb->get_new(timeout, &_front_msb);
+        return _send_impl->get_buff<managed_send_buffer>(timeout);
     }
 
-    size_t get_num_recv_frames(void) const { return _num_recv_frames; }
-    size_t get_num_send_frames(void) const { return _num_send_frames; }
+    size_t get_num_recv_frames(void) const { return _recv_impl->get_num_frames(); }
+    size_t get_num_send_frames(void) const { return _send_impl->get_num_frames(); }
 
-    size_t get_recv_frame_size(void) const { return _recv_frame_size; }
-    size_t get_send_frame_size(void) const { return _send_frame_size; }
+    size_t get_recv_frame_size(void) const { return _recv_impl->get_frame_size(); }
+    size_t get_send_frame_size(void) const { return _send_impl->get_frame_size(); }
 
-private:
-    libusb::device_handle::sptr _handle;
-    const size_t _recv_frame_size, _num_recv_frames;
-    const size_t _send_frame_size, _num_send_frames;
-
+    boost::shared_ptr<libusb_zero_copy_single> _recv_impl, _send_impl;
     boost::mutex _recv_mutex, _send_mutex;
-
-    //! Storage for transfer related objects
-    buffer_pool::sptr _recv_buffer_pool, _send_buffer_pool;
-    std::vector<boost::shared_ptr<libusb_zero_copy_mrb> > _mrb_pool;
-    std::vector<boost::shared_ptr<libusb_zero_copy_msb> > _msb_pool;
-
-    //! Queues to track released buffers
-    boost::shared_ptr<bounded_buffer<libusb_zero_copy_mrb *> > _mrb_released;
-    boost::shared_ptr<bounded_buffer<libusb_zero_copy_msb *> > _msb_released;
-
-    libusb_zero_copy_mrb *_front_mrb;
-    libusb_zero_copy_msb *_front_msb;
-
-    //! a list of all transfer structs we allocated
-    std::list<libusb_transfer *> _all_luts;
 };
 
 /***********************************************************************
