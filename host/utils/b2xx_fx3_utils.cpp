@@ -516,8 +516,10 @@ boost::int32_t main(boost::int32_t argc, char *argv[]) {
         /* Okay, first, we need to discover what the path is to the ehci and
          * xhci device files. */
         std::set<fs::path> path_list;
+        path_list.insert("/sys/bus/pci/drivers/xhci-pci/");
         path_list.insert("/sys/bus/pci/drivers/ehci-pci/");
         path_list.insert("/sys/bus/pci/drivers/xhci_hcd/");
+        path_list.insert("/sys/bus/pci/drivers/ehci_hcd/");
 
         /* Check each of the possible paths above to find which ones this system
          * uses. */
