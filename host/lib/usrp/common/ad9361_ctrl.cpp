@@ -18,8 +18,10 @@
 #include "ad9361_ctrl.hpp"
 #include "ad9361_transaction.h"
 #include <uhd/exception.hpp>
+#include <uhd/types/ranges.hpp>
 #include <uhd/utils/msg.hpp>
 #include <boost/thread/mutex.hpp>
+#include <boost/format.hpp>
 #include <cstring>
 
 using namespace uhd;
@@ -55,9 +57,19 @@ struct ad9361_ctrl_impl : public ad9361_ctrl
     //! set a new clock rate, return the exact value
     double set_clock_rate(const double rate)
     {
+        //warning for known trouble rates
+        if (rate > 56e6) UHD_MSG(warning) << boost::format(
+            "The requested clock rate %f MHz may cause slow configuration.\n"
+            "The driver recommends a master clock rate less than %f MHz.\n"
+        ) % (rate/1e6) % 56.0 << std::endl;
+
+        //clip to known bounds
+        const meta_range_t clock_rate_range(250e3, 61.44e6);
+        const double clipped_rate = clock_rate_range.clip(rate);
+
         ad9361_transaction_t request;
         request.action = AD9361_ACTION_SET_CLOCK_RATE;
-        ad9361_double_pack(rate, request.value.rate);
+        ad9361_double_pack(clipped_rate, request.value.rate);
         const ad9361_transaction_t reply = this->do_transaction(request);
         return ad9361_double_unpack(reply.value.rate);
     }
@@ -78,14 +90,18 @@ struct ad9361_ctrl_impl : public ad9361_ctrl
     }
 
     //! tune the given frontend, return the exact value
-    double tune(const std::string &which, const double raw_value)
+    double tune(const std::string &which, const double freq)
     {
+        //clip to known bounds
+        const meta_range_t freq_range(50e6, 6e9);
+        const double clipped_freq = freq_range.clip(freq);
+
         ad9361_transaction_t request;
 
         if (which[0] == 'R') request.action = AD9361_ACTION_SET_RX_FREQ;
         if (which[0] == 'T') request.action = AD9361_ACTION_SET_TX_FREQ;
 
-        const double value = ad9361_ctrl::get_rf_freq_range().clip(raw_value);
+        const double value = ad9361_ctrl::get_rf_freq_range().clip(clipped_freq);
         ad9361_double_pack(value, request.value.freq);
         const ad9361_transaction_t reply = this->do_transaction(request);
         return ad9361_double_unpack(reply.value.freq);
