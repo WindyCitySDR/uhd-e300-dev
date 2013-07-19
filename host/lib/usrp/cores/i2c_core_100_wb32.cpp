@@ -119,6 +119,14 @@ public:
         return bytes;
     }
 
+    //override read_eeprom so we can write once, read all N bytes
+    //the default implementation calls read i2c once per byte
+    byte_vector_t read_eeprom(boost::uint8_t addr, boost::uint8_t offset, size_t num_bytes)
+    {
+        this->write_i2c(addr, byte_vector_t(1, offset));
+        return this->read_i2c(addr, num_bytes);
+    }
+
 private:
     void i2c_wait(void) {
         for (size_t i = 0; i < 10; i++)

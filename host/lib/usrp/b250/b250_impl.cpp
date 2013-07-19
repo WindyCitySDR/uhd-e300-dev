@@ -195,6 +195,7 @@ b250_impl::b250_impl(const uhd::device_addr_t &dev_addr)
     const std::vector<std::string> DB_NAMES = boost::assign::list_of("A")("B");
 
     //create basic communication
+    UHD_MSG(status) << "X300 setup basic communication..." << std::endl;
     _zpu_ctrl.reset(new b250_ctrl_iface(udp_simple::make_connected(_addr, BOOST_STRINGIZE(B250_FW_COMMS_UDP_PORT))));
     _zpu_spi = spi_core_3000::make(_zpu_ctrl, SR_ADDR(SET0_BASE, ZPU_SR_SPI), SR_ADDR(SET0_BASE, ZPU_RB_SPI));
     _zpu_i2c = i2c_core_100_wb32::make(_zpu_ctrl, I2C1_BASE);
@@ -213,6 +214,7 @@ b250_impl::b250_impl(const uhd::device_addr_t &dev_addr)
     ////////////////////////////////////////////////////////////////////
     // setup the mboard eeprom
     ////////////////////////////////////////////////////////////////////
+    UHD_MSG(status) << "X300 loading values from EEPROM..." << std::endl;
     // TODO
 //    const mboard_eeprom_t mb_eeprom(*_iface, mboard_eeprom_t::MAP_B100);
     mboard_eeprom_t mb_eeprom;
@@ -226,13 +228,14 @@ b250_impl::b250_impl(const uhd::device_addr_t &dev_addr)
     ////////////////////////////////////////////////////////////////////
     for (size_t i = 0; i < 8; i++)
     {
+        if (i == 0 or i == 2) continue; //not used
         _db_eeproms[i].load(*_zpu_i2c, 0x50 | i);
     }
 
     ////////////////////////////////////////////////////////////////////
     // create clock control objects
     ////////////////////////////////////////////////////////////////////
-    UHD_HERE();
+    UHD_MSG(status) << "X300 setup RF frontend clocking..." << std::endl;
     _clock = b250_clock_ctrl::make(_zpu_spi, 1/*slaveno*/,
         dev_addr.cast<double>("master_clock_rate", B250_DEFAULT_TICK_RATE));
     _tree->create<double>(mb_path / "tick_rate")
