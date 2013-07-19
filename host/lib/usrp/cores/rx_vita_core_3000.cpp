@@ -132,6 +132,11 @@ struct rx_vita_core_3000_impl : rx_vita_core_3000
         _is_setup = true;
     }
 
+    bool in_continuous_streaming_mode(void)
+    {
+        return _continuous_streaming;
+    }
+
     wb_iface::sptr _iface;
     const size_t _base;
     double _tick_rate;
