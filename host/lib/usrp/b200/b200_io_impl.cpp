@@ -264,7 +264,7 @@ rx_streamer::sptr b200_impl::get_rx_stream(const uhd::stream_args_t &args_)
             &recv_packet_demuxer_3000::get_recv_buff, _demux, sid, _1
         ), true /*flush*/);
         my_streamer->set_overflow_handler(stream_i, boost::bind(
-            &rx_vita_core_3000::handle_overflow, perif.framer
+            &b200_impl::handle_overflow, this, chan
         ));
         my_streamer->set_issue_stream_cmd(stream_i, boost::bind(
             &rx_vita_core_3000::issue_stream_command, perif.framer, _1
@@ -278,6 +278,28 @@ rx_streamer::sptr b200_impl::get_rx_stream(const uhd::stream_args_t &args_)
     this->update_enables();
 
     return my_streamer;
+}
+
+void b200_impl::handle_overflow(const size_t i)
+{
+    boost::shared_ptr<sph::recv_packet_streamer> my_streamer =
+            boost::dynamic_pointer_cast<sph::recv_packet_streamer>(_radio_perifs[i].rx_streamer.lock());
+    if (my_streamer->get_num_channels() == 2) //MIMO time
+    {
+        //stop streaming
+        my_streamer->issue_stream_cmd(stream_cmd_t::STREAM_MODE_STOP_CONTINUOUS);
+        //flush demux
+        _demux->realloc_sid(B200_RX_DATA0_SID);
+        _demux->realloc_sid(B200_RX_DATA1_SID);
+        //flush actual transport
+        while (_data_transport->get_recv_buff(0.001)){}
+        //restart streaming
+        stream_cmd_t stream_cmd(stream_cmd_t::STREAM_MODE_START_CONTINUOUS);
+        stream_cmd.stream_now = false;
+        stream_cmd.time_spec = _radio_perifs[i].time64->get_time_now() + time_spec_t(0.05);
+        my_streamer->issue_stream_cmd(stream_cmd);
+    }
+    else _radio_perifs[i].framer->handle_overflow();
 }
 
 /***********************************************************************

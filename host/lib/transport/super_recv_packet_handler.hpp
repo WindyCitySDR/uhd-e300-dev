@@ -186,29 +186,6 @@ public:
         {
             if (_props[i].issue_stream_cmd) _props[i].issue_stream_cmd(stream_cmd);
         }
-        _continuous_streaming = stream_cmd.stream_mode == uhd::stream_cmd_t::STREAM_MODE_START_CONTINUOUS;
-    }
-
-    UHD_INLINE void overflow_recovery(const size_t i/*fail chan*/, const uhd::time_spec_t &time_spec)
-    {
-        //step 0) special case, time alignment doesnt matter
-        if (_props.size() == 1)
-        {
-            _props[i].handle_overflow();
-            return;
-        }
-        if (not _continuous_streaming) return;
-        //step 1) stop all other channels (channel i is stopped)
-        for (size_t j = 0; j < _props.size(); j++)
-        {
-            if (j == i) continue;
-            _props[j].issue_stream_cmd(uhd::stream_cmd_t::STREAM_MODE_STOP_CONTINUOUS);
-        }
-        //step 2) start all channels at a new time in the future
-        uhd::stream_cmd_t stream_cmd(uhd::stream_cmd_t::STREAM_MODE_START_CONTINUOUS);
-        stream_cmd.stream_now = false;
-        stream_cmd.time_spec = time_spec + uhd::time_spec_t(0.1/*reasonable*/);
-        this->issue_stream_cmd(stream_cmd);
     }
 
     /*******************************************************************
@@ -266,7 +243,6 @@ private:
     bool _queue_error_for_next_call;
     size_t _alignment_faulure_threshold;
     rx_metadata_t _queue_metadata;
-    bool _continuous_streaming;
     struct xport_chan_props_type{
         xport_chan_props_type(void):
             packet_count(0),
@@ -499,7 +475,7 @@ private:
                 curr_info.metadata.end_of_burst = false;
                 curr_info.metadata.error_code = rx_metadata_t::error_code_t(get_context_code(next_info[index].vrt_hdr, next_info[index].ifpi));
                 if (curr_info.metadata.error_code == rx_metadata_t::ERROR_CODE_OVERFLOW){
-                    this->overflow_recovery(index, curr_info.metadata.time_spec);
+                    _props[index].handle_overflow();
                     UHD_MSG(fastpath) << "O";
                 }
                 return;
@@ -546,6 +522,7 @@ private:
                 curr_info.metadata.start_of_burst = false;
                 curr_info.metadata.end_of_burst = false;
                 curr_info.metadata.error_code = rx_metadata_t::ERROR_CODE_ALIGNMENT;
+                _props[index].handle_overflow();
                 return;
             }
 

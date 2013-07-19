@@ -161,6 +161,7 @@ struct b200_impl : public uhd::device
     };
     std::vector<radio_perifs_t> _radio_perifs;
     void setup_radio(const size_t which_radio);
+    void handle_overflow(const size_t index);
 
     struct gpio_state {
         boost::uint32_t  tx_bandsel_a, tx_bandsel_b, rx_bandsel_a, rx_bandsel_b, rx_bandsel_c, codec_arst, mimo, ref_sel;
