@@ -23,8 +23,12 @@
 #include <uhd/exception.hpp>
 #include <boost/foreach.hpp>
 #include <boost/format.hpp>
+#include <boost/function.hpp>
+#include <boost/bind.hpp>
 #include <boost/make_shared.hpp>
+#include <boost/circular_buffer.hpp>
 #include <boost/thread/mutex.hpp>
+#include <boost/thread/condition_variable.hpp>
 #include <list>
 
 using namespace uhd;
@@ -132,28 +136,29 @@ UHD_INLINE bool wait_for_completion(libusb_context *ctx, const double timeout, i
 class libusb_zero_copy_mb : public managed_buffer
 {
 public:
-    libusb_zero_copy_mb(libusb_transfer *lut, const size_t frame_size, mb_queue_sptr release_queue, const bool is_recv, const std::string &name):
-        _release_queue(release_queue), _is_recv(is_recv), _name(name),
+    libusb_zero_copy_mb(libusb_transfer *lut, const size_t frame_size, boost::function<void(libusb_zero_copy_mb *)> release_cb, const bool is_recv, const std::string &name):
+        _release_cb(release_cb), _is_recv(is_recv), _name(name),
         _ctx(libusb::session::get_global_session()->get_context()),
         _lut(lut), _frame_size(frame_size) { /* NOP */ }
 
-    void release(void)
+    void release(void){_release_cb(this);}
+
+    UHD_INLINE void submit(void)
     {
         _lut->length = (_is_recv)? _frame_size : size(); //always set length
         const int ret = libusb_submit_transfer(_lut);
         if (ret != 0) throw uhd::runtime_error(str(boost::format(
             "usb %s submit failed: %s") % _name % libusb_error_name(ret)));
-        _release_queue->push_with_haste(this);
     }
 
     template <typename buffer_type>
-    UHD_INLINE typename buffer_type::sptr get_new(const double timeout, libusb_zero_copy_mb **p)
+    UHD_INLINE typename buffer_type::sptr get_new(const double timeout)
     {
         if (wait_for_completion(_ctx, timeout, result.completed))
         {
             if (result.status != LIBUSB_TRANSFER_COMPLETED) throw uhd::runtime_error(str(boost::format(
                 "usb %s transfer status: %d") % _name % int(result.status)));
-            result.completed = 0; *p = NULL;
+            result.completed = 0;
             return make(reinterpret_cast<buffer_type *>(this), _lut->buffer, (_is_recv)? result.actual_length : _frame_size);
         }
         return typename buffer_type::sptr();
@@ -162,7 +167,7 @@ public:
     lut_result_t result;
 
 private:
-    mb_queue_sptr _release_queue;
+    boost::function<void(libusb_zero_copy_mb *)> _release_cb;
     const bool _is_recv;
     const std::string _name;
     libusb_context *_ctx;
@@ -185,8 +190,7 @@ public:
         _num_frames(num_frames),
         _frame_size(frame_size),
         _buffer_pool(buffer_pool::make(_num_frames, _frame_size)),
-        _mb_released(new bounded_buffer<libusb_zero_copy_mb *>(_num_frames)),
-        _front_mb(NULL)
+        _enqueued(_num_frames), _released(_num_frames)
     {
         const bool is_recv = (endpoint & 0x80) != 0;
         const std::string name = str(boost::format("%s%d") % ((is_recv)? "rx" : "tx") % int(endpoint & 0x7f));
@@ -216,7 +220,7 @@ public:
             UHD_ASSERT_THROW(lut != NULL);
 
             _mb_pool.push_back(boost::make_shared<libusb_zero_copy_mb>(
-                lut, this->get_frame_size(), _mb_released, is_recv, name
+                lut, this->get_frame_size(), boost::bind(&libusb_zero_copy_single::enqueue_damn_buffer, this, _1), is_recv, name
             ));
 
             libusb_fill_bulk_transfer(
@@ -241,7 +245,7 @@ public:
             else
             {
                 mb.result.completed = 1;
-                _mb_released->push_with_haste(&mb);
+                _enqueued.push_back(&mb);
             }
         }
     }
@@ -270,9 +274,24 @@ public:
     template <typename buffer_type>
     UHD_INLINE typename buffer_type::sptr get_buff(double timeout)
     {
-        if (_front_mb == NULL) _mb_released->pop_with_timed_wait(_front_mb, timeout);
-        if (_front_mb == NULL) return typename buffer_type::sptr();
-        return _front_mb->get_new<buffer_type>(timeout, &_front_mb);
+        typename buffer_type::sptr buff;
+        libusb_zero_copy_mb *front = NULL;
+        {
+            boost::mutex::scoped_lock l(_mutex);
+            if (_enqueued.empty())
+            {
+                _cond.timed_wait(l, boost::posix_time::microseconds(long(timeout*1e6)));
+            }
+            if (_enqueued.empty()) return buff;
+            front = _enqueued.front();
+        }
+
+        buff = front->get_new<buffer_type>(timeout);
+
+        boost::mutex::scoped_lock l(_mutex);
+        if (buff) _enqueued.pop_front();
+        this->submit_what_we_can();
+        return buff;
     }
 
     UHD_INLINE size_t get_num_frames(void) const { return _num_frames; }
@@ -285,8 +304,31 @@ private:
     //! Storage for transfer related objects
     buffer_pool::sptr _buffer_pool;
     std::vector<boost::shared_ptr<libusb_zero_copy_mb> > _mb_pool;
-    mb_queue_sptr _mb_released;
-    libusb_zero_copy_mb *_front_mb;
+
+    boost::mutex _mutex;
+    boost::condition_variable _cond;
+
+    //! why 2 queues? there is room in the future to have > N buffers but only N in flight
+    boost::circular_buffer<libusb_zero_copy_mb *> _enqueued, _released;
+
+    void enqueue_damn_buffer(libusb_zero_copy_mb *mb)
+    {
+        boost::mutex::scoped_lock l(_mutex);
+        _released.push_back(mb);
+        this->submit_what_we_can();
+        l.unlock();
+        _cond.notify_one();
+    }
+
+    void submit_what_we_can(void)
+    {
+        while (not _released.empty() and not _enqueued.full())
+        {
+            _released.front()->submit();
+            _enqueued.push_back(_released.front());
+            _released.pop_front();
+        }
+    }
 
     //! a list of all transfer structs we allocated
     std::list<libusb_transfer *> _all_luts;
