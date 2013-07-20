@@ -20,6 +20,7 @@
 
 #include <uhd/property_tree.hpp>
 #include <uhd/device.hpp>
+#include <uhd/usrp/mboard_eeprom.hpp>
 #include <uhd/usrp/dboard_manager.hpp>
 #include <uhd/usrp/dboard_eeprom.hpp>
 #include <uhd/usrp/subdev_spec.hpp>
@@ -173,6 +174,7 @@ struct b250_impl : public uhd::device
     void update_time_source(const std::string &);
     uhd::sensor_value_t get_ref_locked(void);
     void set_db_eeprom(const size_t, const uhd::usrp::dboard_eeprom_t &);
+    void set_mb_eeprom(const uhd::usrp::mboard_eeprom_t &);
 };
 
 #endif /* INCLUDED_B250_IMPL_HPP */

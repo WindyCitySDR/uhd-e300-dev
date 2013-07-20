@@ -22,7 +22,6 @@
 #include <uhd/utils/images.hpp>
 #include <uhd/utils/safe_call.hpp>
 #include <uhd/usrp/subdev_spec.hpp>
-#include <uhd/usrp/mboard_eeprom.hpp>
 #include <uhd/transport/if_addrs.hpp>
 #include <boost/foreach.hpp>
 #include <boost/asio.hpp>
@@ -172,6 +171,7 @@ static void b250_load_fw(const std::string &addr, const std::string &file_name)
 
 b250_impl::b250_impl(const uhd::device_addr_t &dev_addr)
 {
+    UHD_MSG(status) << "X300 initialization sequence..." << std::endl;
     _async_md.reset(new async_md_type(1000/*messages deep*/));
     _tree = uhd::property_tree::make();
     _sid_framer = 0;
@@ -195,7 +195,7 @@ b250_impl::b250_impl(const uhd::device_addr_t &dev_addr)
     const std::vector<std::string> DB_NAMES = boost::assign::list_of("A")("B");
 
     //create basic communication
-    UHD_MSG(status) << "X300 setup basic communication..." << std::endl;
+    UHD_MSG(status) << "Setup basic communication..." << std::endl;
     _zpu_ctrl.reset(new b250_ctrl_iface(udp_simple::make_connected(_addr, BOOST_STRINGIZE(B250_FW_COMMS_UDP_PORT))));
     _zpu_spi = spi_core_3000::make(_zpu_ctrl, SR_ADDR(SET0_BASE, ZPU_SR_SPI), SR_ADDR(SET0_BASE, ZPU_RB_SPI));
     _zpu_i2c = i2c_core_100_wb32::make(_zpu_ctrl, I2C1_BASE);
@@ -204,9 +204,9 @@ b250_impl::b250_impl(const uhd::device_addr_t &dev_addr)
     ////////////////////////////////////////////////////////////////////
     // Initialize the properties tree
     ////////////////////////////////////////////////////////////////////
-    _tree->create<std::string>("/name").set("B-Series Device");
+    _tree->create<std::string>("/name").set("X-Series Device");
     const fs_path mb_path = "/mboards/0";
-    _tree->create<std::string>(mb_path / "name").set("B250");
+    _tree->create<std::string>(mb_path / "name").set("X300");
     _tree->create<std::string>(mb_path / "codename").set("Yetti");
     _tree->create<std::string>(mb_path / "fpga_version").set("1.0");
     _tree->create<std::string>(mb_path / "fw_version").set("1.0");
@@ -214,14 +214,11 @@ b250_impl::b250_impl(const uhd::device_addr_t &dev_addr)
     ////////////////////////////////////////////////////////////////////
     // setup the mboard eeprom
     ////////////////////////////////////////////////////////////////////
-    UHD_MSG(status) << "X300 loading values from EEPROM..." << std::endl;
-    // TODO
-//    const mboard_eeprom_t mb_eeprom(*_iface, mboard_eeprom_t::MAP_B100);
-    mboard_eeprom_t mb_eeprom;
-    mb_eeprom["name"] = "TODO"; //FIXME with real eeprom values
-    mb_eeprom["serial"] = "TODO"; //FIXME with real eeprom values
+    UHD_MSG(status) << "Loading values from EEPROM..." << std::endl;
+    const mboard_eeprom_t mb_eeprom(*_zpu_i2c, "X300");
     _tree->create<mboard_eeprom_t>(mb_path / "eeprom")
-        .set(mb_eeprom);
+        .set(mb_eeprom)
+        .subscribe(boost::bind(&b250_impl::set_mb_eeprom, this, _1));
 
     ////////////////////////////////////////////////////////////////////
     // read dboard eeproms
@@ -235,7 +232,7 @@ b250_impl::b250_impl(const uhd::device_addr_t &dev_addr)
     ////////////////////////////////////////////////////////////////////
     // create clock control objects
     ////////////////////////////////////////////////////////////////////
-    UHD_MSG(status) << "X300 setup RF frontend clocking..." << std::endl;
+    UHD_MSG(status) << "Setup RF frontend clocking..." << std::endl;
     _clock = b250_clock_ctrl::make(_zpu_spi, 1/*slaveno*/,
         dev_addr.cast<double>("master_clock_rate", B250_DEFAULT_TICK_RATE));
     _tree->create<double>(mb_path / "tick_rate")
@@ -285,6 +282,7 @@ b250_impl::b250_impl(const uhd::device_addr_t &dev_addr)
     ////////////////////////////////////////////////////////////////////
     // setup radios
     ////////////////////////////////////////////////////////////////////
+    UHD_MSG(status) << "Initialize Radio control..." << std::endl;
     this->setup_radio(0, DB_NAMES[0]);
     this->setup_radio(1, DB_NAMES[1]);
 
@@ -328,6 +326,7 @@ b250_impl::b250_impl(const uhd::device_addr_t &dev_addr)
     // do some post-init tasks
     ////////////////////////////////////////////////////////////////////
     _tree->access<double>(mb_path / "tick_rate") //now subscribe the clock rate setter
+        .subscribe(boost::bind(&b250_impl::set_tick_rate, this, _1))
         .subscribe(boost::bind(&b250_impl::update_tick_rate, this, _1))
         .set(_clock->get_master_clock_rate());
 
@@ -379,7 +378,6 @@ void b250_impl::setup_radio(const size_t i, const std::string &db_name)
     ////////////////////////////////////////////////////////////////////
     // radio control
     ////////////////////////////////////////////////////////////////////
-    UHD_HERE();
     sid_config_t config;
     config.router_addr_there = B250_DEVICE_THERE;
     config.dst_prefix = B250_RADIO_DEST_PREFIX_CTRL;
@@ -480,8 +478,6 @@ void b250_impl::setup_radio(const size_t i, const std::string &db_name)
     time64_rb_bases.rb_now = RB64_TIME_NOW;
     time64_rb_bases.rb_pps = RB64_TIME_PPS;
     perif.time64 = time_core_3000::make(perif.ctrl, TOREG(SR_TIME), time64_rb_bases);
-    _tree->access<double>(mb_path / "tick_rate")
-        .subscribe(boost::bind(&b250_impl::set_tick_rate, this, _1));
 
     ////////////////////////////////////////////////////////////////////
     // create RF frontend interfacing
@@ -642,4 +638,9 @@ sensor_value_t b250_impl::get_ref_locked(void)
 void b250_impl::set_db_eeprom(const size_t addr, const uhd::usrp::dboard_eeprom_t &db_eeprom)
 {
     db_eeprom.store(*_zpu_i2c, addr);
+}
+
+void b250_impl::set_mb_eeprom(const mboard_eeprom_t &mb_eeprom)
+{
+    mb_eeprom.commit(*_zpu_i2c, "X300");
 }
