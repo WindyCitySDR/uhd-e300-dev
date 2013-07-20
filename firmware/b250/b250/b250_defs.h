@@ -21,6 +21,9 @@
 #define ETH1G
 //#define ETH10G 
 
+//eeprom map for mboard addrs
+#define MBOARD_EEPROM_ADDR 0x50
+
 // Setting Regs Memeory Map
 static const int SR_LEDS       = 0;
 static const int SR_SW_RST     = 1;
