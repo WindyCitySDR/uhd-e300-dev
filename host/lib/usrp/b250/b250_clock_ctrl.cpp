@@ -92,13 +92,15 @@ struct b250_clock_ctrl_impl : b250_clock_ctrl	{
 //register 11
 
 		//register 11 sync disabled for testing
-		_lmk04816_regs.EN_SYNC = lmk04816_regs_t::EN_SYNC_SYNC_DISABLE;
-		_lmk04816_regs.NO_SYNC_CLKout0_1 = lmk04816_regs_t::NO_SYNC_CLKOUT0_1_CLOCK_XY_NOSYNC;
-		_lmk04816_regs.NO_SYNC_CLKout2_3 = lmk04816_regs_t::NO_SYNC_CLKOUT2_3_CLOCK_XY_NOSYNC;
-		_lmk04816_regs.NO_SYNC_CLKout8_9 = lmk04816_regs_t::NO_SYNC_CLKOUT8_9_CLOCK_XY_NOSYNC;
-		_lmk04816_regs.NO_SYNC_CLKout10_11 = lmk04816_regs_t::NO_SYNC_CLKOUT10_11_CLOCK_XY_NOSYNC;
-		_lmk04816_regs.SYNC_POL_INV = lmk04816_regs_t::SYNC_POL_INV_SYNC_HIGH;
-		_lmk04816_regs.SYNC_TYPE = lmk04816_regs_t::SYNC_TYPE_INPUT;
+		_lmk04816_regs.EN_SYNC = lmk04816_regs_t::EN_SYNC_SYNC_ENABLE;
+		_lmk04816_regs.NO_SYNC_CLKout0_1 = lmk04816_regs_t::NO_SYNC_CLKOUT0_1_CLOCK_XY_SYNC;
+		_lmk04816_regs.NO_SYNC_CLKout2_3 = lmk04816_regs_t::NO_SYNC_CLKOUT2_3_CLOCK_XY_SYNC;
+		_lmk04816_regs.NO_SYNC_CLKout4_5 = lmk04816_regs_t::NO_SYNC_CLKOUT4_5_CLOCK_XY_SYNC;
+		_lmk04816_regs.NO_SYNC_CLKout8_9 = lmk04816_regs_t::NO_SYNC_CLKOUT8_9_CLOCK_XY_SYNC;
+		_lmk04816_regs.NO_SYNC_CLKout10_11 = lmk04816_regs_t::NO_SYNC_CLKOUT10_11_CLOCK_XY_SYNC;
+		_lmk04816_regs.SYNC_EN_AUTO = lmk04816_regs_t::SYNC_EN_AUTO_SYNC_INT_GEN;
+		_lmk04816_regs.SYNC_POL_INV = lmk04816_regs_t::SYNC_POL_INV_SYNC_LOW;
+		_lmk04816_regs.SYNC_TYPE = lmk04816_regs_t::SYNC_TYPE_OUT_PUSH_PULL; //enable soft sync - FPGA must be input
 //register 12
 
 		//enabling LD_MUX
@@ -169,9 +171,20 @@ struct b250_clock_ctrl_impl : b250_clock_ctrl	{
                         this->write_regs(i);
                 }
 
-		//sleep(1000000);
-		
+		this->sync_clocks();
 
+	}
+
+
+	void sync_clocks(void)
+	{
+		//soft sync:
+		//put the sync IO into output mode - FPGA must be input
+		//write low, then write high - this triggers a soft sync
+		_lmk04816_regs.SYNC_POL_INV = lmk04816_regs_t::SYNC_POL_INV_SYNC_LOW;
+		this->write_regs(11);
+		_lmk04816_regs.SYNC_POL_INV = lmk04816_regs_t::SYNC_POL_INV_SYNC_HIGH;
+		this->write_regs(11);
 	}
 
 //empty destructor for testing
