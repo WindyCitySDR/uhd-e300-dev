@@ -44,8 +44,8 @@ spi_config_t::spi_config_t(edge_t edge):
 }
 
 void i2c_iface::write_eeprom(
-    boost::uint8_t addr,
-    boost::uint8_t offset,
+    boost::uint16_t addr,
+    boost::uint16_t offset,
     const byte_vector_t &bytes
 ){
     for (size_t i = 0; i < bytes.size(); i++){
@@ -57,8 +57,8 @@ void i2c_iface::write_eeprom(
 }
 
 byte_vector_t i2c_iface::read_eeprom(
-    boost::uint8_t addr,
-    boost::uint8_t offset,
+    boost::uint16_t addr,
+    boost::uint16_t offset,
     size_t num_bytes
 ){
     byte_vector_t bytes;
@@ -79,35 +79,39 @@ struct eeprom16_impl : i2c_iface
     i2c_iface* _internal;
 
     byte_vector_t read_i2c(
-        boost::uint8_t addr,
+        boost::uint16_t addr,
         size_t num_bytes
     ){
         return _internal->read_i2c(addr, num_bytes);
     }
 
     void write_i2c(
-        boost::uint8_t addr,
+        boost::uint16_t addr,
         const byte_vector_t &bytes
     ){
         return _internal->write_i2c(addr, bytes);
     }
 
-    byte_vector_t read_eeprom(boost::uint8_t addr, boost::uint8_t offset, size_t num_bytes)
-    {
-        byte_vector_t cmd = boost::assign::list_of(0)(offset);
+    byte_vector_t read_eeprom(
+        boost::uint16_t addr,
+        boost::uint16_t offset,
+        size_t num_bytes
+    ){
+        byte_vector_t cmd = boost::assign::list_of(offset >> 8)(offset & 0xff);
         this->write_i2c(addr, cmd);
         return this->read_i2c(addr, num_bytes);
     }
 
     void write_eeprom(
-        boost::uint8_t addr,
-        boost::uint8_t offset,
+        boost::uint16_t addr,
+        boost::uint16_t offset,
         const byte_vector_t &bytes
     ){
         for (size_t i = 0; i < bytes.size(); i++)
         {
             //write a byte at a time, its easy that way
-            byte_vector_t cmd = boost::assign::list_of(0)(offset+i)(bytes[i]);
+            boost::uint16_t offset_i = offset+i;
+            byte_vector_t cmd = boost::assign::list_of(offset_i >> 8)(offset_i & 0xff)(bytes[i]);
             this->write_i2c(addr, cmd);
             boost::this_thread::sleep(boost::posix_time::milliseconds(10)); //worst case write
         }
