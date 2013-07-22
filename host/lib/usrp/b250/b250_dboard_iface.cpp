@@ -53,8 +53,8 @@ public:
     void set_gpio_debug(unit_t, int);
     boost::uint16_t read_gpio(unit_t);
 
-    void write_i2c(boost::uint8_t, const byte_vector_t &);
-    byte_vector_t read_i2c(boost::uint8_t, size_t);
+    void write_i2c(boost::uint16_t, const byte_vector_t &);
+    byte_vector_t read_i2c(boost::uint16_t, size_t);
 
     void set_clock_rate(unit_t, double);
     double get_clock_rate(unit_t);
@@ -247,12 +247,12 @@ boost::uint32_t b250_dboard_iface::read_write_spi(
 /***********************************************************************
  * I2C
  **********************************************************************/
-void b250_dboard_iface::write_i2c(boost::uint8_t addr, const byte_vector_t &bytes)
+void b250_dboard_iface::write_i2c(boost::uint16_t addr, const byte_vector_t &bytes)
 {
     return _config.i2c->write_i2c(addr, bytes);
 }
 
-byte_vector_t b250_dboard_iface::read_i2c(boost::uint8_t addr, size_t num_bytes)
+byte_vector_t b250_dboard_iface::read_i2c(boost::uint16_t addr, size_t num_bytes)
 {
     return _config.i2c->read_i2c(addr, num_bytes);
 }
