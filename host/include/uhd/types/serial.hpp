@@ -46,6 +46,9 @@ namespace uhd{
     public:
         typedef boost::shared_ptr<i2c_iface> sptr;
 
+        //! Create an i2c_iface than can talk to 16 bit addressable EEPROMS
+        i2c_iface::sptr eeprom16(void);
+
         /*!
          * Write bytes over the i2c.
          * \param addr the address

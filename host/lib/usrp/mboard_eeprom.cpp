@@ -327,8 +327,8 @@ static void store_x300(const mboard_eeprom_t &mb_eeprom, i2c_iface &iface)
     );
 
     //store the ip addresses
+    byte_vector_t ip_addr_bytes(4);
     if (mb_eeprom.has_key("gateway")){
-        byte_vector_t ip_addr_bytes(4);
         byte_copy(boost::asio::ip::address_v4::from_string(mb_eeprom["gateway"]).to_bytes(), ip_addr_bytes);
         iface.write_eeprom(X300_EEPROM_ADDR, offsetof(x300_eeprom_map, gateway), ip_addr_bytes);
     }
@@ -336,13 +336,11 @@ static void store_x300(const mboard_eeprom_t &mb_eeprom, i2c_iface &iface)
     {
         const std::string n(1, i+'0');
         if (mb_eeprom.has_key("ip-addr"+n)){
-            byte_vector_t ip_addr_bytes(4);
             byte_copy(boost::asio::ip::address_v4::from_string(mb_eeprom["ip-addr"+n]).to_bytes(), ip_addr_bytes);
             iface.write_eeprom(X300_EEPROM_ADDR, offsetof(x300_eeprom_map, ip_addr)+(i*4), ip_addr_bytes);
         }
 
         if (mb_eeprom.has_key("subnet"+n)){
-            byte_vector_t ip_addr_bytes(4);
             byte_copy(boost::asio::ip::address_v4::from_string(mb_eeprom["subnet"+n]).to_bytes(), ip_addr_bytes);
             iface.write_eeprom(X300_EEPROM_ADDR, offsetof(x300_eeprom_map, subnet)+(i*4), ip_addr_bytes);
         }

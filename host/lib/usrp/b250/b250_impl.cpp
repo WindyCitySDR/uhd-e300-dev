@@ -215,7 +215,8 @@ b250_impl::b250_impl(const uhd::device_addr_t &dev_addr)
     // setup the mboard eeprom
     ////////////////////////////////////////////////////////////////////
     UHD_MSG(status) << "Loading values from EEPROM..." << std::endl;
-    const mboard_eeprom_t mb_eeprom(*_zpu_i2c, "X300");
+    i2c_iface::sptr eeprom16 = _zpu_i2c->eeprom16();
+    const mboard_eeprom_t mb_eeprom(*eeprom16, "X300");
     _tree->create<mboard_eeprom_t>(mb_path / "eeprom")
         .set(mb_eeprom)
         .subscribe(boost::bind(&b250_impl::set_mb_eeprom, this, _1));
@@ -642,5 +643,6 @@ void b250_impl::set_db_eeprom(const size_t addr, const uhd::usrp::dboard_eeprom_
 
 void b250_impl::set_mb_eeprom(const mboard_eeprom_t &mb_eeprom)
 {
-    mb_eeprom.commit(*_zpu_i2c, "X300");
+    i2c_iface::sptr eeprom16 = _zpu_i2c->eeprom16();
+    mb_eeprom.commit(*eeprom16, "X300");
 }
