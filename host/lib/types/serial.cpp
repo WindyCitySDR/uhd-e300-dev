@@ -70,6 +70,55 @@ byte_vector_t i2c_iface::read_eeprom(
     return bytes;
 }
 
+struct eeprom16_impl : i2c_iface
+{
+    eeprom16_impl(i2c_iface* internal)
+    {
+        _internal = internal;
+    }
+    i2c_iface* _internal;
+
+    byte_vector_t read_i2c(
+        boost::uint8_t addr,
+        size_t num_bytes
+    ){
+        return _internal->read_i2c(addr, num_bytes);
+    }
+
+    void write_i2c(
+        boost::uint8_t addr,
+        const byte_vector_t &bytes
+    ){
+        return _internal->write_i2c(addr, bytes);
+    }
+
+    byte_vector_t read_eeprom(boost::uint8_t addr, boost::uint8_t offset, size_t num_bytes)
+    {
+        byte_vector_t cmd = boost::assign::list_of(0)(offset);
+        this->write_i2c(addr, cmd);
+        return this->read_i2c(addr, num_bytes);
+    }
+
+    void write_eeprom(
+        boost::uint8_t addr,
+        boost::uint8_t offset,
+        const byte_vector_t &bytes
+    ){
+        for (size_t i = 0; i < bytes.size(); i++)
+        {
+            //write a byte at a time, its easy that way
+            byte_vector_t cmd = boost::assign::list_of(0)(offset+i)(bytes[i]);
+            this->write_i2c(addr, cmd);
+            boost::this_thread::sleep(boost::posix_time::milliseconds(10)); //worst case write
+        }
+    }
+};
+
+i2c_iface::sptr i2c_iface::eeprom16(void)
+{
+    return i2c_iface::sptr(new eeprom16_impl(this));
+}
+
 boost::uint32_t spi_iface::read_spi(
     int which_slave,
     const spi_config_t &config,
