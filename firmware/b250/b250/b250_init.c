@@ -75,9 +75,9 @@ static void init_network(void)
     u3_net_stack_init(&pkt_config);
 
     //read everything from eeprom
-    const uint8_t eeprom_cmd = 0;
+    static const uint8_t eeprom_cmd[2] = {0, 0}; //the command is 16 bits of address offset
     struct x300_eeprom_map eeprom_map = default_map;
-    wb_i2c_write(I2C1_BASE, MBOARD_EEPROM_ADDR, &eeprom_cmd, 1);
+    wb_i2c_write(I2C1_BASE, MBOARD_EEPROM_ADDR, eeprom_cmd, 2);
     wb_i2c_read(I2C1_BASE, MBOARD_EEPROM_ADDR, (uint8_t *)(&eeprom_map), sizeof(eeprom_map));
 
     //determine interface number
