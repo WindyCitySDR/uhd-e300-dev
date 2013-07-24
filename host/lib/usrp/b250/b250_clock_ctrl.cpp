@@ -99,12 +99,12 @@ struct b250_clock_ctrl_impl : b250_clock_ctrl	{
 		_lmk04816_regs.NO_SYNC_CLKout8_9 = lmk04816_regs_t::NO_SYNC_CLKOUT8_9_CLOCK_XY_SYNC;
 		_lmk04816_regs.NO_SYNC_CLKout10_11 = lmk04816_regs_t::NO_SYNC_CLKOUT10_11_CLOCK_XY_SYNC;
 		_lmk04816_regs.SYNC_EN_AUTO = lmk04816_regs_t::SYNC_EN_AUTO_SYNC_INT_GEN;
-		_lmk04816_regs.SYNC_POL_INV = lmk04816_regs_t::SYNC_POL_INV_SYNC_LOW;
-		_lmk04816_regs.SYNC_TYPE = lmk04816_regs_t::SYNC_TYPE_OUT_PUSH_PULL; //enable soft sync - FPGA must be input
+		_lmk04816_regs.SYNC_POL_INV = lmk04816_regs_t::SYNC_POL_INV_SYNC_HIGH;
+		_lmk04816_regs.SYNC_TYPE = lmk04816_regs_t::SYNC_TYPE_INPUT;
 //register 12
 
 		//enabling LD_MUX
-		_lmk04816_regs.LD_MUX = lmk04816_regs_t::LD_MUX_PLL2_R;
+		_lmk04816_regs.LD_MUX = lmk04816_regs_t::LD_MUX_BOTH;
 
 /* Input Clock Configurations */
 
@@ -118,7 +118,7 @@ struct b250_clock_ctrl_impl : b250_clock_ctrl	{
 		//manual select for Clk 1
 		_lmk04816_regs.CLKin_Select_MODE = lmk04816_regs_t::CLKIN_SELECT_MODE_CLKIN1_MAN;
 		//this->write_regs(13);
-		_lmk04816_regs.HOLDOVER_MUX = lmk04816_regs_t::HOLDOVER_MUX_PLL2_NHALF;
+		_lmk04816_regs.HOLDOVER_MUX = lmk04816_regs_t::HOLDOVER_MUX_PLL1_R; //needed for fpga 10MHz ref in
 		//sleep(1000);
 
 //register 14
@@ -170,21 +170,6 @@ struct b250_clock_ctrl_impl : b250_clock_ctrl	{
 		for (size_t i = 24; i <= 31; ++i) {
                         this->write_regs(i);
                 }
-
-		this->sync_clocks();
-
-	}
-
-
-	void sync_clocks(void)
-	{
-		//soft sync:
-		//put the sync IO into output mode - FPGA must be input
-		//write low, then write high - this triggers a soft sync
-		_lmk04816_regs.SYNC_POL_INV = lmk04816_regs_t::SYNC_POL_INV_SYNC_LOW;
-		this->write_regs(11);
-		_lmk04816_regs.SYNC_POL_INV = lmk04816_regs_t::SYNC_POL_INV_SYNC_HIGH;
-		this->write_regs(11);
 	}
 
 //empty destructor for testing

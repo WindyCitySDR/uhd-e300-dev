@@ -170,6 +170,15 @@ struct b250_impl : public uhd::device
     void update_rx_samp_rate(const size_t, const double);
     void update_tx_samp_rate(const size_t, const double);
 
+    struct clock_control_regs_t
+    {
+        int clock_source;
+        int clock_sync_out;
+        int clock_sync_pps;
+        int pps_select;
+    } clock_control_regs;
+    void update_clock_control(void);
+
     void update_clock_source(const std::string &);
     void update_time_source(const std::string &);
     uhd::sensor_value_t get_ref_locked(void);

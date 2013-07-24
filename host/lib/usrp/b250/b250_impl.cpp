@@ -234,10 +234,24 @@ b250_impl::b250_impl(const uhd::device_addr_t &dev_addr)
     // create clock control objects
     ////////////////////////////////////////////////////////////////////
     UHD_MSG(status) << "Setup RF frontend clocking..." << std::endl;
+
+    //init shadow and clock source
+    clock_control_regs.clock_sync_out = 0; //clock sync off
+    clock_control_regs.clock_sync_pps = 0; //pps sync off
+    clock_control_regs.pps_select = 0; //internal
+    this->update_clock_source("internal");
+    this->update_clock_control();
+
     _clock = b250_clock_ctrl::make(_zpu_spi, 1/*slaveno*/,
         dev_addr.cast<double>("master_clock_rate", B250_DEFAULT_TICK_RATE));
     _tree->create<double>(mb_path / "tick_rate")
         .publish(boost::bind(&b250_clock_ctrl::get_master_clock_rate, _clock));
+
+    //perform sync operation on lmk
+    clock_control_regs.clock_sync_out = 1;
+    this->update_clock_control();
+    clock_control_regs.clock_sync_out = 0;
+    this->update_clock_control();
 
     ////////////////////////////////////////////////////////////////////
     // Create the GPSDO control
@@ -610,14 +624,24 @@ void b250_impl::register_loopback_self_test(wb_iface::sptr iface)
     UHD_MSG(status) << ((test_fail)? " fail" : "pass") << std::endl;
 }
 
+void b250_impl::update_clock_control(void)
+{
+    const size_t reg = clock_control_regs.clock_source
+        | (clock_control_regs.clock_sync_out << 2)
+        | (clock_control_regs.clock_sync_pps << 3)
+        | (clock_control_regs.pps_select << 4)
+    ;
+    _zpu_ctrl->poke32(SR_ADDR(SET0_BASE, ZPU_SR_CLOCK_CTRL), reg);
+}
+
 void b250_impl::update_clock_source(const std::string &source)
 {
-    size_t value = 0x1;
-    if (source == "internal") value |= (0x2 << 1);
-    else if (source == "external") value |= (0x0 << 1);
-    else if (source == "gpsdo") value |= (0x3 << 1);
+    clock_control_regs.clock_source = 0;
+    if (source == "internal") clock_control_regs.clock_source = 0x2;
+    else if (source == "external") clock_control_regs.clock_source = 0x0;
+    else if (source == "gpsdo") clock_control_regs.clock_source = 0x3;
     else throw uhd::key_error("update_clock_source: unknown source: " + source);
-    _zpu_ctrl->poke32(SR_ADDR(SET0_BASE, ZPU_SR_CLOCK_CTRL), value);
+    this->update_clock_control();
 }
 
 void b250_impl::update_time_source(const std::string &source)
@@ -628,11 +652,13 @@ void b250_impl::update_time_source(const std::string &source)
     else throw uhd::key_error("update_time_source: unknown source: " + source);
     _radio_perifs[0].time64->set_time_source((source == "external")? "external" : "internal");
     _radio_perifs[1].time64->set_time_source((source == "external")? "external" : "internal");
+    clock_control_regs.pps_select = (source == "external")? 1 : 0;
+    this->update_clock_control();
 }
 
 sensor_value_t b250_impl::get_ref_locked(void)
 {
-    const bool lock = (_zpu_ctrl->peek32(SR_ADDR(SET0_BASE, 1)) & (1 << 1)) != 0;
+    const bool lock = (_zpu_ctrl->peek32(SR_ADDR(SET0_BASE, ZPU_RB_CLK_STATUS)) & (1 << 2)) != 0;
     return sensor_value_t("Ref", lock, "locked", "unlocked");
 }
 
