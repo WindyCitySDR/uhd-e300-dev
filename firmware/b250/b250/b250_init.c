@@ -122,6 +122,7 @@ void b250_init(void)
 
     //i2c rate init
     wb_i2c_init(I2C0_BASE, CPU_CLOCK);
+    wb_i2c_init(I2C1_BASE, CPU_CLOCK);
     wb_i2c_init(I2C2_BASE, CPU_CLOCK);
 
     //hold phy in reset
