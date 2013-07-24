@@ -353,7 +353,7 @@ static void handle_icmp_packet(
         IPH_TTL_SET(&reply.ip, 32);
         IPH_PROTO_SET(&reply.ip, IP_PROTO_ICMP);
         IPH_CHKSUM_SET(&reply.ip, 0);
-        memcpy(&reply.ip.src, dst, sizeof(struct ip_addr));
+        memcpy(&reply.ip.src, u3_net_stack_get_ip_addr(ethno), sizeof(struct ip_addr));
         memcpy(&reply.ip.dest, src, sizeof(struct ip_addr));
 
         IPH_CHKSUM_SET(&reply.ip, ~chksum_buffer(
