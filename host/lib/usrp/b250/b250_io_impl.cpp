@@ -56,7 +56,10 @@ void b250_impl::update_rx_samp_rate(const size_t dspno, const double rate)
     if (not _rx_streamers.has_key(dspno)) return;
     boost::shared_ptr<sph::recv_packet_streamer> my_streamer =
         boost::dynamic_pointer_cast<sph::recv_packet_streamer>(_rx_streamers[dspno].lock());
-    if (my_streamer) my_streamer->set_samp_rate(rate);
+    if (not my_streamer) return;
+    my_streamer->set_samp_rate(rate);
+    const double adj = _radio_perifs[dspno].ddc->get_scaling_adjustment();
+    my_streamer->set_scale_factor(adj);
 }
 
 void b250_impl::update_tx_samp_rate(const size_t dspno, const double rate)
@@ -64,7 +67,10 @@ void b250_impl::update_tx_samp_rate(const size_t dspno, const double rate)
     if (not _tx_streamers.has_key(dspno)) return;
     boost::shared_ptr<sph::send_packet_streamer> my_streamer =
         boost::dynamic_pointer_cast<sph::send_packet_streamer>(_tx_streamers[dspno].lock());
-    if (my_streamer) my_streamer->set_samp_rate(rate);
+    if (not my_streamer) return;
+    my_streamer->set_samp_rate(rate);
+    const double adj = _radio_perifs[dspno].duc->get_scaling_adjustment();
+    my_streamer->set_scale_factor(adj);
 }
 
 /***********************************************************************
@@ -220,7 +226,7 @@ struct b250_tx_fc_guts_t
     boost::shared_ptr<b250_impl::async_md_type> old_async_queue;
 };
 
-static void handle_tx_async_msgs(boost::shared_ptr<b250_tx_fc_guts_t> guts, zero_copy_if::sptr xport)
+static void handle_tx_async_msgs(boost::shared_ptr<b250_tx_fc_guts_t> guts, zero_copy_if::sptr xport, b250_clock_ctrl::sptr clock)
 {
     managed_recv_buffer::sptr buff = xport->get_recv_buff();
     if (not buff) return;
@@ -253,7 +259,7 @@ static void handle_tx_async_msgs(boost::shared_ptr<b250_tx_fc_guts_t> guts, zero
     async_metadata_t metadata;
     load_metadata_from_buff(
         uhd::ntohx<boost::uint32_t>, metadata, if_packet_info, packet_buff,
-        B250_RADIO_CLOCK_RATE/*FIXME set from rate update*/, guts->stream_channel);
+        clock->get_master_clock_rate(), guts->stream_channel);
     guts->async_queue->push_with_pop_on_full(metadata);
     metadata.channel = guts->device_channel;
     guts->old_async_queue->push_with_pop_on_full(metadata);
@@ -362,6 +368,7 @@ rx_streamer::sptr b250_impl::get_rx_stream(const uhd::stream_args_t &args_)
         perif.framer->set_nsamps_per_packet(spp); //seems to be a good place to set this
         perif.framer->set_sid((data_sid << 16) | (data_sid >> 16));
         perif.framer->setup(args);
+        perif.ddc->setup(args);
 
         //flow control setup
         const size_t max_buffering = size_t(device_addr.cast<double>("recv_buff_size", 1e6));
@@ -452,6 +459,7 @@ tx_streamer::sptr b250_impl::get_tx_stream(const uhd::stream_args_t &args_)
 
         perif.deframer->clear();
         perif.deframer->setup(args);
+        perif.duc->setup(args);
 
         //flow control setup
         perif.deframer->configure_flow_control(0/*cycs off*/, B250_TX_FC_PKT_WINDOW/8/*pkts*/);
@@ -460,7 +468,7 @@ tx_streamer::sptr b250_impl::get_tx_stream(const uhd::stream_args_t &args_)
         guts->device_channel = chan;
         guts->async_queue = async_md;
         guts->old_async_queue = _async_md;
-        task::sptr task = task::make(boost::bind(&handle_tx_async_msgs, guts, data_xport));
+        task::sptr task = task::make(boost::bind(&handle_tx_async_msgs, guts, data_xport, _clock));
 
         my_streamer->set_xport_chan_get_buff(stream_i, boost::bind(
             &get_tx_buff_with_flowctrl, task, guts, data_xport, _1

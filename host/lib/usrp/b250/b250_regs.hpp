@@ -41,6 +41,7 @@ localparam RB32_SPI             = 4;
 localparam RB64_TIME_NOW        = 8;
 localparam RB64_TIME_PPS        = 16;
 localparam RB32_TEST            = 24;
+localparam RB32_RX              = 28;
 
 localparam BL_ADDRESS     = 0;
 localparam BL_DATA        = 1;
@@ -48,7 +49,7 @@ localparam BL_DATA        = 1;
 //wishbone settings map - relevant to host code
 #define SET0_BASE 0xa000
 #define SETXB_BASE 0xb000
-#define BOOT_LDR_BASE 0xFC00
+#define BOOT_LDR_BASE 0xFA00
 #define I2C0_BASE 0xfe00
 #define I2C1_BASE 0xff00
 #define SR_ADDR(base, offset) ((base) + (offset)*4)
@@ -62,6 +63,7 @@ localparam ZPU_SR_ETHINT0    = 40;
 localparam ZPU_SR_ETHINT1    = 56;
 
 localparam ZPU_RB_SPI = 2;
+localparam ZPU_RB_CLK_STATUS = 3;
 
 //spi slaves on radio
 #define DB_DAC_SEN (1 << 7)

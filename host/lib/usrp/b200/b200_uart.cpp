@@ -45,7 +45,7 @@ struct b200_uart_impl : b200_uart
 
         vrt::if_packet_info_t packet_info;
         packet_info.link_type = vrt::if_packet_info_t::LINK_TYPE_CHDR;
-        packet_info.packet_type = vrt::if_packet_info_t::PACKET_TYPE_EXTENSION;
+        packet_info.packet_type = vrt::if_packet_info_t::PACKET_TYPE_CONTEXT;
         packet_info.num_payload_words32 = 2;
         packet_info.num_payload_bytes = packet_info.num_payload_words32*sizeof(boost::uint32_t);
         packet_info.packet_count = _count++;
@@ -92,7 +92,6 @@ struct b200_uart_impl : b200_uart
         const boost::uint32_t *packet_buff = buff->cast<const boost::uint32_t *>();
         vrt::if_packet_info_t packet_info;
         packet_info.link_type = vrt::if_packet_info_t::LINK_TYPE_CHDR;
-        packet_info.packet_type = vrt::if_packet_info_t::PACKET_TYPE_EXTENSION;
         packet_info.num_packet_words32 = buff->size()/sizeof(boost::uint32_t);
         vrt::if_hdr_unpack_le(packet_buff, packet_info);
         const char ch = char(uhd::wtohx(packet_buff[packet_info.num_header_words32+1]));

@@ -1,231 +1,235 @@
-//
-// Copyright 2013 Ettus Research LLC
-//
-// This program is free software: you can redistribute it and/or modify
-// it under the terms of the GNU General Public License as published by
-// the Free Software Foundation, either version 3 of the License, or
-// (at your option) any later version.
-//
-// This program is distributed in the hope that it will be useful,
-// but WITHOUT ANY WARRANTY; without even the implied warranty of
-// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-// GNU General Public License for more details.
-//
-// You should have received a copy of the GNU General Public License
-// along with this program.  If not, see <http://www.gnu.org/licenses/>.
-//
 
+#include <cstdio>
 #include "b250_clock_ctrl.hpp"
-#include "b250_impl.hpp"
 #include <uhd/utils/safe_call.hpp>
-#include "ad9510_regs.hpp"
 #include <boost/cstdint.hpp>
+#include <boost/format.hpp>
+#include <lmk04816_regs.hpp>
+#include <stdexcept>
 
 using namespace uhd;
+struct b250_clock_ctrl_impl : b250_clock_ctrl	{
 
-struct b250_clock_ctrl_impl : b250_clock_ctrl
-{
-    b250_clock_ctrl_impl(uhd::spi_iface::sptr spiface, const size_t slaveno):
-        _spiface(spiface), _slaveno(slaveno)
-    {
-        _ad9510_regs.soft_reset = 1;
-        this->write_reg(0x0);
-        this->update_regs();
-        _ad9510_regs.soft_reset = 0;
-        this->write_reg(0x0);
+	b250_clock_ctrl_impl(uhd::spi_iface::sptr spiface, const size_t slaveno, const double clock_rate):
+		_spiface(spiface), _slaveno(slaveno), _clock_rate(clock_rate)
+	{
 
-        _ad9510_regs.pll_power_down = ad9510_regs_t::PLL_POWER_DOWN_NORMAL;
-        _ad9510_regs.prescaler_value = ad9510_regs_t::PRESCALER_VALUE_DIV2;
-        this->write_reg(0xA);
-        _ad9510_regs.cp_current_setting = ad9510_regs_t::CP_CURRENT_SETTING_3_0MA;
-        this->write_reg(0x9);
-        _ad9510_regs.charge_pump_mode = ad9510_regs_t::CHARGE_PUMP_MODE_NORMAL;
-        _ad9510_regs.pll_mux_control = ad9510_regs_t::PLL_MUX_CONTROL_DLD_HIGH;
-        _ad9510_regs.pfd_polarity = ad9510_regs_t::PFD_POLARITY_POS;
-        this->write_reg(0x8);
+		int div = 0;
+		if (clock_rate == 120e6) div = 20;
+		else if (clock_rate == 200e6) div = 12;
+		else throw uhd::runtime_error(str(boost::format("b250_clock_ctrl: cant handle rate %f") % clock_rate));
 
-        _ad9510_regs.acounter = 0;
-        this->write_reg(0x4);
+/* Individual Clock Output Configurations */		
+//register 0
 
-        _ad9510_regs.bcounter_msb = 0;
-        _ad9510_regs.bcounter_lsb = 6;
-        this->write_reg(0x5);
-        this->write_reg(0x6);
+		
+		_lmk04816_regs.RESET = lmk04816_regs_t::RESET_RESET;
+		this->write_regs(0);
+		_lmk04816_regs.RESET = lmk04816_regs_t::RESET_NO_RESET;
+		this->write_regs(0);
+		_lmk04816_regs.CLKout0_1_PD = lmk04816_regs_t::CLKOUT0_1_PD_POWER_UP;
+		this->write_regs(0);
+		_lmk04816_regs.CLKout0_1_DIV = div;
+		this->write_regs(0);
+		
+//register 1
+		_lmk04816_regs.CLKout2_3_PD = lmk04816_regs_t::CLKOUT2_3_PD_POWER_UP;
+		//set divide value for ADC
+		_lmk04816_regs.CLKout2_3_DIV = div;
+		//this->write_regs(1);
+//register 2
+		_lmk04816_regs.CLKout4_5_PD = lmk04816_regs_t::CLKOUT4_5_PD_POWER_UP;
+		//set divide value for ADC
+		_lmk04816_regs.CLKout4_5_DIV = div;
+		//this->write_regs(2);
+//register 3
+		//set divide value for FPGA
+		_lmk04816_regs.CLKout6_7_DIV = div;
+		_lmk04816_regs.CLKout6_7_OSCin_Sel = lmk04816_regs_t::CLKOUT6_7_OSCIN_SEL_VCO;
+		//this->write_regs(3);
+//register 4
+		//set divide value for FPGA
+		_lmk04816_regs.CLKout8_9_DIV = div;
+		//this->write_regs(4);
+//register 5
+		_lmk04816_regs.CLKout10_11_PD = lmk04816_regs_t::CLKOUT10_11_PD_NORMAL;
+		//set divide value for LVDS low frequency system synch clock
+		_lmk04816_regs.CLKout10_11_DIV = div;
+		//this->write_regs(5);
 
-        _ad9510_regs.ref_counter_msb = 0;
-        _ad9510_regs.ref_counter_lsb = 1; // r divider = 1
-        this->write_reg(0x0B);
-        this->write_reg(0x0C);
+/* Output Clock Type Configurations */
 
-        //want clock2 only
-        _ad9510_regs.clock_select = ad9510_regs_t::CLOCK_SELECT_CLK2_DRIVES;
-        _ad9510_regs.clk1_power_down = 1;
-        _ad9510_regs.clk2_power_down = 0;
-        _ad9510_regs.refin_power_down = 0;
-        _ad9510_regs.prescaler_clock_pd = 0;
-        _ad9510_regs.all_clock_inputs_pd = 0;
-        this->write_reg(0x45);
+//register 6
+		//sets clock type to LVPECL
+		_lmk04816_regs.CLKout0_TYPE = 1; //FPGA
+		_lmk04816_regs.CLKout2_TYPE = lmk04816_regs_t::CLKOUT2_TYPE_LVPECL_700MVPP; //DB_0_RX
+		_lmk04816_regs.CLKout3_TYPE = lmk04816_regs_t::CLKOUT3_TYPE_LVPECL_700MVPP; //DB_1_RX
+		
+//register 7
+		//sets clock type to LVPECL
+		_lmk04816_regs.CLKout4_TYPE = 2; //DB_1_TX
+		_lmk04816_regs.CLKout5_TYPE = lmk04816_regs_t::CLKOUT5_TYPE_LVDS; //REF_CLKOUT
+		//sets clock type to LVDS
+		_lmk04816_regs.CLKout6_TYPE = lmk04816_regs_t::CLKOUT6_TYPE_LVPECL_700MVPP; // DB1_DAC
+		_lmk04816_regs.CLKout7_TYPE = lmk04816_regs_t::CLKOUT7_TYPE_LVPECL_700MVPP; // DB1_DAC
+		_lmk04816_regs.CLKout8_TYPE = 2; // DB0_ADC
+		//this->write_regs(7);
+//register 8 
+		//sets clock type to LVPECL
+		_lmk04816_regs.CLKout9_TYPE = lmk04816_regs_t::CLKOUT9_TYPE_LVPECL_700MVPP; //DB1_ADC
+		_lmk04816_regs.CLKout10_TYPE = lmk04816_regs_t::CLKOUT10_TYPE_LVPECL_700MVPP; //DB_0_TX
+		//this->write_regs(8);
+/*
+	for (size_t i = 1; i <= 8; ++i)	{ 
+		this->write_regs(i);
+		}
+*/
 
-        _enables[B250_CLOCK_WHICH_ADC0] = true;
-        _enables[B250_CLOCK_WHICH_ADC1] = true;
-        _enables[B250_CLOCK_WHICH_DAC0] = true;
-        _enables[B250_CLOCK_WHICH_DAC1] = true;
-        _enables[B250_CLOCK_WHICH_TEST] = true;
-        this->update_enables();
-        this->update_regs();
-    }
+//register 10
 
-    ~b250_clock_ctrl_impl(void)
-    {
-        _enables = uhd::dict<b250_clock_which_t, bool>(); //clears enables
-        UHD_SAFE_CALL
-        (
-            this->update_enables();
-            _ad9510_regs.charge_pump_mode = ad9510_regs_t::CHARGE_PUMP_MODE_3STATE;
-            this->write_reg(0x8);
-            _ad9510_regs.all_clock_inputs_pd = 1;
-            this->write_reg(0x45);
-            this->update_regs();
-        )
-    }
+		_lmk04816_regs.EN_OSCout0 = lmk04816_regs_t::EN_OSCOUT0_DISABLED;
 
-    double get_master_clock_rate(void)
-    {
-        return B250_RADIO_CLOCK_RATE;
-    }
+//register 11
 
-    void enable_clock(const b250_clock_which_t which, const bool enb)
-    {
-        _enables[which] = enb;
-        this->update_enables();
-    }
+		//register 11 sync disabled for testing
+		_lmk04816_regs.EN_SYNC = lmk04816_regs_t::EN_SYNC_SYNC_ENABLE;
+		_lmk04816_regs.NO_SYNC_CLKout0_1 = lmk04816_regs_t::NO_SYNC_CLKOUT0_1_CLOCK_XY_SYNC;
+		_lmk04816_regs.NO_SYNC_CLKout2_3 = lmk04816_regs_t::NO_SYNC_CLKOUT2_3_CLOCK_XY_SYNC;
+		_lmk04816_regs.NO_SYNC_CLKout4_5 = lmk04816_regs_t::NO_SYNC_CLKOUT4_5_CLOCK_XY_SYNC;
+		_lmk04816_regs.NO_SYNC_CLKout8_9 = lmk04816_regs_t::NO_SYNC_CLKOUT8_9_CLOCK_XY_SYNC;
+		_lmk04816_regs.NO_SYNC_CLKout10_11 = lmk04816_regs_t::NO_SYNC_CLKOUT10_11_CLOCK_XY_SYNC;
+		_lmk04816_regs.SYNC_EN_AUTO = lmk04816_regs_t::SYNC_EN_AUTO_SYNC_INT_GEN;
+		_lmk04816_regs.SYNC_POL_INV = lmk04816_regs_t::SYNC_POL_INV_SYNC_HIGH;
+		_lmk04816_regs.SYNC_TYPE = lmk04816_regs_t::SYNC_TYPE_INPUT;
+//register 12
 
-    template <typename Db, typename Hi, typename Lo>
-    void set_divider_foo(Db &db, Hi &hi, Lo &lo, const size_t divider)
-    {
-        const size_t high = divider/2;
-        const size_t low = divider - high;
-        db = (divider == 1)? 1 : 0;
-        hi = high - 1;
-        lo = low - 1;
-    }
+		//enabling LD_MUX
+		_lmk04816_regs.LD_MUX = lmk04816_regs_t::LD_MUX_BOTH;
 
-    void update_enables(void)
-    {
-        //0
-        _ad9510_regs.power_down_lvpecl_out0 = _enables.get(B250_CLOCK_WHICH_TEST, false)?
-            ad9510_regs_t::POWER_DOWN_LVPECL_OUT0_NORMAL :
-            ad9510_regs_t::POWER_DOWN_LVPECL_OUT0_SAFE_PD;
-        _ad9510_regs.output_level_lvpecl_out0 = ad9510_regs_t::OUTPUT_LEVEL_LVPECL_OUT0_810MV;
-        _ad9510_regs.bypass_divider_out0 = 1;
+/* Input Clock Configurations */
 
-        //1
-        _ad9510_regs.power_down_lvpecl_out1 = ad9510_regs_t::POWER_DOWN_LVPECL_OUT1_SAFE_PD;
-        _ad9510_regs.bypass_divider_out1 = 1;
+//register 13
 
-        //2
-        const bool enb_rx = false
-            or _enables.get(B250_CLOCK_WHICH_ADC0, false)
-            or _enables.get(B250_CLOCK_WHICH_ADC1, false)
-            or _enables.get(B250_CLOCK_WHICH_DB0_RX, false)
-            or _enables.get(B250_CLOCK_WHICH_DB1_RX, false)
-        ;
-        _ad9510_regs.power_down_lvpecl_out2 = enb_rx?
-            ad9510_regs_t::POWER_DOWN_LVPECL_OUT2_NORMAL :
-            ad9510_regs_t::POWER_DOWN_LVPECL_OUT2_SAFE_PD;
-        _ad9510_regs.output_level_lvpecl_out2 = ad9510_regs_t::OUTPUT_LEVEL_LVPECL_OUT2_810MV;
-        const double rx0_div = _rates.get(B250_CLOCK_WHICH_DB0_RX, get_master_clock_rate());
-        const double rx1_div = _rates.get(B250_CLOCK_WHICH_DB1_RX, get_master_clock_rate());
-        const size_t rxdiv = size_t((2*get_master_clock_rate())/(rx0_div + rx1_div));
-        set_divider_foo(_ad9510_regs.bypass_divider_out2, _ad9510_regs.divider_low_cycles_out2, _ad9510_regs.divider_high_cycles_out2, rxdiv);
+		//disable clockin0 and clockin2 for testing
+		_lmk04816_regs.EN_CLKin0 = lmk04816_regs_t::EN_CLKIN0_NO_VALID_USE;
+		_lmk04816_regs.EN_CLKin2 = lmk04816_regs_t::EN_CLKIN2_NO_VALID_USE;
+		_lmk04816_regs.Status_CLKin1_MUX = lmk04816_regs_t::STATUS_CLKIN1_MUX_UWIRE_RB;
+		//this->write_regs(13);
+		//manual select for Clk 1
+		_lmk04816_regs.CLKin_Select_MODE = lmk04816_regs_t::CLKIN_SELECT_MODE_CLKIN1_MAN;
+		//this->write_regs(13);
+		_lmk04816_regs.HOLDOVER_MUX = lmk04816_regs_t::HOLDOVER_MUX_PLL1_R; //needed for fpga 10MHz ref in
+		//sleep(1000);
 
-        //3
-        const bool enb_tx = false
-            or _enables.get(B250_CLOCK_WHICH_DAC0, false)
-            or _enables.get(B250_CLOCK_WHICH_DAC1, false)
-            or _enables.get(B250_CLOCK_WHICH_DB0_TX, false)
-            or _enables.get(B250_CLOCK_WHICH_DB1_TX, false)
-        ;
-        _ad9510_regs.power_down_lvpecl_out3 = enb_tx?
-            ad9510_regs_t::POWER_DOWN_LVPECL_OUT3_NORMAL :
-            ad9510_regs_t::POWER_DOWN_LVPECL_OUT3_SAFE_PD;
-        _ad9510_regs.output_level_lvpecl_out3 = ad9510_regs_t::OUTPUT_LEVEL_LVPECL_OUT3_810MV;
-        const double tx0_div = _rates.get(B250_CLOCK_WHICH_DB0_TX, get_master_clock_rate());
-        const double tx1_div = _rates.get(B250_CLOCK_WHICH_DB1_TX, get_master_clock_rate());
-        const size_t txdiv = size_t((2*get_master_clock_rate())/(tx0_div + tx1_div));
-        set_divider_foo(_ad9510_regs.bypass_divider_out3, _ad9510_regs.divider_low_cycles_out3, _ad9510_regs.divider_high_cycles_out3, txdiv);
+//register 14
+		_lmk04816_regs.Status_CLKin1_TYPE = lmk04816_regs_t::STATUS_CLKIN1_TYPE_OUT_PUSH_PULL;
+		//this->write_regs(14);
+		_lmk04816_regs.Status_CLKin0_TYPE = lmk04816_regs_t::STATUS_CLKIN0_TYPE_OUT_PUSH_PULL;
 
-        //4
-        _ad9510_regs.power_down_lvds_cmos_out4 = 0; //always FPGA CLOCK ON
-        _ad9510_regs.lvds_cmos_select_out4 = ad9510_regs_t::LVDS_CMOS_SELECT_OUT4_LVDS;
-        _ad9510_regs.output_level_lvds_out4 = ad9510_regs_t::OUTPUT_LEVEL_LVDS_OUT4_1_75MA;
-        _ad9510_regs.bypass_divider_out4 = 1;
+		//
 
-        //5
-        _ad9510_regs.power_down_lvds_cmos_out5 = 1; //NC off
-        _ad9510_regs.lvds_cmos_select_out5 = ad9510_regs_t::LVDS_CMOS_SELECT_OUT5_LVDS;
-        _ad9510_regs.output_level_lvds_out5 = ad9510_regs_t::OUTPUT_LEVEL_LVDS_OUT5_1_75MA;
-        _ad9510_regs.bypass_divider_out5 = 1;
+/*Loop Filter settings*/
 
-        //6
-        _ad9510_regs.power_down_lvds_cmos_out6 = 1; //MIMO off
-        _ad9510_regs.lvds_cmos_select_out6 = ad9510_regs_t::LVDS_CMOS_SELECT_OUT6_LVDS;
-        _ad9510_regs.output_level_lvds_out6 = ad9510_regs_t::OUTPUT_LEVEL_LVDS_OUT6_1_75MA;
-        _ad9510_regs.bypass_divider_out6 = 1;
+//register 24 - sets C4, C3, R4		
+ 
+/* Divider value setting*/
 
-        //7
-        _ad9510_regs.power_down_lvds_cmos_out7 = 1; //NC off
-        _ad9510_regs.lvds_cmos_select_out7 = ad9510_regs_t::LVDS_CMOS_SELECT_OUT7_LVDS;
-        _ad9510_regs.output_level_lvds_out7 = ad9510_regs_t::OUTPUT_LEVEL_LVDS_OUT7_1_75MA;
-        _ad9510_regs.bypass_divider_out7 = 1;
+//Register 26
 
-        for (size_t i = 0; i < 4; i++) this->write_reg(0x3C+i);
-        for (size_t i = 0; i < 4; i++) this->write_reg(0x40+i);
-        for (size_t i = 0; i < 8; i++) this->write_reg(0x48+(i*2));
-        for (size_t i = 0; i < 8; i++) this->write_reg(0x49+(i*2));
-        this->update_regs();
-    }
+		_lmk04816_regs.PLL2_CP_POL_26 = lmk04816_regs_t::PLL2_CP_POL_26_NEG_SLOPE;
 
-    void set_rate(const b250_clock_which_t which, double rate)
-    {
-        _rates[which] = rate;
-    }
+//register 27
 
-    std::vector<double> get_rates(const b250_clock_which_t)
-    {
-        std::vector<double> rates;
-        for (size_t i = 1; i <= 16+16; i++) rates.push_back(get_master_clock_rate()/i);
-        return rates;
-    }
+		
+		//_lmk04816_regs.CLKin1_PreR_DIV = 1;
+		//_lmk04816_regs.CLKin1_PreR_DIV = lmk04816_regs_t::CLKIN1_PRER_DIV_DIV2;
+		//sets PLL1_R value
+		_lmk04816_regs.PLL1_R_27 = 1;
+		//_lmk04816_regs.CLKin2_PreR_DIV = 1;
+		//this->write_regs(27);
+//register 28
+		//set PLL_1_N value
+		_lmk04816_regs.PLL1_N_28 = 12;
+		//set PLL_2_R value
+		_lmk04816_regs.PLL2_R_28 = 1;
+		//this->write_regs(28);
+//register 29
+		//set the PLL_2_N value (calibration divider)
+		_lmk04816_regs.PLL2_N_CAL_29 = 10;
+		//this->write_regs(29);
+//register 30
+		//sets PLL_2_N divider prescaler
+		_lmk04816_regs.PLL2_P_30 = lmk04816_regs_t::PLL2_P_30_DIV_2A;
+		//sets PLL2_N_divider
+		_lmk04816_regs.PLL2_N_30 = 10;
+		//this->write_regs(30);
+		
+		for (size_t i = 1; i <= 16; ++i) { 
+			this->write_regs(i);
+		}
+		for (size_t i = 24; i <= 31; ++i) {
+                        this->write_regs(i);
+                }
+	}
 
-    /*!
-     * Write a single register to the spi regs.
-     * \param addr the address to write
-     */
-    void write_reg(boost::uint8_t addr)
-    {
-        boost::uint32_t data = _ad9510_regs.get_write_reg(addr);
-        _spiface->write_spi(_slaveno, spi_config_t::EDGE_RISE, data, 24);
-    }
+//empty destructor for testing
+	~b250_clock_ctrl_impl(void)	{}
+	
+//master rate
+	double get_master_clock_rate(void) {
+		
+		return _clock_rate;
+	}
+//empty
+	void enable_clock(const b250_clock_which_t which, const bool enb) {}
+	
+	void set_rate(const b250_clock_which_t which, double rate) {}
 
-    /*!
-     * Tells the ad9510 to latch the settings into the operational registers.
-     */
-    void update_regs(void)
-    {
-        _ad9510_regs.update_registers = 1;
-        this->write_reg(0x5A);
-    }
+	std::vector<double> get_rates(const b250_clock_which_t) {
+		
+		std::vector<double> rates;
+		rates.push_back(get_master_clock_rate());
+		return rates;
+	} 
 
-    const spi_iface::sptr _spiface;
-    const size_t _slaveno;
-    ad9510_regs_t _ad9510_regs;
-    uhd::dict<b250_clock_which_t, bool> _enables;
-    uhd::dict<b250_clock_which_t, double> _rates;
+
+
+
+
+
+//write_reg: write a single register to the spi regs.
+	void write_regs(boost::uint8_t addr)	{
+
+		boost::uint32_t data = _lmk04816_regs.get_reg(addr);
+		_spiface->write_spi(_slaveno, spi_config_t::EDGE_RISE, data,32);
+		//for testing purposes
+		//printf("%u %08x\n", addr, data);
+	}
+
+	const spi_iface::sptr _spiface;
+	const size_t _slaveno;
+	const double _clock_rate;
+	lmk04816_regs_t _lmk04816_regs;
+	//uhd::dict<b250_clock_which_t, bool> _enables;
+	//uhd::dict<b250_clock_which_t, double> _rates;
+/*
+//read_reg: read a single register to the spi regs.
+
+	void read_reg(boost::uint8_t addr)	{
+		
+		boost::unint32_t data = _lmk04816_regs.get_read_reg(addr);
+		_spiface->read_spi(_slaveno, spi_config_t::EDGE_RISE, data , 32);
+	}
+*/	
+//future implementations for modularity
+
 
 };
 
-b250_clock_ctrl::sptr b250_clock_ctrl::make(uhd::spi_iface::sptr spiface, const size_t slaveno)
-{
-    return sptr(new b250_clock_ctrl_impl(spiface, slaveno));
+b250_clock_ctrl::sptr b250_clock_ctrl::make(uhd::spi_iface::sptr spiface, const size_t slaveno, const double clock_rate)	{
+	return sptr(new b250_clock_ctrl_impl(spiface,slaveno,clock_rate));
 }
+
+
+
+

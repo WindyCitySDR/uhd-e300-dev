@@ -33,7 +33,7 @@ public:
      * \param spiface the interface to spi
      * \return a new codec control object
      */
-    static sptr make(uhd::spi_iface::sptr iface, const size_t slaveno);
+    static sptr make(uhd::spi_iface::sptr iface, const size_t slaveno, const double clock_rate);
 
     //! Set the IQ data mode (swap means QI)
     virtual void set_iq_swap(const bool swap) = 0;

@@ -93,8 +93,10 @@ boost::uint32_t adf4001_regs_t::get_reg(boost::uint8_t addr) {
 }
 
 
-adf4001_ctrl::adf4001_ctrl(spi_core_3000::sptr _spi, bool lock_to_ext_ref) {
-    spi_iface = _spi;
+adf4001_ctrl::adf4001_ctrl(spi_core_3000::sptr _spi, int slaveno):
+    spi_iface(_spi),
+    slaveno(slaveno)
+    {
 
     spi_config.mosi_edge = spi_config_t::EDGE_RISE;
 
@@ -106,12 +108,7 @@ adf4001_ctrl::adf4001_ctrl(spi_core_3000::sptr _spi, bool lock_to_ext_ref) {
     adf4001_regs.muxout = adf4001_regs_t::MUXOUT_DLD;
     adf4001_regs.counter_reset = adf4001_regs_t::COUNTER_RESET_NORMAL;
     adf4001_regs.phase_detector_polarity = adf4001_regs_t::PHASE_DETECTOR_POLARITY_POSITIVE;
-
-    if(lock_to_ext_ref) {
-        adf4001_regs.charge_pump_mode = adf4001_regs_t::CHARGE_PUMP_NORMAL;
-    } else {
-        adf4001_regs.charge_pump_mode = adf4001_regs_t::CHARGE_PUMP_TRISTATE;
-    }
+    adf4001_regs.charge_pump_mode = adf4001_regs_t::CHARGE_PUMP_TRISTATE;
 
     //everything else should be defaults
 
@@ -127,19 +124,6 @@ void adf4001_ctrl::set_lock_to_ext_ref(bool external) {
 
     program_regs();
 }
-
-
-bool adf4001_ctrl::locked(void) {
-    boost::uint32_t ret = spi_iface->transact_spi(0,
-                                                  spi_config,
-                                                  0x01,
-                                                  8,
-                                                  true);
-
-    if(ret) return true;
-    else return false;
-}
-
 
 void adf4001_ctrl::program_regs(void) {
     //no control over CE, only LE, therefore we use the initialization latch method

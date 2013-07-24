@@ -46,13 +46,16 @@ namespace uhd{
     public:
         typedef boost::shared_ptr<i2c_iface> sptr;
 
+        //! Create an i2c_iface than can talk to 16 bit addressable EEPROMS
+        i2c_iface::sptr eeprom16(void);
+
         /*!
          * Write bytes over the i2c.
          * \param addr the address
          * \param buf the vector of bytes
          */
         virtual void write_i2c(
-            boost::uint8_t addr,
+            boost::uint16_t addr,
             const byte_vector_t &buf
         ) = 0;
 
@@ -63,7 +66,7 @@ namespace uhd{
          * \return a vector of bytes
          */
         virtual byte_vector_t read_i2c(
-            boost::uint8_t addr,
+            boost::uint16_t addr,
             size_t num_bytes
         ) = 0;
 
@@ -74,8 +77,8 @@ namespace uhd{
          * \param buf the vector of bytes
          */
         virtual void write_eeprom(
-            boost::uint8_t addr,
-            boost::uint8_t offset,
+            boost::uint16_t addr,
+            boost::uint16_t offset,
             const byte_vector_t &buf
         );
 
@@ -87,8 +90,8 @@ namespace uhd{
          * \return a vector of bytes
          */
         virtual byte_vector_t read_eeprom(
-            boost::uint8_t addr,
-            boost::uint8_t offset,
+            boost::uint16_t addr,
+            boost::uint16_t offset,
             size_t num_bytes
         );
     };

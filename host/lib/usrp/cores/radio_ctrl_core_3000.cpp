@@ -48,7 +48,7 @@ public:
         const std::string &name
     ):
         _link_type(link_type),
-        _packet_type((link_type == vrt::if_packet_info_t::LINK_TYPE_VRLP)? vrt::if_packet_info_t::PACKET_TYPE_CONTEXT : vrt::if_packet_info_t::PACKET_TYPE_EXTENSION),
+        _packet_type(vrt::if_packet_info_t::PACKET_TYPE_CONTEXT),
         _bige(link_type == vrt::if_packet_info_t::LINK_TYPE_VRLP),
         _ctrl_xport(ctrl_xport),
         _resp_xport(resp_xport),

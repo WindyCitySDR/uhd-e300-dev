@@ -7,13 +7,13 @@
 
 #include "chinch.h"
 
-#define PCIE_REG_BASE         0xA000
-#define PCIE_OUT_DATA_REG     128   //Write-Only: Data register for outbound requests and responses
-#define PCIE_OUT_CTRL_REG     129   //Write-Only: Control register for outbound requests and responses (Latches Data)
-#define PCIE_STATUS_REG       5     //Read-Only:  Status register for inbound and output transactions
-#define PCIE_IN_DATA_REG      6     //Read-Only:  Latched data for inbound requests
-#define PCIE_IN_CTRL_REG      7     //Read-Only:  Latched control word for inbound requests
-#define PCIE_OUT_RESP_REG     8     //Read-Only:  Latched response data for outbound requests
+#define PCIE_MSG_REG_BASE   0xFB00
+#define PCIE_MSG_DATA_REG   0 //Write: Data register for outbound requests and responses
+                              //Read:  Latched data for inbound requests
+#define PCIE_MSG_CTRL_REG   1 //Write: Control register for outbound requests and responses (Initiates xfer)
+                              //Read:  Latched control word for inbound requests
+#define PCIE_MSG_RESP_REG   2 //Read:  Latched response data for outbound requests
+#define PCIE_MSG_STATUS_REG 3 //Read:  Status register for inbound and outbound transactions
 
 // Transaction Word Format
 //
@@ -69,13 +69,13 @@ bool chinch_poke(
 
     //Wait for space in the transaction queue or timeout
     i = 0;
-    while ((wb_peek32(SR_ADDR(PCIE_REG_BASE, PCIE_STATUS_REG)) & PCIE_STATUS_REG_BUSY) != 0) {
+    while ((wb_peek32(SR_ADDR(PCIE_MSG_REG_BASE, PCIE_MSG_STATUS_REG)) & PCIE_STATUS_REG_BUSY) != 0) {
         if (++i > timeout) return false;
     }
 
     //Flush transaction control and data registers
-    wb_poke32(SR_ADDR(PCIE_REG_BASE, PCIE_OUT_DATA_REG), data);
-    wb_poke32(SR_ADDR(PCIE_REG_BASE, PCIE_OUT_CTRL_REG), ctrl_word);
+    wb_poke32(SR_ADDR(PCIE_MSG_REG_BASE, PCIE_MSG_DATA_REG), data);
+    wb_poke32(SR_ADDR(PCIE_MSG_REG_BASE, PCIE_MSG_CTRL_REG), ctrl_word);
 
     return true;
 }
@@ -95,21 +95,21 @@ bool chinch_peek(
 
     //Wait for space in the transaction queue or timeout
     i = 0;
-    while ((wb_peek32(SR_ADDR(PCIE_REG_BASE, PCIE_STATUS_REG)) & PCIE_STATUS_REG_BUSY) != 0) {
+    while ((wb_peek32(SR_ADDR(PCIE_MSG_REG_BASE, PCIE_MSG_STATUS_REG)) & PCIE_STATUS_REG_BUSY) != 0) {
         if (++i > timeout) return false;
     }
 
     //Flush transaction control register
     if (data) *data = 0;
-    wb_poke32(SR_ADDR(PCIE_REG_BASE, PCIE_OUT_CTRL_REG), ctrl_word);
+    wb_poke32(SR_ADDR(PCIE_MSG_REG_BASE, PCIE_MSG_CTRL_REG), ctrl_word);
 
     //Wait for read completion or timeout
     i = 0;
-    while ((wb_peek32(SR_ADDR(PCIE_REG_BASE, PCIE_STATUS_REG)) & PCIE_STATUS_REG_READ_PENDING) != 0) {
+    while ((wb_peek32(SR_ADDR(PCIE_MSG_REG_BASE, PCIE_MSG_STATUS_REG)) & PCIE_STATUS_REG_READ_PENDING) != 0) {
         if (++i > timeout) return false;
     }
     //Read transaction data register
-    if (data) *data = wb_peek32(SR_ADDR(PCIE_REG_BASE, PCIE_OUT_RESP_REG));
+    if (data) *data = wb_peek32(SR_ADDR(PCIE_MSG_REG_BASE, PCIE_MSG_RESP_REG));
     return true;
 }
 
@@ -244,13 +244,13 @@ bool _respond_to_pcie_xact_request(uint32_t response, uint32_t timeout)
 {
     //Wait for space in the transaction queue or timeout
     uint32_t i = 0;
-    while ((wb_peek32(SR_ADDR(PCIE_REG_BASE, PCIE_STATUS_REG)) & PCIE_STATUS_REG_BUSY) != 0) {
+    while ((wb_peek32(SR_ADDR(PCIE_MSG_REG_BASE, PCIE_MSG_STATUS_REG)) & PCIE_STATUS_REG_BUSY) != 0) {
         if (++i > g_pcie_res_timeout) return false;
     }
 
     //First write data and then the control register to ensure coherency
-    wb_poke32(SR_ADDR(PCIE_REG_BASE, PCIE_OUT_DATA_REG), response);
-    wb_poke32(SR_ADDR(PCIE_REG_BASE, PCIE_OUT_CTRL_REG), PCIE_CTRL_REG_READ_RESP);
+    wb_poke32(SR_ADDR(PCIE_MSG_REG_BASE, PCIE_MSG_DATA_REG), response);
+    wb_poke32(SR_ADDR(PCIE_MSG_REG_BASE, PCIE_MSG_CTRL_REG), PCIE_CTRL_REG_READ_RESP);
 
     return true;
 }
@@ -258,13 +258,13 @@ bool _respond_to_pcie_xact_request(uint32_t response, uint32_t timeout)
 bool check_pcie_user_regport(pcie_register_xact_t** xact_info_hdl)
 {
     //Check for pending transaction requests
-    if ((wb_peek32(SR_ADDR(PCIE_REG_BASE, PCIE_STATUS_REG)) & PCIE_STATUS_REG_REQ_PENDING) != 0) {
+    if ((wb_peek32(SR_ADDR(PCIE_MSG_REG_BASE, PCIE_MSG_STATUS_REG)) & PCIE_STATUS_REG_REQ_PENDING) != 0) {
         //Attach responder to transaction info
         g_pcie_reg_xact_info.respond = _respond_to_pcie_xact_request;
 
         //First read data and then the control register to ensure coherency
-        g_pcie_reg_xact_info.data = wb_peek32(SR_ADDR(PCIE_REG_BASE, PCIE_IN_DATA_REG));
-        uint32_t xact_control = wb_peek32(SR_ADDR(PCIE_REG_BASE, PCIE_IN_CTRL_REG));
+        g_pcie_reg_xact_info.data = wb_peek32(SR_ADDR(PCIE_MSG_REG_BASE, PCIE_MSG_DATA_REG));
+        uint32_t xact_control = wb_peek32(SR_ADDR(PCIE_MSG_REG_BASE, PCIE_MSG_CTRL_REG));
 
         g_pcie_reg_xact_info.addr = xact_control & PCIE_CTRL_REG_ADDR_MASK;
         g_pcie_reg_xact_info.size =

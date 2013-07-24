@@ -88,8 +88,14 @@ static hash_type generate_hash(const char *filename)
     size_t hash = 0;
 
     char ch;
+    long long count = 0;
     while (file.get(ch)) {
+        count++;
         boost::hash_combine(hash, ch);
+    }
+
+    if (count == 0){
+        throw uhd::io_error(std::string("empty input file ") + filename);
     }
 
     if (not file.eof()){
@@ -205,18 +211,18 @@ public:
     }
 
 
-    void write_i2c(boost::uint8_t addr, const byte_vector_t &bytes)
+    void write_i2c(boost::uint16_t addr, const byte_vector_t &bytes)
     {
         throw uhd::not_implemented_error("b200 write i2c");
     }
 
 
-    byte_vector_t read_i2c(boost::uint8_t addr, size_t num_bytes)
+    byte_vector_t read_i2c(boost::uint16_t addr, size_t num_bytes)
     {
         throw uhd::not_implemented_error("b200 read i2c");
     }
 
-    void write_eeprom(boost::uint8_t addr, boost::uint8_t offset,
+    void write_eeprom(boost::uint16_t addr, boost::uint16_t offset,
             const byte_vector_t &bytes)
     {
         fx3_control_write(B200_VREQ_EEPROM_WRITE,
@@ -226,8 +232,8 @@ public:
     }
 
     byte_vector_t read_eeprom(
-        boost::uint8_t addr,
-        boost::uint8_t offset,
+        boost::uint16_t addr,
+        boost::uint16_t offset,
         size_t num_bytes
     ){
         byte_vector_t recv_bytes(num_bytes);

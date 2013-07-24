@@ -31,7 +31,7 @@ SET(util_runtime_sources
 FOREACH(util_source ${util_runtime_sources})
     GET_FILENAME_COMPONENT(util_name ${util_source} NAME_WE)
     ADD_EXECUTABLE(${util_name} ${util_source})
-    TARGET_LINK_LIBRARIES(${util_name} uhd)
+    TARGET_LINK_LIBRARIES(${util_name} uhd ${Boost_LIBRARIES})
     UHD_INSTALL(TARGETS ${util_name} RUNTIME DESTINATION ${RUNTIME_DIR} COMPONENT utilities)
 ENDFOREACH(util_source)
 
@@ -60,6 +60,7 @@ SET(util_share_sources
 IF(ENABLE_USB)
     LIST(APPEND util_share_sources
         fx2_init_eeprom.cpp
+        b2xx_fx3_utils.cpp
     )
 ENDIF(ENABLE_USB)
 
@@ -75,7 +76,7 @@ ENDIF(LINUX AND ENABLE_USB)
 FOREACH(util_source ${util_share_sources})
     GET_FILENAME_COMPONENT(util_name ${util_source} NAME_WE)
     ADD_EXECUTABLE(${util_name} ${util_source})
-    TARGET_LINK_LIBRARIES(${util_name} uhd)
+    TARGET_LINK_LIBRARIES(${util_name} uhd ${Boost_LIBRARIES})
     UHD_INSTALL(TARGETS ${util_name} RUNTIME DESTINATION ${PKG_LIB_DIR}/utils COMPONENT utilities)
 ENDFOREACH(util_source)
 
