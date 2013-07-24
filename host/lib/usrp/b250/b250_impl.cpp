@@ -646,6 +646,16 @@ void b250_impl::update_clock_source(const std::string &source)
 
 void b250_impl::update_time_source(const std::string &source)
 {
+    //---- BEGIN MAGICAL PPS SYNC HOOK ----//
+    if (source == "pps_sync")
+    {
+        clock_control_regs.clock_sync_pps = 1;
+        this->update_clock_control();
+        return;
+    }
+    else clock_control_regs.clock_sync_pps = 0;
+    //---- END MAGICAL PPS SYNC HOOK ----//
+
     if (source == "none"){}
     else if (source == "external"){}
     else if (source == "gpsdo"){}
