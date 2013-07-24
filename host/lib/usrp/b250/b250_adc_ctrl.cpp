@@ -16,7 +16,8 @@
 //
 
 #include "b250_adc_ctrl.hpp"
-#include "ads62p44_regs.hpp"
+#include "ads62p48_regs.hpp"
+#include <uhd/types/ranges.hpp>
 #include <uhd/utils/log.hpp>
 #include <uhd/utils/safe_call.hpp>
 #include <uhd/exception.hpp>
@@ -25,7 +26,7 @@
 using namespace uhd;
 
 /*!
- * A B250 codec control specific to the ads62p44 ic.
+ * A B250 codec control specific to the ads62p48 ic.
  */
 class b250_adc_ctrl_impl : public b250_adc_ctrl
 {
@@ -34,61 +35,88 @@ public:
         _iface(iface), _slaveno(slaveno)
     {
         //power-up adc
-       _ads62p44_regs.reset = 1;
-        this->send_ads62p44_reg(0x00); //issue a reset to the ADC
-        //everything else should be pretty much default, i think
-        //_ads62p44_regs.decimation = DECIMATION_DECIMATE_1;
-        _ads62p44_regs.override = 1;
-        this->send_ads62p44_reg(0x14);
-        _ads62p44_regs.power_down = ads62p44_regs_t::POWER_DOWN_NORMAL;
-        _ads62p44_regs.output_interface = ads62p44_regs_t::OUTPUT_INTERFACE_LVDS;
-        _ads62p44_regs.lvds_current = ads62p44_regs_t::LVDS_CURRENT_2_5MA;
-        _ads62p44_regs.lvds_data_term = ads62p44_regs_t::LVDS_DATA_TERM_100;
-        this->send_ads62p44_reg(0x11);
-        this->send_ads62p44_reg(0x12);
-        this->send_ads62p44_reg(0x14);
-        this->set_rx_analog_gain(1);
+       _ads62p48_regs.reset = 1;
+        this->send_ads62p48_reg(0x00); //issue a reset to the ADC
+       _ads62p48_regs.reset = 0;
 
-        _ads62p44_regs.test_patterns = ads62p44_regs_t::TEST_PATTERNS_NORMAL;
-        this->send_ads62p44_reg(22);
+        _ads62p48_regs.enable_low_speed_mode = 0;
+        _ads62p48_regs.ref = ads62p48_regs_t::REF_INTERNAL;
+        _ads62p48_regs.standby = ads62p48_regs_t::STANDBY_NORMAL;
+        _ads62p48_regs.power_down = ads62p48_regs_t::POWER_DOWN_NORMAL;
+        _ads62p48_regs.lvds_cmos = ads62p48_regs_t::LVDS_CMOS_DDR_LVDS;
+        _ads62p48_regs.channel_control = ads62p48_regs_t::CHANNEL_CONTROL_INDEPENDENT;
+        _ads62p48_regs.data_format = ads62p48_regs_t::DATA_FORMAT_2S_COMPLIMENT;
 
+        this->send_ads62p48_reg(0);
+        this->send_ads62p48_reg(0x20);
+        this->send_ads62p48_reg(0x3f);
+        this->send_ads62p48_reg(0x40);
+        this->send_ads62p48_reg(0x41);
+        this->send_ads62p48_reg(0x44);
+        this->send_ads62p48_reg(0x50);
+        this->send_ads62p48_reg(0x51);
+        this->send_ads62p48_reg(0x52);
+        this->send_ads62p48_reg(0x53);
+        this->send_ads62p48_reg(0x55);
+        this->send_ads62p48_reg(0x57);
+        this->send_ads62p48_reg(0x62);
+        this->send_ads62p48_reg(0x63);
+        this->send_ads62p48_reg(0x66);
+        this->send_ads62p48_reg(0x68);
+        this->send_ads62p48_reg(0x6a);
+        this->send_ads62p48_reg(0x75);
+        this->send_ads62p48_reg(0x76);
+
+    }
+
+    double set_gain(const double &gain)
+    {
+        const meta_range_t gain_range = meta_range_t(0, 6.0, 0.5);
+        const int gain_bits = int((gain_range.clip(gain)*2.0) + 0.5);
+        _ads62p48_regs.gain_chA = gain_bits;
+        _ads62p48_regs.gain_chB = gain_bits;
+        this->send_ads62p48_reg(0x55);
+        this->send_ads62p48_reg(0x68);
+        return gain_bits/2;
+    }
+
+    void set_test_word(const std::string &patterna, const std::string &patternb, const boost::uint32_t num)
+    {
+        _ads62p48_regs.custom_pattern_low = num & 0xff;
+        _ads62p48_regs.custom_pattern_high = num >> 8;
+        if (patterna == "ones") _ads62p48_regs.test_patterns_chA = ads62p48_regs_t::TEST_PATTERNS_CHA_ONES;
+        if (patterna == "zeros") _ads62p48_regs.test_patterns_chA = ads62p48_regs_t::TEST_PATTERNS_CHA_ZEROS;
+        if (patterna == "custom") _ads62p48_regs.test_patterns_chA = ads62p48_regs_t::TEST_PATTERNS_CHA_CUSTOM;
+        if (patterna == "ramp") _ads62p48_regs.test_patterns_chA = ads62p48_regs_t::TEST_PATTERNS_CHA_RAMP;
+        if (patterna == "normal") _ads62p48_regs.test_patterns_chA = ads62p48_regs_t::TEST_PATTERNS_CHA_NORMAL;
+        if (patternb == "ones") _ads62p48_regs.test_patterns_chB = ads62p48_regs_t::TEST_PATTERNS_CHB_ONES;
+        if (patternb == "zeros") _ads62p48_regs.test_patterns_chB = ads62p48_regs_t::TEST_PATTERNS_CHB_ZEROS;
+        if (patternb == "custom") _ads62p48_regs.test_patterns_chB = ads62p48_regs_t::TEST_PATTERNS_CHB_CUSTOM;
+        if (patterna == "ramp") _ads62p48_regs.test_patterns_chB = ads62p48_regs_t::TEST_PATTERNS_CHB_RAMP;
+        if (patterna == "normal") _ads62p48_regs.test_patterns_chB = ads62p48_regs_t::TEST_PATTERNS_CHB_NORMAL;
+        this->send_ads62p48_reg(0x51);
+        this->send_ads62p48_reg(0x52);
+        this->send_ads62p48_reg(0x62);
+        this->send_ads62p48_reg(0x75);
     }
 
     ~b250_adc_ctrl_impl(void)
     {
+        _ads62p48_regs.power_down = ads62p48_regs_t::POWER_DOWN_GLOBAL;
         UHD_SAFE_CALL
         (
-            _ads62p44_regs.power_down = ads62p44_regs_t::POWER_DOWN_GLOBAL_PD;
-            this->send_ads62p44_reg(0x14);
+            this->send_ads62p48_reg(0x40);
         )
     }
 
-    void set_rx_digital_gain(double gain)  //fine digital gain
-    {
-        _ads62p44_regs.fine_gain = int(gain/0.5);
-        this->send_ads62p44_reg(0x17);
-    }
-
-    void set_rx_digital_fine_gain(double gain)  //gain correction   
-    {   
-        _ads62p44_regs.gain_correction = int(gain / 0.05);
-        this->send_ads62p44_reg(0x1A);
-    }
-
-    void set_rx_analog_gain(bool /*gain*/)  //turns on/off analog 3.5dB preamp
-    {
-        _ads62p44_regs.coarse_gain = ads62p44_regs_t::COARSE_GAIN_3_5DB;//gain ? ads62p44_regs_t::COARSE_GAIN_3_5DB : ads62p44_regs_t::COARSE_GAIN_0DB;
-        this->send_ads62p44_reg(0x14);
-    }
-
 private:
-    ads62p44_regs_t _ads62p44_regs;
+    ads62p48_regs_t _ads62p48_regs;
     uhd::spi_iface::sptr _iface;
     const size_t _slaveno;
 
-    void send_ads62p44_reg(boost::uint8_t addr)
+    void send_ads62p48_reg(boost::uint8_t addr)
     {
-        boost::uint16_t reg = _ads62p44_regs.get_write_reg(addr);
+        boost::uint16_t reg = _ads62p48_regs.get_write_reg(addr);
         _iface->write_spi(_slaveno, spi_config_t::EDGE_FALL, reg, 16);
     }
 };

@@ -130,6 +130,7 @@ def get_options():
     parser.add_option("--list", action="store_true",           help="list possible network devices", default=False)
     parser.add_option("--peek", type="int",                 help="Read from memory map",     default=None)
     parser.add_option("--poke", type="int",                 help="Write to memory map",     default=None)
+    parser.add_option("--data", type="int",                 help="Data for poke",     default=None)
     parser.add_option("--stats", action="store_true",           help="Display SuperMIMO Network Stats", default=False)
     (options, args) = parser.parse_args()
 

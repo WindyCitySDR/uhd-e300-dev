@@ -5,6 +5,8 @@
 #include "b250_fw_common.h"
 #include "xge_phy.h"
 #include "ethernet.h"
+#include "chinch.h"
+#include "mdelay.h"
 
 #include <wb_utils.h>
 #include <udp_uart.h>
@@ -76,12 +78,20 @@ void handle_udp_fw_comms(
     {
         if (request->flags & B250_FW_COMMS_FLAGS_PEEK32)
         {
-            reply.data = wb_peek32(request->addr);
+            if (request->addr & 0x00100000) {
+                chinch_peek32(request->addr & 0x000FFFFF, &reply.data);
+            } else {
+                reply.data = wb_peek32(request->addr);
+            }
         }
 
         if (request->flags & B250_FW_COMMS_FLAGS_POKE32)
         {
-            wb_poke32(request->addr, request->data);
+            if (request->addr & 0x00100000) {
+                chinch_poke32(request->addr & 0x000FFFFF, request->data);
+            } else {
+                wb_poke32(request->addr, request->data);
+            }
         }
     }
 
@@ -92,40 +102,142 @@ void handle_udp_fw_comms(
     }
 }
 
+void handle_udp_fpga_prog(
+    const uint8_t ethno,
+    const struct ip_addr *src, const struct ip_addr *dst,
+    const uint16_t src_port, const uint16_t dst_port,
+    const void *buff, const size_t num_bytes
+)
+{
+    const b250_fpga_prog_t *request = (const b250_fpga_prog_t *)buff;
+    b250_fpga_prog_flags_t reply = {0};
+    bool status = true;
+
+    if (num_bytes < offsetof(b250_fpga_prog_t, data)) {
+        reply.flags |= B250_FPGA_PROG_FLAGS_ERROR;
+    } else {
+        if (request->flags & B250_FPGA_PROG_FLAGS_INIT) {
+            STATUS_MERGE(chinch_flash_init(), status);
+        } else if (request->flags & B250_FPGA_PROG_FLAGS_CLEANUP) {
+            chinch_flash_cleanup();
+        } else if (request->flags & B250_FPGA_PROG_CONFIGURE) {
+            //This is a self-destructive operation and will most likely not return an ack.
+            chinch_start_posc();
+        } else if (request->flags & B250_FPGA_PROG_CONFIG_STATUS) {
+            if (chinch_get_posc_status() != CHINCH_POSC_COMPLETED)
+                reply.flags |= B250_FPGA_PROG_FLAGS_ERROR;
+        } else {
+            STATUS_MERGE(chinch_flash_select_sector(request->sector), status);
+            if (request->flags & B250_FPGA_PROG_FLAGS_ERASE)
+                STATUS_CHAIN(chinch_flash_erase_sector(), status);
+
+            uint32_t num_buff_writes = (request->size / CHINCH_FLASH_MAX_BUF_WRITES) +
+                                       (request->size % CHINCH_FLASH_MAX_BUF_WRITES == 0 ? 0 : 1);
+            uint32_t data_idx = 0;
+            for (uint32_t buf_wr_i = 0; (buf_wr_i < num_buff_writes) && status; buf_wr_i++) {
+                uint32_t wr_len = (request->size - data_idx) >= CHINCH_FLASH_MAX_BUF_WRITES ?
+                    CHINCH_FLASH_MAX_BUF_WRITES : (request->size - data_idx);
+
+                STATUS_MERGE(chinch_flash_write_buf((request->index + data_idx)*2,
+                    (uint16_t*)request->data+data_idx, wr_len), status);
+                data_idx += wr_len;
+            }
+
+            if (request->flags & B250_FPGA_PROG_FLAGS_VERIFY) {
+                uint16_t data[request->size];
+                STATUS_MERGE(chinch_flash_read_buf(request->index*2, data, request->size), status);
+                for (uint32_t i = 0; i < request->size; i++) {
+                    status &= (data[i] == request->data[i]);
+                }
+            }
+        }
+    }
+    if (!status) reply.flags |= B250_FPGA_PROG_FLAGS_ERROR;
+
+    //send a reply if ack requested
+    if (request->flags & B250_FPGA_PROG_FLAGS_ACK)
+    {
+        u3_net_stack_send_udp_pkt(ethno, dst, src, dst_port, src_port, &reply, sizeof(reply));
+    }
+}
+
+void run_flash_access_test()
+{
+    printf("Running flash access test...\n");
+    bool status = true, result = true;
+
+    chinch_poke32(0x200, 0);
+
+    STATUS_CHAIN(chinch_flash_init(), status);
+    STATUS_CHAIN(chinch_flash_select_sector(156), status);
+    STATUS_CHAIN(chinch_flash_erase_sector(), status);
+
+    uint16_t wr_data[4] = {0xDEAD, 0xBEEF, 0x1234, 0x5678};
+    uint16_t rd_data[4] = {0x0000, 0x0000, 0x0000, 0x0000};
+
+    STATUS_CHAIN(chinch_flash_write(0x20, 0x0ACE), status);
+    STATUS_CHAIN(chinch_flash_write(0x22, 0xBA5E), status);
+    STATUS_CHAIN(chinch_flash_write_buf(0x0, wr_data, 4), status);
+
+    STATUS_CHAIN(chinch_flash_read_buf(0x0, rd_data, 4), status);
+    for (uint32_t i = 0; i < 4; i++) result &= (rd_data[i] == wr_data[i]);
+
+    uint16_t data = 0;
+    STATUS_CHAIN(chinch_flash_read(0x10, &data), status);
+    result &= (data == 0xFFFF);
+    STATUS_CHAIN(chinch_flash_read(0x12, &data), status);
+    result &= (data == 0xFFFF);
+    STATUS_CHAIN(chinch_flash_read(0x20, &data), status);
+    result &= (data == 0x0ACE);
+    STATUS_CHAIN(chinch_flash_read(0x22, &data), status);
+    result &= (data == 0xBA5E);
+
+    chinch_flash_cleanup();
+    result &= status;
+
+    chinch_poke32(0x200, result);
+
+    printf("[Debug] Flash access test %s\n", result?"PASSED":"FAILED");
+}
+
 int main(void)
 {
-  uint32_t last_counter = 0;
-  uint32_t xge_sfpp_hotplug_count = 0;
-  
+    uint32_t last_counter = 0;
+    uint32_t xge_sfpp_hotplug_count = 0;
+
     b250_init();
     u3_net_stack_register_udp_handler(B250_FW_COMMS_UDP_PORT, &handle_udp_fw_comms);
     u3_net_stack_register_udp_handler(B250_VITA_UDP_PORT, &handle_udp_prog_framer);
+    u3_net_stack_register_udp_handler(B250_FPGA_PROG_UDP_PORT, &handle_udp_fpga_prog);
+
+//    run_flash_access_test();
+
     while(true)
     {
         //makes leds do something alive
         const uint32_t counter = wb_peek32(RB0_BASE + 0*4);
         wb_poke32(SET0_BASE + 0*4, counter/CPU_CLOCK);
         if (counter/CPU_CLOCK != last_counter/CPU_CLOCK) {
-	  last_counter = counter;
-	  wb_poke32(SET0_BASE + 5*4, counter/CPU_CLOCK);
-	  wb_poke32(SET0_BASE + 6*4, counter);
-	}
-
-        //run the serial loader - poll and handle
-        //b250_serial_loader_run1();
+            last_counter = counter;
+            wb_poke32(SET0_BASE + 5*4, counter/CPU_CLOCK);
+            wb_poke32(SET0_BASE + 6*4, counter);
+        }
 
         //run the network stack - poll and handle
         u3_net_stack_handle_one();
 
+        //run the PCIe listener - poll and fwd to wishbone
+        forward_pcie_user_xact_to_wb();
+
         //run the udp uart handler for incoming serial data
         udp_uart_poll();
 
-	if ((xge_sfpp_hotplug_count++) == 1000) {
-          // Every so often poll XGE Phy to look for SFP+ hotplug events.
-          xge_sfpp_hotplug_count = 0;
-	  xge_poll_sfpp_status(0);
-	  
-	}
+        if ((xge_sfpp_hotplug_count++) == 1000) {
+              // Every so often poll XGE Phy to look for SFP+ hotplug events.
+              xge_sfpp_hotplug_count = 0;
+          xge_poll_sfpp_status(0);
+
+        }
     }
     return 0;
 }

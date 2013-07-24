@@ -20,6 +20,7 @@
 
 #include <uhd/property_tree.hpp>
 #include <uhd/device.hpp>
+#include <uhd/usrp/mboard_eeprom.hpp>
 #include <uhd/usrp/dboard_manager.hpp>
 #include <uhd/usrp/dboard_eeprom.hpp>
 #include <uhd/usrp/subdev_spec.hpp>
@@ -46,7 +47,7 @@
 
 static const size_t B250_TX_FC_PKT_WINDOW = 2048; //16MB/8Kpkts
 static const std::string B250_FW_FILE_NAME = "usrp_b250_fw.bin";
-static const double B250_RADIO_CLOCK_RATE = 120e6;
+static const double B250_DEFAULT_TICK_RATE = 120e6;
 static const double B250_BUS_CLOCK_RATE = 175000000;
 static const bool B250_ENABLE_RX_FC = false;
 
@@ -164,14 +165,25 @@ struct b250_impl : public uhd::device
     void update_rx_subdev_spec(const uhd::usrp::subdev_spec_t &spec);
     void update_tx_subdev_spec(const uhd::usrp::subdev_spec_t &spec);
 
+    void set_tick_rate(const double);
     void update_tick_rate(const double);
     void update_rx_samp_rate(const size_t, const double);
     void update_tx_samp_rate(const size_t, const double);
+
+    struct clock_control_regs_t
+    {
+        int clock_source;
+        int clock_sync_out;
+        int clock_sync_pps;
+        int pps_select;
+    } clock_control_regs;
+    void update_clock_control(void);
 
     void update_clock_source(const std::string &);
     void update_time_source(const std::string &);
     uhd::sensor_value_t get_ref_locked(void);
     void set_db_eeprom(const size_t, const uhd::usrp::dboard_eeprom_t &);
+    void set_mb_eeprom(const uhd::usrp::mboard_eeprom_t &);
 };
 
 #endif /* INCLUDED_B250_IMPL_HPP */

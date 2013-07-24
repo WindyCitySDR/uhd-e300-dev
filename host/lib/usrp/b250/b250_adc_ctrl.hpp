@@ -35,26 +35,9 @@ public:
      */
     static sptr make(uhd::spi_iface::sptr iface, const size_t slaveno);
 
-    /*!
-     * Set the analog preamplifier on the USRP2+ ADC (ADS62P44).
-     * \param gain enable or disable the 3.5dB preamp
-     */
+    virtual double set_gain(const double &) = 0;
 
-    virtual void set_rx_analog_gain(bool gain) = 0;
-
-    /*!
-     * Set the digital gain on the USRP2+ ADC (ADS62P44).
-     * \param gain from 0-6dB
-     */
-
-    virtual void set_rx_digital_gain(double gain) = 0;
-
-    /*!
-     * Set the digital gain correction on the USRP2+ ADC (ADS62P44).
-     * \param gain from 0-0.5dB
-     */
-
-    virtual void set_rx_digital_fine_gain(double gain) = 0;
+    virtual void set_test_word(const std::string &patterna, const std::string &patternb, const boost::uint32_t = 0) = 0;
 
 };
 

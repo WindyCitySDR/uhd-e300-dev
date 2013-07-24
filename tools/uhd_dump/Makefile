@@ -6,7 +6,7 @@ OBJECTS = uhd_dump.o
 
 CFLAGS = -g -O0 -Wall
 
-LDFLAGS = -lpcap -lm -L/usr/lib/x86_64-linux-gnu
+LDFLAGS = -lpcap -lm -L/usr/lib/x86_64-linux-gnu -static /usr/lib/x86_64-linux-gnu/libpcap.a
 
 CC = cc
 
@@ -20,3 +20,4 @@ vrlp_log: uhd_dump.o  vrlp_log.o $(INCLUDES)
 
 clean:
 	rm $(BINARIES)  $(BINARIES:%=%.o) $(OBJECTS)
+

@@ -37,16 +37,27 @@ using namespace uhd;
 class b250_dac_ctrl_impl : public b250_dac_ctrl
 {
 public:
-    b250_dac_ctrl_impl(uhd::spi_iface::sptr iface, const size_t slaveno):
+    b250_dac_ctrl_impl(uhd::spi_iface::sptr iface, const size_t slaveno, const double refclk):
         _iface(iface), _slaveno(slaveno)
     {
         write_ad9146_reg(0x00, 0x20); //reset
         write_ad9146_reg(0x00, 0x80); //config + out of reset
         write_ad9146_reg(0x1e, 0x01); //data path config - set for proper operation
 
+        /* calculate N0 to be VCO friendly */
+        const int N1 = 4;
+        int N0_val, N0;
+        for (N0_val = 0; N0_val < 3; N0_val++)
+        {
+            N0 = (1 << N0_val); //1, 2, 4
+            if ((refclk * N0 * N1) >= 1e9) break;
+        }
+        UHD_ASSERT_THROW((refclk * N0 * N1) >= 1e9);
+        UHD_ASSERT_THROW((refclk * N0 * N1) <= 2e9);
+
         /* Start PLL */
         write_ad9146_reg(0x0C, 0xD1);
-        write_ad9146_reg(0x0D, 0xD9); // N0=4, N1=4, N2=16
+        write_ad9146_reg(0x0D, 0xD1 | (N0_val << 2)); // N1=4, N2=16
         write_ad9146_reg(0x0A, 0xCF); // Auto init VCO band training
         write_ad9146_reg(0x0A, 0xA0); // See above.
 
@@ -102,7 +113,7 @@ private:
 /***********************************************************************
  * Public make function for the DAC control
  **********************************************************************/
-b250_dac_ctrl::sptr b250_dac_ctrl::make(uhd::spi_iface::sptr iface, const size_t slaveno)
+b250_dac_ctrl::sptr b250_dac_ctrl::make(uhd::spi_iface::sptr iface, const size_t slaveno, const double clock_rate)
 {
-    return sptr(new b250_dac_ctrl_impl(iface, slaveno));
+    return sptr(new b250_dac_ctrl_impl(iface, slaveno, clock_rate));
 }

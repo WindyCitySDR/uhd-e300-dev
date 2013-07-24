@@ -22,7 +22,7 @@ include_directories(${CMAKE_SOURCE_DIR}/../../host/lib/usrp/b250)
 list(APPEND b250_sources b250_init.c b250_main.c)
 
 ########################################################################
-set(GEN_OUTPUTS_BIN_SIZE 0x3fff)
+set(GEN_OUTPUTS_BIN_SIZE 0x7fff)
 
 add_executable(b250_main.elf ${b250_sources})
 target_link_libraries(b250_main.elf usrpfw)

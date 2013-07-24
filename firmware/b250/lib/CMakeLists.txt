@@ -26,4 +26,5 @@ add_library(usrpfw STATIC
     u3_net_stack.c
     ethernet.c
     mdelay.c
+    chinch.c
 )

@@ -40,7 +40,7 @@
 
 #define VERBOSE 0
 
-#define	NETHS	1	// # of ethernet interfaces
+#define	NETHS	2	// # of ethernet interfaces
 
 
 ////////////////////////////////////////////////////////////////////////
@@ -277,25 +277,25 @@ xge_poll_sfpp_status(const uint32_t eth)
 {   
   uint32_t x;
   // Has MODDET/MODAbS changed since we last looked?
-  x = wb_peek32(SR_ADDR(RB0_BASE, RB_SFPP_STATUS));
+  x = wb_peek32(SR_ADDR(RB0_BASE, (eth==0) ? RB_SFPP_STATUS0 : RB_SFPP_STATUS1 ));
 
   if (x & SFPP_STATUS_RXLOS_CHG)
-    printf("DEBUG: RXLOS changed state: %d\n",x & SFPP_STATUS_RXLOS);
+    printf("DEBUG: eth%1d RXLOS changed state: %d\n", eth, x & SFPP_STATUS_RXLOS);
   if (x & SFPP_STATUS_TXFAULT_CHG)
-    printf("DEBUG: TXFAULT changed state: %d\n", (x & SFPP_STATUS_TXFAULT) >> 1 );
+    printf("DEBUG: eth%1d TXFAULT changed state: %d\n", eth,(x & SFPP_STATUS_TXFAULT) >> 1 );
   if (x & SFPP_STATUS_MODABS_CHG)
-    printf("DEBUG: MODABS changed state: %d\n", (x & SFPP_STATUS_MODABS) >> 2);
+    printf("DEBUG: eth%1d MODABS changed state: %d\n", eth, (x & SFPP_STATUS_MODABS) >> 2);
 
   if (x & (SFPP_STATUS_RXLOS_CHG|SFPP_STATUS_TXFAULT_CHG|SFPP_STATUS_MODABS_CHG))
     if (( x & (SFPP_STATUS_RXLOS|SFPP_STATUS_TXFAULT|SFPP_STATUS_MODABS)) == 0) {
       // Only re-init if it's 10GE
-      if (wb_peek32(SR_ADDR(RB0_BASE, RB_VERSION)) != 0) {
-	xge_ethernet_init(0);
-	dump_mdio_regs(XGE0_BASE,MDIO_PORT);
+      if (wb_peek32(SR_ADDR(RB0_BASE, (eth==0) ? RB_ETH_TYPE0 : RB_ETH_TYPE1)) != 0) {
+	xge_ethernet_init(eth);
+	dump_mdio_regs((eth==0) ? XGE0_BASE : XGE1_BASE,MDIO_PORT);
 	mdelay(100);
-	dump_mdio_regs(XGE0_BASE,MDIO_PORT);
+	dump_mdio_regs((eth==0) ? XGE0_BASE : XGE1_BASE,MDIO_PORT);
 	mdelay(100);
-	dump_mdio_regs(XGE0_BASE,MDIO_PORT);
+	dump_mdio_regs((eth==0) ? XGE0_BASE : XGE1_BASE,MDIO_PORT);
       }
     }
 
@@ -308,7 +308,7 @@ xge_poll_sfpp_status(const uint32_t eth)
       // MODDET is low, module currently inserted.
       // Return status.
       printf("INFO: A new SFP+ module has been inserted into eth port %d.\n", eth);
-      xge_read_sfpp_type(I2C0_BASE,1);
+      xge_read_sfpp_type((eth==0) ? I2C0_BASE : I2C2_BASE,1);
     }
   }
 }
@@ -317,11 +317,12 @@ xge_poll_sfpp_status(const uint32_t eth)
 void
 xge_ethernet_init(const uint32_t eth)
 { 
-  xge_mac_init(XGE0_BASE); 
+  xge_mac_init((eth==0) ? XGE0_BASE : XGE1_BASE); 
  //xge_hard_phy_reset();  
-  xge_phy_init(XGE0_BASE,MDIO_PORT);    
-  uint32_t x = wb_peek32(SR_ADDR(RB0_BASE, RB_SFPP_STATUS));
-  printf("SFP initial state: RXLOS: %d  TXFAULT: %d  MODABS: %d\n",
+  xge_phy_init((eth==0) ? XGE0_BASE : XGE1_BASE ,MDIO_PORT);    
+  uint32_t x = wb_peek32(SR_ADDR(RB0_BASE, (eth==0) ? RB_SFPP_STATUS0 : RB_SFPP_STATUS1 ));
+  printf(" eth%1d SFP initial state: RXLOS: %d  TXFAULT: %d  MODABS: %d\n",
+	 eth,
 	 x & SFPP_STATUS_RXLOS,
 	 (x & SFPP_STATUS_TXFAULT) >> 1,
 	 (x & SFPP_STATUS_MODABS) >> 2);

@@ -22,7 +22,6 @@
 #include <uhd/utils/images.hpp>
 #include <uhd/utils/safe_call.hpp>
 #include <uhd/usrp/subdev_spec.hpp>
-#include <uhd/usrp/mboard_eeprom.hpp>
 #include <uhd/transport/if_addrs.hpp>
 #include <boost/foreach.hpp>
 #include <boost/asio.hpp>
@@ -39,10 +38,10 @@ namespace asio = boost::asio;
 /***********************************************************************
  * Discovery over the udp transport
  **********************************************************************/
-static device_addrs_t b250_find_with_addr(const device_addr_t &dev_addr)
+static device_addrs_t b250_find_with_addr(const device_addr_t &hint)
 {
     udp_simple::sptr comm = udp_simple::make_broadcast(
-        dev_addr["addr"], BOOST_STRINGIZE(B250_FW_COMMS_UDP_PORT));
+        hint["addr"], BOOST_STRINGIZE(B250_FW_COMMS_UDP_PORT));
 
     //load request struct
     b250_fw_comms_t request = b250_fw_comms_t();
@@ -63,9 +62,34 @@ static device_addrs_t b250_find_with_addr(const device_addr_t &dev_addr)
         if (request.flags != reply->flags) break;
         if (request.sequence != reply->sequence) break;
         device_addr_t new_addr;
-        new_addr["type"] = "b250";
+        new_addr["type"] = "x300";
         new_addr["addr"] = comm->get_recv_addr();
-        addrs.push_back(new_addr);
+
+        //Attempt to read the name from the EEPROM and perform filtering.
+        //This operation can throw due to compatibility mismatch.
+        try
+        {
+            wb_iface::sptr zpu_ctrl(new b250_ctrl_iface(udp_simple::make_connected(new_addr["addr"], BOOST_STRINGIZE(B250_FW_COMMS_UDP_PORT))));
+            i2c_core_100_wb32::sptr zpu_i2c = i2c_core_100_wb32::make(zpu_ctrl, I2C1_BASE);
+            i2c_iface::sptr eeprom16 = zpu_i2c->eeprom16();
+            const mboard_eeprom_t mb_eeprom(*eeprom16, "X300");
+            new_addr["name"] = mb_eeprom["name"];
+            new_addr["serial"] = mb_eeprom["serial"];
+        }
+        catch(const std::exception &)
+        {
+            //set these values as empty string so the device may still be found
+            //and the filter's below can still operate on the discovered device
+            new_addr["name"] = "";
+            new_addr["serial"] = "";
+        }
+        //filter the discovered device below by matching optional keys
+        if (
+            (not hint.has_key("name")   or hint["name"]   == new_addr["name"]) and
+            (not hint.has_key("serial") or hint["serial"] == new_addr["serial"])
+        ){
+            addrs.push_back(new_addr);
+        }
     }
 
     return addrs;
@@ -77,7 +101,7 @@ static device_addrs_t b250_find(const device_addr_t &hint_)
     const device_addr_t hint = separate_device_addr(hint_).at(0);
 
     device_addrs_t addrs;
-    if (hint.has_key("type") and hint["type"] != "b250") return addrs;
+    if (hint.has_key("type") and hint["type"] != "x300") return addrs;
 
     //use the address given
     if (hint.has_key("addr"))
@@ -137,26 +161,34 @@ static void b250_load_fw(const std::string &addr, const std::string &file_name)
 
     //poke the fw words into the upper bootram half
     size_t seq = 0;
+    b250_fw_comms_t request = b250_fw_comms_t();
+    char buff[B250_FW_COMMS_MTU] = {};
+
+    request.flags = uhd::htonx<boost::uint32_t>(B250_FW_COMMS_FLAGS_POKE32 | B250_FW_COMMS_FLAGS_ACK);
+    request.sequence = uhd::htonx<boost::uint32_t>(seq++);
+    request.addr = uhd::htonx<boost::uint32_t>(SR_ADDR(BOOT_LDR_BASE, BL_ADDRESS));
+    request.data = 0;
+    comm->send(asio::buffer(&request, sizeof(request)));
+    comm->recv(asio::buffer(buff));
+
     for (size_t i = 0; i < B250_FW_NUM_BYTES; i+=sizeof(boost::uint32_t))
     {
         //do ack for occasional backpressure
         const bool ack = (i & 0xf) == 0;
 
         //load request struct
-        b250_fw_comms_t request = b250_fw_comms_t();
         request.flags = uhd::htonx<boost::uint32_t>(B250_FW_COMMS_FLAGS_POKE32 | (ack?B250_FW_COMMS_FLAGS_ACK : 0));
         request.sequence = uhd::htonx<boost::uint32_t>(seq++);
-        request.addr = uhd::htonx<boost::uint32_t>(B250_FW_NUM_BYTES+i);
+        request.addr = uhd::htonx<boost::uint32_t>(SR_ADDR(BOOT_LDR_BASE, BL_DATA));
         request.data = uhd::htonx(uhd::byteswap(fw_file_buff[i/sizeof(boost::uint32_t)]));
 
         //send request
         comm->send(asio::buffer(&request, sizeof(request)));
 
         //do ack for occasional backpressure
-        char buff[B250_FW_COMMS_MTU] = {};
         if (ack) comm->recv(asio::buffer(buff));
 
-        if ((i & 0xfff) == 0) UHD_MSG(status) << "." << std::flush;
+        if ((i & 0x1fff) == 0) UHD_MSG(status) << "." << std::flush;
     }
 
     UHD_MSG(status) << " done!" << std::endl;
@@ -164,6 +196,7 @@ static void b250_load_fw(const std::string &addr, const std::string &file_name)
 
 b250_impl::b250_impl(const uhd::device_addr_t &dev_addr)
 {
+    UHD_MSG(status) << "X300 initialization sequence..." << std::endl;
     _async_md.reset(new async_md_type(1000/*messages deep*/));
     _tree = uhd::property_tree::make();
     _sid_framer = 0;
@@ -187,6 +220,7 @@ b250_impl::b250_impl(const uhd::device_addr_t &dev_addr)
     const std::vector<std::string> DB_NAMES = boost::assign::list_of("A")("B");
 
     //create basic communication
+    UHD_MSG(status) << "Setup basic communication..." << std::endl;
     _zpu_ctrl.reset(new b250_ctrl_iface(udp_simple::make_connected(_addr, BOOST_STRINGIZE(B250_FW_COMMS_UDP_PORT))));
     _zpu_spi = spi_core_3000::make(_zpu_ctrl, SR_ADDR(SET0_BASE, ZPU_SR_SPI), SR_ADDR(SET0_BASE, ZPU_RB_SPI));
     _zpu_i2c = i2c_core_100_wb32::make(_zpu_ctrl, I2C1_BASE);
@@ -195,9 +229,9 @@ b250_impl::b250_impl(const uhd::device_addr_t &dev_addr)
     ////////////////////////////////////////////////////////////////////
     // Initialize the properties tree
     ////////////////////////////////////////////////////////////////////
-    _tree->create<std::string>("/name").set("B-Series Device");
+    _tree->create<std::string>("/name").set("X-Series Device");
     const fs_path mb_path = "/mboards/0";
-    _tree->create<std::string>(mb_path / "name").set("B250");
+    _tree->create<std::string>(mb_path / "name").set("X300");
     _tree->create<std::string>(mb_path / "codename").set("Yetti");
     _tree->create<std::string>(mb_path / "fpga_version").set("1.0");
     _tree->create<std::string>(mb_path / "fw_version").set("1.0");
@@ -205,29 +239,44 @@ b250_impl::b250_impl(const uhd::device_addr_t &dev_addr)
     ////////////////////////////////////////////////////////////////////
     // setup the mboard eeprom
     ////////////////////////////////////////////////////////////////////
-    // TODO
-//    const mboard_eeprom_t mb_eeprom(*_iface, mboard_eeprom_t::MAP_B100);
-    mboard_eeprom_t mb_eeprom;
-    mb_eeprom["name"] = "TODO"; //FIXME with real eeprom values
-    mb_eeprom["serial"] = "TODO"; //FIXME with real eeprom values
+    UHD_MSG(status) << "Loading values from EEPROM..." << std::endl;
+    i2c_iface::sptr eeprom16 = _zpu_i2c->eeprom16();
+    const mboard_eeprom_t mb_eeprom(*eeprom16, "X300");
     _tree->create<mboard_eeprom_t>(mb_path / "eeprom")
-        .set(mb_eeprom);
+        .set(mb_eeprom)
+        .subscribe(boost::bind(&b250_impl::set_mb_eeprom, this, _1));
 
     ////////////////////////////////////////////////////////////////////
     // read dboard eeproms
     ////////////////////////////////////////////////////////////////////
     for (size_t i = 0; i < 8; i++)
     {
+        if (i == 0 or i == 2) continue; //not used
         _db_eeproms[i].load(*_zpu_i2c, 0x50 | i);
     }
 
     ////////////////////////////////////////////////////////////////////
     // create clock control objects
     ////////////////////////////////////////////////////////////////////
-    UHD_HERE();
-    _clock = b250_clock_ctrl::make(_zpu_spi, 1/*slaveno*/);
+    UHD_MSG(status) << "Setup RF frontend clocking..." << std::endl;
+
+    //init shadow and clock source
+    clock_control_regs.clock_sync_out = 0; //clock sync off
+    clock_control_regs.clock_sync_pps = 0; //pps sync off
+    clock_control_regs.pps_select = 0; //internal
+    this->update_clock_source("internal");
+    this->update_clock_control();
+
+    _clock = b250_clock_ctrl::make(_zpu_spi, 1/*slaveno*/,
+        dev_addr.cast<double>("master_clock_rate", B250_DEFAULT_TICK_RATE));
     _tree->create<double>(mb_path / "tick_rate")
-        .set(B250_RADIO_CLOCK_RATE);
+        .publish(boost::bind(&b250_clock_ctrl::get_master_clock_rate, _clock));
+
+    //perform sync operation on lmk
+    clock_control_regs.clock_sync_out = 1;
+    this->update_clock_control();
+    clock_control_regs.clock_sync_out = 0;
+    this->update_clock_control();
 
     ////////////////////////////////////////////////////////////////////
     // Create the GPSDO control
@@ -273,6 +322,7 @@ b250_impl::b250_impl(const uhd::device_addr_t &dev_addr)
     ////////////////////////////////////////////////////////////////////
     // setup radios
     ////////////////////////////////////////////////////////////////////
+    UHD_MSG(status) << "Initialize Radio control..." << std::endl;
     this->setup_radio(0, DB_NAMES[0]);
     this->setup_radio(1, DB_NAMES[1]);
 
@@ -316,8 +366,9 @@ b250_impl::b250_impl(const uhd::device_addr_t &dev_addr)
     // do some post-init tasks
     ////////////////////////////////////////////////////////////////////
     _tree->access<double>(mb_path / "tick_rate") //now subscribe the clock rate setter
+        .subscribe(boost::bind(&b250_impl::set_tick_rate, this, _1))
         .subscribe(boost::bind(&b250_impl::update_tick_rate, this, _1))
-        .set(B250_RADIO_CLOCK_RATE);
+        .set(_clock->get_master_clock_rate());
 
     subdev_spec_t rx_fe_spec, tx_fe_spec;
     rx_fe_spec.push_back(subdev_spec_pair_t("A", _tree->list(mb_path / "dboards" / "A" / "rx_frontends").at(0)));
@@ -351,6 +402,13 @@ b250_impl::~b250_impl(void)
     )
 }
 
+static void check_adc(wb_iface::sptr iface, const boost::uint32_t val)
+{
+    boost::uint32_t adc_rb = iface->peek32(RB32_RX);
+    adc_rb ^= 0xfffc0000; //adapt for I inversion in FPGA
+    UHD_ASSERT_THROW(adc_rb == val);
+}
+
 void b250_impl::setup_radio(const size_t i, const std::string &db_name)
 {
     const fs_path mb_path = "/mboards/0";
@@ -360,7 +418,6 @@ void b250_impl::setup_radio(const size_t i, const std::string &db_name)
     ////////////////////////////////////////////////////////////////////
     // radio control
     ////////////////////////////////////////////////////////////////////
-    UHD_HERE();
     sid_config_t config;
     config.router_addr_there = B250_DEVICE_THERE;
     config.dst_prefix = B250_RADIO_DEST_PREFIX_CTRL;
@@ -369,40 +426,54 @@ void b250_impl::setup_radio(const size_t i, const std::string &db_name)
     const boost::uint32_t ctrl_sid = this->allocate_sid(config);
     udp_zero_copy::sptr ctrl_xport = this->make_transport(_addr, ctrl_sid);
     perif.ctrl = radio_ctrl_core_3000::make(vrt::if_packet_info_t::LINK_TYPE_VRLP, ctrl_xport, ctrl_xport, ctrl_sid, db_name);
-    perif.ctrl->poke32(TOREG(SR_MISC_OUTS), (1 << 2)); //reset adc + dac
     perif.ctrl->poke32(TOREG(SR_MISC_OUTS),  (1 << 1) | (1 << 0)); //out of reset + dac enable
 
     this->register_loopback_self_test(perif.ctrl);
 
     perif.spi = spi_core_3000::make(perif.ctrl, TOREG(SR_SPI), RB32_SPI);
     perif.adc = b250_adc_ctrl::make(perif.spi, DB_ADC_SEN);
-    perif.dac = b250_dac_ctrl::make(perif.spi, DB_DAC_SEN);
+    perif.dac = b250_dac_ctrl::make(perif.spi, DB_DAC_SEN, _clock->get_master_clock_rate());
+
+    ////////////////////////////////////////////////////////////////
+    // ADC self test
+    ////////////////////////////////////////////////////////////////
+    perif.adc->set_test_word("ones", "ones"); check_adc(perif.ctrl, 0xfffcfffc);
+    perif.adc->set_test_word("zeros", "zeros"); check_adc(perif.ctrl, 0x00000000);
+    perif.adc->set_test_word("ones", "zeros"); check_adc(perif.ctrl, 0xfffc0000);
+    perif.adc->set_test_word("zeros", "ones"); check_adc(perif.ctrl, 0x0000fffc);
+    for (size_t k = 0; k < 14; k++)
+    {
+        perif.adc->set_test_word("zeros", "custom", 1 << k);
+        check_adc(perif.ctrl, 1 << (k+2));
+    }
+    for (size_t k = 0; k < 14; k++)
+    {
+        perif.adc->set_test_word("custom", "zeros", 1 << k);
+        check_adc(perif.ctrl, 1 << (k+18));
+    }
+    perif.adc->set_test_word("normal", "normal");
 
     ////////////////////////////////////////////////////////////////
     // create codec control objects
     ////////////////////////////////////////////////////////////////
     _tree->create<int>(mb_path / "rx_codecs" / db_name / "gains"); //phony property so this dir exists
     _tree->create<int>(mb_path / "tx_codecs" / db_name / "gains"); //phony property so this dir exists
-    _tree->create<std::string>(mb_path / "rx_codecs" / db_name / "name").set("ads62p44");
+    _tree->create<std::string>(mb_path / "rx_codecs" / db_name / "name").set("ads62p48");
     _tree->create<std::string>(mb_path / "tx_codecs" / db_name / "name").set("ad9146");
 
     _tree->create<meta_range_t>(mb_path / "rx_codecs" / db_name / "gains" / "digital" / "range").set(meta_range_t(0, 6.0, 0.5));
-    _tree->create<double>(mb_path / "rx_codecs" / db_name / "gains" / "digital/value")
-        .subscribe(boost::bind(&b250_adc_ctrl::set_rx_digital_gain, perif.adc, _1)).set(0);
-
-    _tree->create<meta_range_t>(mb_path / "rx_codecs" / db_name / "gains" / "fine" / "range").set(meta_range_t(0, 0.5, 0.05));
-    _tree->create<double>(mb_path / "rx_codecs" / db_name / "gains" / "fine" / "value")
-        .subscribe(boost::bind(&b250_adc_ctrl::set_rx_digital_fine_gain, perif.adc, _1)).set(0);
+    _tree->create<double>(mb_path / "rx_codecs" / db_name / "gains" / "digital" / "value")
+        .subscribe(boost::bind(&b250_adc_ctrl::set_gain, perif.adc, _1)).set(0);
 
     ////////////////////////////////////////////////////////////////////
     // create rx dsp control objects
     ////////////////////////////////////////////////////////////////////
     perif.framer = rx_vita_core_3000::make(perif.ctrl, TOREG(SR_RX_CTRL));
-    perif.framer->set_tick_rate(B250_RADIO_CLOCK_RATE);
     perif.ddc = rx_dsp_core_3000::make(perif.ctrl, TOREG(SR_RX_DSP));
     perif.ddc->set_link_rate(10e9/8); //whatever
-    perif.ddc->set_tick_rate(B250_RADIO_CLOCK_RATE);
-
+    _tree->access<double>(mb_path / "tick_rate")
+        .subscribe(boost::bind(&rx_vita_core_3000::set_tick_rate, perif.framer, _1))
+        .subscribe(boost::bind(&rx_dsp_core_3000::set_tick_rate, perif.ddc, _1));
     const fs_path rx_dsp_path = mb_path / "rx_dsps" / str(boost::format("%u") % dspno);
     _tree->create<meta_range_t>(rx_dsp_path / "rate" / "range")
         .publish(boost::bind(&rx_dsp_core_3000::get_host_rates, perif.ddc));
@@ -422,11 +493,11 @@ void b250_impl::setup_radio(const size_t i, const std::string &db_name)
     // create tx dsp control objects
     ////////////////////////////////////////////////////////////////////
     perif.deframer = tx_vita_core_3000::make(perif.ctrl, TOREG(SR_TX_CTRL));
-    perif.deframer->set_tick_rate(B250_RADIO_CLOCK_RATE);
     perif.duc = tx_dsp_core_3000::make(perif.ctrl, TOREG(SR_TX_DSP));
     perif.duc->set_link_rate(10e9/8); //whatever
-    perif.duc->set_tick_rate(B250_RADIO_CLOCK_RATE);
-
+    _tree->access<double>(mb_path / "tick_rate")
+        .subscribe(boost::bind(&tx_vita_core_3000::set_tick_rate, perif.deframer, _1))
+        .subscribe(boost::bind(&tx_dsp_core_3000::set_tick_rate, perif.duc, _1));
     const fs_path tx_dsp_path = mb_path / "tx_dsps" / str(boost::format("%u") % dspno);
     _tree->create<meta_range_t>(tx_dsp_path / "rate" / "range")
         .publish(boost::bind(&tx_dsp_core_3000::get_host_rates, perif.duc));
@@ -447,8 +518,6 @@ void b250_impl::setup_radio(const size_t i, const std::string &db_name)
     time64_rb_bases.rb_now = RB64_TIME_NOW;
     time64_rb_bases.rb_pps = RB64_TIME_PPS;
     perif.time64 = time_core_3000::make(perif.ctrl, TOREG(SR_TIME), time64_rb_bases);
-    perif.time64->set_tick_rate(B250_RADIO_CLOCK_RATE);
-    perif.time64->self_test();
 
     ////////////////////////////////////////////////////////////////////
     // create RF frontend interfacing
@@ -556,6 +625,15 @@ boost::uint32_t b250_impl::allocate_sid(const sid_config_t &config)
     return sid;
 }
 
+void b250_impl::set_tick_rate(const double rate)
+{
+    BOOST_FOREACH(radio_perifs_t &perif, _radio_perifs)
+    {
+        perif.time64->set_tick_rate(rate);
+        perif.time64->self_test();
+    }
+}
+
 void b250_impl::register_loopback_self_test(wb_iface::sptr iface)
 {
     bool test_fail = false;
@@ -571,33 +649,61 @@ void b250_impl::register_loopback_self_test(wb_iface::sptr iface)
     UHD_MSG(status) << ((test_fail)? " fail" : "pass") << std::endl;
 }
 
+void b250_impl::update_clock_control(void)
+{
+    const size_t reg = clock_control_regs.clock_source
+        | (clock_control_regs.clock_sync_out << 2)
+        | (clock_control_regs.clock_sync_pps << 3)
+        | (clock_control_regs.pps_select << 4)
+    ;
+    _zpu_ctrl->poke32(SR_ADDR(SET0_BASE, ZPU_SR_CLOCK_CTRL), reg);
+}
+
 void b250_impl::update_clock_source(const std::string &source)
 {
-    size_t value = 0x1;
-    if (source == "internal") value |= (0x2 << 1);
-    else if (source == "external") value |= (0x0 << 1);
-    else if (source == "gpsdo") value |= (0x3 << 1);
+    clock_control_regs.clock_source = 0;
+    if (source == "internal") clock_control_regs.clock_source = 0x2;
+    else if (source == "external") clock_control_regs.clock_source = 0x0;
+    else if (source == "gpsdo") clock_control_regs.clock_source = 0x3;
     else throw uhd::key_error("update_clock_source: unknown source: " + source);
-    _zpu_ctrl->poke32(SR_ADDR(SET0_BASE, ZPU_SR_CLOCK_CTRL), value);
+    this->update_clock_control();
 }
 
 void b250_impl::update_time_source(const std::string &source)
 {
+    //---- BEGIN MAGICAL PPS SYNC HOOK ----//
+    if (source == "pps_sync")
+    {
+        clock_control_regs.clock_sync_pps = 1;
+        this->update_clock_control();
+        return;
+    }
+    else clock_control_regs.clock_sync_pps = 0;
+    //---- END MAGICAL PPS SYNC HOOK ----//
+
     if (source == "none"){}
     else if (source == "external"){}
     else if (source == "gpsdo"){}
     else throw uhd::key_error("update_time_source: unknown source: " + source);
     _radio_perifs[0].time64->set_time_source((source == "external")? "external" : "internal");
     _radio_perifs[1].time64->set_time_source((source == "external")? "external" : "internal");
+    clock_control_regs.pps_select = (source == "external")? 1 : 0;
+    this->update_clock_control();
 }
 
 sensor_value_t b250_impl::get_ref_locked(void)
 {
-    const bool lock = (_zpu_ctrl->peek32(SR_ADDR(SET0_BASE, 1)) & (1 << 1)) != 0;
+    const bool lock = (_zpu_ctrl->peek32(SR_ADDR(SET0_BASE, ZPU_RB_CLK_STATUS)) & (1 << 2)) != 0;
     return sensor_value_t("Ref", lock, "locked", "unlocked");
 }
 
 void b250_impl::set_db_eeprom(const size_t addr, const uhd::usrp::dboard_eeprom_t &db_eeprom)
 {
     db_eeprom.store(*_zpu_i2c, addr);
+}
+
+void b250_impl::set_mb_eeprom(const mboard_eeprom_t &mb_eeprom)
+{
+    i2c_iface::sptr eeprom16 = _zpu_i2c->eeprom16();
+    mb_eeprom.commit(*eeprom16, "X300");
 }
