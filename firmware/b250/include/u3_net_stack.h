@@ -36,7 +36,7 @@ typedef struct
 
 void u3_net_stack_init(wb_pkt_iface64_config_t *config);
 
-void u3_net_stack_init_eth(const uint8_t ethno, const eth_mac_addr_t *mac, const struct ip_addr *ip);
+void u3_net_stack_init_eth(const uint8_t ethno, const eth_mac_addr_t *mac, const struct ip_addr *ip, const struct ip_addr *subnet);
 
 const struct ip_addr *u3_net_stack_get_ip_addr(const uint8_t ethno);
 

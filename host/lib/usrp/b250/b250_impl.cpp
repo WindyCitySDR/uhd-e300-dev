@@ -38,10 +38,10 @@ namespace asio = boost::asio;
 /***********************************************************************
  * Discovery over the udp transport
  **********************************************************************/
-static device_addrs_t b250_find_with_addr(const device_addr_t &dev_addr)
+static device_addrs_t b250_find_with_addr(const device_addr_t &hint)
 {
     udp_simple::sptr comm = udp_simple::make_broadcast(
-        dev_addr["addr"], BOOST_STRINGIZE(B250_FW_COMMS_UDP_PORT));
+        hint["addr"], BOOST_STRINGIZE(B250_FW_COMMS_UDP_PORT));
 
     //load request struct
     b250_fw_comms_t request = b250_fw_comms_t();
@@ -62,9 +62,34 @@ static device_addrs_t b250_find_with_addr(const device_addr_t &dev_addr)
         if (request.flags != reply->flags) break;
         if (request.sequence != reply->sequence) break;
         device_addr_t new_addr;
-        new_addr["type"] = "b250";
+        new_addr["type"] = "x300";
         new_addr["addr"] = comm->get_recv_addr();
-        addrs.push_back(new_addr);
+
+        //Attempt to read the name from the EEPROM and perform filtering.
+        //This operation can throw due to compatibility mismatch.
+        try
+        {
+            wb_iface::sptr zpu_ctrl(new b250_ctrl_iface(udp_simple::make_connected(new_addr["addr"], BOOST_STRINGIZE(B250_FW_COMMS_UDP_PORT))));
+            i2c_core_100_wb32::sptr zpu_i2c = i2c_core_100_wb32::make(zpu_ctrl, I2C1_BASE);
+            i2c_iface::sptr eeprom16 = zpu_i2c->eeprom16();
+            const mboard_eeprom_t mb_eeprom(*eeprom16, "X300");
+            new_addr["name"] = mb_eeprom["name"];
+            new_addr["serial"] = mb_eeprom["serial"];
+        }
+        catch(const std::exception &)
+        {
+            //set these values as empty string so the device may still be found
+            //and the filter's below can still operate on the discovered device
+            new_addr["name"] = "";
+            new_addr["serial"] = "";
+        }
+        //filter the discovered device below by matching optional keys
+        if (
+            (not hint.has_key("name")   or hint["name"]   == new_addr["name"]) and
+            (not hint.has_key("serial") or hint["serial"] == new_addr["serial"])
+        ){
+            addrs.push_back(new_addr);
+        }
     }
 
     return addrs;
@@ -76,7 +101,7 @@ static device_addrs_t b250_find(const device_addr_t &hint_)
     const device_addr_t hint = separate_device_addr(hint_).at(0);
 
     device_addrs_t addrs;
-    if (hint.has_key("type") and hint["type"] != "b250") return addrs;
+    if (hint.has_key("type") and hint["type"] != "x300") return addrs;
 
     //use the address given
     if (hint.has_key("addr"))
