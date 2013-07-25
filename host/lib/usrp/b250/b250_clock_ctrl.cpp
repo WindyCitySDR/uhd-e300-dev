@@ -16,9 +16,12 @@ struct b250_clock_ctrl_impl : b250_clock_ctrl	{
 
 		int div = 0;
 		if (clock_rate == 120e6) div = 20;
-                else if (clock_rate == 150e6) div = 16;
+		else if (clock_rate == 150e6) div = 16;
 		else if (clock_rate == 200e6) div = 12;
 		else throw uhd::runtime_error(str(boost::format("b250_clock_ctrl: cant handle rate %f") % clock_rate));
+
+		//calculate N div -- ok as long as integer multiple of 10e6
+		const int pll_1_n_div = int(clock_rate/10e6);
 
 /* Individual Clock Output Configurations */		
 //register 0
@@ -94,10 +97,11 @@ struct b250_clock_ctrl_impl : b250_clock_ctrl	{
 
 //register 11
 
-		//register 11 sync disabled for testing
+		//register 11 sync enabled
+		_lmk04816_regs.MODE = lmk04816_regs_t::MODE_DUAL_INT_ZER_DELAY;
 		_lmk04816_regs.SYNC_QUAL = lmk04816_regs_t::SYNC_QUAL_FB_MUX;
 		_lmk04816_regs.EN_SYNC = lmk04816_regs_t::EN_SYNC_ENABLE;
-		_lmk04816_regs.NO_SYNC_CLKout0_1 = lmk04816_regs_t::NO_SYNC_CLKOUT0_1_CLOCK_XY_NOSYNC;
+		_lmk04816_regs.NO_SYNC_CLKout0_1 = lmk04816_regs_t::NO_SYNC_CLKOUT0_1_CLOCK_XY_SYNC;
 		_lmk04816_regs.NO_SYNC_CLKout2_3 = lmk04816_regs_t::NO_SYNC_CLKOUT2_3_CLOCK_XY_SYNC;
 		_lmk04816_regs.NO_SYNC_CLKout4_5 = lmk04816_regs_t::NO_SYNC_CLKOUT4_5_CLOCK_XY_SYNC;
 		_lmk04816_regs.NO_SYNC_CLKout8_9 = lmk04816_regs_t::NO_SYNC_CLKOUT8_9_CLOCK_XY_SYNC;
@@ -153,7 +157,7 @@ struct b250_clock_ctrl_impl : b250_clock_ctrl	{
 		//this->write_regs(27);
 //register 28
 		//set PLL_1_N value
-		_lmk04816_regs.PLL1_N_28 = 12;
+		_lmk04816_regs.PLL1_N_28 = pll_1_n_div;
 		//set PLL_2_R value
 		_lmk04816_regs.PLL2_R_28 = 1;
 		//this->write_regs(28);
