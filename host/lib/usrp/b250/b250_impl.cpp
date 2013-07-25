@@ -383,6 +383,22 @@ b250_impl::b250_impl(const uhd::device_addr_t &dev_addr)
         const time_t tp = time_t(_gps->get_sensor("gps_time").to_int()+1);
         _tree->access<time_spec_t>(mb_path / "time" / "pps").set(time_spec_t(tp));
     }
+    else
+    {
+        _tree->access<std::string>(mb_path / "time_source" / "value").set("external");
+        _tree->access<std::string>(mb_path / "clock_source" / "value").set("external");
+        boost::this_thread::sleep(boost::posix_time::milliseconds(100));
+        if (this->get_ref_locked().to_bool())
+        {
+            UHD_MSG(status) << "Setting references to external sources" << std::endl;
+        }
+        else
+        {
+            UHD_MSG(status) << "Setting references to internal sources" << std::endl;
+            _tree->access<std::string>(mb_path / "time_source" / "value").set("none");
+            _tree->access<std::string>(mb_path / "clock_source" / "value").set("internal");
+        }
+    }
 }
 
 b250_impl::~b250_impl(void)
