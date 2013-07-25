@@ -16,6 +16,7 @@ struct b250_clock_ctrl_impl : b250_clock_ctrl	{
 
 		int div = 0;
 		if (clock_rate == 120e6) div = 20;
+                else if (clock_rate == 150e6) div = 16;
 		else if (clock_rate == 200e6) div = 12;
 		else throw uhd::runtime_error(str(boost::format("b250_clock_ctrl: cant handle rate %f") % clock_rate));
 

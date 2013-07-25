@@ -406,6 +406,7 @@ static void check_adc(wb_iface::sptr iface, const boost::uint32_t val)
 {
     boost::uint32_t adc_rb = iface->peek32(RB32_RX);
     adc_rb ^= 0xfffc0000; //adapt for I inversion in FPGA
+    //UHD_MSG(status) << "adc_rb " << std::hex << adc_rb << "  val " << std::hex << val << std::endl;
     UHD_ASSERT_THROW(adc_rb == val);
 }
 
