@@ -173,8 +173,6 @@ struct b250_impl : public uhd::device
     struct clock_control_regs_t
     {
         int clock_source;
-        int clock_sync_out;
-        int clock_sync_pps;
         int pps_select;
     } clock_control_regs;
     void update_clock_control(void);

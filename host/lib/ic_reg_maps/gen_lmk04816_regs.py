@@ -184,7 +184,7 @@ Required_11		 11[6:11]   0
 SYNC_TYPE                11[12:14]  1		input=0,in_pull_up=1,in_pull_down=2,out_push_pull=3,out_inverted=4,out_open_sources=5,out_open_drains=6
 SYNC_EN_AUTO             11[15]     0		man_sync=0,sync_int_gen=1
 SYNC_POL_INV             11[16]     1           sync_high=0,sync_low=1
-SYNC_QUAL                11[17]     0           not_qual=0,qual_from_feedback_mux=1
+SYNC_QUAL                11[17]     0           not_qual=0,fb_mux=1
 SYNC_CLKin2_MUX          11[18:19]  0           log_low=0,CLKin2_LOS=1,CLKin2_Selected=2,uWire_RB=3
 NO_SYNC_CLKout0_1        11[20]     0           clock_xy_sync=0,clock_xy_nosync=1
 NO_SYNC_CLKout2_3        11[21]     0           clock_xy_sync=0,clock_xy_nosync=1
@@ -192,7 +192,7 @@ NO_SYNC_CLKout4_5        11[22]     1           clock_xy_sync=0,clock_xy_nosync=
 NO_SYNC_CLKout6_7        11[23]     1           clock_xy_sync=0,clock_xy_nosync=1
 NO_SYNC_CLKout8_9        11[24]     0		clock_xy_sync=0,clock_xy_nosync=1
 NO_SYNC_CLKout10_11      11[25]     0		clock_xy_sync=0,clock_xy_nosync=1
-EN_SYNC                  11[26]     1           sync_disable=0,sync_enable=1
+EN_SYNC                  11[26]     1           disable=0,enable=1
 MODE                     11[27:31]  0		dual_int=0, dual_int_zer_delay=2,dual_ext=3,dual_ext_zer_delay=5,pll_two_int=6,pll_two_int_zer_delay=8,pll_two_ext=11,clock_dist=16
 ########################################################################
 ## address 12

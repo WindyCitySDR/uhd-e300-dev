@@ -261,8 +261,6 @@ b250_impl::b250_impl(const uhd::device_addr_t &dev_addr)
     UHD_MSG(status) << "Setup RF frontend clocking..." << std::endl;
 
     //init shadow and clock source
-    clock_control_regs.clock_sync_out = 0; //clock sync off
-    clock_control_regs.clock_sync_pps = 0; //pps sync off
     clock_control_regs.pps_select = 0; //internal
     this->update_clock_source("internal");
     this->update_clock_control();
@@ -271,12 +269,6 @@ b250_impl::b250_impl(const uhd::device_addr_t &dev_addr)
         dev_addr.cast<double>("master_clock_rate", B250_DEFAULT_TICK_RATE));
     _tree->create<double>(mb_path / "tick_rate")
         .publish(boost::bind(&b250_clock_ctrl::get_master_clock_rate, _clock));
-
-    //perform sync operation on lmk
-    clock_control_regs.clock_sync_out = 1;
-    this->update_clock_control();
-    clock_control_regs.clock_sync_out = 0;
-    this->update_clock_control();
 
     ////////////////////////////////////////////////////////////////////
     // Create the GPSDO control
@@ -653,9 +645,7 @@ void b250_impl::register_loopback_self_test(wb_iface::sptr iface)
 void b250_impl::update_clock_control(void)
 {
     const size_t reg = clock_control_regs.clock_source
-        | (clock_control_regs.clock_sync_out << 2)
-        | (clock_control_regs.clock_sync_pps << 3)
-        | (clock_control_regs.pps_select << 4)
+        | (clock_control_regs.pps_select << 2)
     ;
     _zpu_ctrl->poke32(SR_ADDR(SET0_BASE, ZPU_SR_CLOCK_CTRL), reg);
 }
@@ -672,16 +662,6 @@ void b250_impl::update_clock_source(const std::string &source)
 
 void b250_impl::update_time_source(const std::string &source)
 {
-    //---- BEGIN MAGICAL PPS SYNC HOOK ----//
-    if (source == "pps_sync")
-    {
-        clock_control_regs.clock_sync_pps = 1;
-        this->update_clock_control();
-        return;
-    }
-    else clock_control_regs.clock_sync_pps = 0;
-    //---- END MAGICAL PPS SYNC HOOK ----//
-
     if (source == "none"){}
     else if (source == "external"){}
     else if (source == "gpsdo"){}
