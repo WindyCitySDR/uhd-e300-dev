@@ -59,6 +59,9 @@ static const bool B250_ENABLE_RX_FC = false;
 #define B250_XB_DST_E1 1
 #define B250_XB_DST_R0 2
 #define B250_XB_DST_R1 3
+#define B250_XB_DST_CE0 4
+#define B250_XB_DST_CE1 5
+#define B250_XB_DST_CE2 5
 #define B250_XB_DST_PCI 7
 
 #define B250_DEVICE_THERE 2
@@ -113,6 +116,7 @@ struct b250_impl : public uhd::device
     boost::mutex _transport_setup_mutex;
 
     void register_loopback_self_test(wb_iface::sptr iface);
+    void transport_loopback_self_test();
 
     std::string _addr;
     std::string _xport_path;

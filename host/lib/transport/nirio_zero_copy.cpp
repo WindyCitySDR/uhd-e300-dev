@@ -26,6 +26,8 @@
 #include <boost/make_shared.hpp>
 #include <boost/thread/thread.hpp> //sleep
 #include <vector>
+//@TODO: Move the register defs required by the class to a common location
+#include "../usrp/b250/b250_regs.hpp"
 
 using namespace uhd;
 using namespace uhd::transport;
@@ -33,7 +35,7 @@ using namespace nifpga_interface;
 
 //A reasonable number of frames for send/recv and async/sync
 static const size_t DEFAULT_NUM_FRAMES  = 32;
-static const size_t DEFAULT_FRAMES_SIZE = 4096;
+static const size_t DEFAULT_FRAMES_SIZE = 256;
 
 typedef uint64_t fifo_data_t;
 
@@ -45,7 +47,7 @@ public:
 
     void release(void)
     {
-        _fifo.release(_length);
+        _fifo.release(_frame_size / sizeof(fifo_data_t));
     }
 
     UHD_INLINE sptr get_new(const double timeout, size_t &index)
@@ -82,7 +84,7 @@ public:
 
     void release(void)
     {
-        _fifo.release(_length);
+        _fifo.release(_frame_size / sizeof(fifo_data_t));
     }
 
     UHD_INLINE sptr get_new(const double timeout, size_t &index)
@@ -133,12 +135,31 @@ public:
         nirio_status status = 0;
         size_t dummy;
 
+        nirio_interface::niriok_proxy& reg_int = fpga_session->get_kernel_proxy();
+
+        //Configure frame width
+        nirio_status_chain(
+            reg_int.poke(PCIE_TX_DMA_REG(DMA_FRAME_SIZE_REG, instance), _send_frame_size/sizeof(fifo_data_t)),
+            status);
+        nirio_status_chain(
+            reg_int.poke(PCIE_RX_DMA_REG(DMA_FRAME_SIZE_REG, instance), _recv_frame_size/sizeof(fifo_data_t)),
+            status);
+        //Config 32-bit word flipping and Reset DMA streams
+        nirio_status_chain(
+            reg_int.poke(PCIE_TX_DMA_REG(DMA_CTRL_STATUS_REG, instance), DMA_CTRL_SW_BUF_U32 | DMA_CTRL_RESET),
+            status);
+        nirio_status_chain(
+            reg_int.poke(PCIE_RX_DMA_REG(DMA_CTRL_STATUS_REG, instance), DMA_CTRL_SW_BUF_U32 | DMA_CTRL_RESET),
+            status);
+
+        //Create FIFOs
         nirio_status_chain(
             fpga_session->create_rx_fifo(nifpga_image::INPUT_FIFOS[instance], _recv_fifo),
             status);
         nirio_status_chain(
             fpga_session->create_tx_fifo(nifpga_image::OUTPUT_FIFOS[instance], _send_fifo),
             status);
+        //Initialize FIFOs
         nirio_status_chain(
             _recv_fifo.initialize((_recv_frame_size*_num_recv_frames)/sizeof(fifo_data_t), dummy, dummy),
             status);

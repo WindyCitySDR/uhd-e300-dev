@@ -82,13 +82,32 @@ localparam ZPU_RB_CLK_STATUS = 3;
 static const uint32_t PCIE_FPGA_ADDR_BASE   = 0x80000;
 #define PCIE_FPGA_REG(X)                    (PCIE_FPGA_ADDR_BASE + X)
 
-static const uint32_t FPGA_B250_SIG_REG     = PCIE_FPGA_REG(0x0000);
+static const uint32_t FPGA_X300_SIG_REG     = PCIE_FPGA_REG(0x0000);
 static const uint32_t FPGA_CNTR_LO_REG      = PCIE_FPGA_REG(0x0004);
 static const uint32_t FPGA_CNTR_HI_REG      = PCIE_FPGA_REG(0x0008);
 static const uint32_t FPGA_CNTR_FREQ_REG    = PCIE_FPGA_REG(0x000C);
 
-static const uint32_t PCIE_ROUTER_REG_BASE  = PCIE_FPGA_REG(0x0100);
-#define PCIE_ROUTER_REG(X)                  (PCIE_FPGA_REG(PCIE_ROUTER_REG_BASE) + X)
+static const uint32_t PCIE_TX_DMA_REG_BASE  = PCIE_FPGA_REG(0x0200);
+static const uint32_t PCIE_RX_DMA_REG_BASE  = PCIE_FPGA_REG(0x0400);
+
+static const uint32_t DMA_REG_GRP_SIZE      = 16;
+static const uint32_t DMA_CTRL_STATUS_REG   = 0x0;
+static const uint32_t DMA_FRAME_SIZE_REG    = 0x4;
+static const uint32_t DMA_SAMPLE_COUNT_REG  = 0x8;
+static const uint32_t DMA_PKT_COUNT_REG     = 0xC;
+
+#define PCIE_TX_DMA_REG(REG, CHAN)          (PCIE_TX_DMA_REG_BASE + (CHAN*DMA_REG_GRP_SIZE) + REG)
+#define PCIE_RX_DMA_REG(REG, CHAN)          (PCIE_RX_DMA_REG_BASE + (CHAN*DMA_REG_GRP_SIZE) + REG)
+
+static const uint32_t DMA_CTRL_RESET        = 1;
+static const uint32_t DMA_CTRL_SW_BUF_U64   = (3 << 4);
+static const uint32_t DMA_CTRL_SW_BUF_U32   = (2 << 4);
+static const uint32_t DMA_CTRL_SW_BUF_U16   = (1 << 4);
+static const uint32_t DMA_CTRL_SW_BUF_U8    = (0 << 4);
+static const uint32_t DMA_STATUS_ERROR      = 1;
+
+static const uint32_t PCIE_ROUTER_REG_BASE  = PCIE_FPGA_REG(0x0500);
+#define PCIE_ROUTER_REG(X)                  (PCIE_ROUTER_REG_BASE + X)
 
 static const uint32_t PCIE_ZPU_DATA_BASE    = 0x70000;
 static const uint32_t PCIE_ZPU_READ_BASE    = 0x60000;

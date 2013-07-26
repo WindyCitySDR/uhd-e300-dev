@@ -191,7 +191,7 @@ b250_impl::b250_impl(const uhd::device_addr_t &dev_addr)
         UHD_MSG(status) << "Opening nifpga session...\n";
         _rio_fpga_interface.reset(new nifpga_session("RIO0"));
         nirio_status status = 0;
-        nirio_status_chain(_rio_fpga_interface->open(nifpga_image::BITFILE, nifpga_image::SIGNATURE, 1<<31), status);
+        nirio_status_chain(_rio_fpga_interface->open(nifpga_image::BITFILE, nifpga_image::SIGNATURE), status);
 
         UHD_ASSERT_THROW(nirio_status_not_fatal(status));
     }
@@ -221,13 +221,13 @@ b250_impl::b250_impl(const uhd::device_addr_t &dev_addr)
     else
         _zpu_ctrl.reset(new b250_ctrl_iface_enet(udp_simple::make_connected(_addr, BOOST_STRINGIZE(B250_FW_COMMS_UDP_PORT))));
 
+    UHD_MSG(status) << _zpu_ctrl->peek32(0xa000) << "\n";
+    UHD_MSG(status) << _zpu_ctrl->peek32(0xa000) << "\n";
+    UHD_MSG(status) << _zpu_ctrl->peek32(0xa000) << "\n";
+
     _zpu_spi = spi_core_3000::make(_zpu_ctrl, SR_ADDR(SET0_BASE, ZPU_SR_SPI), SR_ADDR(SET0_BASE, ZPU_RB_SPI));
     _zpu_i2c = i2c_core_100_wb32::make(_zpu_ctrl, I2C1_BASE);
     _zpu_i2c->set_clock_rate(B250_BUS_CLOCK_RATE);
-
-    UHD_MSG(status) << _zpu_ctrl->peek32(0xa000) << "\n";
-    UHD_MSG(status) << _zpu_ctrl->peek32(0xa000) << "\n";
-    UHD_MSG(status) << _zpu_ctrl->peek32(0xa000) << "\n";
 
     ////////////////////////////////////////////////////////////////////
     // Initialize the properties tree
@@ -646,7 +646,7 @@ boost::uint32_t b250_impl::allocate_sid(const sid_config_t &config, std::string 
 
     if (xport_path == "pcie") {
         uint32_t chan = config.router_dst_there == B250_XB_DST_R0 ? 0 : 1;
-        uint32_t router_config_word = (_sid_framer << 16) | (config.dst_prefix + (chan * 3));
+        uint32_t router_config_word = ((_sid_framer & 0xff) << 16) | (config.dst_prefix + (chan * 3));
         _rio_fpga_interface->get_kernel_proxy().poke(PCIE_ROUTER_REG(0), router_config_word);
     }
 
@@ -682,6 +682,49 @@ void b250_impl::register_loopback_self_test(wb_iface::sptr iface)
         if (test_fail) break; //exit loop on any failure
     }
     UHD_MSG(status) << ((test_fail)? " fail" : "pass") << std::endl;
+}
+
+void b250_impl::transport_loopback_self_test()
+{
+    boost::uint32_t sid;
+    zero_copy_if::sptr xport =
+        this->make_transport(_addr, _xport_path, B250_XB_DST_CE0, B250_RADIO_DEST_PREFIX_CTRL,
+                             device_addr_t(), sid);
+
+    boost::uint32_t pkt_length = 10;
+    for (size_t j = 0; j < 1; j++)
+    {
+        {
+            managed_send_buffer::sptr buff = xport->get_send_buff(0.0);
+            if (not buff){
+                throw uhd::runtime_error("timed out getting a send buffer");
+            }
+            boost::uint32_t *pkt = buff->cast<boost::uint32_t *>();
+            pkt[0] = pkt_length;
+            pkt[1] = sid;
+
+            for (size_t i = 2; i < pkt_length; i++)
+                pkt[i] = 0xDEAD0000 + i - 2;
+
+            buff->commit(sizeof(boost::uint32_t)*pkt_length);
+        }
+
+        {
+            managed_recv_buffer::sptr buff = xport->get_recv_buff(5.0);
+            try
+            {
+                UHD_ASSERT_THROW(bool(buff));
+                UHD_ASSERT_THROW(bool(buff->size()));
+            }
+            catch(const std::exception &ex)
+            {
+                throw uhd::io_error(str(boost::format("no response packet - %s") % ex.what()));
+            }
+            boost::uint32_t *pkt = buff->cast<boost::uint32_t *>();
+            for (size_t i = 0; i < pkt_length; i++)
+                UHD_MSG(status) << boost::format("[READ] 0x%x") % pkt[i] << std::endl;
+        }
+    }
 }
 
 void b250_impl::update_clock_control(void)
