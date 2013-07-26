@@ -735,7 +735,7 @@ void b200_impl::update_time_source(const std::string &source)
     else throw uhd::key_error("update_time_source: unknown source: " + source);
     for (size_t i = 0; i < _radio_perifs.size(); i++)
     {
-        _radio_perifs[i].time64->set_time_source((source == "external")? "external" : "internal");
+        //FIXME hit registers to mux source
     }
     this->update_gpio_state();
 }

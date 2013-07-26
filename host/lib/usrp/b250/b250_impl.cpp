@@ -442,6 +442,7 @@ void b250_impl::setup_radio(const size_t i, const std::string &db_name)
     perif.spi = spi_core_3000::make(perif.ctrl, TOREG(SR_SPI), RB32_SPI);
     perif.adc = b250_adc_ctrl::make(perif.spi, DB_ADC_SEN);
     perif.dac = b250_dac_ctrl::make(perif.spi, DB_DAC_SEN, _clock->get_master_clock_rate());
+    perif.leds = gpio_core_200_32wo::make(perif.ctrl, TOREG(SR_LEDS));
 
     ////////////////////////////////////////////////////////////////
     // ADC self test
@@ -634,6 +635,11 @@ boost::uint32_t b250_impl::allocate_sid(const sid_config_t &config)
     return sid;
 }
 
+void b250_impl::update_atr_leds(const size_t, const std::string &ant)
+{
+    
+}
+
 void b250_impl::set_tick_rate(const double rate)
 {
     BOOST_FOREACH(radio_perifs_t &perif, _radio_perifs)
@@ -682,8 +688,6 @@ void b250_impl::update_time_source(const std::string &source)
     else if (source == "external"){}
     else if (source == "gpsdo"){}
     else throw uhd::key_error("update_time_source: unknown source: " + source);
-    _radio_perifs[0].time64->set_time_source((source == "external")? "external" : "internal");
-    _radio_perifs[1].time64->set_time_source((source == "external")? "external" : "internal");
     clock_control_regs.pps_select = (source == "external")? 1 : 0;
     this->update_clock_control();
 }
