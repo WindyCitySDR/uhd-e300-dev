@@ -20,7 +20,7 @@
 #include <iostream>
 #include <iomanip>
 #include <fstream>
-#include <libusb-1.0/libusb.h>
+#include <libusb.h>
 #include <sstream>
 #include <string>
 #include <cmath>
@@ -34,6 +34,7 @@
 #include <boost/thread/thread.hpp>
 #include <boost/functional/hash.hpp>
 
+#include <uhd/config.hpp>
 
 const static boost::uint16_t FX3_VID = 0x04b4;
 const static boost::uint16_t FX3_DEFAULT_PID = 0x00f3;
@@ -278,6 +279,12 @@ void usrp_set_fpga_hash(libusb_device_handle *dev_handle, hash_type hash) {
 boost::int32_t load_fpga(libusb_device_handle *dev_handle,
         const std::string filestring) {
 
+    if (filestring.empty())
+    {
+        std::cerr << "load_fpga: input file is empty." << std::endl;
+        exit(-1);
+    }
+
     boost::uint8_t fx3_state = 0;
 
     const char *filename = filestring.c_str();
@@ -297,7 +304,7 @@ boost::int32_t load_fpga(libusb_device_handle *dev_handle,
 
     if(!file.good()) {
         std::cerr << "load_fpga: cannot open FPGA input file." << std::endl;
-        return ~0;
+        exit(-1);
     }
 
     do {
@@ -365,6 +372,12 @@ boost::int32_t load_fpga(libusb_device_handle *dev_handle,
 boost::int32_t fx3_load_firmware(libusb_device_handle *dev_handle, \
         std::string filestring) {
 
+    if (filestring.empty())
+    {
+        std::cerr << "fx3_load_firmware: input file is empty." << std::endl;
+        exit(-1);
+    }
+
     const char *filename = filestring.c_str();
 
     /* Fields used in each USB control transfer. */
@@ -384,6 +397,7 @@ boost::int32_t fx3_load_firmware(libusb_device_handle *dev_handle, \
     if(!file.good()) {
         std::cerr << "fx3_load_firmware: cannot open firmware input file"
             << std::endl;
+        exit(-1);
     }
 
     std::cout << "Loading firmware image: " \
@@ -502,8 +516,10 @@ boost::int32_t main(boost::int32_t argc, char *argv[]) {
         /* Okay, first, we need to discover what the path is to the ehci and
          * xhci device files. */
         std::set<fs::path> path_list;
+        path_list.insert("/sys/bus/pci/drivers/xhci-pci/");
         path_list.insert("/sys/bus/pci/drivers/ehci-pci/");
         path_list.insert("/sys/bus/pci/drivers/xhci_hcd/");
+        path_list.insert("/sys/bus/pci/drivers/ehci_hcd/");
 
         /* Check each of the possible paths above to find which ones this system
          * uses. */
@@ -526,7 +542,7 @@ boost::int32_t main(boost::int32_t argc, char *argv[]) {
                 for(std::set<fs::path>::iterator it = globbed.begin();
                         it != globbed.end(); ++it) {
 
-                    std::string file = (*it).filename().string();
+                    std::string file = (*it).string();
 
                     if(file.compare(0, 5, "0000:") == 0) {
                         /* Un-bind the device. */
@@ -571,6 +587,7 @@ boost::int32_t main(boost::int32_t argc, char *argv[]) {
         if(dev_handle == NULL) {
             std::cerr << "Cannot open device with vid: " << vid << " and pid: "
                 << pid << std::endl;
+            return -1;
         } else { std::cout << "Uninitialized B2xx detected..." << std::flush; }
         libusb_free_device_list(devs, 1);
 
@@ -604,10 +621,11 @@ boost::int32_t main(boost::int32_t argc, char *argv[]) {
         if(dev_handle == NULL) {
             std::cerr << "Cannot open device with vid: " << vid << " and pid: "
                 << pid << std::endl;
+            return -1;
         } else {
             std::cout << "Detected in-progress init of B2xx..." << std::flush;
         }
-        libusb_free_device_list(devs, 1);
+        //libusb_free_device_list(devs, 1);
         libusb_claim_interface(dev_handle, 0);
         std::cout << " Reenumeration complete, Device claimed..."
             << std::endl;
@@ -643,6 +661,7 @@ boost::int32_t main(boost::int32_t argc, char *argv[]) {
     if(dev_handle == NULL) {
         std::cerr << "Cannot open device with vid: " << vid << " and pid: "
             << pid << std::endl;
+            return -1;
     } else { std::cout << "Reactor Core Online..." << std::flush; }
     libusb_free_device_list(devs, 1);
 

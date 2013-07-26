@@ -107,11 +107,6 @@ static device_addrs_t b200_find(const device_addr_t &hint)
         found++;
     }
 
-    //get descriptors again with serial number, but using the initialized VID/PID now since we have firmware
-    const bool init = hint.has_key("vid") and hint.has_key("pid");
-    if (init) pid = INIT_PRODUCT_ID;
-    //TODO sleep after fw load ?
-
     const boost::system_time timeout_time = boost::get_system_time() + REENUMERATION_TIMEOUT_MS;
 
     //search for the device until found or timeout
@@ -124,22 +119,6 @@ static device_addrs_t b200_find(const device_addr_t &hint)
             catch(const uhd::exception &){continue;} //ignore claimed
 
             b200_iface::sptr iface = b200_iface::make(control);
-            if (init)
-            {
-                UHD_HERE();
-                byte_vector_t bytes(8);
-                bytes[0] = 0x43;
-                bytes[1] = 0x59;
-                bytes[2] = 0x14;
-                bytes[3] = 0xB2;
-                bytes[4] = (B200_PRODUCT_ID & 0xff);
-                bytes[5] = (B200_PRODUCT_ID >> 8);
-                bytes[6] = (B200_VENDOR_ID & 0xff);
-                bytes[7] = (B200_VENDOR_ID >> 8);
-                iface->write_eeprom(0x0, 0x0, bytes);
-                iface->reset_fx3();
-                return b200_addrs;
-            }
             const mboard_eeprom_t mb_eeprom = mboard_eeprom_t(*iface, "B200");
 
             device_addr_t new_addr;
@@ -446,7 +425,8 @@ b200_impl::b200_impl(const device_addr_t &device_addr)
     ////////////////////////////////////////////////////////////////////
 
     //init the clock rate to something reasonable
-    _tree->access<double>(mb_path / "tick_rate").set(61.44e6/2);
+    _tree->access<double>(mb_path / "tick_rate").set(
+        device_addr.cast<double>("master_clock_rate", B200_DEFAULT_TICK_RATE));
 
     //subdev spec contains full width of selections
     subdev_spec_t rx_spec, tx_spec;
@@ -660,11 +640,8 @@ void b200_impl::codec_loopback_self_test(wb_iface::sptr iface)
 /***********************************************************************
  * Sample and tick rate comprehension below
  **********************************************************************/
-double b200_impl::set_tick_rate(const double raw_rate)
+double b200_impl::set_tick_rate(const double rate)
 {
-    //clip rate (which can be doubled by factor) to possible bounds
-    const double rate = ad9361_ctrl::get_samp_rate_range().clip(raw_rate);
-
     UHD_MSG(status) << "Asking for clock rate " << rate/1e6 << " MHz\n";
     _tick_rate = _codec_ctrl->set_clock_rate(rate);
     UHD_MSG(status) << "Actually got clock rate " << _tick_rate/1e6 << " MHz\n";

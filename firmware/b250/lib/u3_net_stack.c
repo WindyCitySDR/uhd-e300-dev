@@ -92,15 +92,18 @@ void u3_net_stack_init(wb_pkt_iface64_config_t *config)
 #define MAX_NETHS 4
 static struct ip_addr net_conf_ips[MAX_NETHS];
 static eth_mac_addr_t net_conf_macs[MAX_NETHS];
+static eth_mac_addr_t net_conf_subnets[MAX_NETHS];
 
 void u3_net_stack_init_eth(
     const uint8_t ethno,
     const eth_mac_addr_t *mac,
-    const struct ip_addr *ip
+    const struct ip_addr *ip,
+    const struct ip_addr *subnet
 )
 {
     memcpy(&net_conf_macs[ethno], mac, sizeof(eth_mac_addr_t));
     memcpy(&net_conf_ips[ethno], ip, sizeof(struct ip_addr));
+    memcpy(&net_conf_subnets[ethno], subnet, sizeof(struct ip_addr));
 }
 
 const struct ip_addr *u3_net_stack_get_ip_addr(const uint8_t ethno)
@@ -350,7 +353,7 @@ static void handle_icmp_packet(
         IPH_TTL_SET(&reply.ip, 32);
         IPH_PROTO_SET(&reply.ip, IP_PROTO_ICMP);
         IPH_CHKSUM_SET(&reply.ip, 0);
-        memcpy(&reply.ip.src, dst, sizeof(struct ip_addr));
+        memcpy(&reply.ip.src, u3_net_stack_get_ip_addr(ethno), sizeof(struct ip_addr));
         memcpy(&reply.ip.dest, src, sizeof(struct ip_addr));
 
         IPH_CHKSUM_SET(&reply.ip, ~chksum_buffer(

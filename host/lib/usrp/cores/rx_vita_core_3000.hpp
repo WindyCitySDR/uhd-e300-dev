@@ -52,6 +52,8 @@ public:
     virtual void setup(const uhd::stream_args_t &stream_args) = 0;
 
     virtual void configure_flow_control(const size_t window_size) = 0;
+
+    virtual bool in_continuous_streaming_mode(void) = 0;
 };
 
 #endif /* INCLUDED_LIBUHD_USRP_RX_VITA_CORE_3000_HPP */

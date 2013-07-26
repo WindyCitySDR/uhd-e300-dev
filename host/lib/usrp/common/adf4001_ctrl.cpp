@@ -143,7 +143,7 @@ void adf4001_ctrl::program_regs(void) {
 void adf4001_ctrl::write_reg(boost::uint8_t addr) {
     boost::uint32_t reg = adf4001_regs.get_reg(addr); //load the reg data
 
-        spi_iface->transact_spi(2,
+        spi_iface->transact_spi(slaveno,
                                 spi_config,
                                 reg,
                                 24,

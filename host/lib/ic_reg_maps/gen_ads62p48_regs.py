@@ -28,8 +28,8 @@ ref                     0x3f[6:5]     0       internal=0, external=3
 standby                 0x3f[1]       0       normal, standby
 power_down              0x40[3:0]     0       pins=0, normal=8, chb=9, cha=10, chab=11, global=12, chb_standby=13, cha_standby=14, mux=15
 lvds_cmos               0x41[7]       0       parallel_cmos, ddr_lvds
-clk_out_pos_edge        0x44[7:5]     0
-clk_out_ned_edge        0x44[4:2]     0
+clk_out_pos_edge        0x44[7:5]     0       normal=0, plus4_26=5, minus4_26=7, minus7_26=6
+clk_out_neg_edge        0x44[4:2]     0       normal=0, plus4_26=5, minus4_26=7, minus7_26=6
 channel_control         0x50[6]       0                common, independent
 data_format                    0x50[2:1]       2       2s_compliment=2, offset_binary=3
 custom_pattern_low             0x51[7:0]       0

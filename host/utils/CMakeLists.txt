@@ -62,6 +62,7 @@ IF(ENABLE_USB)
         fx2_init_eeprom.cpp
         b2xx_fx3_utils.cpp
     )
+    INCLUDE_DIRECTORIES(${LIBUSB_INCLUDE_DIRS})
 ENDIF(ENABLE_USB)
 
 IF(LINUX AND ENABLE_USB)

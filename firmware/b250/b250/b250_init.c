@@ -88,16 +88,18 @@ static void init_network(void)
     const eth_mac_addr_t *my_mac0 = (const eth_mac_addr_t *)pick_inited_field(&eeprom_map.mac_addr0, &default_map.mac_addr0, 6);
     const eth_mac_addr_t *my_mac1 = (const eth_mac_addr_t *)pick_inited_field(&eeprom_map.mac_addr1, &default_map.mac_addr1, 6);
     const struct ip_addr *my_ip0 = (const struct ip_addr *)pick_inited_field(&eeprom_map.ip_addr[eth0no], &default_map.ip_addr[eth0no], 4);
+    const struct ip_addr *subnet0 = (const struct ip_addr *)pick_inited_field(&eeprom_map.subnet[eth0no], &default_map.subnet[eth0no], 4);
     const struct ip_addr *my_ip1 = (const struct ip_addr *)pick_inited_field(&eeprom_map.ip_addr[eth1no], &default_map.ip_addr[eth1no], 4);
+    const struct ip_addr *subnet1 = (const struct ip_addr *)pick_inited_field(&eeprom_map.subnet[eth1no], &default_map.subnet[eth1no], 4);
 
     //init eth0
-    u3_net_stack_init_eth(0, my_mac0, my_ip0);
+    u3_net_stack_init_eth(0, my_mac0, my_ip0, subnet0);
     wb_poke32(SR_ADDR(SET0_BASE, SR_ETHINT0 + 8 + 0), (my_mac0->addr[5] << 0) | (my_mac0->addr[4] << 8) | (my_mac0->addr[3] << 16) | (my_mac0->addr[2] << 24));
     wb_poke32(SR_ADDR(SET0_BASE, SR_ETHINT0 + 8 + 1), (my_mac0->addr[1] << 0) | (my_mac0->addr[0] << 8));
     wb_poke32(SR_ADDR(SET0_BASE, SR_ETHINT0 + 8 + 2), my_ip0->addr);
 
     //init eth1
-    u3_net_stack_init_eth(1, my_mac1, my_ip1);
+    u3_net_stack_init_eth(1, my_mac1, my_ip1, subnet1);
     wb_poke32(SR_ADDR(SET0_BASE, SR_ETHINT1 + 8 + 0), (my_mac1->addr[5] << 0) | (my_mac1->addr[4] << 8) | (my_mac1->addr[3] << 16) | (my_mac1->addr[2] << 24));
     wb_poke32(SR_ADDR(SET0_BASE, SR_ETHINT1 + 8 + 1), (my_mac1->addr[1] << 0) | (my_mac1->addr[0] << 8));
     wb_poke32(SR_ADDR(SET0_BASE, SR_ETHINT1 + 8 + 2), my_ip1->addr);
@@ -120,6 +122,7 @@ void b250_init(void)
 
     //i2c rate init
     wb_i2c_init(I2C0_BASE, CPU_CLOCK);
+    wb_i2c_init(I2C1_BASE, CPU_CLOCK);
     wb_i2c_init(I2C2_BASE, CPU_CLOCK);
 
     //hold phy in reset

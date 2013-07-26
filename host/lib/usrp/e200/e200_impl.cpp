@@ -374,11 +374,8 @@ e200_impl::~e200_impl(void)
     /* NOP */
 }
 
-double e200_impl::set_tick_rate(const double raw_rate)
+double e200_impl::set_tick_rate(const double rate)
 {
-    //clip rate (which can be doubled by factor) to possible bounds
-    const double rate = ad9361_ctrl::get_samp_rate_range().clip(raw_rate);
-
     const size_t factor = 1.0;//((_fe_enb_map["RX1"] and _fe_enb_map["RX2"]) or (_fe_enb_map["TX1"] and _fe_enb_map["TX2"]))? 2:1;
     UHD_MSG(status) << "asking for clock rate " << rate/1e6 << " MHz\n";
     _tick_rate = _codec_ctrl->set_clock_rate(rate/factor)*factor;

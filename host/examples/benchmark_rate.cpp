@@ -22,10 +22,11 @@
 #include <boost/program_options.hpp>
 #include <boost/format.hpp>
 #include <boost/thread/thread.hpp>
-#include <boost/math/special_functions/round.hpp>
 #include <iostream>
 #include <complex>
 #include <cstdlib>
+
+#define myllround(x) ((long long)((x) + 0.5))
 
 namespace po = boost::program_options;
 
@@ -47,8 +48,8 @@ void benchmark_rx_rate(uhd::usrp::multi_usrp::sptr usrp, const std::string &rx_c
 
     //print pre-test summary
     std::cout << boost::format(
-        "Testing receive rate %f Msps"
-    ) % (usrp->get_rx_rate()/1e6) << std::endl;
+        "Testing receive rate %f Msps on %u channels"
+    ) % (usrp->get_rx_rate()/1e6) % rx_stream->get_num_channels() << std::endl;
 
     //setup variables and allocate buffer
     uhd::rx_metadata_t md;
@@ -66,14 +67,14 @@ void benchmark_rx_rate(uhd::usrp::multi_usrp::sptr usrp, const std::string &rx_c
     cmd.stream_now = (buffs.size() == 1);
     rx_stream->issue_stream_cmd(cmd);
     while (not boost::this_thread::interruption_requested()){
-        num_rx_samps += rx_stream->recv(buffs, max_samps_per_packet, md);
+        num_rx_samps += rx_stream->recv(buffs, max_samps_per_packet, md)*rx_stream->get_num_channels();
 
         //handle the error codes
         switch(md.error_code){
         case uhd::rx_metadata_t::ERROR_CODE_NONE:
             if (had_an_overflow){
                 had_an_overflow = false;
-                num_dropped_samps += boost::math::iround((md.time_spec - last_time).get_real_secs()*rate);
+                num_dropped_samps += myllround((md.time_spec - last_time).get_real_secs()*rate);
             }
             break;
 
@@ -101,8 +102,8 @@ void benchmark_tx_rate(uhd::usrp::multi_usrp::sptr usrp, const std::string &tx_c
 
     //print pre-test summary
     std::cout << boost::format(
-        "Testing transmit rate %f Msps"
-    ) % (usrp->get_tx_rate()/1e6) << std::endl;
+        "Testing transmit rate %f Msps on %u channels"
+    ) % (usrp->get_tx_rate()/1e6) % tx_stream->get_num_channels() << std::endl;
 
     //setup variables and allocate buffer
     uhd::tx_metadata_t md;
@@ -115,7 +116,7 @@ void benchmark_tx_rate(uhd::usrp::multi_usrp::sptr usrp, const std::string &tx_c
     md.has_time_spec = (buffs.size() != 1);
 
     while (not boost::this_thread::interruption_requested()){
-        num_tx_samps += tx_stream->send(buffs, max_samps_per_packet, md);
+        num_tx_samps += tx_stream->send(buffs, max_samps_per_packet, md)*tx_stream->get_num_channels();;
         md.has_time_spec = false;
     }
 
@@ -222,7 +223,7 @@ int UHD_SAFE_MAIN(int argc, char *argv[]){
         usrp->set_rx_rate(rx_rate);
         //create a receive streamer
         uhd::stream_args_t stream_args(rx_cpu, rx_otw);
-        for (size_t ch = 0; ch < usrp->get_num_mboards(); ch++) //linear channel mapping
+        for (size_t ch = 0; ch < usrp->get_rx_num_channels(); ch++) //linear channel mapping
             stream_args.channels.push_back(ch);
         uhd::rx_streamer::sptr rx_stream = usrp->get_rx_stream(stream_args);
         thread_group.create_thread(boost::bind(&benchmark_rx_rate, usrp, rx_cpu, rx_stream));
@@ -233,7 +234,7 @@ int UHD_SAFE_MAIN(int argc, char *argv[]){
         usrp->set_tx_rate(tx_rate);
         //create a transmit streamer
         uhd::stream_args_t stream_args(tx_cpu, tx_otw);
-        for (size_t ch = 0; ch < usrp->get_num_mboards(); ch++) //linear channel mapping
+        for (size_t ch = 0; ch < usrp->get_tx_num_channels(); ch++) //linear channel mapping
             stream_args.channels.push_back(ch);
         uhd::tx_streamer::sptr tx_stream = usrp->get_tx_stream(stream_args);
         thread_group.create_thread(boost::bind(&benchmark_tx_rate, usrp, tx_cpu, tx_stream));
