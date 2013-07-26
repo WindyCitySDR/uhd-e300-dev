@@ -144,11 +144,12 @@ struct b250_clock_ctrl_impl : b250_clock_ctrl	{
 
 //Register 26
 
+		_lmk04816_regs.PLL2_CP_GAIN_26 = lmk04816_regs_t::PLL2_CP_GAIN_26_1600UA;
 		_lmk04816_regs.PLL2_CP_POL_26 = lmk04816_regs_t::PLL2_CP_POL_26_NEG_SLOPE;
 
 //register 27
 
-		
+		_lmk04816_regs.PLL1_CP_GAIN_27 = lmk04816_regs_t::PLL1_CP_GAIN_27_100UA;
 		//_lmk04816_regs.CLKin1_PreR_DIV = 1;
 		//_lmk04816_regs.CLKin1_PreR_DIV = lmk04816_regs_t::CLKIN1_PRER_DIV_DIV2;
 		//sets PLL1_R value
@@ -157,7 +158,7 @@ struct b250_clock_ctrl_impl : b250_clock_ctrl	{
 		//this->write_regs(27);
 //register 28
 		//set PLL_1_N value
-		_lmk04816_regs.PLL1_N_28 = pll_1_n_div;
+		_lmk04816_regs.PLL1_N_28 = pll_1_n_div*_lmk04816_regs.PLL1_R_27;
 		//set PLL_2_R value
 		_lmk04816_regs.PLL2_R_28 = 1;
 		//this->write_regs(28);
