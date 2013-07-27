@@ -200,10 +200,47 @@ void run_flash_access_test()
     printf("[Debug] Flash access test %s\n", result?"PASSED":"FAILED");
 }
 
+static uint32_t get_xbar_total(const uint8_t port)
+{
+    #define get_xbar_stat(in_prt, out_prt) \
+        wb_peek32(RB0_BASE+256+(((in_prt)*8+(out_prt))*4))
+    uint32_t total = 0;
+    for (size_t i = 0; i < 8; i++)
+    {
+        total += get_xbar_stat(port, i);
+    }
+    for (size_t i = 0; i < 8; i++)
+    {
+        total += get_xbar_stat(i, port);
+    }
+    return total;
+}
+
+static void update_leds(void)
+{
+    //update activity status for all ports
+    bool activity[8];
+    for (size_t i = 0; i < 8; i++)
+    {
+        static uint32_t last_total[8];
+        const uint32_t total = get_xbar_total(i);
+        activity[i] = (total != last_total[i]);
+        last_total[i] = total;
+    }
+
+    wb_poke32(SET0_BASE + SR_LEDS*4, 0
+        | (ethernet_get_link_up(0)? LED_LINK2 : 0)
+        | (ethernet_get_link_up(1)? LED_LINK1 : 0)
+        | (activity[0]? LED_ACT2 : 0)
+        | (activity[1]? LED_ACT1 : 0)
+        | (activity[0] | activity[1] | activity[7]? LED_LINKACT : 0)
+    );
+}
+
 int main(void)
 {
-    uint32_t last_counter = 0;
     uint32_t xge_sfpp_hotplug_count = 0;
+    uint32_t led_activity_update_count = 0;
 
     b250_init();
     u3_net_stack_register_udp_handler(B250_FW_COMMS_UDP_PORT, &handle_udp_fw_comms);
@@ -214,13 +251,10 @@ int main(void)
 
     while(true)
     {
-        //makes leds do something alive
-        const uint32_t counter = wb_peek32(RB0_BASE + 0*4);
-        wb_poke32(SET0_BASE + 0*4, counter/CPU_CLOCK);
-        if (counter/CPU_CLOCK != last_counter/CPU_CLOCK) {
-            last_counter = counter;
-            wb_poke32(SET0_BASE + 5*4, counter/CPU_CLOCK);
-            wb_poke32(SET0_BASE + 6*4, counter);
+        //run the link and activity leds
+        if ((led_activity_update_count++) == 1000)
+        {
+            update_leds();
         }
 
         //run the network stack - poll and handle
@@ -238,6 +272,7 @@ int main(void)
           xge_poll_sfpp_status(0);
 
         }
+
     }
     return 0;
 }

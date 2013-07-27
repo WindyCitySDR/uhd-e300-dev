@@ -47,5 +47,7 @@ void dump_mdio_regs(const uint32_t base, uint32_t mdio_port);
 void
 xge_poll_sfpp_status(const uint32_t eth);
 
+//! get the link status of eth (true for link up)
+bool ethernet_get_link_up(const uint32_t eth);
 
 #endif /* INCLUDED_ETHERNET_H */

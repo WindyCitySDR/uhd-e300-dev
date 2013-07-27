@@ -564,6 +564,12 @@ void b250_impl::setup_radio(const size_t i, const std::string &db_name)
         _dboard_ifaces[db_name],
         _tree->subtree(mb_path / "dboards" / db_name)
     );
+
+    //now that dboard is created -- register into rx antenna event
+    const std::string fe_name = _tree->list(mb_path / "dboards" / db_name / "rx_frontends").front();
+    _tree->access<std::string>(mb_path / "dboards" / db_name / "rx_frontends" / fe_name / "antenna" / "value")
+        .subscribe(boost::bind(&b250_impl::update_atr_leds, this, i, _1));
+    this->update_atr_leds(i, ""); //init anyway, even if never called
 }
 
 uhd::transport::udp_zero_copy::sptr b250_impl::make_transport(
@@ -635,9 +641,16 @@ boost::uint32_t b250_impl::allocate_sid(const sid_config_t &config)
     return sid;
 }
 
-void b250_impl::update_atr_leds(const size_t, const std::string &ant)
+void b250_impl::update_atr_leds(const size_t fe, const std::string &rx_ant)
 {
-    
+    const bool is_txrx = (rx_ant == "TX/RX");
+    const int rx_led = (1 << 2);
+    const int txrx_led = (1 << 1);
+    const int tx_led = (1 << 0);
+    _radio_perifs[fe].leds->set_atr_reg(dboard_iface::ATR_REG_IDLE, 0);
+    _radio_perifs[fe].leds->set_atr_reg(dboard_iface::ATR_REG_RX_ONLY, is_txrx? txrx_led : rx_led);
+    _radio_perifs[fe].leds->set_atr_reg(dboard_iface::ATR_REG_TX_ONLY, tx_led);
+    _radio_perifs[fe].leds->set_atr_reg(dboard_iface::ATR_REG_FULL_DUPLEX, rx_led | tx_led);
 }
 
 void b250_impl::set_tick_rate(const double rate)
