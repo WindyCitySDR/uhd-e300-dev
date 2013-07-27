@@ -42,6 +42,8 @@ const struct ip_addr *u3_net_stack_get_ip_addr(const uint8_t ethno);
 
 const eth_mac_addr_t *u3_net_stack_get_mac_addr(const uint8_t ethno);
 
+uint32_t u3_net_stack_get_stat_counts(const uint8_t ethno);
+
 //------------------ udp handling ------------------------------------
 
 typedef void (*u3_net_stack_udp_handler_t)(

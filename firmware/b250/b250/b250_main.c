@@ -213,27 +213,52 @@ static uint32_t get_xbar_total(const uint8_t port)
     {
         total += get_xbar_stat(i, port);
     }
+    if (port < 2) //also netstack if applicable
+    {
+        total += u3_net_stack_get_stat_counts(port);
+    }
+    return total;
+}
+
+static size_t popcntll(uint64_t num)
+{
+    size_t total = 0;
+    for (size_t i = 0; i < sizeof(num)*8; i++)
+    {
+        total += (num >> i) & 0x1;
+    }
     return total;
 }
 
 static void update_leds(void)
 {
     //update activity status for all ports
-    bool activity[8];
+    uint64_t activity_shreg[8];
     for (size_t i = 0; i < 8; i++)
     {
         static uint32_t last_total[8];
         const uint32_t total = get_xbar_total(i);
-        activity[i] = (total != last_total[i]);
+        activity_shreg[i] <<= 1;
+        activity_shreg[i] |= (total == last_total[i])? 0 : 1;
         last_total[i] = total;
     }
 
+    static uint32_t counter = 0;
+    counter++;
+
+    const size_t cnt0 = popcntll(activity_shreg[0]);
+    const size_t cnt1 = popcntll(activity_shreg[1]);
+    const bool act0 = cnt0*8 > (counter % 64);
+    const bool act1 = cnt1*8 > (counter % 64);
+    const bool link0 = ethernet_get_link_up(0);
+    const bool link1 = ethernet_get_link_up(1);
+
     wb_poke32(SET0_BASE + SR_LEDS*4, 0
-        | (ethernet_get_link_up(0)? LED_LINK2 : 0)
-        | (ethernet_get_link_up(1)? LED_LINK1 : 0)
-        | (activity[0]? LED_ACT2 : 0)
-        | (activity[1]? LED_ACT1 : 0)
-        | (activity[0] | activity[1] | activity[7]? LED_LINKACT : 0)
+        | (link0? LED_LINK2 : 0)
+        | (link1? LED_LINK1 : 0)
+        | (act0? LED_ACT2 : 0)
+        | (act1? LED_ACT1 : 0)
+        | ((act0 || act1)? LED_LINKACT : 0)
     );
 }
 
@@ -254,6 +279,7 @@ int main(void)
         //run the link and activity leds
         if ((led_activity_update_count++) == 1000)
         {
+            led_activity_update_count = 0;
             update_leds();
         }
 
