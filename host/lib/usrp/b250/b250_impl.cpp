@@ -376,8 +376,6 @@ b250_impl::b250_impl(const uhd::device_addr_t &dev_addr)
 
     _tree->access<subdev_spec_t>(mb_path / "rx_subdev_spec").set(rx_fe_spec);
     _tree->access<subdev_spec_t>(mb_path / "tx_subdev_spec").set(tx_fe_spec);
-    _tree->access<std::string>(mb_path / "clock_source" / "value").set("internal");
-    _tree->access<std::string>(mb_path / "time_source" / "value").set("none");
 
     //GPS installed: use external ref, time, and init time spec
     if (_gps and _gps->gps_detected())
@@ -401,7 +399,7 @@ b250_impl::b250_impl(const uhd::device_addr_t &dev_addr)
         else
         {
             UHD_MSG(status) << "Setting references to internal sources" << std::endl;
-            _tree->access<std::string>(mb_path / "time_source" / "value").set("none");
+            _tree->access<std::string>(mb_path / "time_source" / "value").set("internal");
             _tree->access<std::string>(mb_path / "clock_source" / "value").set("internal");
         }
     }
