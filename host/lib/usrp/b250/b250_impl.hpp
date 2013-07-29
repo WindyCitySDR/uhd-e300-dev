@@ -147,6 +147,10 @@ struct b250_impl : public uhd::device
     b250_clock_ctrl::sptr _clock;
     uhd::gps_ctrl::sptr _gps;
 
+    gpio_core_200::sptr _fp_gpio;
+    boost::uint64_t get_fp_gpio(const std::string &);
+    void set_fp_gpio(const std::string &, const boost::uint64_t);
+
     size_t _sid_framer;
     struct sid_config_t
     {

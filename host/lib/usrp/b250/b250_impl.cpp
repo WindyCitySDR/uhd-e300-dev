@@ -319,6 +319,20 @@ b250_impl::b250_impl(const uhd::device_addr_t &dev_addr)
     this->setup_radio(1, DB_NAMES[1]);
 
     ////////////////////////////////////////////////////////////////////
+    // front panel gpio
+    ////////////////////////////////////////////////////////////////////
+    _fp_gpio = gpio_core_200::make(_radio_perifs[0].ctrl, TOREG(SR_FP_GPIO), RB32_FP_GPIO);
+    const std::vector<std::string> GPIO_ATTRS = boost::assign::list_of("CTRL")("DDR")("OUT")("ATR_0X")("ATR_RX")("ATR_TX")("ATR_XX");
+    BOOST_FOREACH(const std::string &attr, GPIO_ATTRS)
+    {
+        _tree->create<boost::uint64_t>(mb_path / "gpio" / "FP0" / attr)
+            .set(0)
+            .subscribe(boost::bind(&b250_impl::set_fp_gpio, this, attr, _1));
+    }
+    _tree->create<boost::uint64_t>(mb_path / "gpio" / "FP0" / "READBACK")
+        .publish(boost::bind(&b250_impl::get_fp_gpio, this, "READBACK"));
+
+    ////////////////////////////////////////////////////////////////////
     // register the time keepers - only one can be the highlander
     ////////////////////////////////////////////////////////////////////
     _tree->create<time_spec_t>(mb_path / "time" / "now")
@@ -731,4 +745,30 @@ void b250_impl::set_mb_eeprom(const mboard_eeprom_t &mb_eeprom)
 {
     i2c_iface::sptr eeprom16 = _zpu_i2c->eeprom16();
     mb_eeprom.commit(*eeprom16, "X300");
+}
+
+boost::uint64_t b250_impl::get_fp_gpio(const std::string &)
+{
+    return boost::uint64_t(_fp_gpio->read_gpio(dboard_iface::UNIT_RX));
+}
+
+template <typename T>
+static T shadow_it(const T &shadow, const T &value, const T &mask)
+{
+    return (shadow & ~mask) | (value & mask);
+}
+
+void b250_impl::set_fp_gpio(const std::string &attr, const boost::uint64_t setting)
+{
+    const boost::uint32_t value = boost::uint32_t(setting >> 0);
+    const boost::uint32_t mask = boost::uint32_t(setting >> 32);
+    const boost::uint32_t shadow = boost::uint32_t(_tree->access<boost::uint64_t>("/mboards/0/gpio/FP0/"+attr).get());
+    const boost::uint32_t new_value = shadow_it(shadow, value, mask);
+    if (attr == "CTRL") return _fp_gpio->set_pin_ctrl(dboard_iface::UNIT_RX, new_value);
+    if (attr == "DDR") return _fp_gpio->set_gpio_ddr(dboard_iface::UNIT_RX, new_value);
+    if (attr == "OUT") return _fp_gpio->set_gpio_out(dboard_iface::UNIT_RX, new_value);
+    if (attr == "ATR_0X") return _fp_gpio->set_atr_reg(dboard_iface::UNIT_RX, dboard_iface::ATR_REG_IDLE, new_value);
+    if (attr == "ATR_RX") return _fp_gpio->set_atr_reg(dboard_iface::UNIT_RX, dboard_iface::ATR_REG_RX_ONLY, new_value);
+    if (attr == "ATR_TX") return _fp_gpio->set_atr_reg(dboard_iface::UNIT_RX, dboard_iface::ATR_REG_TX_ONLY, new_value);
+    if (attr == "ATR_XX") return _fp_gpio->set_atr_reg(dboard_iface::UNIT_RX, dboard_iface::ATR_REG_FULL_DUPLEX, new_value);
 }

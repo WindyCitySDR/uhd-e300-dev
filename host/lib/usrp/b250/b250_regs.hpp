@@ -43,6 +43,7 @@ localparam RB64_TIME_NOW        = 8;
 localparam RB64_TIME_PPS        = 16;
 localparam RB32_TEST            = 24;
 localparam RB32_RX              = 28;
+localparam RB32_FP_GPIO         = 32;
 
 localparam BL_ADDRESS     = 0;
 localparam BL_DATA        = 1;

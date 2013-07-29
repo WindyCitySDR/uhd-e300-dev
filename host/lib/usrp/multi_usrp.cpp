@@ -906,9 +906,12 @@ public:
     std::vector<std::string> get_gpio_banks(const size_t mboard)
     {
         std::vector<std::string> banks;
-        BOOST_FOREACH(const std::string &name, _tree->list(mb_root(mboard) / "gpio"))
+        if (_tree->exists(mb_root(mboard) / "gpio"))
         {
-            banks.push_back(name);
+            BOOST_FOREACH(const std::string &name, _tree->list(mb_root(mboard) / "gpio"))
+            {
+                banks.push_back(name);
+            }
         }
         BOOST_FOREACH(const std::string &name, _tree->list(mb_root(mboard) / "dboards"))
         {
