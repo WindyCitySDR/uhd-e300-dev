@@ -93,6 +93,7 @@ void u3_net_stack_init(wb_pkt_iface64_config_t *config)
 static struct ip_addr net_conf_ips[MAX_NETHS];
 static eth_mac_addr_t net_conf_macs[MAX_NETHS];
 static eth_mac_addr_t net_conf_subnets[MAX_NETHS];
+static uint32_t net_stat_counts[MAX_NETHS];
 
 void u3_net_stack_init_eth(
     const uint8_t ethno,
@@ -104,6 +105,7 @@ void u3_net_stack_init_eth(
     memcpy(&net_conf_macs[ethno], mac, sizeof(eth_mac_addr_t));
     memcpy(&net_conf_ips[ethno], ip, sizeof(struct ip_addr));
     memcpy(&net_conf_subnets[ethno], subnet, sizeof(struct ip_addr));
+    net_stat_counts[ethno] = 0;
 }
 
 const struct ip_addr *u3_net_stack_get_ip_addr(const uint8_t ethno)
@@ -117,6 +119,20 @@ const eth_mac_addr_t *u3_net_stack_get_mac_addr(const uint8_t ethno)
 }
 
 /***********************************************************************
+ * Ethernet activity stats
+ **********************************************************************/
+uint32_t u3_net_stack_get_stat_counts(const uint8_t ethno)
+{
+    return net_stat_counts[ethno];
+}
+
+static void incr_stat_counts(const void *p)
+{
+    const padded_eth_hdr_t *eth = (const padded_eth_hdr_t *)p;
+    if (eth->ethno < MAX_NETHS) net_stat_counts[eth->ethno]++;
+}
+
+/***********************************************************************
  * Ethernet handlers - send packet w/ payload
  **********************************************************************/
 static void send_eth_pkt(
@@ -125,6 +141,7 @@ static void send_eth_pkt(
     const void *p2, const size_t l2
 )
 {
+    incr_stat_counts(p0);
     void *ptr = wb_pkt_iface64_tx_claim(pkt_iface_config);
     size_t buff_i = 0;
 
@@ -450,6 +467,7 @@ void u3_net_stack_handle_one(void)
     if (ptr != NULL)
     {
         //printf("u3_net_stack_handle_one got %u bytes\n", (unsigned)num_bytes);
+        incr_stat_counts(ptr);
         handle_eth_packet(ptr, num_bytes);
         wb_pkt_iface64_rx_release(pkt_iface_config);
     }

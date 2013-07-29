@@ -135,6 +135,7 @@ struct b250_impl : public uhd::device
         rx_dsp_core_3000::sptr ddc;
         tx_vita_core_3000::sptr deframer;
         tx_dsp_core_3000::sptr duc;
+        gpio_core_200_32wo::sptr leds;
     };
     radio_perifs_t _radio_perifs[2];
     uhd::usrp::dboard_eeprom_t _db_eeproms[8];
@@ -145,6 +146,10 @@ struct b250_impl : public uhd::device
 
     b250_clock_ctrl::sptr _clock;
     uhd::gps_ctrl::sptr _gps;
+
+    gpio_core_200::sptr _fp_gpio;
+    boost::uint64_t get_fp_gpio(const std::string &);
+    void set_fp_gpio(const std::string &, const boost::uint64_t);
 
     size_t _sid_framer;
     struct sid_config_t
@@ -174,11 +179,14 @@ struct b250_impl : public uhd::device
     {
         int clock_source;
         int pps_select;
+        int pps_out_enb;
     } clock_control_regs;
     void update_clock_control(void);
 
+    void set_time_source_out(const bool);
     void update_clock_source(const std::string &);
     void update_time_source(const std::string &);
+    void update_atr_leds(const size_t, const std::string &ant);
     uhd::sensor_value_t get_ref_locked(void);
     void set_db_eeprom(const size_t, const uhd::usrp::dboard_eeprom_t &);
     void set_mb_eeprom(const uhd::usrp::mboard_eeprom_t &);

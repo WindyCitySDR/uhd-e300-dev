@@ -217,8 +217,10 @@ struct b250_clock_ctrl_impl : b250_clock_ctrl	{
 	} 
 
 
-
-
+	void set_ref_out(const bool)
+	{
+		//TODO -- always on until we rev the HW
+	}
 
 
 //write_reg: write a single register to the spi regs.

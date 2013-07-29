@@ -35,6 +35,7 @@ localparam SR_TIME      = 128;
 localparam SR_RX_DSP    = 144;
 localparam SR_TX_DSP    = 184;
 localparam SR_LEDS      = 196;
+localparam SR_FP_GPIO   = 200;
 
 localparam RB32_GPIO            = 0;
 localparam RB32_SPI             = 4;
@@ -42,6 +43,7 @@ localparam RB64_TIME_NOW        = 8;
 localparam RB64_TIME_PPS        = 16;
 localparam RB32_TEST            = 24;
 localparam RB32_RX              = 28;
+localparam RB32_FP_GPIO         = 32;
 
 localparam BL_ADDRESS     = 0;
 localparam BL_DATA        = 1;

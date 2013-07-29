@@ -261,7 +261,7 @@ b250_impl::b250_impl(const uhd::device_addr_t &dev_addr)
     UHD_MSG(status) << "Setup RF frontend clocking..." << std::endl;
 
     //init shadow and clock source
-    clock_control_regs.pps_select = 0; //internal
+    std::memset(&clock_control_regs, 0, sizeof(clock_control_regs));
     this->update_clock_source("internal");
     this->update_clock_control();
 
@@ -321,6 +321,20 @@ b250_impl::b250_impl(const uhd::device_addr_t &dev_addr)
     this->setup_radio(1, DB_NAMES[1]);
 
     ////////////////////////////////////////////////////////////////////
+    // front panel gpio
+    ////////////////////////////////////////////////////////////////////
+    _fp_gpio = gpio_core_200::make(_radio_perifs[0].ctrl, TOREG(SR_FP_GPIO), RB32_FP_GPIO);
+    const std::vector<std::string> GPIO_ATTRS = boost::assign::list_of("CTRL")("DDR")("OUT")("ATR_0X")("ATR_RX")("ATR_TX")("ATR_XX");
+    BOOST_FOREACH(const std::string &attr, GPIO_ATTRS)
+    {
+        _tree->create<boost::uint64_t>(mb_path / "gpio" / "FP0" / attr)
+            .set(0)
+            .subscribe(boost::bind(&b250_impl::set_fp_gpio, this, attr, _1));
+    }
+    _tree->create<boost::uint64_t>(mb_path / "gpio" / "FP0" / "READBACK")
+        .publish(boost::bind(&b250_impl::get_fp_gpio, this, "READBACK"));
+
+    ////////////////////////////////////////////////////////////////////
     // register the time keepers - only one can be the highlander
     ////////////////////////////////////////////////////////////////////
     _tree->create<time_spec_t>(mb_path / "time" / "now")
@@ -334,11 +348,17 @@ b250_impl::b250_impl(const uhd::device_addr_t &dev_addr)
     //setup time source props
     _tree->create<std::string>(mb_path / "time_source" / "value")
         .subscribe(boost::bind(&b250_impl::update_time_source, this, _1));
-    static const std::vector<std::string> time_sources = boost::assign::list_of("none")("external")("gpsdo");
+    _tree->create<bool>(mb_path / "time_source" / "output")
+        .subscribe(boost::bind(&b250_impl::set_time_source_out, this, _1))
+        .set(true);
+    static const std::vector<std::string> time_sources = boost::assign::list_of("internal")("external")("gpsdo");
     _tree->create<std::vector<std::string> >(mb_path / "time_source" / "options").set(time_sources);
     //setup reference source props
     _tree->create<std::string>(mb_path / "clock_source" / "value")
         .subscribe(boost::bind(&b250_impl::update_clock_source, this, _1));
+    _tree->create<bool>(mb_path / "clock_source" / "output")
+        .subscribe(boost::bind(&b250_clock_ctrl::set_ref_out, _clock, _1))
+        .set(true);
     static const std::vector<std::string> clock_sources = boost::assign::list_of("internal")("external")("gpsdo");
     _tree->create<std::vector<std::string> >(mb_path / "clock_source" / "options").set(clock_sources);
 
@@ -372,8 +392,6 @@ b250_impl::b250_impl(const uhd::device_addr_t &dev_addr)
 
     _tree->access<subdev_spec_t>(mb_path / "rx_subdev_spec").set(rx_fe_spec);
     _tree->access<subdev_spec_t>(mb_path / "tx_subdev_spec").set(tx_fe_spec);
-    _tree->access<std::string>(mb_path / "clock_source" / "value").set("internal");
-    _tree->access<std::string>(mb_path / "time_source" / "value").set("none");
 
     //GPS installed: use external ref, time, and init time spec
     if (_gps and _gps->gps_detected())
@@ -397,7 +415,7 @@ b250_impl::b250_impl(const uhd::device_addr_t &dev_addr)
         else
         {
             UHD_MSG(status) << "Setting references to internal sources" << std::endl;
-            _tree->access<std::string>(mb_path / "time_source" / "value").set("none");
+            _tree->access<std::string>(mb_path / "time_source" / "value").set("internal");
             _tree->access<std::string>(mb_path / "clock_source" / "value").set("internal");
         }
     }
@@ -444,6 +462,7 @@ void b250_impl::setup_radio(const size_t i, const std::string &db_name)
     perif.spi = spi_core_3000::make(perif.ctrl, TOREG(SR_SPI), RB32_SPI);
     perif.adc = b250_adc_ctrl::make(perif.spi, DB_ADC_SEN);
     perif.dac = b250_dac_ctrl::make(perif.spi, DB_DAC_SEN, _clock->get_master_clock_rate());
+    perif.leds = gpio_core_200_32wo::make(perif.ctrl, TOREG(SR_LEDS));
 
     ////////////////////////////////////////////////////////////////
     // ADC self test
@@ -565,6 +584,12 @@ void b250_impl::setup_radio(const size_t i, const std::string &db_name)
         _dboard_ifaces[db_name],
         _tree->subtree(mb_path / "dboards" / db_name)
     );
+
+    //now that dboard is created -- register into rx antenna event
+    const std::string fe_name = _tree->list(mb_path / "dboards" / db_name / "rx_frontends").front();
+    _tree->access<std::string>(mb_path / "dboards" / db_name / "rx_frontends" / fe_name / "antenna" / "value")
+        .subscribe(boost::bind(&b250_impl::update_atr_leds, this, i, _1));
+    this->update_atr_leds(i, ""); //init anyway, even if never called
 }
 
 uhd::transport::udp_zero_copy::sptr b250_impl::make_transport(
@@ -636,6 +661,18 @@ boost::uint32_t b250_impl::allocate_sid(const sid_config_t &config)
     return sid;
 }
 
+void b250_impl::update_atr_leds(const size_t fe, const std::string &rx_ant)
+{
+    const bool is_txrx = (rx_ant == "TX/RX");
+    const int rx_led = (1 << 2);
+    const int txrx_led = (1 << 1);
+    const int tx_led = (1 << 0);
+    _radio_perifs[fe].leds->set_atr_reg(dboard_iface::ATR_REG_IDLE, 0);
+    _radio_perifs[fe].leds->set_atr_reg(dboard_iface::ATR_REG_RX_ONLY, is_txrx? txrx_led : rx_led);
+    _radio_perifs[fe].leds->set_atr_reg(dboard_iface::ATR_REG_TX_ONLY, tx_led);
+    _radio_perifs[fe].leds->set_atr_reg(dboard_iface::ATR_REG_FULL_DUPLEX, rx_led | tx_led);
+}
+
 void b250_impl::set_tick_rate(const double rate)
 {
     BOOST_FOREACH(radio_perifs_t &perif, _radio_perifs)
@@ -660,10 +697,17 @@ void b250_impl::register_loopback_self_test(wb_iface::sptr iface)
     UHD_MSG(status) << ((test_fail)? " fail" : "pass") << std::endl;
 }
 
+void b250_impl::set_time_source_out(const bool enb)
+{
+    clock_control_regs.pps_out_enb = enb? 1 : 0;
+    this->update_clock_control();
+}
+
 void b250_impl::update_clock_control(void)
 {
     const size_t reg = clock_control_regs.clock_source
         | (clock_control_regs.pps_select << 2)
+        | (clock_control_regs.pps_out_enb << 3)
     ;
     _zpu_ctrl->poke32(SR_ADDR(SET0_BASE, ZPU_SR_CLOCK_CTRL), reg);
 }
@@ -680,12 +724,10 @@ void b250_impl::update_clock_source(const std::string &source)
 
 void b250_impl::update_time_source(const std::string &source)
 {
-    if (source == "none"){}
+    if (source == "internal"){}
     else if (source == "external"){}
     else if (source == "gpsdo"){}
     else throw uhd::key_error("update_time_source: unknown source: " + source);
-    _radio_perifs[0].time64->set_time_source((source == "external")? "external" : "internal");
-    _radio_perifs[1].time64->set_time_source((source == "external")? "external" : "internal");
     clock_control_regs.pps_select = (source == "external")? 1 : 0;
     this->update_clock_control();
 }
@@ -705,4 +747,30 @@ void b250_impl::set_mb_eeprom(const mboard_eeprom_t &mb_eeprom)
 {
     i2c_iface::sptr eeprom16 = _zpu_i2c->eeprom16();
     mb_eeprom.commit(*eeprom16, "X300");
+}
+
+boost::uint64_t b250_impl::get_fp_gpio(const std::string &)
+{
+    return boost::uint64_t(_fp_gpio->read_gpio(dboard_iface::UNIT_RX));
+}
+
+template <typename T>
+static T shadow_it(const T &shadow, const T &value, const T &mask)
+{
+    return (shadow & ~mask) | (value & mask);
+}
+
+void b250_impl::set_fp_gpio(const std::string &attr, const boost::uint64_t setting)
+{
+    const boost::uint32_t value = boost::uint32_t(setting >> 0);
+    const boost::uint32_t mask = boost::uint32_t(setting >> 32);
+    const boost::uint32_t shadow = boost::uint32_t(_tree->access<boost::uint64_t>("/mboards/0/gpio/FP0/"+attr).get());
+    const boost::uint32_t new_value = shadow_it(shadow, value, mask);
+    if (attr == "CTRL") return _fp_gpio->set_pin_ctrl(dboard_iface::UNIT_RX, new_value);
+    if (attr == "DDR") return _fp_gpio->set_gpio_ddr(dboard_iface::UNIT_RX, new_value);
+    if (attr == "OUT") return _fp_gpio->set_gpio_out(dboard_iface::UNIT_RX, new_value);
+    if (attr == "ATR_0X") return _fp_gpio->set_atr_reg(dboard_iface::UNIT_RX, dboard_iface::ATR_REG_IDLE, new_value);
+    if (attr == "ATR_RX") return _fp_gpio->set_atr_reg(dboard_iface::UNIT_RX, dboard_iface::ATR_REG_RX_ONLY, new_value);
+    if (attr == "ATR_TX") return _fp_gpio->set_atr_reg(dboard_iface::UNIT_RX, dboard_iface::ATR_REG_TX_ONLY, new_value);
+    if (attr == "ATR_XX") return _fp_gpio->set_atr_reg(dboard_iface::UNIT_RX, dboard_iface::ATR_REG_FULL_DUPLEX, new_value);
 }

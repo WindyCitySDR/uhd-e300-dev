@@ -560,3 +560,9 @@ dump_mdio_regs(const uint32_t base, uint32_t mdio_port)
       /* 	  decode_reg(regs_a[y],XGE_MDIO_DEVICE_DTE_XS,x); */
       /* 	} */
 }
+
+bool ethernet_get_link_up(const uint32_t eth)
+{
+    //TODO fill in the implementation
+    return true;
+}

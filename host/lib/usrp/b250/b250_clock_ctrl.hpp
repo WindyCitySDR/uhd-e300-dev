@@ -64,6 +64,8 @@ struct b250_clock_ctrl : boost::noncopyable
      */
     virtual std::vector<double> get_rates(const b250_clock_which_t which) = 0;
 
+    //! enable the reference output
+    virtual void set_ref_out(const bool) = 0;
 };
 
 #endif /* INCLUDED_B250_CLOCK_CTRL_HPP */

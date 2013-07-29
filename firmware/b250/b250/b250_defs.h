@@ -34,6 +34,14 @@ static const int SR_SPI        = 32;
 static const int SR_ETHINT0    = 40;
 static const int SR_ETHINT1    = 56;
 
+//led shifts for SR_LEDS
+static const int LED_ACT1 = (1 << 5);
+static const int LED_ACT2 = (1 << 4);
+static const int LED_LINK1 = (1 << 3);
+static const int LED_LINK2 = (1 << 2);
+static const int LED_LINKSTAT = (1 << 1);
+static const int LED_LINKACT = (1 << 0);
+
 // Readback Memory Map
 static const int RB_COUNTER      = 0;
 static const int RB_SPI_RDY      = 1;
