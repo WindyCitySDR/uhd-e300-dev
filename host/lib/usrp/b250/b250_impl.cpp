@@ -262,6 +262,7 @@ b250_impl::b250_impl(const uhd::device_addr_t &dev_addr)
 
     //init shadow and clock source
     clock_control_regs.pps_select = 0; //internal
+    clock_control_regs.pps_out_enb = 1; //always on
     this->update_clock_source("internal");
     this->update_clock_control();
 
@@ -332,7 +333,7 @@ b250_impl::b250_impl(const uhd::device_addr_t &dev_addr)
     //setup time source props
     _tree->create<std::string>(mb_path / "time_source" / "value")
         .subscribe(boost::bind(&b250_impl::update_time_source, this, _1));
-    static const std::vector<std::string> time_sources = boost::assign::list_of("none")("external")("gpsdo");
+    static const std::vector<std::string> time_sources = boost::assign::list_of("internal")("external")("gpsdo");
     _tree->create<std::vector<std::string> >(mb_path / "time_source" / "options").set(time_sources);
     //setup reference source props
     _tree->create<std::string>(mb_path / "clock_source" / "value")
@@ -681,6 +682,7 @@ void b250_impl::update_clock_control(void)
 {
     const size_t reg = clock_control_regs.clock_source
         | (clock_control_regs.pps_select << 2)
+        | (clock_control_regs.pps_out_enb << 3)
     ;
     _zpu_ctrl->poke32(SR_ADDR(SET0_BASE, ZPU_SR_CLOCK_CTRL), reg);
 }
@@ -697,7 +699,7 @@ void b250_impl::update_clock_source(const std::string &source)
 
 void b250_impl::update_time_source(const std::string &source)
 {
-    if (source == "none"){}
+    if (source == "internal"){}
     else if (source == "external"){}
     else if (source == "gpsdo"){}
     else throw uhd::key_error("update_time_source: unknown source: " + source);

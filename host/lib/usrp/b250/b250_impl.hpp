@@ -175,6 +175,7 @@ struct b250_impl : public uhd::device
     {
         int clock_source;
         int pps_select;
+        int pps_out_enb;
     } clock_control_regs;
     void update_clock_control(void);
 
