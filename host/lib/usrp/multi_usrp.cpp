@@ -509,6 +509,46 @@ public:
         return _tree->access<std::vector<std::string> >(mb_root(mboard) / "clock_source" / "options").get();
     }
 
+    void set_clock_source_out(const bool enb, const size_t mboard)
+    {
+        if (mboard != ALL_MBOARDS)
+        {
+            if (_tree->exists(mb_root(mboard) / "clock_source" / "output"))
+            {
+                _tree->access<bool>(mb_root(mboard) / "clock_source" / "output").set(enb);
+            }
+            else
+            {
+                throw uhd::runtime_error("multi_usrp::set_clock_source_out - not supported on this device");
+            }
+            return;
+        }
+        for (size_t m = 0; m < get_num_mboards(); m++)
+        {
+            this->set_clock_source_out(enb, m);
+        }
+    }
+
+    void set_time_source_out(const bool enb, const size_t mboard)
+    {
+        if (mboard != ALL_MBOARDS)
+        {
+            if (_tree->exists(mb_root(mboard) / "time_source" / "output"))
+            {
+                _tree->access<bool>(mb_root(mboard) / "time_source" / "output").set(enb);
+            }
+            else
+            {
+                throw uhd::runtime_error("multi_usrp::set_time_source_out - not supported on this device");
+            }
+            return;
+        }
+        for (size_t m = 0; m < get_num_mboards(); m++)
+        {
+            this->set_time_source_out(enb, m);
+        }
+    }
+
     size_t get_num_mboards(void){
         return _tree->list("/mboards").size();
     }

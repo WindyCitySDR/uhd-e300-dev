@@ -339,6 +339,26 @@ public:
     virtual std::vector<std::string> get_clock_sources(const size_t mboard) = 0;
 
     /*!
+     * Send the clock source to an output connector.
+     * This call is only applicable on devices with reference outputs.
+     * By default, the reference output will be enabled for ease of use.
+     * This call may be used to enable or disable the output.
+     * \param enb true to output the clock source.
+     * \param mboard which motherboard to set
+     */
+    virtual void set_clock_source_out(const bool enb, const size_t mboard = ALL_MBOARDS) = 0;
+
+    /*!
+     * Send the time source to an output connector.
+     * This call is only applicable on devices with PPS outputs.
+     * By default, the PPS output will be enabled for ease of use.
+     * This call may be used to enable or disable the output.
+     * \param enb true to output the time source.
+     * \param mboard which motherboard to set
+     */
+    virtual void set_time_source_out(const bool enb, const size_t mboard = ALL_MBOARDS) = 0;
+
+    /*!
      * Get the number of USRP motherboards in this configuration.
      */
     virtual size_t get_num_mboards(void) = 0;

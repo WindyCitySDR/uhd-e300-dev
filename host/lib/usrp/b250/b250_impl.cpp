@@ -261,8 +261,7 @@ b250_impl::b250_impl(const uhd::device_addr_t &dev_addr)
     UHD_MSG(status) << "Setup RF frontend clocking..." << std::endl;
 
     //init shadow and clock source
-    clock_control_regs.pps_select = 0; //internal
-    clock_control_regs.pps_out_enb = 1; //always on
+    std::memset(&clock_control_regs, 0, sizeof(clock_control_regs));
     this->update_clock_source("internal");
     this->update_clock_control();
 
@@ -333,11 +332,17 @@ b250_impl::b250_impl(const uhd::device_addr_t &dev_addr)
     //setup time source props
     _tree->create<std::string>(mb_path / "time_source" / "value")
         .subscribe(boost::bind(&b250_impl::update_time_source, this, _1));
+    _tree->create<bool>(mb_path / "time_source" / "output")
+        .subscribe(boost::bind(&b250_impl::set_time_source_out, this, _1))
+        .set(true);
     static const std::vector<std::string> time_sources = boost::assign::list_of("internal")("external")("gpsdo");
     _tree->create<std::vector<std::string> >(mb_path / "time_source" / "options").set(time_sources);
     //setup reference source props
     _tree->create<std::string>(mb_path / "clock_source" / "value")
         .subscribe(boost::bind(&b250_impl::update_clock_source, this, _1));
+    _tree->create<bool>(mb_path / "clock_source" / "output")
+        .subscribe(boost::bind(&b250_clock_ctrl::set_ref_out, _clock, _1))
+        .set(true);
     static const std::vector<std::string> clock_sources = boost::assign::list_of("internal")("external")("gpsdo");
     _tree->create<std::vector<std::string> >(mb_path / "clock_source" / "options").set(clock_sources);
 
@@ -676,6 +681,12 @@ void b250_impl::register_loopback_self_test(wb_iface::sptr iface)
         if (test_fail) break; //exit loop on any failure
     }
     UHD_MSG(status) << ((test_fail)? " fail" : "pass") << std::endl;
+}
+
+void b250_impl::set_time_source_out(const bool enb)
+{
+    clock_control_regs.pps_out_enb = enb? 1 : 0;
+    this->update_clock_control();
 }
 
 void b250_impl::update_clock_control(void)

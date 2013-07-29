@@ -179,6 +179,7 @@ struct b250_impl : public uhd::device
     } clock_control_regs;
     void update_clock_control(void);
 
+    void set_time_source_out(const bool);
     void update_clock_source(const std::string &);
     void update_time_source(const std::string &);
     void update_atr_leds(const size_t, const std::string &ant);
