@@ -68,18 +68,17 @@ int main(int argc, char *argv[])
         exit(EXIT_FAILURE);
     }
 
-    //Write kBoardFlashAutoLoadMode
-    if (load_mode >= 0 && load_mode <= 2) {
-        printf("Writing BoardFlashAutoLoadMode = %u...", load_mode);
-        fflush(stdout);
-        uint32_t attr_val;
-        nirio_status_chain(dev_proxy.set_attribute(kBoardFlashAutoLoadMode, load_mode), status);
-        nirio_status_chain(dev_proxy.get_attribute(kBoardFlashAutoLoadMode, attr_val), status);
-        printf("%s\n", (load_mode==attr_val?"DONE":"ERROR!"));
-    }
+//    //Write kBoardFlashAutoLoadMode
+//    if (load_mode >= 0 && load_mode <= 2) {
+//        printf("Writing BoardFlashAutoLoadMode = %u...", load_mode);
+//        fflush(stdout);
+//        uint32_t attr_val;
+//        nirio_status_chain(dev_proxy.set_attribute(kBoardFlashAutoLoadMode, load_mode), status);
+//        nirio_status_chain(dev_proxy.get_attribute(kBoardFlashAutoLoadMode, attr_val), status);
+//        printf("%s\n", (load_mode==attr_val?"DONE":"ERROR!"));
+//    }
 
     boost::scoped_array<uint8_t> fpga_buffer, flash_buffer;
-    size_t fpga_bufsize, flash_bufsize;
 
     //Download BIN to FPGA
     if (fpga_bin_path != "") {
@@ -106,7 +105,7 @@ int main(int argc, char *argv[])
 
     //Start fly-by configuration
     if (vm.count("start-fly-by")){
-        printf("Starting fly-by FPGA configuration from flash...", flash_path.c_str());
+        printf("Starting fly-by FPGA configuration from flash...");
         fflush(stdout);
         nirio_status_chain(fpga_utils::configure_fpga_from_flash(dev_proxy), status);
         printf("DONE\n");
@@ -117,8 +116,7 @@ int main(int argc, char *argv[])
         printf("Configuring STC3 and FPGA to master the Chinch...");
         fflush(stdout);
 
-        uint32_t cached_addr_space, reg_value;
-        //nirio_status_chain(dev_proxy.get_attribute(kRioAddressSpace, cached_addr_space), status);
+        uint32_t reg_value;
 
         //Write HBRCR
         nirio_status_chain(dev_proxy.set_attribute(kRioAddressSpace, kRioAddressSpaceBusInterface), status);
@@ -131,8 +129,6 @@ int main(int argc, char *argv[])
         nirio_status_chain(dev_proxy.peek(0x1810, reg_value), status);
         reg_value &= 0xFFFFFF00;
         nirio_status_chain(dev_proxy.poke(0x1810, reg_value), status);
-
-        //dev_proxy.set_attribute(kRioAddressSpace, cached_addr_space);
 
         printf("DONE\n");
     }
@@ -189,7 +185,7 @@ int main(int argc, char *argv[])
         printf("* Chinch Signature = %x\n", reg_val);
         nirio_status_chain(dev_proxy.set_attribute(kRioAddressSpace, kRioAddressSpaceFpga), status);
         nirio_status_chain(dev_proxy.peek(0, reg_val), status);
-        printf("* PCIe FPGA Signature = %x (%c%c%c%c)\n", reg_val, ((char*)&reg_val)[3], ((char*)&reg_val)[2], ((char*)&reg_val)[1], ((char*)&reg_val)[0]);
+        printf("* PCIe FPGA Signature = %x\n", reg_val);
 
 //      nirio_status_chain(dev_proxy.get_attribute(kBoardFlashAutoLoadMode, attr_val), status);
 //      printf("* Board Flash Auto Load Mode = %u {0=None, 1=AnyReset, 2=PowerOnReset}\n", attr_val);
@@ -198,53 +194,53 @@ int main(int argc, char *argv[])
 
         nirio_status_chain(dev_proxy.set_attribute(kRioAddressSpace, kRioAddressSpaceFpga), status);
 
-        printf("----------------------------------------------------------------");
+        printf("----------------------------------------------------------------------------------");
         printf("\nChannel =>     |");
-        for (uint32_t i = 0; i < 4; i++) {
-            printf("%10d |", i);
+        for (uint32_t i = 0; i < 6; i++) {
+            printf("%9d |", i);
         }
-        printf("\n----------------------------------------------------------------");
+        printf("\n----------------------------------------------------------------------------------");
         printf("\nTX Status      |");
-        for (uint32_t i = 0; i < 4; i++) {
+        for (uint32_t i = 0; i < 6; i++) {
             nirio_status_chain(dev_proxy.peek(0x200 + (i * 16), reg_val), status);
-            printf("%s |", reg_val==0 ? "      Good" : "     Error");
+            printf("%s |", reg_val==0 ? "     Good" : "    Error");
         }
         printf("\nRX Status      |");
-        for (uint32_t i = 0; i < 4; i++) {
+        for (uint32_t i = 0; i < 6; i++) {
             nirio_status_chain(dev_proxy.peek(0x400 + (i * 16), reg_val), status);
-            printf("%s |", reg_val==0 ? "      Good" : "     Error");
+            printf("%s |", reg_val==0 ? "     Good" : "    Error");
         }
         printf("\nTX Frm Size    |");
-        for (uint32_t i = 0; i < 4; i++) {
+        for (uint32_t i = 0; i < 6; i++) {
             nirio_status_chain(dev_proxy.peek(0x204 + (i * 16), reg_val), status);
-            printf("%10d |", reg_val);
+            printf("%9d |", reg_val);
         }
         printf("\nRX Frm Size    |");
-        for (uint32_t i = 0; i < 4; i++) {
+        for (uint32_t i = 0; i < 6; i++) {
             nirio_status_chain(dev_proxy.peek(0x404 + (i * 16), reg_val), status);
-            printf("%10d |", reg_val);
+            printf("%9d |", reg_val);
         }
         printf("\nTX Pkt Count   |");
-        for (uint32_t i = 0; i < 4; i++) {
+        for (uint32_t i = 0; i < 6; i++) {
             nirio_status_chain(dev_proxy.peek(0x20C + (i * 16), reg_val), status);
-            printf("%10d |", reg_val);
+            printf("%9d |", reg_val);
         }
         printf("\nTX Samp Count  |");
-        for (uint32_t i = 0; i < 4; i++) {
+        for (uint32_t i = 0; i < 6; i++) {
             nirio_status_chain(dev_proxy.peek(0x208 + (i * 16), reg_val), status);
-            printf("%10d |", reg_val);
+            printf("%9d |", reg_val);
         }
         printf("\nRX Pkt Count   |");
-        for (uint32_t i = 0; i < 4; i++) {
+        for (uint32_t i = 0; i < 6; i++) {
             nirio_status_chain(dev_proxy.peek(0x40C + (i * 16), reg_val), status);
-            printf("%10d |", reg_val);
+            printf("%9d |", reg_val);
         }
         printf("\nRX Samp Count  |");
-        for (uint32_t i = 0; i < 4; i++) {
+        for (uint32_t i = 0; i < 6; i++) {
             nirio_status_chain(dev_proxy.peek(0x408 + (i * 16), reg_val), status);
-            printf("%10d |", reg_val);
+            printf("%9d |", reg_val);
         }
-        printf("\n----------------------------------------------------------------\n");
+        printf("\n----------------------------------------------------------------------------------\n");
     }
 
     exit(EXIT_SUCCESS);

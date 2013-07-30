@@ -18,6 +18,7 @@ namespace nifpga_interface
 {
 
 nifpga_session::nifpga_session(const std::string& resource_name) :
+    _session(0),
 	_resource_name(resource_name),
 	_resource_manager(_riok_proxy)
 {
@@ -25,6 +26,7 @@ nifpga_session::nifpga_session(const std::string& resource_name) :
 
 nifpga_session::~nifpga_session()
 {
+    close();
 }
 
 nirio_status nifpga_session::load_lib()
@@ -84,11 +86,13 @@ nirio_status nifpga_session::open(
 
 void nifpga_session::close(bool reset_fpga)
 {
-	nirio_status status = NiRio_Status_Success;
-	nirio_status_chain(_lock.acquire(SESSION_LOCK_TIMEOUT_IN_MS), status);
-	if (reset_fpga) reset();
-	nirio_status_chain(NiFpga_Close(_session, 0), status);
-	_lock.release();
+    if (_session) {
+        nirio_status status = NiRio_Status_Success;
+        nirio_status_chain(_lock.acquire(SESSION_LOCK_TIMEOUT_IN_MS), status);
+        if (reset_fpga) reset();
+        nirio_status_chain(NiFpga_Close(_session, 0), status);
+        _lock.release();
+    }
 }
 
 nirio_status nifpga_session::reset()

@@ -109,31 +109,48 @@ static device_addrs_t b250_find(const device_addr_t &hint_)
     device_addrs_t addrs;
     if (hint.has_key("type") and hint["type"] != "x300") return addrs;
 
-    //use the address given
-    if (hint.has_key("addr"))
+    if (hint.has_key("transport") && hint["transport"] == "pcie")
     {
-        device_addrs_t reply_addrs = b250_find_with_addr(hint);
-        BOOST_FOREACH(const device_addr_t &reply_addr, reply_addrs)
+        niriok_proxy_vtr dev_proxy_vtr;
+        niriok_proxy_factory::get_by_device_id(X300_PCIE_SSID, dev_proxy_vtr);
+        BOOST_FOREACH(niriok_proxy &dev_proxy, dev_proxy_vtr)
         {
-            device_addrs_t new_addrs = b250_find_with_addr(reply_addr);
-            addrs.insert(addrs.begin(), new_addrs.begin(), new_addrs.end());
+            device_addr_t new_addr;
+            new_addr["type"] = "x300";
+            new_addr["addr"] = boost::str(boost::format("RIO%u") % dev_proxy.get_interface_num());
+            addrs.push_back(new_addr);
+            dev_proxy.close();
         }
         return addrs;
     }
-
-    //otherwise, no address was specified, send a broadcast on each interface
-    BOOST_FOREACH(const if_addrs_t &if_addrs, get_if_addrs())
+    else
     {
-        //avoid the loopback device
-        if (if_addrs.inet == asio::ip::address_v4::loopback().to_string()) continue;
+        //use the address given
+        if (hint.has_key("addr"))
+        {
+            device_addrs_t reply_addrs = b250_find_with_addr(hint);
+            BOOST_FOREACH(const device_addr_t &reply_addr, reply_addrs)
+            {
+                device_addrs_t new_addrs = b250_find_with_addr(reply_addr);
+                addrs.insert(addrs.begin(), new_addrs.begin(), new_addrs.end());
+            }
+            return addrs;
+        }
 
-        //create a new hint with this broadcast address
-        device_addr_t new_hint = hint;
-        new_hint["addr"] = if_addrs.bcast;
+        //otherwise, no address was specified, send a broadcast on each interface
+        BOOST_FOREACH(const if_addrs_t &if_addrs, get_if_addrs())
+        {
+            //avoid the loopback device
+            if (if_addrs.inet == asio::ip::address_v4::loopback().to_string()) continue;
 
-        //call discover with the new hint and append results
-        device_addrs_t new_addrs = b250_find(new_hint);
-        addrs.insert(addrs.begin(), new_addrs.begin(), new_addrs.end());
+            //create a new hint with this broadcast address
+            device_addr_t new_hint = hint;
+            new_hint["addr"] = if_addrs.bcast;
+
+            //call discover with the new hint and append results
+            device_addrs_t new_addrs = b250_find(new_hint);
+            addrs.insert(addrs.begin(), new_addrs.begin(), new_addrs.end());
+        }
     }
 
     return addrs;
@@ -213,7 +230,7 @@ b250_impl::b250_impl(const uhd::device_addr_t &dev_addr)
         UHD_MSG(status) << "Loading NiFpga lib...\n";
         nirio_status_not_fatal(nifpga_session::load_lib());
 
-        UHD_MSG(status) << "Opening nifpga session...\n";
+        UHD_MSG(status) << boost::format("Loading bitfile %s...\n") % nifpga_image::SIGNATURE;
         _rio_fpga_interface.reset(new nifpga_session("RIO0"));
         nirio_status status = 0;
         nirio_status_chain(_rio_fpga_interface->open(nifpga_image::BITFILE, nifpga_image::SIGNATURE), status);
@@ -420,10 +437,10 @@ b250_impl::~b250_impl(void)
         _radio_perifs[0].ctrl->poke32(TOREG(SR_MISC_OUTS), (1 << 2)); //disable/reset ADC/DAC
         _radio_perifs[1].ctrl->poke32(TOREG(SR_MISC_OUTS), (1 << 2)); //disable/reset ADC/DAC
 
-        if (_xport_path == "pcie") {
-            _rio_fpga_interface->close(true);
-            nifpga_session::unload_lib();
-        }
+//        if (_xport_path == "pcie") {
+//            _rio_fpga_interface->close(true);
+//            nifpga_session::unload_lib();
+//        }
     )
 }
 
@@ -700,49 +717,6 @@ void b250_impl::register_loopback_self_test(wb_iface::sptr iface)
         if (test_fail) break; //exit loop on any failure
     }
     UHD_MSG(status) << ((test_fail)? " fail" : "pass") << std::endl;
-}
-
-void b250_impl::transport_loopback_self_test()
-{
-    boost::uint32_t sid;
-    zero_copy_if::sptr xport =
-        this->make_transport(_addr, _xport_path, B250_XB_DST_CE0, B250_RADIO_DEST_PREFIX_CTRL,
-                             device_addr_t(), sid);
-
-    boost::uint32_t pkt_length = 10;
-    for (size_t j = 0; j < 1; j++)
-    {
-        {
-            managed_send_buffer::sptr buff = xport->get_send_buff(0.0);
-            if (not buff){
-                throw uhd::runtime_error("timed out getting a send buffer");
-            }
-            boost::uint32_t *pkt = buff->cast<boost::uint32_t *>();
-            pkt[0] = pkt_length;
-            pkt[1] = sid;
-
-            for (size_t i = 2; i < pkt_length; i++)
-                pkt[i] = 0xDEAD0000 + i - 2;
-
-            buff->commit(sizeof(boost::uint32_t)*pkt_length);
-        }
-
-        {
-            managed_recv_buffer::sptr buff = xport->get_recv_buff(5.0);
-            try
-            {
-                UHD_ASSERT_THROW(bool(buff));
-                UHD_ASSERT_THROW(bool(buff->size()));
-            }
-            catch(const std::exception &ex)
-            {
-                throw uhd::io_error(str(boost::format("no response packet - %s") % ex.what()));
-            }
-            boost::uint32_t *pkt = buff->cast<boost::uint32_t *>();
-            for (size_t i = 0; i < pkt_length; i++)
-                UHD_MSG(status) << boost::format("[READ] 0x%x") % pkt[i] << std::endl;
-        }
-    }
 }
 
 void b250_impl::update_clock_control(void)

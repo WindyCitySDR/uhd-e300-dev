@@ -3,7 +3,7 @@
 #define LOCKS_H_
 
 #include <uhd/transport/nirio/status.h>
-#include <boost/thread/pthread/mutex.hpp>
+#include <boost/thread/pthread/recursive_mutex.hpp>
 #include <unistd.h>
 
 namespace nifpga_interface
@@ -33,9 +33,9 @@ public:
 	}
 
 private:
-	uint32_t 	    _session;
-	pid_t 		    _pid;
-    boost::mutex    _mutex;
+	uint32_t 	            _session;
+	pid_t 		            _pid;
+    boost::recursive_mutex  _mutex;
 };
 
 }

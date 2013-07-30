@@ -62,8 +62,7 @@ public:
         UHD_LOG << "radio_ctrl_core_3000_impl() " << _name << std::endl;
         if (resp_xport)
         {
-//@TODO: Uncomment this. Figure out how to handle this for PCIe.
-//            while (resp_xport->get_recv_buff(0.0)){} //flush
+            while (resp_xport->get_recv_buff(0.0)){} //flush
         }
         this->set_time(uhd::time_spec_t(0.0));
         this->set_tick_rate(1.0); //something possible but bogus

@@ -116,7 +116,6 @@ struct b250_impl : public uhd::device
     boost::mutex _transport_setup_mutex;
 
     void register_loopback_self_test(wb_iface::sptr iface);
-    void transport_loopback_self_test();
 
     std::string _addr;
     std::string _xport_path;

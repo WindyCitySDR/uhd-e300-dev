@@ -10,7 +10,7 @@
 
 #include <unistd.h>
 
-#define ENABLE_EXTENDED_ERROR_INFO true
+#define ENABLE_EXTENDED_ERROR_INFO false
 
 typedef int32_t nirio_status;
 
