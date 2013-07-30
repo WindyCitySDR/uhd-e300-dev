@@ -115,6 +115,7 @@ struct b250_impl : public uhd::device
     void register_loopback_self_test(wb_iface::sptr iface);
 
     std::string _addr;
+    int _router_dst_here;
     uhd::device_addr_t _send_args;
     uhd::device_addr_t _recv_args;
 

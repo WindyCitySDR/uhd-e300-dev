@@ -247,6 +247,15 @@ b250_impl::b250_impl(const uhd::device_addr_t &dev_addr)
         .subscribe(boost::bind(&b250_impl::set_mb_eeprom, this, _1));
 
     ////////////////////////////////////////////////////////////////////
+    // determine routing based on address match
+    ////////////////////////////////////////////////////////////////////
+    _router_dst_here = B250_XB_DST_E0; //some default if eeprom not match
+    if (_addr == mb_eeprom["ip-addr0"]) _router_dst_here = B250_XB_DST_E0;
+    if (_addr == mb_eeprom["ip-addr1"]) _router_dst_here = B250_XB_DST_E1;
+    if (_addr == mb_eeprom["ip-addr2"]) _router_dst_here = B250_XB_DST_E0;
+    if (_addr == mb_eeprom["ip-addr3"]) _router_dst_here = B250_XB_DST_E1;
+
+    ////////////////////////////////////////////////////////////////////
     // read dboard eeproms
     ////////////////////////////////////////////////////////////////////
     for (size_t i = 0; i < 8; i++)
@@ -451,7 +460,7 @@ void b250_impl::setup_radio(const size_t i, const std::string &db_name)
     config.router_addr_there = B250_DEVICE_THERE;
     config.dst_prefix = B250_RADIO_DEST_PREFIX_CTRL;
     config.router_dst_there = (i == 0)? B250_XB_DST_R0 : B250_XB_DST_R1;
-    config.router_dst_here = B250_XB_DST_E0;
+    config.router_dst_here = _router_dst_here;
     const boost::uint32_t ctrl_sid = this->allocate_sid(config);
     udp_zero_copy::sptr ctrl_xport = this->make_transport(_addr, ctrl_sid);
     perif.ctrl = radio_ctrl_core_3000::make(vrt::if_packet_info_t::LINK_TYPE_VRLP, ctrl_xport, ctrl_xport, ctrl_sid, db_name);
@@ -617,6 +626,7 @@ uhd::transport::udp_zero_copy::sptr b250_impl::make_transport(
     //reprogram the ethernet dispatcher's udp port (should be safe to always set)
     UHD_LOG << "reprogram the ethernet dispatcher's udp port" << std::endl;
     _zpu_ctrl->poke32(SR_ADDR(SET0_BASE, (ZPU_SR_ETHINT0+8+3)), B250_VITA_UDP_PORT);
+    _zpu_ctrl->poke32(SR_ADDR(SET0_BASE, (ZPU_SR_ETHINT1+8+3)), B250_VITA_UDP_PORT);
 
     //Do a peek to an arbitrary address to guarantee that the
     //ethernet framer has been programmed before we return.
