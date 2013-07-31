@@ -262,6 +262,20 @@ static void update_leds(void)
     );
 }
 
+static void garp(void)
+{
+    static size_t count = 0;
+    if (count++ == 60000) //60 seconds
+    {
+        count = 0;
+        for (size_t e = 0; e < ethernet_ninterfaces(); e++)
+        {
+            if (!ethernet_get_link_up(e)) continue;
+            u3_net_stack_send_arp_request(e, u3_net_stack_get_ip_addr(e));
+        }
+    }
+}
+
 int main(void)
 {
     x300_init();
@@ -280,6 +294,7 @@ int main(void)
         if (ticks_passed > tick_delta)
         {
             update_leds(); //run the link and activity leds
+            garp(); //send periodic garps
             xge_poll_sfpp_status(0); // Every so often poll XGE Phy to look for SFP+ hotplug events.
             xge_poll_sfpp_status(1); // Every so often poll XGE Phy to look for SFP+ hotplug events.
             last_cronjob = wb_peek32(SR_ADDR(RB0_BASE, RB_COUNTER));

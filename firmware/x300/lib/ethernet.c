@@ -34,6 +34,7 @@
 #include <stdbool.h>
 #include "xge_phy.h"
 #include "xge_mac.h"
+#include <u3_net_stack.h>
 
 
 
@@ -313,10 +314,13 @@ xge_poll_sfpp_status(const uint32_t eth)
     }
   }
 
-    //link up status
+    //update the link up status
+    const bool old_link_up = links_up[eth];
     //TODO eth 1G and 10G
-    //TODO if became up - send GARP
-    links_up[eth] = true;//(xge_read_mdio((eth==0) ? XGE0_BASE : XGE1_BASE, 0x1,XGE_MDIO_DEVICE_PMA,MDIO_PORT)) & 0x2;
+    //TODO (xge_read_mdio((eth==0) ? XGE0_BASE : XGE1_BASE, 0x1,XGE_MDIO_DEVICE_PMA,MDIO_PORT)) & 0x2;
+    links_up[eth] = false;
+    //The link became up, send a GARP so everyone knows our mac/ip association
+    if (!old_link_up && links_up[eth]) u3_net_stack_send_arp_request(eth, u3_net_stack_get_ip_addr(eth));
 }
   
 
