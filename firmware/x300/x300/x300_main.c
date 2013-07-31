@@ -264,23 +264,25 @@ static void update_leds(void)
 
 int main(void)
 {
-    uint32_t xge_sfpp_hotplug_count = 0;
-    uint32_t led_activity_update_count = 0;
-
     x300_init();
     u3_net_stack_register_udp_handler(X300_FW_COMMS_UDP_PORT, &handle_udp_fw_comms);
     u3_net_stack_register_udp_handler(X300_VITA_UDP_PORT, &handle_udp_prog_framer);
     u3_net_stack_register_udp_handler(X300_FPGA_PROG_UDP_PORT, &handle_udp_fpga_prog);
 
-//    run_flash_access_test();
+    uint32_t last_cronjob = 0;
 
     while(true)
     {
-        //run the link and activity leds
-        if ((led_activity_update_count++) == 1000)
+        //jobs that happen once every ms
+        const uint32_t ticks_now = wb_peek32(SR_ADDR(RB0_BASE, RB_COUNTER));
+        const uint32_t ticks_passed = ticks_now - last_cronjob;
+        static const uint32_t tick_delta = CPU_CLOCK/1000;
+        if (ticks_passed > tick_delta)
         {
-            led_activity_update_count = 0;
-            update_leds();
+            update_leds(); //run the link and activity leds
+            xge_poll_sfpp_status(0); // Every so often poll XGE Phy to look for SFP+ hotplug events.
+            xge_poll_sfpp_status(1); // Every so often poll XGE Phy to look for SFP+ hotplug events.
+            last_cronjob = wb_peek32(SR_ADDR(RB0_BASE, RB_COUNTER));
         }
 
         //run the network stack - poll and handle
@@ -291,14 +293,6 @@ int main(void)
 
         //run the udp uart handler for incoming serial data
         udp_uart_poll();
-
-        if ((xge_sfpp_hotplug_count++) == 1000) {
-              // Every so often poll XGE Phy to look for SFP+ hotplug events.
-              xge_sfpp_hotplug_count = 0;
-          xge_poll_sfpp_status(0);
-
-        }
-
     }
     return 0;
 }

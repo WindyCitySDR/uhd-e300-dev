@@ -294,7 +294,7 @@ b250_impl::b250_impl(const uhd::device_addr_t &dev_addr)
         try
         {
             _gps = gps_ctrl::make(udp_simple::make_uart(udp_simple::make_connected(
-                _addr, BOOST_STRINGIZE(B250_GPSDO_UDP_PORT)
+                _addr, BOOST_STRINGIZE(X300_GPSDO_UDP_PORT)
             )));
         }
         catch(std::exception &e)
@@ -608,7 +608,7 @@ uhd::transport::udp_zero_copy::sptr b250_impl::make_transport(
 )
 {
     //make a new transport - fpga has no idea how to talk to use on this yet
-    udp_zero_copy::sptr xport = udp_zero_copy::make(addr, BOOST_STRINGIZE(B250_VITA_UDP_PORT), device_addr);
+    udp_zero_copy::sptr xport = udp_zero_copy::make(addr, BOOST_STRINGIZE(X300_VITA_UDP_PORT), device_addr);
 
     //clear the ethernet dispatcher's udp port
     //NOT clearing this, the dispatcher is now intelligent

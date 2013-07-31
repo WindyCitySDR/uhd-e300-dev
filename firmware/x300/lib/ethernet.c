@@ -42,6 +42,7 @@
 
 #define	NETHS	2	// # of ethernet interfaces
 
+static bool links_up[NETHS] = {};
 
 ////////////////////////////////////////////////////////////////////////
 //
@@ -62,7 +63,7 @@ typedef struct {
 #define xge_regs ((xge_regs_t *) base)
 
 #define SFPP_STATUS_MODABS_CHG     (1 << 5)    // Has MODABS changed since last read?
-#define SFPP_STATUS_TXFAULT_CHG    (1 << 4)    // Has TXFAULT changed sonce last read?
+#define SFPP_STATUS_TXFAULT_CHG    (1 << 4)    // Has TXFAULT changed since last read?
 #define SFPP_STATUS_RXLOS_CHG      (1 << 3)    // Has RXLOS changed since last read?
 #define SFPP_STATUS_MODABS         (1 << 2)    // MODABS state
 #define SFPP_STATUS_TXFAULT        (1 << 1)    // TXFAULT state
@@ -311,6 +312,11 @@ xge_poll_sfpp_status(const uint32_t eth)
       xge_read_sfpp_type((eth==0) ? I2C0_BASE : I2C2_BASE,1);
     }
   }
+
+    //link up status
+    //TODO eth 1G and 10G
+    //TODO if became up - send GARP
+    links_up[eth] = true;//(xge_read_mdio((eth==0) ? XGE0_BASE : XGE1_BASE, 0x1,XGE_MDIO_DEVICE_PMA,MDIO_PORT)) & 0x2;
 }
   
 
@@ -563,6 +569,5 @@ dump_mdio_regs(const uint32_t base, uint32_t mdio_port)
 
 bool ethernet_get_link_up(const uint32_t eth)
 {
-    //TODO fill in the implementation
-    return true;
+    return links_up[eth];
 }
