@@ -22,7 +22,7 @@
 #include "printf.h"
 #include <stdint.h>
 //IJB FIXME.
-#include "../b250/b250_defs.h"
+#include "../x300/x300_defs.h"
 
 void mdelay(int ms){
   for(int i = 0; i < ms; i++){

@@ -1,5 +1,5 @@
-#include "b250_init.h"
-#include "b250_defs.h"
+#include "x300_init.h"
+#include "x300_defs.h"
 #include "ethernet.h"
 #include "mdelay.h"
 #include <wb_utils.h>
@@ -11,7 +11,7 @@
 #include <wb_pkt_iface64.h>
 #include <u3_net_stack.h>
 #include <udp_uart.h>
-#include "b250_fw_common.h"
+#include "x300_fw_common.h"
 
 static wb_pkt_iface64_config_t pkt_config;
 
@@ -110,12 +110,12 @@ static void putc(void *p, char c)
     //wb_uart_putc(UART0_BASE, c);
 }
 
-void b250_init(void)
+void x300_init(void)
 {
     //first - uart
     wb_uart_init(UART0_BASE, CPU_CLOCK/UART0_BAUD);
     init_printf(NULL,putc);
-    udp_uart_init(UART0_BASE, B250_GPSDO_UDP_PORT);
+    udp_uart_init(UART0_BASE, X300_GPSDO_UDP_PORT);
 
     //now we can init the rest with prints
     printf("B250 ZPU Init Begin -- CPU CLOCK is %d MHz\n", CPU_CLOCK/1000000);

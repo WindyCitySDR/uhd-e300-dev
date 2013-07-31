@@ -115,4 +115,4 @@ ENDMACRO(GEN_OUTPUTS)
 # Add the subdirectories
 ########################################################################
 ADD_SUBDIRECTORY(lib)
-ADD_SUBDIRECTORY(b250)
+ADD_SUBDIRECTORY(x300)

@@ -27,7 +27,7 @@
 #include <uhd/types/sensors.hpp>
 #include "wb_iface.hpp"
 #include "b250_clock_ctrl.hpp"
-#include "b250_fw_common.h"
+#include "x300_fw_common.h"
 #include "b250_fw_ctrl.hpp"
 #include <uhd/transport/udp_zero_copy.hpp>
 #include "spi_core_3000.hpp"

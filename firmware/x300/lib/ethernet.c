@@ -19,7 +19,7 @@
 #ifdef HAVE_CONFIG_H
 #include <config.h>
 #endif
-#include "../b250/b250_defs.h"
+#include "../x300/x300_defs.h"
 #include "ethernet.h"
 #include "mdelay.h"
 #include "printf.h"

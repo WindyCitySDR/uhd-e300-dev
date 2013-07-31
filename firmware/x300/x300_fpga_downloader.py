@@ -70,10 +70,10 @@ def draw_progress_bar(percent, bar_len = 28):
     sys.stdout.write("[%s] %d%%" % (progress, percent))
     sys.stdout.flush()
 
-def unpack_b250_fpga_flags_fmt(s):
+def unpack_x300_fpga_flags_fmt(s):
     return struct.unpack('!L', s)[0] #(flags)
 
-def pack_b250_fpga_prog_fmt(flags, sector, offset, size, data):
+def pack_x300_fpga_prog_fmt(flags, sector, offset, size, data):
     return struct.pack("!LLLL%dH" % (len(data),), flags, sector, offset, size, *data)
 
 def bit_reverse(byte):
@@ -106,7 +106,7 @@ class ctrl_socket(object):
     def send_with_ack(self, out_pkt, message):
         self.send_without_ack(out_pkt)
         in_pkt = self._sock.recv(B250_MAX_RESPONSE_BYTES)
-        flags = unpack_b250_fpga_flags_fmt(in_pkt)
+        flags = unpack_x300_fpga_flags_fmt(in_pkt)
         if flags & B250_FPGA_PROG_FLAGS_ERROR == B250_FPGA_PROG_FLAGS_ERROR:
             raise Exception(message)
 
@@ -117,7 +117,7 @@ class ctrl_socket(object):
         fpga_image = ''.join([ bit_reverse(b) for b in fpga_file.read() ])
         
         print("Writing FPGA image to flash...")
-        out_pkt = pack_b250_fpga_prog_fmt(B250_FPGA_PROG_FLAGS_ACK|B250_FPGA_PROG_FLAGS_INIT,
+        out_pkt = pack_x300_fpga_prog_fmt(B250_FPGA_PROG_FLAGS_ACK|B250_FPGA_PROG_FLAGS_INIT,
                                           0, 0, 0, [0]*(B250_PACKET_SIZE/2))
         self.send_with_ack(out_pkt, "Flash initialization failed!!!")
 
@@ -130,28 +130,28 @@ class ctrl_socket(object):
                 flags = B250_FPGA_PROG_FLAGS_ACK
                 if offset == 0: flags |= B250_FPGA_PROG_FLAGS_ERASE
                 if verify: flags |= B250_FPGA_PROG_FLAGS_VERIFY
-                out_pkt = pack_b250_fpga_prog_fmt(flags, B250_FPGA_SECTOR_START+sector_idx, offset, len(data), data)
+                out_pkt = pack_x300_fpga_prog_fmt(flags, B250_FPGA_SECTOR_START+sector_idx, offset, len(data), data)
                 self.send_with_ack(out_pkt, "Transfer failed or data verification failed!!!")
                 offset += len(data)
             draw_progress_bar(((sector_idx+1)*100)/len(sector_chunks))
 
         print(' ')
-        out_pkt = pack_b250_fpga_prog_fmt(B250_FPGA_PROG_FLAGS_ACK|B250_FPGA_PROG_FLAGS_CLEANUP,
+        out_pkt = pack_x300_fpga_prog_fmt(B250_FPGA_PROG_FLAGS_ACK|B250_FPGA_PROG_FLAGS_CLEANUP,
                                           0, 0, 0, [0]*(B250_PACKET_SIZE/2))
         self.send_with_ack(out_pkt, "Flash cleanup failed!!!")
 
     def program(self):
         print("Programming FPGA from flash...")
-        out_pkt = pack_b250_fpga_prog_fmt(B250_FPGA_PROG_CONFIGURE, 0, 0, 0, [0]*(B250_PACKET_SIZE/2))
+        out_pkt = pack_x300_fpga_prog_fmt(B250_FPGA_PROG_CONFIGURE, 0, 0, 0, [0]*(B250_PACKET_SIZE/2))
         self.send_without_ack(out_pkt)
         print("Waiting for FPGA to load...")
         self._sock.settimeout(1)
-        out_pkt = pack_b250_fpga_prog_fmt(B250_FPGA_PROG_FLAGS_ACK|B250_FPGA_PROG_CONFIG_STATUS, 0, 0, 0, [0]*(B250_PACKET_SIZE/2))
+        out_pkt = pack_x300_fpga_prog_fmt(B250_FPGA_PROG_FLAGS_ACK|B250_FPGA_PROG_CONFIG_STATUS, 0, 0, 0, [0]*(B250_PACKET_SIZE/2))
         for i in range(FPGA_LOAD_TIMEOUT):
             try:
                 self.send_without_ack(out_pkt)
                 in_pkt = self._sock.recv(B250_MAX_RESPONSE_BYTES)
-                flags = unpack_b250_fpga_flags_fmt(in_pkt)
+                flags = unpack_x300_fpga_flags_fmt(in_pkt)
                 if not(flags & B250_FPGA_PROG_FLAGS_ERROR == B250_FPGA_PROG_FLAGS_ERROR):
                     break
             except socket.error:

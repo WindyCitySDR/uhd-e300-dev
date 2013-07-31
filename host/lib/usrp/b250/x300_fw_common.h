@@ -15,13 +15,13 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 //
 
-#ifndef INCLUDED_B250_FW_COMMON_H
-#define INCLUDED_B250_FW_COMMON_H
+#ifndef INCLUDED_X300_FW_COMMON_H
+#define INCLUDED_X300_FW_COMMON_H
 
 #include <stdint.h>
 
 /*!
- * Structs and constants for b250 communication.
+ * Structs and constants for x300 communication.
  * This header is shared by the firmware and host code.
  * Therefore, this header may only contain valid C code.
  */
@@ -29,27 +29,27 @@
 extern "C" {
 #endif
 
-#define B250_FW_NUM_BYTES (1 << 15) //64k
-#define B250_FW_COMMS_MTU (1 << 13) //8k
-#define B250_FW_COMMS_UDP_PORT 49152
+#define X300_FW_NUM_BYTES (1 << 15) //64k
+#define X300_FW_COMMS_MTU (1 << 13) //8k
+#define X300_FW_COMMS_UDP_PORT 49152
 
-#define B250_VITA_UDP_PORT 49153
-#define B250_GPSDO_UDP_PORT 49156
-#define B250_FPGA_PROG_UDP_PORT 49157
+#define X300_VITA_UDP_PORT 49153
+#define X300_GPSDO_UDP_PORT 49156
+#define X300_FPGA_PROG_UDP_PORT 49157
 
-#define B250_FW_COMMS_FLAGS_ACK        (1 << 0)
-#define B250_FW_COMMS_FLAGS_ERROR      (1 << 1)
-#define B250_FW_COMMS_FLAGS_POKE32     (1 << 2)
-#define B250_FW_COMMS_FLAGS_PEEK32     (1 << 3)
+#define X300_FW_COMMS_FLAGS_ACK        (1 << 0)
+#define X300_FW_COMMS_FLAGS_ERROR      (1 << 1)
+#define X300_FW_COMMS_FLAGS_POKE32     (1 << 2)
+#define X300_FW_COMMS_FLAGS_PEEK32     (1 << 3)
 
-#define B250_FPGA_PROG_FLAGS_ACK       (1 << 0)
-#define B250_FPGA_PROG_FLAGS_ERROR     (1 << 1)
-#define B250_FPGA_PROG_FLAGS_INIT      (1 << 2)
-#define B250_FPGA_PROG_FLAGS_CLEANUP   (1 << 3)
-#define B250_FPGA_PROG_FLAGS_ERASE     (1 << 4)
-#define B250_FPGA_PROG_FLAGS_VERIFY    (1 << 5)
-#define B250_FPGA_PROG_CONFIGURE       (1 << 6)
-#define B250_FPGA_PROG_CONFIG_STATUS   (1 << 7)
+#define X300_FPGA_PROG_FLAGS_ACK       (1 << 0)
+#define X300_FPGA_PROG_FLAGS_ERROR     (1 << 1)
+#define X300_FPGA_PROG_FLAGS_INIT      (1 << 2)
+#define X300_FPGA_PROG_FLAGS_CLEANUP   (1 << 3)
+#define X300_FPGA_PROG_FLAGS_ERASE     (1 << 4)
+#define X300_FPGA_PROG_FLAGS_VERIFY    (1 << 5)
+#define X300_FPGA_PROG_CONFIGURE       (1 << 6)
+#define X300_FPGA_PROG_CONFIG_STATUS   (1 << 7)
 
 typedef struct
 {
@@ -57,7 +57,7 @@ typedef struct
     uint32_t sequence;
     uint32_t addr;
     uint32_t data;
-} b250_fw_comms_t;
+} x300_fw_comms_t;
 
 typedef struct
 {
@@ -66,15 +66,15 @@ typedef struct
     uint32_t index;
     uint32_t size;
     uint16_t data[128];
-} b250_fpga_prog_t;
+} x300_fpga_prog_t;
 
 typedef struct
 {
     uint32_t flags;
-} b250_fpga_prog_flags_t;
+} x300_fpga_prog_flags_t;
 
 #ifdef __cplusplus
 }
 #endif
 
-#endif /* INCLUDED_B250_FW_COMMON_H */
+#endif /* INCLUDED_X300_FW_COMMON_H */

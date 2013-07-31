@@ -46,7 +46,7 @@ struct b250_ctrl_iface : wb_iface
 
     void flush(void)
     {
-        char buff[B250_FW_COMMS_MTU] = {};
+        char buff[X300_FW_COMMS_MTU] = {};
         while (udp->recv(boost::asio::buffer(buff), 0.0)){} //flush
     }
 
@@ -92,8 +92,8 @@ struct b250_ctrl_iface : wb_iface
         boost::mutex::scoped_lock lock(mutex);
 
         //load request struct
-        b250_fw_comms_t request = b250_fw_comms_t();
-        request.flags = uhd::htonx<boost::uint32_t>(B250_FW_COMMS_FLAGS_ACK | B250_FW_COMMS_FLAGS_POKE32);
+        x300_fw_comms_t request = x300_fw_comms_t();
+        request.flags = uhd::htonx<boost::uint32_t>(X300_FW_COMMS_FLAGS_ACK | X300_FW_COMMS_FLAGS_POKE32);
         request.sequence = uhd::htonx<boost::uint32_t>(seq++);
         request.addr = uhd::htonx(addr);
         request.data = uhd::htonx(data);
@@ -103,16 +103,16 @@ struct b250_ctrl_iface : wb_iface
         udp->send(boost::asio::buffer(&request, sizeof(request)));
 
         //recv reply
-        b250_fw_comms_t reply = b250_fw_comms_t();
+        x300_fw_comms_t reply = x300_fw_comms_t();
         const size_t nbytes = udp->recv(boost::asio::buffer(&reply, sizeof(reply)), 1.0);
         if (nbytes == 0) throw uhd::io_error("b250 fw poke32 - reply timed out");
 
         //sanity checks
         const size_t flags = uhd::ntohx<boost::uint32_t>(reply.flags);
         UHD_ASSERT_THROW(nbytes == sizeof(reply));
-        UHD_ASSERT_THROW(not (flags & B250_FW_COMMS_FLAGS_ERROR));
-        UHD_ASSERT_THROW(flags & B250_FW_COMMS_FLAGS_POKE32);
-        UHD_ASSERT_THROW(flags & B250_FW_COMMS_FLAGS_ACK);
+        UHD_ASSERT_THROW(not (flags & X300_FW_COMMS_FLAGS_ERROR));
+        UHD_ASSERT_THROW(flags & X300_FW_COMMS_FLAGS_POKE32);
+        UHD_ASSERT_THROW(flags & X300_FW_COMMS_FLAGS_ACK);
         UHD_ASSERT_THROW(reply.sequence == request.sequence);
         UHD_ASSERT_THROW(reply.addr == request.addr);
         UHD_ASSERT_THROW(reply.data == request.data);
@@ -123,8 +123,8 @@ struct b250_ctrl_iface : wb_iface
         boost::mutex::scoped_lock lock(mutex);
 
         //load request struct
-        b250_fw_comms_t request = b250_fw_comms_t();
-        request.flags = uhd::htonx<boost::uint32_t>(B250_FW_COMMS_FLAGS_ACK | B250_FW_COMMS_FLAGS_PEEK32);
+        x300_fw_comms_t request = x300_fw_comms_t();
+        request.flags = uhd::htonx<boost::uint32_t>(X300_FW_COMMS_FLAGS_ACK | X300_FW_COMMS_FLAGS_PEEK32);
         request.sequence = uhd::htonx<boost::uint32_t>(seq++);
         request.addr = uhd::htonx(addr);
         request.data = 0;
@@ -134,16 +134,16 @@ struct b250_ctrl_iface : wb_iface
         udp->send(boost::asio::buffer(&request, sizeof(request)));
 
         //recv reply
-        b250_fw_comms_t reply = b250_fw_comms_t();
+        x300_fw_comms_t reply = x300_fw_comms_t();
         const size_t nbytes = udp->recv(boost::asio::buffer(&reply, sizeof(reply)), 1.0);
         if (nbytes == 0) throw uhd::io_error("b250 fw peek32 - reply timed out");
 
         //sanity checks
         const size_t flags = uhd::ntohx<boost::uint32_t>(reply.flags);
         UHD_ASSERT_THROW(nbytes == sizeof(reply));
-        UHD_ASSERT_THROW(not (flags & B250_FW_COMMS_FLAGS_ERROR));
-        UHD_ASSERT_THROW(flags & B250_FW_COMMS_FLAGS_PEEK32);
-        UHD_ASSERT_THROW(flags & B250_FW_COMMS_FLAGS_ACK);
+        UHD_ASSERT_THROW(not (flags & X300_FW_COMMS_FLAGS_ERROR));
+        UHD_ASSERT_THROW(flags & X300_FW_COMMS_FLAGS_PEEK32);
+        UHD_ASSERT_THROW(flags & X300_FW_COMMS_FLAGS_ACK);
         UHD_ASSERT_THROW(reply.sequence == request.sequence);
         UHD_ASSERT_THROW(reply.addr == request.addr);
 

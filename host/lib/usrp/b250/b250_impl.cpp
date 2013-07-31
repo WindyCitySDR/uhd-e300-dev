@@ -41,11 +41,11 @@ namespace asio = boost::asio;
 static device_addrs_t b250_find_with_addr(const device_addr_t &hint)
 {
     udp_simple::sptr comm = udp_simple::make_broadcast(
-        hint["addr"], BOOST_STRINGIZE(B250_FW_COMMS_UDP_PORT));
+        hint["addr"], BOOST_STRINGIZE(X300_FW_COMMS_UDP_PORT));
 
     //load request struct
-    b250_fw_comms_t request = b250_fw_comms_t();
-    request.flags = uhd::htonx<boost::uint32_t>(B250_FW_COMMS_FLAGS_ACK);
+    x300_fw_comms_t request = x300_fw_comms_t();
+    request.flags = uhd::htonx<boost::uint32_t>(X300_FW_COMMS_FLAGS_ACK);
     request.sequence = uhd::htonx<boost::uint32_t>(std::rand());
 
     //send request
@@ -55,10 +55,10 @@ static device_addrs_t b250_find_with_addr(const device_addr_t &hint)
     device_addrs_t addrs;
     while (true)
     {
-        char buff[B250_FW_COMMS_MTU] = {};
+        char buff[X300_FW_COMMS_MTU] = {};
         const size_t nbytes = comm->recv(asio::buffer(buff), 0.050);
         if (nbytes == 0) break;
-        const b250_fw_comms_t *reply = (const b250_fw_comms_t *)buff;
+        const x300_fw_comms_t *reply = (const x300_fw_comms_t *)buff;
         if (request.flags != reply->flags) break;
         if (request.sequence != reply->sequence) break;
         device_addr_t new_addr;
@@ -69,7 +69,7 @@ static device_addrs_t b250_find_with_addr(const device_addr_t &hint)
         //This operation can throw due to compatibility mismatch.
         try
         {
-            wb_iface::sptr zpu_ctrl(new b250_ctrl_iface(udp_simple::make_connected(new_addr["addr"], BOOST_STRINGIZE(B250_FW_COMMS_UDP_PORT))));
+            wb_iface::sptr zpu_ctrl(new b250_ctrl_iface(udp_simple::make_connected(new_addr["addr"], BOOST_STRINGIZE(X300_FW_COMMS_UDP_PORT))));
             i2c_core_100_wb32::sptr zpu_i2c = i2c_core_100_wb32::make(zpu_ctrl, I2C1_BASE);
             i2c_iface::sptr eeprom16 = zpu_i2c->eeprom16();
             const mboard_eeprom_t mb_eeprom(*eeprom16, "X300");
@@ -149,35 +149,35 @@ UHD_STATIC_BLOCK(register_b250_device)
 static void b250_load_fw(const std::string &addr, const std::string &file_name)
 {
     udp_simple::sptr comm = udp_simple::make_connected(
-        addr, BOOST_STRINGIZE(B250_FW_COMMS_UDP_PORT));
+        addr, BOOST_STRINGIZE(X300_FW_COMMS_UDP_PORT));
 
     UHD_MSG(status) << "Loading firmware " << file_name << std::flush;
 
     //load file into memory
     std::ifstream fw_file(file_name.c_str());
-    boost::uint32_t fw_file_buff[B250_FW_NUM_BYTES/sizeof(boost::uint32_t)];
+    boost::uint32_t fw_file_buff[X300_FW_NUM_BYTES/sizeof(boost::uint32_t)];
     fw_file.read((char *)fw_file_buff, sizeof(fw_file_buff));
     fw_file.close();
 
     //poke the fw words into the upper bootram half
     size_t seq = 0;
-    b250_fw_comms_t request = b250_fw_comms_t();
-    char buff[B250_FW_COMMS_MTU] = {};
+    x300_fw_comms_t request = x300_fw_comms_t();
+    char buff[X300_FW_COMMS_MTU] = {};
 
-    request.flags = uhd::htonx<boost::uint32_t>(B250_FW_COMMS_FLAGS_POKE32 | B250_FW_COMMS_FLAGS_ACK);
+    request.flags = uhd::htonx<boost::uint32_t>(X300_FW_COMMS_FLAGS_POKE32 | X300_FW_COMMS_FLAGS_ACK);
     request.sequence = uhd::htonx<boost::uint32_t>(seq++);
     request.addr = uhd::htonx<boost::uint32_t>(SR_ADDR(BOOT_LDR_BASE, BL_ADDRESS));
     request.data = 0;
     comm->send(asio::buffer(&request, sizeof(request)));
     comm->recv(asio::buffer(buff));
 
-    for (size_t i = 0; i < B250_FW_NUM_BYTES; i+=sizeof(boost::uint32_t))
+    for (size_t i = 0; i < X300_FW_NUM_BYTES; i+=sizeof(boost::uint32_t))
     {
         //do ack for occasional backpressure
         const bool ack = (i & 0xf) == 0;
 
         //load request struct
-        request.flags = uhd::htonx<boost::uint32_t>(B250_FW_COMMS_FLAGS_POKE32 | (ack?B250_FW_COMMS_FLAGS_ACK : 0));
+        request.flags = uhd::htonx<boost::uint32_t>(X300_FW_COMMS_FLAGS_POKE32 | (ack?X300_FW_COMMS_FLAGS_ACK : 0));
         request.sequence = uhd::htonx<boost::uint32_t>(seq++);
         request.addr = uhd::htonx<boost::uint32_t>(SR_ADDR(BOOT_LDR_BASE, BL_DATA));
         request.data = uhd::htonx(uhd::byteswap(fw_file_buff[i/sizeof(boost::uint32_t)]));
@@ -221,7 +221,7 @@ b250_impl::b250_impl(const uhd::device_addr_t &dev_addr)
 
     //create basic communication
     UHD_MSG(status) << "Setup basic communication..." << std::endl;
-    _zpu_ctrl.reset(new b250_ctrl_iface(udp_simple::make_connected(_addr, BOOST_STRINGIZE(B250_FW_COMMS_UDP_PORT))));
+    _zpu_ctrl.reset(new b250_ctrl_iface(udp_simple::make_connected(_addr, BOOST_STRINGIZE(X300_FW_COMMS_UDP_PORT))));
     _zpu_spi = spi_core_3000::make(_zpu_ctrl, SR_ADDR(SET0_BASE, ZPU_SR_SPI), SR_ADDR(SET0_BASE, ZPU_RB_SPI));
     _zpu_i2c = i2c_core_100_wb32::make(_zpu_ctrl, I2C1_BASE);
     _zpu_i2c->set_clock_rate(B250_BUS_CLOCK_RATE);
@@ -625,8 +625,8 @@ uhd::transport::udp_zero_copy::sptr b250_impl::make_transport(
 
     //reprogram the ethernet dispatcher's udp port (should be safe to always set)
     UHD_LOG << "reprogram the ethernet dispatcher's udp port" << std::endl;
-    _zpu_ctrl->poke32(SR_ADDR(SET0_BASE, (ZPU_SR_ETHINT0+8+3)), B250_VITA_UDP_PORT);
-    _zpu_ctrl->poke32(SR_ADDR(SET0_BASE, (ZPU_SR_ETHINT1+8+3)), B250_VITA_UDP_PORT);
+    _zpu_ctrl->poke32(SR_ADDR(SET0_BASE, (ZPU_SR_ETHINT0+8+3)), X300_VITA_UDP_PORT);
+    _zpu_ctrl->poke32(SR_ADDR(SET0_BASE, (ZPU_SR_ETHINT1+8+3)), X300_VITA_UDP_PORT);
 
     //Do a peek to an arbitrary address to guarantee that the
     //ethernet framer has been programmed before we return.

@@ -1,8 +1,8 @@
 // Copyright 2013 Ettus Research LLC
 
-#include "b250_init.h"
-#include "b250_defs.h"
-#include "b250_fw_common.h"
+#include "x300_init.h"
+#include "x300_defs.h"
+#include "x300_fw_common.h"
 #include "xge_phy.h"
 #include "ethernet.h"
 #include "chinch.h"
@@ -64,19 +64,19 @@ void handle_udp_fw_comms(
     const void *buff, const size_t num_bytes
 )
 {
-    const b250_fw_comms_t *request = (const b250_fw_comms_t *)buff;
-    b250_fw_comms_t reply; memcpy(&reply, buff, sizeof(reply));
+    const x300_fw_comms_t *request = (const x300_fw_comms_t *)buff;
+    x300_fw_comms_t reply; memcpy(&reply, buff, sizeof(reply));
 
     //check for error and set error flag
-    if (num_bytes < sizeof(b250_fw_comms_t))
+    if (num_bytes < sizeof(x300_fw_comms_t))
     {
-        reply.flags |= B250_FW_COMMS_FLAGS_ERROR;
+        reply.flags |= X300_FW_COMMS_FLAGS_ERROR;
     }
 
     //otherwise, run the actions set by the flags
     else
     {
-        if (request->flags & B250_FW_COMMS_FLAGS_PEEK32)
+        if (request->flags & X300_FW_COMMS_FLAGS_PEEK32)
         {
             if (request->addr & 0x00100000) {
                 chinch_peek32(request->addr & 0x000FFFFF, &reply.data);
@@ -85,7 +85,7 @@ void handle_udp_fw_comms(
             }
         }
 
-        if (request->flags & B250_FW_COMMS_FLAGS_POKE32)
+        if (request->flags & X300_FW_COMMS_FLAGS_POKE32)
         {
             if (request->addr & 0x00100000) {
                 chinch_poke32(request->addr & 0x000FFFFF, request->data);
@@ -96,7 +96,7 @@ void handle_udp_fw_comms(
     }
 
     //send a reply if ack requested
-    if (request->flags & B250_FW_COMMS_FLAGS_ACK)
+    if (request->flags & X300_FW_COMMS_FLAGS_ACK)
     {
         u3_net_stack_send_udp_pkt(ethno, dst, src, dst_port, src_port, &reply, sizeof(reply));
     }
@@ -109,26 +109,26 @@ void handle_udp_fpga_prog(
     const void *buff, const size_t num_bytes
 )
 {
-    const b250_fpga_prog_t *request = (const b250_fpga_prog_t *)buff;
-    b250_fpga_prog_flags_t reply = {0};
+    const x300_fpga_prog_t *request = (const x300_fpga_prog_t *)buff;
+    x300_fpga_prog_flags_t reply = {0};
     bool status = true;
 
-    if (num_bytes < offsetof(b250_fpga_prog_t, data)) {
-        reply.flags |= B250_FPGA_PROG_FLAGS_ERROR;
+    if (num_bytes < offsetof(x300_fpga_prog_t, data)) {
+        reply.flags |= X300_FPGA_PROG_FLAGS_ERROR;
     } else {
-        if (request->flags & B250_FPGA_PROG_FLAGS_INIT) {
+        if (request->flags & X300_FPGA_PROG_FLAGS_INIT) {
             STATUS_MERGE(chinch_flash_init(), status);
-        } else if (request->flags & B250_FPGA_PROG_FLAGS_CLEANUP) {
+        } else if (request->flags & X300_FPGA_PROG_FLAGS_CLEANUP) {
             chinch_flash_cleanup();
-        } else if (request->flags & B250_FPGA_PROG_CONFIGURE) {
+        } else if (request->flags & X300_FPGA_PROG_CONFIGURE) {
             //This is a self-destructive operation and will most likely not return an ack.
             chinch_start_posc();
-        } else if (request->flags & B250_FPGA_PROG_CONFIG_STATUS) {
+        } else if (request->flags & X300_FPGA_PROG_CONFIG_STATUS) {
             if (chinch_get_posc_status() != CHINCH_POSC_COMPLETED)
-                reply.flags |= B250_FPGA_PROG_FLAGS_ERROR;
+                reply.flags |= X300_FPGA_PROG_FLAGS_ERROR;
         } else {
             STATUS_MERGE(chinch_flash_select_sector(request->sector), status);
-            if (request->flags & B250_FPGA_PROG_FLAGS_ERASE)
+            if (request->flags & X300_FPGA_PROG_FLAGS_ERASE)
                 STATUS_CHAIN(chinch_flash_erase_sector(), status);
 
             uint32_t num_buff_writes = (request->size / CHINCH_FLASH_MAX_BUF_WRITES) +
@@ -143,7 +143,7 @@ void handle_udp_fpga_prog(
                 data_idx += wr_len;
             }
 
-            if (request->flags & B250_FPGA_PROG_FLAGS_VERIFY) {
+            if (request->flags & X300_FPGA_PROG_FLAGS_VERIFY) {
                 uint16_t data[request->size];
                 STATUS_MERGE(chinch_flash_read_buf(request->index*2, data, request->size), status);
                 for (uint32_t i = 0; i < request->size; i++) {
@@ -152,10 +152,10 @@ void handle_udp_fpga_prog(
             }
         }
     }
-    if (!status) reply.flags |= B250_FPGA_PROG_FLAGS_ERROR;
+    if (!status) reply.flags |= X300_FPGA_PROG_FLAGS_ERROR;
 
     //send a reply if ack requested
-    if (request->flags & B250_FPGA_PROG_FLAGS_ACK)
+    if (request->flags & X300_FPGA_PROG_FLAGS_ACK)
     {
         u3_net_stack_send_udp_pkt(ethno, dst, src, dst_port, src_port, &reply, sizeof(reply));
     }
@@ -267,10 +267,10 @@ int main(void)
     uint32_t xge_sfpp_hotplug_count = 0;
     uint32_t led_activity_update_count = 0;
 
-    b250_init();
-    u3_net_stack_register_udp_handler(B250_FW_COMMS_UDP_PORT, &handle_udp_fw_comms);
-    u3_net_stack_register_udp_handler(B250_VITA_UDP_PORT, &handle_udp_prog_framer);
-    u3_net_stack_register_udp_handler(B250_FPGA_PROG_UDP_PORT, &handle_udp_fpga_prog);
+    x300_init();
+    u3_net_stack_register_udp_handler(X300_FW_COMMS_UDP_PORT, &handle_udp_fw_comms);
+    u3_net_stack_register_udp_handler(X300_VITA_UDP_PORT, &handle_udp_prog_framer);
+    u3_net_stack_register_udp_handler(X300_FPGA_PROG_UDP_PORT, &handle_udp_fpga_prog);
 
 //    run_flash_access_test();
 
