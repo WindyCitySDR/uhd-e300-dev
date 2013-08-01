@@ -293,9 +293,12 @@ b250_impl::b250_impl(const uhd::device_addr_t &dev_addr)
         UHD_MSG(status) << "Detecting internal GPSDO.... " << std::flush;
         try
         {
+            _gps = gps_ctrl::make(b250_make_uart_iface(_zpu_ctrl));
+            /*
             _gps = gps_ctrl::make(udp_simple::make_uart(udp_simple::make_connected(
                 _addr, BOOST_STRINGIZE(X300_GPSDO_UDP_PORT)
             )));
+            */
         }
         catch(std::exception &e)
         {

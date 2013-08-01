@@ -59,4 +59,14 @@ static const int BL_DATA        = 1;
 #define SW_RST_RADIO 0x02
 #define SW_RST_RADIO_PLL 0x04
 
+//eth framer constants
+#define ETH_FRAMER_SRC_MAC_HI 0
+#define ETH_FRAMER_SRC_MAC_LO 1
+#define ETH_FRAMER_SRC_IP_ADDR 2
+#define ETH_FRAMER_SRC_UDP_PORT 3
+#define ETH_FRAMER_DST_RAM_ADDR 4
+#define ETH_FRAMER_DST_IP_ADDR 5
+#define ETH_FRAMER_DST_UDP_MAC 6
+#define ETH_FRAMER_DST_MAC_LO 7
+
 #endif /* INCLUDED_B250_DEFS_H */

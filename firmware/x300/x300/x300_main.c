@@ -9,20 +9,15 @@
 #include "mdelay.h"
 
 #include <wb_utils.h>
+#include <wb_uart.h>
 #include <udp_uart.h>
 #include <u3_net_stack.h>
 #include <printf.h>
 #include <string.h>
 
-#define ETH_FRAMER_SRC_MAC_HI 0
-#define ETH_FRAMER_SRC_MAC_LO 1
-#define ETH_FRAMER_SRC_IP_ADDR 2
-#define ETH_FRAMER_SRC_UDP_PORT 3
-#define ETH_FRAMER_DST_RAM_ADDR 4
-#define ETH_FRAMER_DST_IP_ADDR 5
-#define ETH_FRAMER_DST_UDP_MAC 6
-#define ETH_FRAMER_DST_MAC_LO 7
-
+/***********************************************************************
+ * Handler for UDP framer program packets
+ **********************************************************************/
 void handle_udp_prog_framer(
     const uint8_t ethno,
     const struct ip_addr *src, const struct ip_addr *dst,
@@ -57,6 +52,9 @@ void handle_udp_prog_framer(
         (((uint32_t)dst_mac->addr[4]) << 8) | (((uint32_t)dst_mac->addr[5]) << 0));
 }
 
+/***********************************************************************
+ * Handler for peek and poke host packets
+ **********************************************************************/
 void handle_udp_fw_comms(
     const uint8_t ethno,
     const struct ip_addr *src, const struct ip_addr *dst,
@@ -102,6 +100,9 @@ void handle_udp_fw_comms(
     }
 }
 
+/***********************************************************************
+ * Handler for FPGA programming packets
+ **********************************************************************/
 void handle_udp_fpga_prog(
     const uint8_t ethno,
     const struct ip_addr *src, const struct ip_addr *dst,
@@ -161,6 +162,9 @@ void handle_udp_fpga_prog(
     }
 }
 
+/***********************************************************************
+ * Flash access test -- for the debugs
+ **********************************************************************/
 void run_flash_access_test()
 {
     printf("Running flash access test...\n");
@@ -200,6 +204,9 @@ void run_flash_access_test()
     printf("[Debug] Flash access test %s\n", result?"PASSED":"FAILED");
 }
 
+/***********************************************************************
+ * LED blinky logic and support utilities
+ **********************************************************************/
 static uint32_t get_xbar_total(const uint8_t port)
 {
     #define get_xbar_stat(in_prt, out_prt) \
@@ -262,6 +269,9 @@ static void update_leds(void)
     );
 }
 
+/***********************************************************************
+ * Send periodic GARPs to keep network hardware informed
+ **********************************************************************/
 static void garp(void)
 {
     static size_t count = 0;
@@ -276,6 +286,39 @@ static void garp(void)
     }
 }
 
+/***********************************************************************
+ * UART handlers - interacts between UART and SHMEM
+ **********************************************************************/
+static void handle_uarts(void)
+{
+    uint32_t *shmem = (uint32_t *) X300_FW_SHMEM_BASE;
+    ////////////////////////////////////////////////////////////////////
+    // RX UART - try to get a character and post it to the shmem buffer
+    ////////////////////////////////////////////////////////////////////
+    static uint32_t rxoffset = 0;
+    const int rxch = wb_uart_getc(UART0_BASE);
+    if (rxch != -1)
+    {
+        rxoffset = (rxoffset+1) % X300_FW_SHMEM_UART_POOL_WORDS32;
+        shmem[X300_FW_SHMEM_UART_RX_POOL+rxoffset] = (uint32_t) rxch;
+        shmem[X300_FW_SHMEM_UART_RX_INDEX] = rxoffset;
+    }
+
+    ////////////////////////////////////////////////////////////////////
+    // TX UART - check for a character in the shmem buffer and send it
+    ////////////////////////////////////////////////////////////////////
+    static uint32_t txoffset = 0;
+    if (txoffset != shmem[X300_FW_SHMEM_UART_TX_INDEX])
+    {
+        const int txch = shmem[X300_FW_SHMEM_UART_TX_POOL+txoffset];
+        wb_uart_putc(UART0_BASE, txch);
+        txoffset = (txoffset+1) % X300_FW_SHMEM_UART_POOL_WORDS32;
+    }
+}
+
+/***********************************************************************
+ * Main loop runs all the handlers
+ **********************************************************************/
 int main(void)
 {
     x300_init();
@@ -307,7 +350,7 @@ int main(void)
         forward_pcie_user_xact_to_wb();
 
         //run the udp uart handler for incoming serial data
-        udp_uart_poll();
+        handle_uarts(); //udp_uart_poll();
     }
     return 0;
 }

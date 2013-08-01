@@ -87,6 +87,7 @@ struct b250_dboard_iface_config_t
 };
 
 uhd::usrp::dboard_iface::sptr b250_make_dboard_iface(const b250_dboard_iface_config_t &);
+uhd::uart_iface::sptr b250_make_uart_iface(wb_iface::sptr iface);
 
 struct b250_impl : public uhd::device
 {

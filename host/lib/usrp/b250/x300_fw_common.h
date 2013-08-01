@@ -29,6 +29,16 @@
 extern "C" {
 #endif
 
+//shared memory sections - in between the stack and the program space
+#define X300_FW_SHMEM_BASE 0x6000
+#define X300_FW_SHMEM_GPSDO_STATUS 0
+#define X300_FW_SHMEM_CLAIM_time 1
+#define X300_FW_SHMEM_UART_RX_INDEX 2
+#define X300_FW_SHMEM_UART_TX_INDEX 3
+#define X300_FW_SHMEM_UART_RX_POOL 256
+#define X300_FW_SHMEM_UART_TX_POOL 512
+#define X300_FW_SHMEM_UART_POOL_WORDS32 256
+
 #define X300_FW_NUM_BYTES (1 << 15) //64k
 #define X300_FW_COMMS_MTU (1 << 13) //8k
 #define X300_FW_COMMS_UDP_PORT 49152

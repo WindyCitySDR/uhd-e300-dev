@@ -115,7 +115,7 @@ void x300_init(void)
     //first - uart
     wb_uart_init(UART0_BASE, CPU_CLOCK/UART0_BAUD);
     init_printf(NULL,putc);
-    udp_uart_init(UART0_BASE, X300_GPSDO_UDP_PORT);
+    //udp_uart_init(UART0_BASE, X300_GPSDO_UDP_PORT);
 
     //now we can init the rest with prints
     printf("B250 ZPU Init Begin -- CPU CLOCK is %d MHz\n", CPU_CLOCK/1000000);
