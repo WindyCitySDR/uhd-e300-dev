@@ -287,18 +287,12 @@ b250_impl::b250_impl(const uhd::device_addr_t &dev_addr)
     static const boost::uint32_t dont_look_for_gpsdo = 0x1234abcdul;
 
     //otherwise if not disabled, look for the internal GPSDO
-    //TODO if (_iface->peekfw(U2_FW_REG_HAS_GPSDO) != dont_look_for_gpsdo)
-    //if (false)
+    if (_zpu_ctrl->peek32(SR_ADDR(X300_FW_SHMEM_BASE, X300_FW_SHMEM_GPSDO_STATUS)) != dont_look_for_gpsdo)
     {
         UHD_MSG(status) << "Detecting internal GPSDO.... " << std::flush;
         try
         {
             _gps = gps_ctrl::make(b250_make_uart_iface(_zpu_ctrl));
-            /*
-            _gps = gps_ctrl::make(udp_simple::make_uart(udp_simple::make_connected(
-                _addr, BOOST_STRINGIZE(X300_GPSDO_UDP_PORT)
-            )));
-            */
         }
         catch(std::exception &e)
         {
@@ -316,7 +310,7 @@ b250_impl::b250_impl(const uhd::device_addr_t &dev_addr)
         else
         {
             UHD_MSG(status) << "not found" << std::endl;
-            //TODO _iface->pokefw(U2_FW_REG_HAS_GPSDO, dont_look_for_gpsdo);
+            _zpu_ctrl->poke32(SR_ADDR(X300_FW_SHMEM_BASE, X300_FW_SHMEM_GPSDO_STATUS), dont_look_for_gpsdo);
         }
     }
 
