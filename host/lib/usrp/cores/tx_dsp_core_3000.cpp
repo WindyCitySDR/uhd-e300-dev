@@ -152,16 +152,14 @@ public:
             _dsp_extra_scaling = 1.0;
             _host_extra_scaling = 1.0;
         }
-        /*
         else if (stream_args.otw_format == "sc8"){
-            format_word = (1 << 0);
+            //format_word = (1 << 0);
             double peak = stream_args.args.cast<double>("peak", 1.0);
             peak = std::max(peak, 1.0/256);
             _host_extra_scaling = 1.0/peak/256;
             _dsp_extra_scaling = 1.0/peak;
         }
         else throw uhd::value_error("USRP TX cannot handle requested wire format: " + stream_args.otw_format);
-        */
 
         _host_extra_scaling /= stream_args.args.cast<double>("fullscale", 1.0);
 

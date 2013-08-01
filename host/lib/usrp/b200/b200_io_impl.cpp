@@ -214,11 +214,7 @@ rx_streamer::sptr b200_impl::get_rx_stream(const uhd::stream_args_t &args_)
     stream_args_t args = args_;
 
     //setup defaults for unspecified values
-    if (not args.otw_format.empty() and args.otw_format != "sc16")
-    {
-        throw uhd::value_error("b200_impl::get_rx_stream only supports otw_format sc16");
-    }
-    args.otw_format = "sc16";
+    if (args.otw_format.empty()) args.otw_format = "sc16";
     args.channels = args.channels.empty()? std::vector<size_t>(1, 0) : args.channels;
 
     boost::shared_ptr<sph::recv_packet_streamer> my_streamer;
@@ -226,6 +222,8 @@ rx_streamer::sptr b200_impl::get_rx_stream(const uhd::stream_args_t &args_)
     {
         const size_t chan = args.channels[stream_i];
         radio_perifs_t &perif = _radio_perifs[chan];
+        if (args.otw_format == "sc16") perif.ctrl->poke32(TOREG(SR_RX_FMT), 0);
+        if (args.otw_format == "sc8") perif.ctrl->poke32(TOREG(SR_RX_FMT), 1);
         const boost::uint32_t sid = chan?B200_RX_DATA1_SID:B200_RX_DATA0_SID;
 
         //calculate packet size
@@ -316,11 +314,7 @@ tx_streamer::sptr b200_impl::get_tx_stream(const uhd::stream_args_t &args_)
     stream_args_t args = args_;
 
     //setup defaults for unspecified values
-    if (not args.otw_format.empty() and args.otw_format != "sc16")
-    {
-        throw uhd::value_error("b200_impl::get_rx_stream only supports otw_format sc16");
-    }
-    args.otw_format = "sc16";
+    if (args.otw_format.empty()) args.otw_format = "sc16";
     args.channels = args.channels.empty()? std::vector<size_t>(1, 0) : args.channels;
 
     boost::shared_ptr<sph::send_packet_streamer> my_streamer;
@@ -328,6 +322,8 @@ tx_streamer::sptr b200_impl::get_tx_stream(const uhd::stream_args_t &args_)
     {
         const size_t chan = args.channels[stream_i];
         radio_perifs_t &perif = _radio_perifs[chan];
+        if (args.otw_format == "sc16") perif.ctrl->poke32(TOREG(SR_TX_FMT), 0);
+        if (args.otw_format == "sc8") perif.ctrl->poke32(TOREG(SR_TX_FMT), 1);
 
         //calculate packet size
         static const size_t hdr_size = 0
