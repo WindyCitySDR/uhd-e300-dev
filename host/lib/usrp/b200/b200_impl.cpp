@@ -733,11 +733,7 @@ void b200_impl::update_time_source(const std::string &source)
     else if (source == "external"){}
     else if (source == "gpsdo"){}
     else throw uhd::key_error("update_time_source: unknown source: " + source);
-    for (size_t i = 0; i < _radio_perifs.size(); i++)
-    {
-        _radio_perifs[i].time64->set_time_source((source == "external")? "external" : "internal");
-    }
-    this->update_gpio_state();
+    _local_ctrl->poke32(TOREG(SR_CORE_PPS_SEL), (source == "external")? 1 : 0);
 }
 
 /***********************************************************************

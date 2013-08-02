@@ -316,7 +316,7 @@ Required_26_22           26[22]      0
 Required_26_23           26[23]      1
 Required_26_24           26[24]      1
 Required_26_25           26[25]       1
-PLL2_CP_GAIN_26          26[26:27]   3		100microA=0, 400microA=1, 1600microA=2, 3200microA=3
+PLL2_CP_GAIN_26          26[26:27]   3		100uA=0, 400uA=1, 1600uA=2, 3200uA=3
 PLL2_CP_POL_26           26[28]      0		neg_slope=0, pos_slope=1
 EN_PLL2_REF_2X           26[29]      0		normal_freq_ref=0, doubled_freq_ref=1
 PLL2_WND_SIZE            26[30:31]   2		3p7ns=2
@@ -329,7 +329,7 @@ PLL1_R_27                27[6:19]    96
 CLKin0_PreR_DIV		 27[20:21]   0         div1=0,div2=1,div4=2,div8=3
 CLKin1_PreR_DIV          27[22:23]   0         div1=0,div2=1,div4=2,div8=3
 CLKin2_PreR_DIV          27[24:25]   0         div1=0,div2=1,div4=2,div8=3
-PLL1_CP_GAIN_27          27[26:27]   0	       100microA=0, 400microA=1, 1600microA=2, 3200microA=3	
+PLL1_CP_GAIN_27          27[26:27]   0	       100uA=0, 200uA=1, 400uA=2, 1600uA=3
 PLL1_CP_POL_27           27[28]      1	       neg_slove=0, pos_slope=1
 Reqiured_27              27[29:31]   0
 #########################################################################

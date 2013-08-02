@@ -73,6 +73,13 @@ public:
             boost::this_thread::sleep(boost::posix_time::milliseconds(10));
         }
 
+	/* Skew DCI signal to find stable data eye */
+	//write_ad9146_reg(0x16, 0x04); //Disable delay in DCI
+	//write_ad9146_reg(0x16, 0x00); //165ps delay in DCI
+	//write_ad9146_reg(0x16, 0x01); //375ps delay in DCI
+	write_ad9146_reg(0x16, 0x02); //615ps delay in DCI
+	//write_ad9146_reg(0x16, 0x03); //720ps delay in DCI
+ 
         this->set_iq_swap(false);
         write_ad9146_reg(0x10, 0x48); // Choose data rate mode
         write_ad9146_reg(0x17, 0x04); // Issue software FIFO reset

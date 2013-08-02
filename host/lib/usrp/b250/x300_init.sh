@@ -1,7 +1,7 @@
 #!/bin/bash
 
-utils/usrp_burn_mb_eeprom --key=serial --val="x300_p04"
-utils/usrp_burn_mb_eeprom --key=name --val="ian"
+utils/usrp_burn_mb_eeprom --key=serial --val="x300_p03"
+utils/usrp_burn_mb_eeprom --key=name --val="ohthrie"
 
 utils/usrp_burn_mb_eeprom --key=product --val="1"
 utils/usrp_burn_mb_eeprom --key=revision --val="2"
