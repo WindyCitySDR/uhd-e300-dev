@@ -35,6 +35,8 @@ public:
         const uint32_t instance,
         const device_addr_t &hints = device_addr_t()
     );
+
+    static size_t get_default_buffer_size(void);
 };
 
 }} //namespace

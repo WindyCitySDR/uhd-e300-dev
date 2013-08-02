@@ -34,8 +34,8 @@ using namespace uhd::transport;
 using namespace nifpga_interface;
 
 //A reasonable number of frames for send/recv and async/sync
-static const size_t DEFAULT_NUM_FRAMES  = 32;
-static const size_t DEFAULT_FRAMES_SIZE = 256;
+static const size_t DEFAULT_NUM_FRAMES  = 128;
+static const size_t DEFAULT_FRAMES_SIZE = 8192;
 
 typedef uint64_t fifo_data_t;
 
@@ -226,3 +226,8 @@ nirio_zero_copy::sptr nirio_zero_copy::make(
 ){
     return nirio_zero_copy::sptr(new nirio_zero_copy_impl(fpga_session, instance, hints));
 }
+
+size_t nirio_zero_copy::get_default_buffer_size(void) {
+    return (DEFAULT_NUM_FRAMES * DEFAULT_FRAMES_SIZE);
+}
+

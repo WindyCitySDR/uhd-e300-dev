@@ -5,6 +5,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <fcntl.h>
+#include <iostream>
 #include <boost/program_options.hpp>
 #include <boost/format.hpp>
 #include <boost/thread/thread.hpp>
@@ -143,11 +144,15 @@ int main(int argc, char *argv[])
         ss.clear();
         ss << std::hex << poke_tokens[2];
         ss >> poke_data;
-        tRioAddressSpace addr_space = poke_tokens[0]=="f"?kRioAddressSpaceFpga:kRioAddressSpaceBusInterface;
 
+        tRioAddressSpace addr_space = poke_tokens[0]=="c"?kRioAddressSpaceBusInterface:kRioAddressSpaceFpga;
         nirio_status_chain(dev_proxy.set_attribute(kRioAddressSpace, addr_space), status);
-        nirio_status_chain(dev_proxy.poke(poke_addr, poke_data), status);
-        printf("[POKE] %s:0x%x <= 0x%x (%u)\n", addr_space==kRioAddressSpaceFpga?"FPGA":"Chinch", poke_addr, poke_data, poke_data);
+        if (poke_tokens[0]=="z") {
+            nirio_status_chain(dev_proxy.poke(poke_addr, (uint32_t)0x70000 + poke_addr), status);
+        } else {
+            nirio_status_chain(dev_proxy.poke(poke_addr, poke_data), status);
+        }
+        printf("[POKE] %s:0x%x <= 0x%x (%u)\n", poke_tokens[0]=="c"?"Chinch":(poke_tokens[0]=="z"?"ZPU":"FPGA"), poke_addr, poke_data, poke_data);
     }
 
     if (peek_tokens_str != ""){
@@ -157,12 +162,21 @@ int main(int argc, char *argv[])
         ss.clear();
         ss << std::hex << peek_tokens[1];
         ss >> peek_addr;
-        tRioAddressSpace addr_space = peek_tokens[0]=="f"?kRioAddressSpaceFpga:kRioAddressSpaceBusInterface;
 
-        uint32_t reg_val;
+        tRioAddressSpace addr_space = peek_tokens[0]=="c"?kRioAddressSpaceBusInterface:kRioAddressSpaceFpga;
         nirio_status_chain(dev_proxy.set_attribute(kRioAddressSpace, addr_space), status);
-        nirio_status_chain(dev_proxy.peek(peek_addr, reg_val), status);
-        printf("[PEEK] %s:0x%x = 0x%x (%u)\n", addr_space==kRioAddressSpaceFpga?"FPGA":"Chinch", peek_addr, reg_val, reg_val);
+        uint32_t reg_val;
+        if (peek_tokens[0]=="z") {
+            nirio_status_chain(dev_proxy.poke((uint32_t)0x60000 + peek_addr, (uint32_t)0), status);
+            do {
+                nirio_status_chain(dev_proxy.peek((uint32_t)0x60000 + peek_addr, reg_val), status);
+            } while (reg_val != 0);
+            nirio_status_chain(dev_proxy.peek((uint32_t)0x70000 + peek_addr, reg_val), status);
+        } else {
+            nirio_status_chain(dev_proxy.peek(peek_addr, reg_val), status);
+        }
+
+        printf("[PEEK] %s:0x%x = 0x%x (%u)\n", peek_tokens[0]=="c"?"Chinch":(peek_tokens[0]=="z"?"ZPU":"FPGA"), peek_addr, reg_val, reg_val);
     }
 
     //Display attributes

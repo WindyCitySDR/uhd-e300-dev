@@ -44,6 +44,8 @@
 #include <uhd/usrp/gps_ctrl.hpp>
 #include <uhd/transport/bounded_buffer.hpp>
 #include <uhd/transport/nirio/nifpga_interface.h>
+#include <uhd/transport/vrt_if_packet.hpp>
+
 
 static const size_t B250_TX_FC_PKT_WINDOW = 2048; //16MB/8Kpkts
 static const std::string B250_FW_FILE_NAME = "usrp_b250_fw.bin";
@@ -121,6 +123,7 @@ struct b250_impl : public uhd::device
     std::string _xport_path;
     uhd::device_addr_t _send_args;
     uhd::device_addr_t _recv_args;
+    uhd::transport::vrt::if_packet_info_t::link_type_t _if_pkt_link_type;
 
     nifpga_interface::nifpga_session::sptr  _rio_fpga_interface;
 

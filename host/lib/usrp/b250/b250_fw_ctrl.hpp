@@ -47,7 +47,6 @@ public:
         {
             try
             {
-//                UHD_MSG(status) << boost::format("b250_ctrl_iface::poke32(0x%x) <= 0x%x") % addr % data << std::endl;
                 return this->__poke32(addr, data);
             }
             catch(const std::exception &ex)
@@ -67,7 +66,6 @@ public:
             try
             {
                 boost::uint32_t data = this->__peek32(addr);
-//                UHD_MSG(status) << boost::format("b250_ctrl_iface::peek32(0x%x) == 0x%x") % addr % data << std::endl;
                 return data;
             }
             catch(const std::exception &ex)
@@ -207,49 +205,57 @@ protected:
     {
         boost::mutex::scoped_lock lock(mutex);
 
-        UHD_ASSERT_THROW(
-            nirio_status_not_fatal(_drv_proxy.poke(PCIE_ZPU_DATA_REG(addr), data)));
+        nirio_status status = 0;
+        boost::uint32_t reg_data = 0xffffffff;
+        boost::posix_time::ptime start_time = boost::posix_time::microsec_clock::local_time();
+        boost::posix_time::time_duration elapsed;
 
-        //@TODO: Do this the right way. No sleeps!
-        boost::this_thread::sleep(boost::posix_time::microsec(200));
+        nirio_status_chain(_drv_proxy.poke(PCIE_ZPU_DATA_REG(addr), data), status);
+        if (nirio_status_not_fatal(status)) {
+            do {
+                boost::this_thread::sleep(boost::posix_time::microsec(100));
+                elapsed = boost::posix_time::microsec_clock::local_time() - start_time;
+                nirio_status_chain(_drv_proxy.peek(PCIE_ZPU_STATUS_REG(addr), reg_data), status);
+            } while (
+                nirio_status_not_fatal(status) &&
+                (reg_data & PCIE_ZPU_STATUS_BUSY) &&
+                elapsed.total_milliseconds() < READ_TIMEOUT_IN_MS);
+        }
+
+        UHD_ASSERT_THROW(elapsed.total_milliseconds() <= READ_TIMEOUT_IN_MS);
+        UHD_ASSERT_THROW(nirio_status_not_fatal(status));
 }
 
     virtual boost::uint32_t __peek32(const wb_addr_type addr)
     {
         boost::mutex::scoped_lock lock(mutex);
 
-//@TODO: Do this the right way. No sleeps!
-//        boost::uint32_t reg_data = 0xFFFFFFFF;
-//        boost::posix_time::ptime start_time = boost::posix_time::microsec_clock::local_time();
-//        boost::posix_time::time_duration elapsed;
-//
-//        nirio_status status = 0;
-//        nirio_status_chain(_drv_proxy.peek(PCIE_ZPU_READ_REG(addr), reg_data), status);
-//        boost::this_thread::sleep(boost::posix_time::microsec(100));
-//
-//        if (nirio_status_not_fatal(status)) {
-//            do {
-//                nirio_status_chain(_drv_proxy.peek(PCIE_ZPU_READ_REG(addr), reg_data), status);
-//                elapsed = boost::posix_time::microsec_clock::local_time() - start_time;
-//                boost::this_thread::sleep(boost::posix_time::microsec(100));
-//            } while (nirio_status_not_fatal(status) && reg_data != 0 &&
-//                     elapsed.total_milliseconds() < READ_TIMEOUT_IN_MS);
-//        }
+        nirio_status status = 0;
+        boost::uint32_t reg_data = 0xffffffff;
+        boost::posix_time::ptime start_time = boost::posix_time::microsec_clock::local_time();
+        boost::posix_time::time_duration elapsed;
 
-        boost::uint32_t reg_data = 0xFFFFFFFF;
+        nirio_status_chain(_drv_proxy.poke(PCIE_ZPU_READ_REG(addr), PCIE_ZPU_READ_START), status);
+        if (nirio_status_not_fatal(status)) {
+            do {
+                boost::this_thread::sleep(boost::posix_time::microsec(100));
+                elapsed = boost::posix_time::microsec_clock::local_time() - start_time;
+                nirio_status_chain(_drv_proxy.peek(PCIE_ZPU_STATUS_REG(addr), reg_data), status);
+            } while (
+                nirio_status_not_fatal(status) &&
+                (reg_data & PCIE_ZPU_STATUS_BUSY) &&
+                elapsed.total_milliseconds() < READ_TIMEOUT_IN_MS);
+        }
+        nirio_status_chain(_drv_proxy.peek(PCIE_ZPU_DATA_REG(addr), reg_data), status);
 
-        UHD_ASSERT_THROW(
-            nirio_status_not_fatal(_drv_proxy.peek(PCIE_ZPU_READ_REG(addr), reg_data)));
-        boost::this_thread::sleep(boost::posix_time::microsec(200));
-
-        UHD_ASSERT_THROW(
-            nirio_status_not_fatal(_drv_proxy.peek(PCIE_ZPU_DATA_REG(addr), reg_data)));
+        UHD_ASSERT_THROW(elapsed.total_milliseconds() <= READ_TIMEOUT_IN_MS);
+        UHD_ASSERT_THROW(nirio_status_not_fatal(status));
         return reg_data;
     }
 
 private:
     nirio_interface::niriok_proxy& _drv_proxy;
-    static const uint32_t READ_TIMEOUT_IN_MS = 50;
+    static const uint32_t READ_TIMEOUT_IN_MS = 10;
 };
 
 #endif /* INCLUDED_B250_FW_CTRL_HPP */

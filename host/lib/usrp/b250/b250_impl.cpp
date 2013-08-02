@@ -225,6 +225,8 @@ b250_impl::b250_impl(const uhd::device_addr_t &dev_addr)
     _sid_framer = 0;
     _addr = dev_addr["addr"];
     _xport_path = dev_addr.has_key("transport") ? dev_addr["transport"] : "eth";
+    _if_pkt_link_type = (_xport_path == "pcie") ? vrt::if_packet_info_t::LINK_TYPE_CHDR :
+                                                  vrt::if_packet_info_t::LINK_TYPE_VRLP;
 
     if (_xport_path == "pcie") {
         UHD_MSG(status) << "Loading NiFpga lib...\n";
@@ -262,10 +264,6 @@ b250_impl::b250_impl(const uhd::device_addr_t &dev_addr)
         _zpu_ctrl.reset(new b250_ctrl_iface_pcie(_rio_fpga_interface->get_kernel_proxy()));
     else
         _zpu_ctrl.reset(new b250_ctrl_iface_enet(udp_simple::make_connected(_addr, BOOST_STRINGIZE(B250_FW_COMMS_UDP_PORT))));
-
-    UHD_MSG(status) << _zpu_ctrl->peek32(0xa000) << "\n";
-    UHD_MSG(status) << _zpu_ctrl->peek32(0xa000) << "\n";
-    UHD_MSG(status) << _zpu_ctrl->peek32(0xa000) << "\n";
 
     _zpu_spi = spi_core_3000::make(_zpu_ctrl, SR_ADDR(SET0_BASE, ZPU_SR_SPI), SR_ADDR(SET0_BASE, ZPU_RB_SPI));
     _zpu_i2c = i2c_core_100_wb32::make(_zpu_ctrl, I2C1_BASE);
@@ -465,10 +463,7 @@ void b250_impl::setup_radio(const size_t i, const std::string &db_name)
     uint8_t dest = (i == 0)? B250_XB_DST_R0 : B250_XB_DST_R1;
     boost::uint32_t ctrl_sid;
     zero_copy_if::sptr ctrl_xport = this->make_transport(_addr, _xport_path, dest, B250_RADIO_DEST_PREFIX_CTRL, device_addr_t(), ctrl_sid);
-    vrt::if_packet_info_t::link_type_t pkt_format = (_xport_path == "pcie") ?
-                                                   vrt::if_packet_info_t::LINK_TYPE_CHDR :
-                                                   vrt::if_packet_info_t::LINK_TYPE_VRLP;
-    perif.ctrl = radio_ctrl_core_3000::make(pkt_format, ctrl_xport, ctrl_xport, ctrl_sid, db_name);
+    perif.ctrl = radio_ctrl_core_3000::make(_if_pkt_link_type, ctrl_xport, ctrl_xport, ctrl_sid, db_name);
     perif.ctrl->poke32(TOREG(SR_MISC_OUTS), (1 << 2)); //reset adc + dac
     perif.ctrl->poke32(TOREG(SR_MISC_OUTS),  (1 << 1) | (1 << 0)); //out of reset + dac enable
 
