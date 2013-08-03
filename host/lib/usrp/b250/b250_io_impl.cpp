@@ -344,7 +344,7 @@ rx_streamer::sptr b250_impl::get_rx_stream(const uhd::stream_args_t &args_)
         device_addr_t device_addr = _recv_args;
         if (not device_addr.has_key("recv_buff_size"))
         {
-            if (_xport_path == "pcie") {
+            if (_xport_path == "nirio") {
                 device_addr["recv_buff_size"] = boost::lexical_cast<std::string>(
                         uhd::transport::nirio_zero_copy::get_default_buffer_size());
             } else {

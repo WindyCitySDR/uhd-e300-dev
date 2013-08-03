@@ -109,34 +109,20 @@ static device_addrs_t b250_find(const device_addr_t &hint_)
     device_addrs_t addrs;
     if (hint.has_key("type") and hint["type"] != "x300") return addrs;
 
-    if (hint.has_key("transport") && hint["transport"] == "pcie")
+    //use the address given
+    if (hint.has_key("addr"))
     {
-        niriok_proxy_vtr dev_proxy_vtr;
-        niriok_proxy_factory::get_by_device_id(X300_PCIE_SSID, dev_proxy_vtr);
-        BOOST_FOREACH(niriok_proxy &dev_proxy, dev_proxy_vtr)
+        device_addrs_t reply_addrs = b250_find_with_addr(hint);
+        BOOST_FOREACH(const device_addr_t &reply_addr, reply_addrs)
         {
-            device_addr_t new_addr;
-            new_addr["type"] = "x300";
-            new_addr["addr"] = boost::str(boost::format("RIO%u") % dev_proxy.get_interface_num());
-            addrs.push_back(new_addr);
-            dev_proxy.close();
+            device_addrs_t new_addrs = b250_find_with_addr(reply_addr);
+            addrs.insert(addrs.begin(), new_addrs.begin(), new_addrs.end());
         }
         return addrs;
     }
-    else
-    {
-        //use the address given
-        if (hint.has_key("addr"))
-        {
-            device_addrs_t reply_addrs = b250_find_with_addr(hint);
-            BOOST_FOREACH(const device_addr_t &reply_addr, reply_addrs)
-            {
-                device_addrs_t new_addrs = b250_find_with_addr(reply_addr);
-                addrs.insert(addrs.begin(), new_addrs.begin(), new_addrs.end());
-            }
-            return addrs;
-        }
 
+    if (not hint.has_key("resource"))
+    {
         //otherwise, no address was specified, send a broadcast on each interface
         BOOST_FOREACH(const if_addrs_t &if_addrs, get_if_addrs())
         {
@@ -151,6 +137,21 @@ static device_addrs_t b250_find(const device_addr_t &hint_)
             device_addrs_t new_addrs = b250_find(new_hint);
             addrs.insert(addrs.begin(), new_addrs.begin(), new_addrs.end());
         }
+    }
+
+    niriok_proxy_vtr dev_proxy_vtr;
+    niriok_proxy_factory::get_by_device_id(X300_PCIE_SSID, dev_proxy_vtr);
+    BOOST_FOREACH(niriok_proxy &dev_proxy, dev_proxy_vtr)
+    {
+        device_addr_t new_addr;
+        new_addr["type"] = "x300";
+        new_addr["resource"] = boost::str(boost::format("RIO%u") % dev_proxy.get_interface_num());
+
+        if (not hint.has_key("resource") || hint["resource"] == new_addr["resource"])
+        {
+            addrs.push_back(new_addr);
+        }
+        dev_proxy.close();
     }
 
     return addrs;
@@ -198,17 +199,18 @@ b250_impl::b250_impl(const uhd::device_addr_t &dev_addr)
     _async_md.reset(new async_md_type(1000/*messages deep*/));
     _tree = uhd::property_tree::make();
     _sid_framer = 0;
-    _addr = dev_addr["addr"];
-    _xport_path = dev_addr.has_key("transport") ? dev_addr["transport"] : "eth";
-    _if_pkt_link_type = (_xport_path == "pcie") ? vrt::if_packet_info_t::LINK_TYPE_CHDR :
+    _addr = dev_addr.has_key("resource") ? dev_addr["resource"] : dev_addr["addr"];
+    _xport_path = dev_addr.has_key("resource") ? "nirio" : "eth";
+    _if_pkt_link_type = (_xport_path == "nirio") ? vrt::if_packet_info_t::LINK_TYPE_CHDR :
                                                   vrt::if_packet_info_t::LINK_TYPE_VRLP;
 
-    if (_xport_path == "pcie") {
+    if (_xport_path == "nirio") {
+        //@TODO: Remove this when we have the helper process
         UHD_MSG(status) << "Loading NiFpga lib...\n";
         nirio_status_not_fatal(nifpga_session::load_lib());
 
         UHD_MSG(status) << boost::format("Loading bitfile %s...\n") % nifpga_image::SIGNATURE;
-        _rio_fpga_interface.reset(new nifpga_session("RIO0"));
+        _rio_fpga_interface.reset(new nifpga_session(dev_addr["resource"]));
         nirio_status status = 0;
         nirio_status_chain(_rio_fpga_interface->open(nifpga_image::BITFILE, nifpga_image::SIGNATURE), status);
 
@@ -225,7 +227,7 @@ b250_impl::b250_impl(const uhd::device_addr_t &dev_addr)
 
     //create basic communication
     UHD_MSG(status) << "Setup basic communication..." << std::endl;
-    if (_xport_path == "pcie")
+    if (_xport_path == "nirio")
         _zpu_ctrl.reset(new b250_ctrl_iface_pcie(_rio_fpga_interface->get_kernel_proxy()));
     else
         _zpu_ctrl.reset(new b250_ctrl_iface_enet(udp_simple::make_connected(_addr, BOOST_STRINGIZE(X300_FW_COMMS_UDP_PORT))));
@@ -268,12 +270,14 @@ b250_impl::b250_impl(const uhd::device_addr_t &dev_addr)
     // determine routing based on address match
     ////////////////////////////////////////////////////////////////////
     _router_dst_here = B250_XB_DST_E0; //some default if eeprom not match
-    if (_addr == mb_eeprom["ip-addr0"]) _router_dst_here = B250_XB_DST_E0;
-    if (_addr == mb_eeprom["ip-addr1"]) _router_dst_here = B250_XB_DST_E1;
-    if (_addr == mb_eeprom["ip-addr2"]) _router_dst_here = B250_XB_DST_E0;
-    if (_addr == mb_eeprom["ip-addr3"]) _router_dst_here = B250_XB_DST_E1;
-    if (_xport_path == "pcie")          _router_dst_here = B250_XB_DST_PCI;
-
+    if (_xport_path == "nirio") {
+        _router_dst_here = B250_XB_DST_PCI;
+    } else {
+        if (_addr == mb_eeprom["ip-addr0"]) _router_dst_here = B250_XB_DST_E0;
+        if (_addr == mb_eeprom["ip-addr1"]) _router_dst_here = B250_XB_DST_E1;
+        if (_addr == mb_eeprom["ip-addr2"]) _router_dst_here = B250_XB_DST_E0;
+        if (_addr == mb_eeprom["ip-addr3"]) _router_dst_here = B250_XB_DST_E1;
+    }
     ////////////////////////////////////////////////////////////////////
     // read dboard eeproms
     ////////////////////////////////////////////////////////////////////
@@ -453,7 +457,8 @@ b250_impl::~b250_impl(void)
         _radio_perifs[0].ctrl->poke32(TOREG(SR_MISC_OUTS), (1 << 2)); //disable/reset ADC/DAC
         _radio_perifs[1].ctrl->poke32(TOREG(SR_MISC_OUTS), (1 << 2)); //disable/reset ADC/DAC
 
-//        if (_xport_path == "pcie") {
+//@TODO: Handle lifetime issus for these objects.
+//        if (_xport_path == "nirio") {
 //            _rio_fpga_interface->close(true);
 //            nifpga_session::unload_lib();
 //        }
@@ -639,7 +644,7 @@ uhd::transport::zero_copy_if::sptr b250_impl::make_transport(
     config.router_dst_here      = _router_dst_here;
     sid = this->allocate_sid(config, xport_path);
 
-    if (xport_path == "pcie") {
+    if (xport_path == "nirio") {
         uint32_t chan = (destination == B250_XB_DST_R0) ? 0 : 1;
         uint32_t instance = prefix + (chan * 3);
         xport = nirio_zero_copy::make(_rio_fpga_interface, instance, args);
@@ -700,7 +705,7 @@ boost::uint32_t b250_impl::allocate_sid(const sid_config_t &config, std::string 
     // This type of packet does not match the XB_LOCAL address and is looked up in the lower half of the CAM
     _zpu_ctrl->poke32(SR_ADDR(SETXB_BASE, 0 + (B250_DEVICE_HERE)), config.router_dst_here);
 
-    if (xport_path == "pcie") {
+    if (xport_path == "nirio") {
         uint32_t chan = config.router_dst_there == B250_XB_DST_R0 ? 0 : 1;
         uint32_t router_config_word = ((_sid_framer & 0xff) << 16) | (config.dst_prefix + (chan * 3));
         _rio_fpga_interface->get_kernel_proxy().poke(PCIE_ROUTER_REG(0), router_config_word);
