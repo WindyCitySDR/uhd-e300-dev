@@ -82,7 +82,7 @@ public:
 protected:
     virtual void __poke32(const wb_addr_type addr, const boost::uint32_t data) = 0;
     virtual boost::uint32_t __peek32(const wb_addr_type addr) = 0;
-    virtual void __flush() { /* NOP */}
+    virtual void __flush() = 0;
 
     boost::mutex mutex;
 };
@@ -222,8 +222,10 @@ protected:
                 elapsed.total_milliseconds() < READ_TIMEOUT_IN_MS);
         }
 
-        UHD_ASSERT_THROW(elapsed.total_milliseconds() <= READ_TIMEOUT_IN_MS);
-        UHD_ASSERT_THROW(nirio_status_not_fatal(status));
+        if (nirio_status_fatal(status))
+            throw uhd::io_error("b250 fw poke32 - hardware IO error");
+        if (elapsed.total_milliseconds() > READ_TIMEOUT_IN_MS)
+            throw uhd::io_error("b250 fw poke32 - operation timed out");
 }
 
     virtual boost::uint32_t __peek32(const wb_addr_type addr)
@@ -248,9 +250,17 @@ protected:
         }
         nirio_status_chain(_drv_proxy.peek(PCIE_ZPU_DATA_REG(addr), reg_data), status);
 
-        UHD_ASSERT_THROW(elapsed.total_milliseconds() <= READ_TIMEOUT_IN_MS);
-        UHD_ASSERT_THROW(nirio_status_not_fatal(status));
+        if (nirio_status_fatal(status))
+            throw uhd::io_error("b250 fw peek32 - hardware IO error");
+        if (elapsed.total_milliseconds() > READ_TIMEOUT_IN_MS)
+            throw uhd::io_error("b250 fw peek32 - operation timed out");
+
         return reg_data;
+    }
+
+    virtual void __flush(void)
+    {
+        __peek32(0);
     }
 
 private:

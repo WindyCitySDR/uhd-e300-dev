@@ -169,11 +169,8 @@ UHD_STATIC_BLOCK(register_b250_device)
     device::register_device(&b250_find, &b250_make);
 }
 
-static void b250_load_fw(const std::string &addr, const std::string &file_name)
+static void b250_load_fw(wb_iface::sptr fw_reg_ctrl, const std::string &file_name)
 {
-    udp_simple::sptr comm = udp_simple::make_connected(
-        addr, BOOST_STRINGIZE(X300_FW_COMMS_UDP_PORT));
-
     UHD_MSG(status) << "Loading firmware " << file_name << std::flush;
 
     //load file into memory
@@ -182,35 +179,13 @@ static void b250_load_fw(const std::string &addr, const std::string &file_name)
     fw_file.read((char *)fw_file_buff, sizeof(fw_file_buff));
     fw_file.close();
 
-    //poke the fw words into the upper bootram half
-    size_t seq = 0;
-    x300_fw_comms_t request = x300_fw_comms_t();
-    char buff[X300_FW_COMMS_MTU] = {};
-
-    request.flags = uhd::htonx<boost::uint32_t>(X300_FW_COMMS_FLAGS_POKE32 | X300_FW_COMMS_FLAGS_ACK);
-    request.sequence = uhd::htonx<boost::uint32_t>(seq++);
-    request.addr = uhd::htonx<boost::uint32_t>(SR_ADDR(BOOT_LDR_BASE, BL_ADDRESS));
-    request.data = 0;
-    comm->send(asio::buffer(&request, sizeof(request)));
-    comm->recv(asio::buffer(buff));
-
+    //Poke the fw words into the WB boot loader
+    fw_reg_ctrl->poke32(SR_ADDR(BOOT_LDR_BASE, BL_ADDRESS), 0);
     for (size_t i = 0; i < X300_FW_NUM_BYTES; i+=sizeof(boost::uint32_t))
     {
-        //do ack for occasional backpressure
-        const bool ack = (i & 0xf) == 0;
-
-        //load request struct
-        request.flags = uhd::htonx<boost::uint32_t>(X300_FW_COMMS_FLAGS_POKE32 | (ack?X300_FW_COMMS_FLAGS_ACK : 0));
-        request.sequence = uhd::htonx<boost::uint32_t>(seq++);
-        request.addr = uhd::htonx<boost::uint32_t>(SR_ADDR(BOOT_LDR_BASE, BL_DATA));
-        request.data = uhd::htonx(uhd::byteswap(fw_file_buff[i/sizeof(boost::uint32_t)]));
-
-        //send request
-        comm->send(asio::buffer(&request, sizeof(request)));
-
-        //do ack for occasional backpressure
-        if (ack) comm->recv(asio::buffer(buff));
-
+        //@TODO: FIXME: Since b250_ctrl_iface acks each write and traps exceptions, the first try for the last word
+        //              written will print an error because it triggers a FW reload and fails to reply.
+        fw_reg_ctrl->poke32(SR_ADDR(BOOT_LDR_BASE, BL_DATA), uhd::byteswap(fw_file_buff[i/sizeof(boost::uint32_t)]));
         if ((i & 0x1fff) == 0) UHD_MSG(status) << "." << std::flush;
     }
 
@@ -246,16 +221,6 @@ b250_impl::b250_impl(const uhd::device_addr_t &dev_addr)
         if (key[0] == 's') _send_args[key] = dev_addr[key];
     }
 
-    //extract the FW path for the B250
-    //and live load fw over ethernet link
-    if (dev_addr.has_key("fw"))
-    {
-        const std::string b250_fw_image = find_image_path(
-            dev_addr.has_key("fw")? dev_addr["fw"] : B250_FW_FILE_NAME
-        );
-        b250_load_fw(_addr, b250_fw_image);
-    }
-
     const std::vector<std::string> DB_NAMES = boost::assign::list_of("A")("B");
 
     //create basic communication
@@ -264,6 +229,16 @@ b250_impl::b250_impl(const uhd::device_addr_t &dev_addr)
         _zpu_ctrl.reset(new b250_ctrl_iface_pcie(_rio_fpga_interface->get_kernel_proxy()));
     else
         _zpu_ctrl.reset(new b250_ctrl_iface_enet(udp_simple::make_connected(_addr, BOOST_STRINGIZE(X300_FW_COMMS_UDP_PORT))));
+
+    //extract the FW path for the B250
+    //and live load fw over ethernet link
+    if (dev_addr.has_key("fw"))
+    {
+        const std::string b250_fw_image = find_image_path(
+            dev_addr.has_key("fw")? dev_addr["fw"] : B250_FW_FILE_NAME
+        );
+        b250_load_fw(_zpu_ctrl, b250_fw_image);
+    }
 
     _zpu_spi = spi_core_3000::make(_zpu_ctrl, SR_ADDR(SET0_BASE, ZPU_SR_SPI), SR_ADDR(SET0_BASE, ZPU_RB_SPI));
     _zpu_i2c = i2c_core_100_wb32::make(_zpu_ctrl, I2C1_BASE);
