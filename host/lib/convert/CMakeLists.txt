@@ -55,6 +55,36 @@ ELSE(ENABLE_ORC)
     MESSAGE(STATUS "Orc not found, disabling orc support.")
 ENDIF(ENABLE_ORC)
 
+########################################################################
+# Check for SSE2 SIMD headers
+########################################################################
+IF(CMAKE_COMPILER_IS_GNUCXX)
+    SET(EMMINTRIN_FLAGS -msse2)
+ELSEIF(MSVC)
+    SET(EMMINTRIN_FLAGS /arch:SSE2)
+ENDIF()
+
+SET(CMAKE_REQUIRED_FLAGS ${EMMINTRIN_FLAGS})
+CHECK_INCLUDE_FILE_CXX(emmintrin.h HAVE_EMMINTRIN_H)
+UNSET(CMAKE_REQUIRED_FLAGS)
+
+IF(HAVE_EMMINTRIN_H)
+    SET(convert_with_sse2_sources
+        ${CMAKE_CURRENT_SOURCE_DIR}/sse2_sc16_to_fc64.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/sse2_sc16_to_fc32.cpp
+        #${CMAKE_CURRENT_SOURCE_DIR}/sse2_sc8_to_fc64.cpp
+        #${CMAKE_CURRENT_SOURCE_DIR}/sse2_sc8_to_fc32.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/sse2_fc64_to_sc16.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/sse2_fc32_to_sc16.cpp
+        #${CMAKE_CURRENT_SOURCE_DIR}/sse2_fc64_to_sc8.cpp
+        #${CMAKE_CURRENT_SOURCE_DIR}/sse2_fc32_to_sc8.cpp
+    )
+    SET_SOURCE_FILES_PROPERTIES(
+        ${convert_with_sse2_sources}
+        PROPERTIES COMPILE_FLAGS "${EMMINTRIN_FLAGS}"
+    )
+    LIBUHD_APPEND_SOURCES(${convert_with_sse2_sources})
+ENDIF(HAVE_EMMINTRIN_H)
 
 ########################################################################
 # Check for NEON SIMD headers
@@ -88,6 +118,7 @@ LIBUHD_PYTHON_GEN_SOURCE(
 )
 
 LIBUHD_APPEND_SOURCES(
+    ${CMAKE_CURRENT_SOURCE_DIR}/convert_with_tables.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/convert_impl.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/convert_item32.cpp
 )
