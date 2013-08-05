@@ -97,11 +97,11 @@ struct convert_sc12_item32_1_to_star_1 : public converter
         switch (head_samps)
         {
         case 0: break; //no head
-        case 1: convert_sc12_item32_3_to_star_4<type, tohost>(input[i], dummy0, dummy1, dummy2, output[0], _scalar); break;
-        case 2: convert_sc12_item32_3_to_star_4<type, tohost>(input[i], dummy0, dummy1, output[0], output[1], _scalar); break;
-        case 3: convert_sc12_item32_3_to_star_4<type, tohost>(input[i], dummy0, output[0], output[1], output[2], _scalar); break;
+        case 1: convert_sc12_item32_3_to_star_4<type, tohost>(input[i++], dummy0, dummy1, dummy2, output[0], _scalar); break;
+        case 2: convert_sc12_item32_3_to_star_4<type, tohost>(input[i++], dummy0, dummy1, output[0], output[1], _scalar); break;
+        case 3: convert_sc12_item32_3_to_star_4<type, tohost>(input[i++], dummy0, output[0], output[1], output[2], _scalar); break;
         }
-        i++; o += head_samps;
+        o += head_samps;
 
         //convert the body
         while (o+3 < nsamps)
@@ -111,7 +111,8 @@ struct convert_sc12_item32_1_to_star_1 : public converter
         }
 
         //handle the tail case
-        switch (nsamps-o)
+        const size_t tail_samps = nsamps - o;
+        switch (tail_samps)
         {
         case 0: break; //no tail
         case 1: convert_sc12_item32_3_to_star_4<type, tohost>(input[i], output[o+0], dummy0, dummy1, dummy2, _scalar); break;
