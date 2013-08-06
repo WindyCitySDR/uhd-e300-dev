@@ -257,12 +257,19 @@ static void handle_tx_async_msgs(boost::shared_ptr<b250_tx_fc_guts_t> guts, zero
     const boost::uint32_t *packet_buff = buff->cast<const boost::uint32_t *>();
 
     //unpacking can fail
+    uint32_t (*endian_conv)(uint32_t) = uhd::ntohx;
     try
     {
         if (link_type == vrt::if_packet_info_t::LINK_TYPE_VRLP)
+        {
             b250_if_hdr_unpack_vrlp(packet_buff, if_packet_info);
+            endian_conv = uhd::ntohx;
+        }
         else
+        {
             b250_if_hdr_unpack_chdr(packet_buff, if_packet_info);
+            endian_conv = uhd::wtohx;
+        }
     }
     catch(const std::exception &ex)
     {
@@ -271,9 +278,9 @@ static void handle_tx_async_msgs(boost::shared_ptr<b250_tx_fc_guts_t> guts, zero
     }
 
     //catch the flow control packets and react
-    if (uhd::ntohx(packet_buff[if_packet_info.num_header_words32+0]) == 0)
+    if (endian_conv(packet_buff[if_packet_info.num_header_words32+0]) == 0)
     {
-        const size_t seq = uhd::ntohx(packet_buff[if_packet_info.num_header_words32+1]);
+        const size_t seq = endian_conv(packet_buff[if_packet_info.num_header_words32+1]);
         guts->seq_queue.push_with_haste(seq);
         return;
     }
@@ -281,7 +288,7 @@ static void handle_tx_async_msgs(boost::shared_ptr<b250_tx_fc_guts_t> guts, zero
     //fill in the async metadata
     async_metadata_t metadata;
     load_metadata_from_buff(
-        uhd::ntohx<boost::uint32_t>, metadata, if_packet_info, packet_buff,
+        endian_conv, metadata, if_packet_info, packet_buff,
         clock->get_master_clock_rate(), guts->stream_channel);
     guts->async_queue->push_with_pop_on_full(metadata);
     metadata.channel = guts->device_channel;
@@ -382,14 +389,18 @@ rx_streamer::sptr b250_impl::get_rx_stream(const uhd::stream_args_t &args_)
         my_streamer->resize(args.channels.size());
 
         //init some streamer stuff
-        if (_if_pkt_link_type == vrt::if_packet_info_t::LINK_TYPE_VRLP)
+        std::string conv_endianness;
+        if (_if_pkt_link_type == vrt::if_packet_info_t::LINK_TYPE_VRLP) {
             my_streamer->set_vrt_unpacker(&b250_if_hdr_unpack_vrlp);
-        else
+            conv_endianness = "be";
+        } else {
             my_streamer->set_vrt_unpacker(&b250_if_hdr_unpack_chdr);
+            conv_endianness = "le";
+        }
 
         //set the converter
         uhd::convert::id_type id;
-        id.input_format = args.otw_format + "_item32_be";
+        id.input_format = args.otw_format + "_item32_" + conv_endianness;
         id.num_inputs = 1;
         id.output_format = args.cpu_format;
         id.num_outputs = 1;
@@ -477,17 +488,20 @@ tx_streamer::sptr b250_impl::get_tx_stream(const uhd::stream_args_t &args_)
         if (not my_streamer) my_streamer = boost::make_shared<sph::send_packet_streamer>(spp);
         my_streamer->resize(args.channels.size());
 
-        //init some streamer stuff
-        if (_if_pkt_link_type == vrt::if_packet_info_t::LINK_TYPE_VRLP)
+        std::string conv_endianness;
+        if (_if_pkt_link_type == vrt::if_packet_info_t::LINK_TYPE_VRLP) {
             my_streamer->set_vrt_packer(&b250_if_hdr_pack_vrlp);
-        else
+            conv_endianness = "be";
+        } else {
             my_streamer->set_vrt_packer(&b250_if_hdr_pack_chdr);
+            conv_endianness = "le";
+        }
 
         //set the converter
         uhd::convert::id_type id;
         id.input_format = args.cpu_format;
         id.num_inputs = 1;
-        id.output_format = args.otw_format + "_item32_be";
+        id.output_format = args.otw_format + "_item32_" + conv_endianness;
         id.num_outputs = 1;
         my_streamer->set_converter(id);
 
