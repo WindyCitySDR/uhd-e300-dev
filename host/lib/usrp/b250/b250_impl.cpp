@@ -101,6 +101,49 @@ static device_addrs_t b250_find_with_addr(const device_addr_t &hint)
     return addrs;
 }
 
+static device_addrs_t b250_find_pcie(const device_addr_t &hint)
+{
+    device_addrs_t addrs;
+    niriok_proxy_vtr dev_proxy_vtr;
+    //@TODO: This info should come from the interprocess helper.
+    niriok_proxy_factory::get_by_device_id(X300_PCIE_SSID, dev_proxy_vtr);
+    BOOST_FOREACH(niriok_proxy &dev_proxy, dev_proxy_vtr)
+    {
+        device_addr_t new_addr;
+        new_addr["type"] = "x300";
+        new_addr["resource"] = boost::str(boost::format("RIO%u") % dev_proxy.get_interface_num());
+
+        //Attempt to read the name from the EEPROM and perform filtering.
+        //This operation can throw due to compatibility mismatch.
+        try
+        {
+            wb_iface::sptr zpu_ctrl(new b250_ctrl_iface_pcie(dev_proxy));
+            i2c_core_100_wb32::sptr zpu_i2c = i2c_core_100_wb32::make(zpu_ctrl, I2C1_BASE);
+            i2c_iface::sptr eeprom16 = zpu_i2c->eeprom16();
+            const mboard_eeprom_t mb_eeprom(*eeprom16, "X300");
+            new_addr["name"] = mb_eeprom["name"];
+            new_addr["serial"] = mb_eeprom["serial"];
+        }
+        catch(const std::exception &)
+        {
+            //set these values as empty string so the device may still be found
+            //and the filter's below can still operate on the discovered device
+            new_addr["name"] = "";
+            new_addr["serial"] = "";
+        }
+        //filter the discovered device below by matching optional keys
+        if (
+            (not hint.has_key("resource") or hint["resource"] == new_addr["resource"]) and
+            (not hint.has_key("name")     or hint["name"]     == new_addr["name"]) and
+            (not hint.has_key("serial")   or hint["serial"]   == new_addr["serial"])
+        ){
+            addrs.push_back(new_addr);
+        }
+        dev_proxy.close();
+    }
+    return addrs;
+}
+
 static device_addrs_t b250_find(const device_addr_t &hint_)
 {
     //we only do single device discovery for now
@@ -121,38 +164,26 @@ static device_addrs_t b250_find(const device_addr_t &hint_)
         return addrs;
     }
 
-    if (not hint.has_key("resource"))
+    //otherwise, no address was specified, send a broadcast on each interface
+    BOOST_FOREACH(const if_addrs_t &if_addrs, get_if_addrs())
     {
-        //otherwise, no address was specified, send a broadcast on each interface
-        BOOST_FOREACH(const if_addrs_t &if_addrs, get_if_addrs())
-        {
-            //avoid the loopback device
-            if (if_addrs.inet == asio::ip::address_v4::loopback().to_string()) continue;
+        //avoid the loopback device
+        if (if_addrs.inet == asio::ip::address_v4::loopback().to_string()) continue;
 
-            //create a new hint with this broadcast address
-            device_addr_t new_hint = hint;
-            new_hint["addr"] = if_addrs.bcast;
+        //create a new hint with this broadcast address
+        device_addr_t new_hint = hint;
+        new_hint["addr"] = if_addrs.bcast;
 
-            //call discover with the new hint and append results
-            device_addrs_t new_addrs = b250_find(new_hint);
-            addrs.insert(addrs.begin(), new_addrs.begin(), new_addrs.end());
-        }
+        //call discover with the new hint and append results
+        device_addrs_t new_addrs = b250_find(new_hint);
+        addrs.insert(addrs.begin(), new_addrs.begin(), new_addrs.end());
     }
 
-    niriok_proxy_vtr dev_proxy_vtr;
-    niriok_proxy_factory::get_by_device_id(X300_PCIE_SSID, dev_proxy_vtr);
-    BOOST_FOREACH(niriok_proxy &dev_proxy, dev_proxy_vtr)
-    {
-        device_addr_t new_addr;
-        new_addr["type"] = "x300";
-        new_addr["resource"] = boost::str(boost::format("RIO%u") % dev_proxy.get_interface_num());
+    //@TODO: Why clear insted of skipping populating addrs? Workaround for device enumeration bug.
+    if (hint.has_key("resource")) addrs.clear();
 
-        if (not hint.has_key("resource") || hint["resource"] == new_addr["resource"])
-        {
-            addrs.push_back(new_addr);
-        }
-        dev_proxy.close();
-    }
+    device_addrs_t pcie_addrs = b250_find_pcie(hint);
+    if (not pcie_addrs.empty()) addrs.insert(addrs.end(), pcie_addrs.begin(), pcie_addrs.end());
 
     return addrs;
 }

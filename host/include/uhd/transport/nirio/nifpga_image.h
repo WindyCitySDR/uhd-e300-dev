@@ -9,7 +9,7 @@
 
 namespace nifpga_image {
 
-static const char* BITFILE = "nifpga_image.lvbitx";
+static const char* BITFILE = "/usr/local/share/uhd/images/nifpga_image.lvbitx";
 static const char* SIGNATURE = "82F2060A477C76260CE6698B04554731C4816FA7DC9EC80C5DE93C5EB7047626";
 
 static const char* CONTROLS[] = {
