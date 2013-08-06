@@ -23,7 +23,7 @@
 
 using namespace uhd::convert;
 
-typedef boost::uint32_t (*tohost32_type)(boost::uint32_t);
+typedef boost::uint32_t (*towire32_type)(boost::uint32_t);
 
 struct item32_sc12_3x
 {
@@ -32,7 +32,7 @@ struct item32_sc12_3x
     item32_t line2;
 };
 
-template <typename type, tohost32_type towire>
+template <typename type, towire32_type towire>
 void convert_star_4_to_sc12_item32_3
 (
     const std::complex<type> &in0,
@@ -64,7 +64,7 @@ void convert_star_4_to_sc12_item32_3
     output.line2 = towire(line2);
 }
 
-template <typename type, tohost32_type towire>
+template <typename type, towire32_type towire>
 struct convert_star_1_to_sc12_item32_1 : public converter
 {
     convert_star_1_to_sc12_item32_1(void)
