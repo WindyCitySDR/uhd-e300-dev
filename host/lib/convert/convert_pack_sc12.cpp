@@ -17,6 +17,7 @@
 
 #include "convert_common.hpp"
 #include <uhd/utils/byteswap.hpp>
+#include <uhd/utils/msg.hpp>
 #include <boost/math/special_functions/round.hpp>
 #include <vector>
 
@@ -83,18 +84,16 @@ struct convert_star_1_to_sc12_item32_1 : public converter
 
         //helper variables
         size_t i = 0, o = 0;
-        item32_sc12_3x dummy;
 
         //handle the head case
         const size_t head_samps = size_t(outputs[0]) & 0x3;
         switch (head_samps)
         {
         case 0: break; //no head
-        case 1: convert_star_4_to_sc12_item32_3<type, towire>(0, 0, 0, input[0], dummy, _scalar); break;
-        case 2: convert_star_4_to_sc12_item32_3<type, towire>(0, 0, input[0], input[1], dummy, _scalar); break;
-        case 3: convert_star_4_to_sc12_item32_3<type, towire>(0, input[0], input[1], input[2], dummy, _scalar); break;
+        case 1: convert_star_4_to_sc12_item32_3<type, towire>(0, 0, 0, input[0], output[o++], _scalar); break;
+        case 2: convert_star_4_to_sc12_item32_3<type, towire>(0, 0, input[0], input[1], output[o++], _scalar); break;
+        case 3: convert_star_4_to_sc12_item32_3<type, towire>(0, input[0], input[1], input[2], output[o++], _scalar); break;
         }
-        if (head_samps != 0) std::memcpy(outputs[o++], (reinterpret_cast<char *>(&dummy) + 12 - head_samps*3), head_samps*3);
         i += head_samps;
 
         //convert the body
@@ -109,11 +108,10 @@ struct convert_star_1_to_sc12_item32_1 : public converter
         switch (tail_samps)
         {
         case 0: break; //no tail
-        case 1: convert_star_4_to_sc12_item32_3<type, towire>(input[i+0], 0, 0, 0, dummy, _scalar); break;
-        case 2: convert_star_4_to_sc12_item32_3<type, towire>(input[i+0], input[i+1], 0, 0, dummy, _scalar); break;
-        case 3: convert_star_4_to_sc12_item32_3<type, towire>(input[i+0], input[i+1], input[i+2], 0, dummy, _scalar); break;
+        case 1: convert_star_4_to_sc12_item32_3<type, towire>(input[i+0], 0, 0, 0, output[o], _scalar); break;
+        case 2: convert_star_4_to_sc12_item32_3<type, towire>(input[i+0], input[i+1], 0, 0, output[o], _scalar); break;
+        case 3: convert_star_4_to_sc12_item32_3<type, towire>(input[i+0], input[i+1], input[i+2], 0, output[o], _scalar); break;
         }
-        if (tail_samps != 0) std::memcpy(outputs[o], &dummy, tail_samps*3);
     }
 
     double _scalar;

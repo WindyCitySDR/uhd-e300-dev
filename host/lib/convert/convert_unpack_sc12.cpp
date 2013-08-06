@@ -17,6 +17,7 @@
 
 #include "convert_common.hpp"
 #include <uhd/utils/byteswap.hpp>
+#include <uhd/utils/msg.hpp>
 #include <boost/math/special_functions/round.hpp>
 #include <vector>
 
@@ -30,6 +31,14 @@ struct item32_sc12_3x
     item32_t line1;
     item32_t line2;
 };
+
+UHD_INLINE boost::int16_t signextd12(const item32_t &in)
+{
+    if ((in & 0x800) != 0)
+        return boost::uint16_t(in | 0xf000);
+    else
+        return boost::uint16_t(in & 0x0fff);
+}
 
 template <typename type, tohost32_type tohost>
 void convert_sc12_item32_3_to_star_4
@@ -50,17 +59,17 @@ void convert_sc12_item32_3_to_star_4
     const boost::uint64_t line12 = (boost::uint64_t(line1) << 32) | line2;
 
     //step 1: shift out and mask off the individual numbers
-    const type i0 = type(((line0 >> 20) & 0xfff)*scalar);
-    const type q0 = type(((line0 >> 8) & 0xfff)*scalar);
+    const type i0 = type(signextd12(line0 >> 20)*scalar);
+    const type q0 = type(signextd12(line0 >> 8)*scalar);
 
-    const type i1 = type(((line01 >> 28) & 0xfff)*scalar);
-    const type q1 = type(((line1 >> 16) & 0xfff)*scalar);
+    const type i1 = type(signextd12(line01 >> 28)*scalar);
+    const type q1 = type(signextd12(line1 >> 16)*scalar);
 
-    const type i2 = type(((line1 >> 4) & 0xfff)*scalar);
-    const type q2 = type(((line12 >> 24) & 0xfff)*scalar);
+    const type i2 = type(signextd12(line1 >> 4)*scalar);
+    const type q2 = type(signextd12(line12 >> 24)*scalar);
 
-    const type i3 = type(((line2 >> 12) & 0xfff)*scalar);
-    const type q3 = type(((line2 >> 0) & 0xfff)*scalar);
+    const type i3 = type(signextd12(line2 >> 12)*scalar);
+    const type q3 = type(signextd12(line2 >> 0)*scalar);
 
     //step 2: load the outputs
     out0 = std::complex<type>(i0, q0);

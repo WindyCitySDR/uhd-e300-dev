@@ -207,6 +207,38 @@ BOOST_AUTO_TEST_CASE(test_convert_types_le_fc64){
 }
 
 /***********************************************************************
+ * Test float to/from sc12 conversion loopback
+ **********************************************************************/
+
+BOOST_AUTO_TEST_CASE(test_convert_types_le_sc12_with_fc32){
+    convert::id_type id;
+    id.input_format = "fc32";
+    id.num_inputs = 1;
+    id.output_format = "sc12_item32_le";
+    id.num_outputs = 1;
+
+    //try various lengths to test edge cases
+    for (size_t nsamps = 1; nsamps < 128; nsamps++){
+        test_convert_types_for_floats<fc32_t>(nsamps, id, 1./2048);
+        break;
+    }
+}
+
+BOOST_AUTO_TEST_CASE(test_convert_types_be_sc12_with_fc32){
+    convert::id_type id;
+    id.input_format = "fc32";
+    id.num_inputs = 1;
+    id.output_format = "sc12_item32_be";
+    id.num_outputs = 1;
+
+    //try various lengths to test edge cases
+    for (size_t nsamps = 1; nsamps < 128; nsamps++){
+        test_convert_types_for_floats<fc32_t>(nsamps, id, 1./2048);
+        break;
+    }
+}
+
+/***********************************************************************
  * Test float to short conversion loopback
  **********************************************************************/
 BOOST_AUTO_TEST_CASE(test_convert_types_fc32_to_sc16){
