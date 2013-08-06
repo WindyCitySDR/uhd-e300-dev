@@ -148,8 +148,8 @@ static void test_convert_types_for_floats(
     BOOST_FOREACH(const int_pair_t &prio, prios){
         loopback(nsamps, in_id, out_id, input, output, prio.first, prio.second);
         for (size_t i = 0; i < nsamps; i++){
-            MY_CHECK_CLOSE(input[i].real(), output[i].real(), value_type(1./32767));
-            MY_CHECK_CLOSE(input[i].imag(), output[i].imag(), value_type(1./32767));
+            MY_CHECK_CLOSE(input[i].real(), output[i].real(), value_type(1./(1 << 14)));
+            MY_CHECK_CLOSE(input[i].imag(), output[i].imag(), value_type(1./(1 << 14)));
         }
     }
 }
@@ -219,8 +219,7 @@ BOOST_AUTO_TEST_CASE(test_convert_types_le_sc12_with_fc32){
 
     //try various lengths to test edge cases
     for (size_t nsamps = 1; nsamps < 16; nsamps++){
-        test_convert_types_for_floats<fc32_t>(nsamps, id, 1./2048);
-        break;
+        test_convert_types_for_floats<fc32_t>(nsamps, id, 1./16);
     }
 }
 
@@ -233,8 +232,7 @@ BOOST_AUTO_TEST_CASE(test_convert_types_be_sc12_with_fc32){
 
     //try various lengths to test edge cases
     for (size_t nsamps = 1; nsamps < 16; nsamps++){
-        test_convert_types_for_floats<fc32_t>(nsamps, id, 1./2048);
-        break;
+        test_convert_types_for_floats<fc32_t>(nsamps, id, 1./16);
     }
 }
 
@@ -251,7 +249,7 @@ BOOST_AUTO_TEST_CASE(test_convert_types_le_fc32_with_fc32){
 
     //try various lengths to test edge cases
     for (size_t nsamps = 1; nsamps < 16; nsamps++){
-        test_convert_types_for_floats<fc32_t>(nsamps, id, 1.);
+        test_convert_types_for_floats<fc32_t>(nsamps, id);
     }
 }
 
@@ -264,7 +262,7 @@ BOOST_AUTO_TEST_CASE(test_convert_types_be_fc32_with_fc32){
 
     //try various lengths to test edge cases
     for (size_t nsamps = 1; nsamps < 16; nsamps++){
-        test_convert_types_for_floats<fc32_t>(nsamps, id, 1.);
+        test_convert_types_for_floats<fc32_t>(nsamps, id);
     }
 }
 
