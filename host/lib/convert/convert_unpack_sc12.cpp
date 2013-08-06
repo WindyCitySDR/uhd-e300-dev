@@ -32,14 +32,6 @@ struct item32_sc12_3x
     item32_t line2;
 };
 
-UHD_INLINE boost::int16_t signextd12(const item32_t &in)
-{
-    if ((in & 0x800) != 0)
-        return boost::uint16_t(in | 0xf000);
-    else
-        return boost::uint16_t(in & 0x0fff);
-}
-
 template <typename type, tohost32_type tohost>
 void convert_sc12_item32_3_to_star_4
 (
@@ -59,17 +51,17 @@ void convert_sc12_item32_3_to_star_4
     const boost::uint64_t line12 = (boost::uint64_t(line1) << 32) | line2;
 
     //step 1: shift out and mask off the individual numbers
-    const type i0 = type(signextd12(line0 >> 20)*scalar);
-    const type q0 = type(signextd12(line0 >> 8)*scalar);
+    const type i0 = type(boost::int16_t(line0 >> 16)*scalar);
+    const type q0 = type(boost::int16_t(line0 >> 4)*scalar);
 
-    const type i1 = type(signextd12(line01 >> 28)*scalar);
-    const type q1 = type(signextd12(line1 >> 16)*scalar);
+    const type i1 = type(boost::int16_t(line01 >> 24)*scalar);
+    const type q1 = type(boost::int16_t(line1 >> 12)*scalar);
 
-    const type i2 = type(signextd12(line1 >> 4)*scalar);
-    const type q2 = type(signextd12(line12 >> 24)*scalar);
+    const type i2 = type(boost::int16_t(line1 >> 0)*scalar);
+    const type q2 = type(boost::int16_t(line12 >> 20)*scalar);
 
-    const type i3 = type(signextd12(line2 >> 12)*scalar);
-    const type q3 = type(signextd12(line2 >> 0)*scalar);
+    const type i3 = type(boost::int16_t(line2 >> 8)*scalar);
+    const type q3 = type(boost::int16_t(line2 << 4)*scalar);
 
     //step 2: load the outputs
     out0 = std::complex<type>(i0, q0);
@@ -88,7 +80,8 @@ struct convert_sc12_item32_1_to_star_1 : public converter
 
     void set_scalar(const double scalar)
     {
-        _scalar = scalar;
+        const int unpack_growth = 16;
+        _scalar = scalar/unpack_growth;
     }
 
     void operator()(const input_type &inputs, const output_type &outputs, const size_t nsamps)
