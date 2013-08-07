@@ -223,7 +223,9 @@ rx_streamer::sptr b200_impl::get_rx_stream(const uhd::stream_args_t &args_)
         const size_t chan = args.channels[stream_i];
         radio_perifs_t &perif = _radio_perifs[chan];
         if (args.otw_format == "sc16") perif.ctrl->poke32(TOREG(SR_RX_FMT), 0);
-        if (args.otw_format == "sc8") perif.ctrl->poke32(TOREG(SR_RX_FMT), 1);
+        if (args.otw_format == "sc12") perif.ctrl->poke32(TOREG(SR_RX_FMT), 1);
+        if (args.otw_format == "fc32") perif.ctrl->poke32(TOREG(SR_RX_FMT), 2);
+        if (args.otw_format == "sc8") perif.ctrl->poke32(TOREG(SR_RX_FMT), 3);
         const boost::uint32_t sid = chan?B200_RX_DATA1_SID:B200_RX_DATA0_SID;
 
         //calculate packet size
@@ -322,8 +324,10 @@ tx_streamer::sptr b200_impl::get_tx_stream(const uhd::stream_args_t &args_)
     {
         const size_t chan = args.channels[stream_i];
         radio_perifs_t &perif = _radio_perifs[chan];
-        if (args.otw_format == "sc16") perif.ctrl->poke32(TOREG(SR_TX_FMT), 0);
-        if (args.otw_format == "sc8") perif.ctrl->poke32(TOREG(SR_TX_FMT), 1);
+        if (args.otw_format == "sc16") perif.ctrl->poke32(TOREG(SR_RX_FMT), 0);
+        if (args.otw_format == "sc12") perif.ctrl->poke32(TOREG(SR_RX_FMT), 1);
+        if (args.otw_format == "fc32") perif.ctrl->poke32(TOREG(SR_RX_FMT), 2);
+        if (args.otw_format == "sc8") perif.ctrl->poke32(TOREG(SR_RX_FMT), 3);
 
         //calculate packet size
         static const size_t hdr_size = 0
