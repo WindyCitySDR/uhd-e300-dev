@@ -29,6 +29,7 @@
 #include "b250_clock_ctrl.hpp"
 #include "x300_fw_common.h"
 #include "b250_fw_ctrl.hpp"
+#include <uhd/utils/tasks.hpp>
 #include <uhd/transport/udp_zero_copy.hpp>
 #include "spi_core_3000.hpp"
 #include "b250_adc_ctrl.hpp"
@@ -93,6 +94,10 @@ struct b250_impl : public uhd::device
 {
     b250_impl(const uhd::device_addr_t &);
     ~b250_impl(void);
+
+    //task for periodically reclaiming the device from others
+    void claimer_loop(wb_iface::sptr);
+    uhd::task::sptr _claimer_task;
 
     //the io interface
     uhd::rx_streamer::sptr get_rx_stream(const uhd::stream_args_t &);

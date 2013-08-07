@@ -70,6 +70,7 @@ static device_addrs_t b250_find_with_addr(const device_addr_t &hint)
         try
         {
             wb_iface::sptr zpu_ctrl(new b250_ctrl_iface(udp_simple::make_connected(new_addr["addr"], BOOST_STRINGIZE(X300_FW_COMMS_UDP_PORT))));
+            if (zpu_ctrl->peek32(SR_ADDR(X300_FW_SHMEM_BASE, X300_FW_SHMEM_CLAIM_STATUS)) != 0) continue; //claimed by another process
             i2c_core_100_wb32::sptr zpu_i2c = i2c_core_100_wb32::make(zpu_ctrl, I2C1_BASE);
             i2c_iface::sptr eeprom16 = zpu_i2c->eeprom16();
             const mboard_eeprom_t mb_eeprom(*eeprom16, "X300");
@@ -222,6 +223,7 @@ b250_impl::b250_impl(const uhd::device_addr_t &dev_addr)
     //create basic communication
     UHD_MSG(status) << "Setup basic communication..." << std::endl;
     _zpu_ctrl.reset(new b250_ctrl_iface(udp_simple::make_connected(_addr, BOOST_STRINGIZE(X300_FW_COMMS_UDP_PORT))));
+    _claimer_task = uhd::task::make(boost::bind(&b250_impl::claimer_loop, this, _zpu_ctrl));
     _zpu_spi = spi_core_3000::make(_zpu_ctrl, SR_ADDR(SET0_BASE, ZPU_SR_SPI), SR_ADDR(SET0_BASE, ZPU_RB_SPI));
     _zpu_i2c = i2c_core_100_wb32::make(_zpu_ctrl, I2C1_BASE);
     _zpu_i2c->set_clock_rate(B250_BUS_CLOCK_RATE);
@@ -433,6 +435,10 @@ b250_impl::~b250_impl(void)
     (
         _radio_perifs[0].ctrl->poke32(TOREG(SR_MISC_OUTS), (1 << 2)); //disable/reset ADC/DAC
         _radio_perifs[1].ctrl->poke32(TOREG(SR_MISC_OUTS), (1 << 2)); //disable/reset ADC/DAC
+
+        //kill the claimer task and unclaim the device
+        _claimer_task.reset();
+        _zpu_ctrl->poke32(SR_ADDR(X300_FW_SHMEM_BASE, X300_FW_SHMEM_CLAIM_TIME), 0);
     )
 }
 
@@ -780,4 +786,10 @@ void b250_impl::set_fp_gpio(const std::string &attr, const boost::uint64_t setti
     if (attr == "ATR_RX") return _fp_gpio->set_atr_reg(dboard_iface::UNIT_RX, dboard_iface::ATR_REG_RX_ONLY, new_value);
     if (attr == "ATR_TX") return _fp_gpio->set_atr_reg(dboard_iface::UNIT_RX, dboard_iface::ATR_REG_TX_ONLY, new_value);
     if (attr == "ATR_XX") return _fp_gpio->set_atr_reg(dboard_iface::UNIT_RX, dboard_iface::ATR_REG_FULL_DUPLEX, new_value);
+}
+
+void b250_impl::claimer_loop(wb_iface::sptr iface)
+{
+    iface->poke32(SR_ADDR(X300_FW_SHMEM_BASE, X300_FW_SHMEM_CLAIM_TIME), time(NULL));
+    boost::this_thread::sleep(boost::posix_time::milliseconds(1500)); //1.5 seconds
 }
