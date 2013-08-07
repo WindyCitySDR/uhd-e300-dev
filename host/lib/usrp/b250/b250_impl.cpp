@@ -111,7 +111,11 @@ static device_addrs_t b250_find_pcie(const device_addr_t &hint)
     {
         device_addr_t new_addr;
         new_addr["type"] = "x300";
-        new_addr["resource"] = boost::str(boost::format("RIO%u") % dev_proxy.get_interface_num());
+
+        //@TODO: Only one RIO device supported for now. Change this when we switch to enumerating
+        //       using the inter-process helper.
+        //new_addr["resource"] = boost::str(boost::format("RIO%u") % dev_proxy.get_interface_num());
+        new_addr["resource"] = "RIO0";
 
         //Attempt to read the name from the EEPROM and perform filtering.
         //This operation can throw due to compatibility mismatch.
@@ -233,7 +237,7 @@ b250_impl::b250_impl(const uhd::device_addr_t &dev_addr)
     _addr = dev_addr.has_key("resource") ? dev_addr["resource"] : dev_addr["addr"];
     _xport_path = dev_addr.has_key("resource") ? "nirio" : "eth";
     _if_pkt_link_type = (_xport_path == "nirio") ? vrt::if_packet_info_t::LINK_TYPE_CHDR :
-                                                  vrt::if_packet_info_t::LINK_TYPE_VRLP;
+                                                   vrt::if_packet_info_t::LINK_TYPE_VRLP;
 
     if (_xport_path == "nirio") {
         //@TODO: Remove this when we have the helper process
@@ -656,6 +660,15 @@ void b250_impl::setup_radio(const size_t i, const std::string &db_name)
     this->update_atr_leds(i, ""); //init anyway, even if never called
 }
 
+boost::uint32_t get_pcie_dma_channel(boost::uint8_t destination, boost::uint8_t prefix)
+{
+    static const boost::uint32_t RADIO_GRP_SIZE = 3;
+    static const boost::uint32_t RADIO0_GRP     = 1;
+    static const boost::uint32_t RADIO1_GRP     = 0;
+
+    boost::uint32_t radio_grp = (destination == B250_XB_DST_R0) ? RADIO0_GRP : RADIO1_GRP;
+    return ((radio_grp * RADIO_GRP_SIZE) + prefix);
+}
 
 uhd::transport::zero_copy_if::sptr b250_impl::make_transport(
     const std::string& addr,
@@ -676,9 +689,13 @@ uhd::transport::zero_copy_if::sptr b250_impl::make_transport(
     sid = this->allocate_sid(config, xport_path);
 
     if (xport_path == "nirio") {
-        uint32_t chan = (destination == B250_XB_DST_R0) ? 0 : 1;
-        uint32_t instance = prefix + (chan * 3);
-        xport = nirio_zero_copy::make(_rio_fpga_interface, instance, args);
+        device_addr_t xport_args(args);
+        xport_args["send_frame_size"] = boost::lexical_cast<std::string>(
+            (prefix == B250_RADIO_DEST_PREFIX_TX) ? B250_PCIE_DATA_FRAME_SIZE : B250_PCIE_MSG_FRAME_SIZE);
+        xport_args["recv_frame_size"] = boost::lexical_cast<std::string>(
+            (prefix == B250_RADIO_DEST_PREFIX_RX) ? B250_PCIE_DATA_FRAME_SIZE : B250_PCIE_MSG_FRAME_SIZE);
+
+        xport = nirio_zero_copy::make(_rio_fpga_interface, get_pcie_dma_channel(destination, prefix), xport_args);
     } else {
         //make a new transport - fpga has no idea how to talk to use on this yet
         xport = udp_zero_copy::make(addr, BOOST_STRINGIZE(X300_VITA_UDP_PORT), args);
@@ -737,8 +754,8 @@ boost::uint32_t b250_impl::allocate_sid(const sid_config_t &config, std::string 
     _zpu_ctrl->poke32(SR_ADDR(SETXB_BASE, 0 + (B250_DEVICE_HERE)), config.router_dst_here);
 
     if (xport_path == "nirio") {
-        uint32_t chan = config.router_dst_there == B250_XB_DST_R0 ? 0 : 1;
-        uint32_t router_config_word = ((_sid_framer & 0xff) << 16) | (config.dst_prefix + (chan * 3));
+        uint32_t router_config_word = ((_sid_framer & 0xff) << 16) |                                    //Return SID
+                                      get_pcie_dma_channel(config.router_dst_there, config.dst_prefix); //Dest
         _rio_fpga_interface->get_kernel_proxy().poke(PCIE_ROUTER_REG(0), router_config_word);
     }
 

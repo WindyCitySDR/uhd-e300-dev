@@ -52,6 +52,8 @@ static const std::string B250_FW_FILE_NAME = "usrp_b250_fw.bin";
 static const double B250_DEFAULT_TICK_RATE = 120e6;
 static const double B250_BUS_CLOCK_RATE = 175000000;
 static const bool B250_ENABLE_RX_FC = false;
+static const size_t B250_PCIE_DATA_FRAME_SIZE = 8192;   //bytes
+static const size_t B250_PCIE_MSG_FRAME_SIZE  = 256;    //bytes
 
 #define B250_RADIO_DEST_PREFIX_TX 0
 #define B250_RADIO_DEST_PREFIX_CTRL 1
