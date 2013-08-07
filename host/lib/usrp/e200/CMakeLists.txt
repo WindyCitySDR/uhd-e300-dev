@@ -24,7 +24,7 @@
 ########################################################################
 find_package(UDev)
 
-LIBUHD_REGISTER_COMPONENT("E200" ENABLE_E200 ON "ENABLE_LIBUHD" OFF)
+LIBUHD_REGISTER_COMPONENT("E200" ENABLE_E200 OFF "ENABLE_LIBUHD" OFF)
 
 IF(ENABLE_E200)
     LIST(APPEND E200_SOURCES

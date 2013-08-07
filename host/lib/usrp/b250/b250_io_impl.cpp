@@ -335,7 +335,7 @@ rx_streamer::sptr b250_impl::get_rx_stream(const uhd::stream_args_t &args_)
         data_config.router_addr_there = B250_DEVICE_THERE;
         data_config.dst_prefix = B250_RADIO_DEST_PREFIX_RX;
         data_config.router_dst_there = (chan == 0)? B250_XB_DST_R0 : B250_XB_DST_R1;
-        data_config.router_dst_here = B250_XB_DST_E0;
+        data_config.router_dst_here = _router_dst_here;
         const boost::uint32_t data_sid = this->allocate_sid(data_config);
         UHD_LOG << "creating rx stream " << device_addr.to_string() << std::endl;
         zero_copy_if::sptr data_xport = this->make_transport(_addr, data_sid, device_addr);
@@ -432,7 +432,7 @@ tx_streamer::sptr b250_impl::get_tx_stream(const uhd::stream_args_t &args_)
         data_config.router_addr_there = B250_DEVICE_THERE;
         data_config.dst_prefix = B250_RADIO_DEST_PREFIX_TX;
         data_config.router_dst_there = (chan == 0)? B250_XB_DST_R0 : B250_XB_DST_R1;
-        data_config.router_dst_here = B250_XB_DST_E0;
+        data_config.router_dst_here = _router_dst_here;
         const boost::uint32_t data_sid = this->allocate_sid(data_config);
         UHD_LOG << "creating tx stream " << _send_args.to_string() << std::endl;
         zero_copy_if::sptr data_xport = this->make_transport(_addr, data_sid, _send_args);

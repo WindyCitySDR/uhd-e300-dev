@@ -27,8 +27,9 @@
 #include <uhd/types/sensors.hpp>
 #include "wb_iface.hpp"
 #include "b250_clock_ctrl.hpp"
-#include "b250_fw_common.h"
+#include "x300_fw_common.h"
 #include "b250_fw_ctrl.hpp"
+#include <uhd/utils/tasks.hpp>
 #include <uhd/transport/udp_zero_copy.hpp>
 #include "spi_core_3000.hpp"
 #include "b250_adc_ctrl.hpp"
@@ -87,11 +88,16 @@ struct b250_dboard_iface_config_t
 };
 
 uhd::usrp::dboard_iface::sptr b250_make_dboard_iface(const b250_dboard_iface_config_t &);
+uhd::uart_iface::sptr b250_make_uart_iface(wb_iface::sptr iface);
 
 struct b250_impl : public uhd::device
 {
     b250_impl(const uhd::device_addr_t &);
     ~b250_impl(void);
+
+    //task for periodically reclaiming the device from others
+    void claimer_loop(wb_iface::sptr);
+    uhd::task::sptr _claimer_task;
 
     //the io interface
     uhd::rx_streamer::sptr get_rx_stream(const uhd::stream_args_t &);
@@ -115,6 +121,7 @@ struct b250_impl : public uhd::device
     void register_loopback_self_test(wb_iface::sptr iface);
 
     std::string _addr;
+    int _router_dst_here;
     uhd::device_addr_t _send_args;
     uhd::device_addr_t _recv_args;
 
@@ -135,6 +142,7 @@ struct b250_impl : public uhd::device
         rx_dsp_core_3000::sptr ddc;
         tx_vita_core_3000::sptr deframer;
         tx_dsp_core_3000::sptr duc;
+        gpio_core_200_32wo::sptr leds;
     };
     radio_perifs_t _radio_perifs[2];
     uhd::usrp::dboard_eeprom_t _db_eeproms[8];
@@ -145,6 +153,10 @@ struct b250_impl : public uhd::device
 
     b250_clock_ctrl::sptr _clock;
     uhd::gps_ctrl::sptr _gps;
+
+    gpio_core_200::sptr _fp_gpio;
+    boost::uint64_t get_fp_gpio(const std::string &);
+    void set_fp_gpio(const std::string &, const boost::uint64_t);
 
     size_t _sid_framer;
     struct sid_config_t
@@ -174,11 +186,14 @@ struct b250_impl : public uhd::device
     {
         int clock_source;
         int pps_select;
+        int pps_out_enb;
     } clock_control_regs;
     void update_clock_control(void);
 
+    void set_time_source_out(const bool);
     void update_clock_source(const std::string &);
     void update_time_source(const std::string &);
+    void update_atr_leds(const size_t, const std::string &ant);
     uhd::sensor_value_t get_ref_locked(void);
     void set_db_eeprom(const size_t, const uhd::usrp::dboard_eeprom_t &);
     void set_mb_eeprom(const uhd::usrp::mboard_eeprom_t &);
