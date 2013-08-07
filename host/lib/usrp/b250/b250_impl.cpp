@@ -663,8 +663,8 @@ void b250_impl::setup_radio(const size_t i, const std::string &db_name)
 boost::uint32_t get_pcie_dma_channel(boost::uint8_t destination, boost::uint8_t prefix)
 {
     static const boost::uint32_t RADIO_GRP_SIZE = 3;
-    static const boost::uint32_t RADIO0_GRP     = 1;
-    static const boost::uint32_t RADIO1_GRP     = 0;
+    static const boost::uint32_t RADIO0_GRP     = 0;
+    static const boost::uint32_t RADIO1_GRP     = 1;
 
     boost::uint32_t radio_grp = (destination == B250_XB_DST_R0) ? RADIO0_GRP : RADIO1_GRP;
     return ((radio_grp * RADIO_GRP_SIZE) + prefix);

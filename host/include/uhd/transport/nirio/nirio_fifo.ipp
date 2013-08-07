@@ -55,7 +55,12 @@ nirio_status nirio_fifo<data_t>::initialize(
 	nNIRIOSRV200::tRioDeviceSocketInputParameters in = {};
 	nNIRIOSRV200::tRioDeviceSocketOutputParameters out = {};
 
-	in.function = nNIRIOSRV200::nRioFunction::kFifo;
+	//Forcefully stop the fifo if it is running
+    in.function    = nNIRIOSRV200::nRioFunction::kFifo;
+    in.subfunction = nNIRIOSRV200::nRioDeviceFifoFunction::kStop;
+    status = _riok_proxy_ptr->sync_operation(&in, sizeof(in), &out, sizeof(out));
+
+    in.function = nNIRIOSRV200::nRioFunction::kFifo;
 	in.subfunction = nNIRIOSRV200::nRioDeviceFifoFunction::kConfigure;
 
 	in.params.fifo.channel = _fifo_channel;

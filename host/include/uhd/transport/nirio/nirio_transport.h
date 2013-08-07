@@ -500,7 +500,12 @@ inline static nirio_status rio_mmap(
 	if (map.addr == MAP_FAILED)	{
 		map.addr = NULL;
 		map.size = 0;
-		return NiRio_Status_MemoryFull;
+		if (errno == EINVAL)
+		    return NiRio_Status_InvalidParameter;
+		else if (errno == ENOMEM)
+		    return NiRio_Status_MemoryFull;
+		else
+		    return NiRio_Status_SoftwareFault;
 	}
 	return 0;
 }

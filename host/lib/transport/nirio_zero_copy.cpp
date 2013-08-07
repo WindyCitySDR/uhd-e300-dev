@@ -133,7 +133,7 @@ public:
         UHD_LOG << boost::format("Creating PCIe transport for instance %d") % instance << std::endl;
 
         nirio_status status = 0;
-        size_t dummy;
+        size_t actual_depth = 0, actual_size = 0;
 
         nirio_interface::niriok_proxy& reg_int = fpga_session->get_kernel_proxy();
 
@@ -161,10 +161,10 @@ public:
             status);
         //Initialize FIFOs
         nirio_status_chain(
-            _recv_fifo.initialize((_recv_frame_size*_num_recv_frames)/sizeof(fifo_data_t), dummy, dummy),
+            _recv_fifo.initialize((_recv_frame_size*_num_recv_frames)/sizeof(fifo_data_t), actual_depth, actual_size),
             status);
         nirio_status_chain(
-            _send_fifo.initialize((_send_frame_size*_num_send_frames)/sizeof(fifo_data_t), dummy, dummy),
+            _send_fifo.initialize((_send_frame_size*_num_send_frames)/sizeof(fifo_data_t), actual_depth, actual_size),
             status);
 
         nirio_status_chain(_recv_fifo.start(), status);
@@ -182,8 +182,9 @@ public:
                 _send_fifo, get_send_frame_size())));
         }
 
-        if (nirio_status_fatal(status))
-            throw uhd::runtime_error("error creating nirio zero-copy transport.");
+        if (nirio_status_fatal(status)) {
+            throw uhd::runtime_error((boost::format("Error %d occured when creating nirio_zero_copy transport.") % status).str());
+        }
     }
 
     /*******************************************************************
