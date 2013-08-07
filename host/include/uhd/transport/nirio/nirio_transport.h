@@ -463,6 +463,8 @@ struct rio_memory_map {
 	rio_memory_map() : addr(NULL), size(0) {}
     void *addr;
     size_t size;
+
+    bool is_null() { return size == 0; }
 };
 
 inline static nirio_status rio_ioctl(
@@ -498,7 +500,7 @@ inline static nirio_status rio_mmap(
 	if (map.addr == MAP_FAILED)	{
 		map.addr = NULL;
 		map.size = 0;
-		return errno;
+		return NiRio_Status_MemoryFull;
 	}
 	return 0;
 }

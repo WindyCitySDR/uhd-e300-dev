@@ -27,6 +27,7 @@ nirio_fifo<data_t>::nirio_fifo(
     _fifo_channel(fifo_instance),
     _datatype_info(_get_datatype_info()),
     _started(false),
+    _acquired_pending(0),
     _mem_map(),
 	_lock(riok_proxy.get_interface_num(), fifo_instance),
     _riok_proxy_ptr(&riok_proxy)
@@ -76,11 +77,12 @@ template <typename data_t>
 void nirio_fifo<data_t>::finalize()
 {
 	nirio_status status = _lock.acquire(FIFO_LOCK_TIMEOUT_IN_MS);
-	if (nirio_status_not_fatal(status)) return;
+    if (nirio_status_fatal(status)) return;
 
-	if (_started) stop();
-	_riok_proxy_ptr->unmap_fifo_memory(_mem_map);
-
+    if (!_mem_map.is_null()) {
+        if (_started) stop();
+        _riok_proxy_ptr->unmap_fifo_memory(_mem_map);
+    }
 	_lock.release();
 }
 
@@ -101,6 +103,7 @@ nirio_status nirio_fifo<data_t>::start()
 
     status = _riok_proxy_ptr->sync_operation(&in, sizeof(in), &out, sizeof(out));
     _started = nirio_status_not_fatal(status);
+    _acquired_pending = 0;
 	_lock.release();
 
 	return status;
@@ -115,15 +118,19 @@ nirio_status nirio_fifo<data_t>::stop()
 	status = _lock.acquire(FIFO_LOCK_TIMEOUT_IN_MS);
 	if (nirio_status_fatal(status)) return status;
 
-	if (!_started) return NiRio_Status_Success;
+	if (_started) {
+        if (_acquired_pending > 0) release(_acquired_pending);
 
-    nNIRIOSRV200::tRioDeviceSocketInputParameters in = {};
-    nNIRIOSRV200::tRioDeviceSocketOutputParameters out = {};
+        nNIRIOSRV200::tRioDeviceSocketInputParameters in = {};
+        nNIRIOSRV200::tRioDeviceSocketOutputParameters out = {};
 
-    in.function    = nNIRIOSRV200::nRioFunction::kFifo;
-    in.subfunction = nNIRIOSRV200::nRioDeviceFifoFunction::kStop;
+        in.function    = nNIRIOSRV200::nRioFunction::kFifo;
+        in.subfunction = nNIRIOSRV200::nRioDeviceFifoFunction::kStop;
 
-    status = _riok_proxy_ptr->sync_operation(&in, sizeof(in), &out, sizeof(out));
+        status = _riok_proxy_ptr->sync_operation(&in, sizeof(in), &out, sizeof(out));
+
+        _started = false;
+	}
 	_lock.release();
 	return status;
 }
@@ -137,7 +144,7 @@ nirio_status nirio_fifo<data_t>::acquire(
 	size_t& elements_remaining)
 {
 	nirio_status status = NiRio_Status_Success;
-	if (!_riok_proxy_ptr) return NiRio_Status_ResourceNotInitialized;
+	if (!_riok_proxy_ptr || _mem_map.is_null()) return NiRio_Status_ResourceNotInitialized;
 
 	status = _lock.acquire(FIFO_LOCK_TIMEOUT_IN_MS);
 	if (nirio_status_fatal(status)) return status;
@@ -163,6 +170,7 @@ nirio_status nirio_fifo<data_t>::acquire(
 		elements = static_cast<data_t*>(out.params.fifo.op.wait.elements.pointer);
 		elements_acquired = stuffed[0];
 		elements_remaining = stuffed[1];
+		_acquired_pending = elements_acquired;
     }
 
     _lock.release();
@@ -188,6 +196,7 @@ nirio_status nirio_fifo<data_t>::release(const size_t elements)
 	in.params.fifo.op.grant.elements = static_cast<uint32_t>(elements);
 
     status = _riok_proxy_ptr->sync_operation(&in, sizeof(in), &out, sizeof(out));
+    _acquired_pending = 0;
 
     _lock.release();
 	return status;

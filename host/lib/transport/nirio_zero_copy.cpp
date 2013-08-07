@@ -34,7 +34,7 @@ using namespace uhd::transport;
 using namespace nifpga_interface;
 
 //A reasonable number of frames for send/recv and async/sync
-static const size_t DEFAULT_NUM_FRAMES  = 128;
+static const size_t DEFAULT_NUM_FRAMES  = 32;
 static const size_t DEFAULT_FRAMES_SIZE = 8192;
 
 typedef uint64_t fifo_data_t;
@@ -181,6 +181,9 @@ public:
             _msb_pool.push_back(boost::shared_ptr<nirio_zero_copy_msb>(new nirio_zero_copy_msb(
                 _send_fifo, get_send_frame_size())));
         }
+
+        if (nirio_status_fatal(status))
+            throw uhd::runtime_error("error creating nirio zero-copy transport.");
     }
 
     /*******************************************************************
