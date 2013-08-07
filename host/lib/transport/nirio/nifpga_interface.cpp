@@ -14,6 +14,8 @@
 #include <boost/regex.hpp>
 #include <boost/lexical_cast.hpp>
 
+#define REDOWNLOAD_IF_BIN_SIG_MISMATCH 1
+
 namespace nifpga_interface
 {
 
@@ -48,8 +50,10 @@ nirio_status nifpga_session::open(
 
 	nirio_status status = NiRio_Status_Success;
 	const char* signature_without_checksum = signature ? signature + 32 : NULL;
+#if REDOWNLOAD_IF_BIN_SIG_MISMATCH
 	if ((attribute & OPEN_ATTR_SKIP_SIGNATURE_CHECK) == 0 && _signature != signature)
 		attribute |= OPEN_ATTR_FORCE_DOWNLOAD;
+#endif
 
 	nirio_status_chain(NiFpga_Open(bitfile_path.c_str(), signature_without_checksum, _resource_name.c_str(), attribute, &_session), status);
 	_lock.initialize(_session);

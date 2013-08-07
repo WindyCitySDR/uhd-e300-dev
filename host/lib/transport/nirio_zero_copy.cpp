@@ -122,6 +122,8 @@ public:
         uint32_t instance,
         const device_addr_t &hints
     ):
+        _reg_int(fpga_session->get_kernel_proxy()),
+        _fifo_instance(instance),
         _recv_frame_size(size_t(hints.cast<double>("recv_frame_size", DEFAULT_FRAMES_SIZE))),
         _num_recv_frames(size_t(hints.cast<double>("num_recv_frames", DEFAULT_NUM_FRAMES))),
         _send_frame_size(size_t(hints.cast<double>("send_frame_size", DEFAULT_FRAMES_SIZE))),
@@ -135,29 +137,27 @@ public:
         nirio_status status = 0;
         size_t actual_depth = 0, actual_size = 0;
 
-        nirio_interface::niriok_proxy& reg_int = fpga_session->get_kernel_proxy();
-
         //Configure frame width
         nirio_status_chain(
-            reg_int.poke(PCIE_TX_DMA_REG(DMA_FRAME_SIZE_REG, instance), _send_frame_size/sizeof(fifo_data_t)),
+            _reg_int.poke(PCIE_TX_DMA_REG(DMA_FRAME_SIZE_REG, _fifo_instance), _send_frame_size/sizeof(fifo_data_t)),
             status);
         nirio_status_chain(
-            reg_int.poke(PCIE_RX_DMA_REG(DMA_FRAME_SIZE_REG, instance), _recv_frame_size/sizeof(fifo_data_t)),
+            _reg_int.poke(PCIE_RX_DMA_REG(DMA_FRAME_SIZE_REG, _fifo_instance), _recv_frame_size/sizeof(fifo_data_t)),
             status);
         //Config 32-bit word flipping and Reset DMA streams
         nirio_status_chain(
-            reg_int.poke(PCIE_TX_DMA_REG(DMA_CTRL_STATUS_REG, instance), DMA_CTRL_SW_BUF_U32 | DMA_CTRL_RESET),
+            _reg_int.poke(PCIE_TX_DMA_REG(DMA_CTRL_STATUS_REG, _fifo_instance), DMA_CTRL_SW_BUF_U32 | DMA_CTRL_RESET),
             status);
         nirio_status_chain(
-            reg_int.poke(PCIE_RX_DMA_REG(DMA_CTRL_STATUS_REG, instance), DMA_CTRL_SW_BUF_U32 | DMA_CTRL_RESET),
+            _reg_int.poke(PCIE_RX_DMA_REG(DMA_CTRL_STATUS_REG, _fifo_instance), DMA_CTRL_SW_BUF_U32 | DMA_CTRL_RESET),
             status);
 
         //Create FIFOs
         nirio_status_chain(
-            fpga_session->create_rx_fifo(nifpga_image::INPUT_FIFOS[instance], _recv_fifo),
+            fpga_session->create_rx_fifo(nifpga_image::INPUT_FIFOS[_fifo_instance], _recv_fifo),
             status);
         nirio_status_chain(
-            fpga_session->create_tx_fifo(nifpga_image::OUTPUT_FIFOS[instance], _send_fifo),
+            fpga_session->create_tx_fifo(nifpga_image::OUTPUT_FIFOS[_fifo_instance], _send_fifo),
             status);
         //Initialize FIFOs
         nirio_status_chain(
@@ -187,6 +187,17 @@ public:
         }
     }
 
+    ~nirio_zero_copy_impl() {
+        //Reset DMA streams
+        nirio_status status = 0;
+        nirio_status_chain(
+            _reg_int.poke(PCIE_TX_DMA_REG(DMA_CTRL_STATUS_REG, _fifo_instance), DMA_CTRL_RESET),
+            status);
+        nirio_status_chain(
+            _reg_int.poke(PCIE_RX_DMA_REG(DMA_CTRL_STATUS_REG, _fifo_instance), DMA_CTRL_RESET),
+            status);
+    }
+
     /*******************************************************************
      * Receive implementation:
      * Block on the managed buffer's get call and advance the index.
@@ -213,6 +224,8 @@ public:
 
 private:
     //memory management -> buffers and fifos
+    nirio_interface::niriok_proxy& _reg_int;
+    uint32_t _fifo_instance;
     nirio_interface::nirio_fifo<fifo_data_t> _recv_fifo, _send_fifo;
     const size_t _recv_frame_size, _num_recv_frames;
     const size_t _send_frame_size, _num_send_frames;
