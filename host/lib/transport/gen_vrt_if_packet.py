@@ -352,7 +352,7 @@ void vrt::if_hdr_unpack_$(suffix)(
         vrt_hdr_word32 = chdr_to_vrt(chdr, if_packet_info);
         size_t packet_count = if_packet_info.packet_count;
         __if_hdr_unpack_$(suffix)(packet_buff, if_packet_info, vrt_hdr_word32);
-        if_packet_info.num_payload_bytes -= (chdr & 0xffff) % 4;
+        if_packet_info.num_payload_bytes -= (~chdr + 1) & 0x3;
         if_packet_info.packet_count = packet_count;
         break;
     }
