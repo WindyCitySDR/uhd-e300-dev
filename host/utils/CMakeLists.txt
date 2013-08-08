@@ -45,6 +45,7 @@ SET(niro_prog_sources nirio_programmer.cpp
     ../lib/transport/nirio/fpga_utils.cpp
     ../lib/transport/nirio/nirio_resource_manager.cpp
     ../lib/transport/nirio/NiFpga/NiFpga.c
+    ../lib/transport/nirio/NiFpga/niusrprio.c
 )
 ADD_EXECUTABLE(nirio_programmer ${niro_prog_sources})
 TARGET_LINK_LIBRARIES(nirio_programmer uhd)

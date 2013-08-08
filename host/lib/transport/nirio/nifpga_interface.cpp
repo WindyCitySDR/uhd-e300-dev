@@ -11,6 +11,7 @@
 #include <uhd/transport/nirio/status.h>
 #include <stdio.h>
 #include "NiFpga/NiFpga.h"
+#include "NiFpga/niusrprio.h"
 #include <boost/regex.hpp>
 #include <boost/lexical_cast.hpp>
 
@@ -33,12 +34,42 @@ nifpga_session::~nifpga_session()
 
 nirio_status nifpga_session::load_lib()
 {
-	return NiFpga_Initialize();
+    nirio_status status = NiRio_Status_Success;
+    nirio_status_chain(NiFpga_Initialize(), status);
+    nirio_status_chain(niusrprio_Initialize(), status);
+    return status;
 }
 
 nirio_status nifpga_session::unload_lib()
 {
-	return NiFpga_Finalize();
+    nirio_status status = NiRio_Status_Success;
+    nirio_status_chain(NiFpga_Finalize(), status);
+    nirio_status_chain(niusrprio_Finalize(), status);
+    return status;
+}
+
+nirio_status nifpga_session::enumerate(nirio_device_info_vtr& device_info_vtr)
+{
+    device_info_vtr.clear();
+    nirio_status status = NiRio_Status_Success;
+
+    uint64_t ndevs;
+    nirio_status_chain(niusrprio_getNumberOfDevices(&ndevs), status);
+    if (ndevs > 0) {
+        std::vector<uint32_t> nodes(ndevs);
+        std::vector<uint64_t> serials(ndevs);
+
+        nirio_status_chain(niusrprio_getDevicesInformation(ndevs, &nodes[0], &serials[0]), status);
+        for(size_t i = 0; i < ndevs && nirio_status_not_fatal(status); i++) {
+            nirio_device_info info = nirio_device_info();
+            info.interface_num = nodes[i];
+            info.resource_name = "RIO" + boost::lexical_cast<std::string>(nodes[i]);
+            info.serial_num = boost::lexical_cast<std::string>(serials[i]);
+            device_info_vtr.push_back(info);
+        }
+    }
+
+    return status;
 }
 
 nirio_status nifpga_session::open(

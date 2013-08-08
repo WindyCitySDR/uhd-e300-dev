@@ -103,25 +103,27 @@ static device_addrs_t b250_find_with_addr(const device_addr_t &hint)
 
 static device_addrs_t b250_find_pcie(const device_addr_t &hint)
 {
+    //@TODO: Remove this when we have the helper process
+    nirio_status_not_fatal(nifpga_session::load_lib());
+
+    nifpga_session::nirio_device_info_vtr dev_info_vtr;
+    nifpga_session::enumerate(dev_info_vtr);
+
     device_addrs_t addrs;
-    niriok_proxy_vtr dev_proxy_vtr;
-    //@TODO: This info should come from the interprocess helper.
-    niriok_proxy_factory::get_by_device_id(X300_PCIE_SSID, dev_proxy_vtr);
-    BOOST_FOREACH(niriok_proxy &dev_proxy, dev_proxy_vtr)
+    BOOST_FOREACH(nifpga_session::nirio_device_info &dev_info, dev_info_vtr)
     {
         device_addr_t new_addr;
         new_addr["type"] = "x300";
+        new_addr["resource"] = dev_info.resource_name;
 
-        //@TODO: Only one RIO device supported for now. Change this when we switch to enumerating
-        //       using the inter-process helper.
-        //new_addr["resource"] = boost::str(boost::format("RIO%u") % dev_proxy.get_interface_num());
-        new_addr["resource"] = "RIO0";
+        niriok_proxy kernel_proxy;
+        niriok_proxy_factory::get_by_interface_num(dev_info.interface_num, kernel_proxy);
 
         //Attempt to read the name from the EEPROM and perform filtering.
         //This operation can throw due to compatibility mismatch.
         try
         {
-            wb_iface::sptr zpu_ctrl(new b250_ctrl_iface_pcie(dev_proxy));
+            wb_iface::sptr zpu_ctrl(new b250_ctrl_iface_pcie(kernel_proxy));
             i2c_core_100_wb32::sptr zpu_i2c = i2c_core_100_wb32::make(zpu_ctrl, I2C1_BASE);
             i2c_iface::sptr eeprom16 = zpu_i2c->eeprom16();
             const mboard_eeprom_t mb_eeprom(*eeprom16, "X300");
@@ -135,6 +137,8 @@ static device_addrs_t b250_find_pcie(const device_addr_t &hint)
             new_addr["name"] = "";
             new_addr["serial"] = "";
         }
+        kernel_proxy.close();
+
         //filter the discovered device below by matching optional keys
         if (
             (not hint.has_key("resource") or hint["resource"] == new_addr["resource"]) and
@@ -143,7 +147,6 @@ static device_addrs_t b250_find_pcie(const device_addr_t &hint)
         ){
             addrs.push_back(new_addr);
         }
-        dev_proxy.close();
     }
     return addrs;
 }
@@ -241,7 +244,7 @@ b250_impl::b250_impl(const uhd::device_addr_t &dev_addr)
 
     if (_xport_path == "nirio") {
         //@TODO: Remove this when we have the helper process
-        UHD_MSG(status) << "Loading NiFpga lib...\n";
+        UHD_MSG(status) << "Loading NI shared libs...\n";
         nirio_status_not_fatal(nifpga_session::load_lib());
 
         UHD_MSG(status) << boost::format("Loading bitfile %s...\n") % nifpga_image::SIGNATURE;
