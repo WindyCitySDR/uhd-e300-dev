@@ -94,7 +94,9 @@ UHD_INLINE static boost::uint32_t chdr_to_vrt(const boost::uint32_t chdr, if_pac
 UHD_INLINE static boost::uint32_t vrt_to_chdr(const boost::uint32_t vrt, const if_packet_info_t &info)
 {
     const boost::uint32_t words32 = vrt & 0xffff;
-    boost::uint32_t chdr = (words32 * 4) + info.num_payload_bytes % 4;
+    int bytes_rem = info.num_payload_bytes % 4;
+    if (bytes_rem != 0) bytes_rem -= 4; //adjust for round up
+    boost::uint32_t chdr = (words32 * 4) + bytes_rem;
     chdr |= (info.packet_count & 0xfff) << 16;
     chdr |= ((vrt >> 30) & 0x1) << 31; //context packet
     chdr |= ((vrt >> 20) & 0x1) << 29; //has tsf
