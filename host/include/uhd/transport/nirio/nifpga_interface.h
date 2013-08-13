@@ -85,11 +85,24 @@ public:
 	    return _riok_proxy;
 	}
 
+    nirio_status download_bitstream_to_flash(const std::string& bitstream_path);
+
 	static const uint32_t OPEN_ATTR_SKIP_SIGNATURE_CHECK	= 1 << 31;
 	static const uint32_t OPEN_ATTR_FORCE_DOWNLOAD 			= 1 << 29;
 
 private:
 	void _init_fifo_info(nirio_interface::nirio_fifo_info_vtr& vtr);
+
+	static uint32_t _read_bitstream_from_file(
+        const std::string& filename,
+        boost::scoped_array<uint8_t>& buffer);
+
+    static inline uint8_t _reverse(uint8_t b) {
+       b = (b & 0xF0) >> 4 | (b & 0x0F) << 4;
+       b = (b & 0xCC) >> 2 | (b & 0x33) << 2;
+       b = (b & 0xAA) >> 1 | (b & 0x55) << 1;
+       return b;
+    }
 
 	uint32_t								_session;
 	std::string								_resource_name;

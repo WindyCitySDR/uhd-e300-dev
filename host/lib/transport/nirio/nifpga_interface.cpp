@@ -14,6 +14,7 @@
 #include "NiFpga/niusrprio.h"
 #include <boost/regex.hpp>
 #include <boost/lexical_cast.hpp>
+#include <fstream>
 
 #define REDOWNLOAD_IF_BIN_SIG_MISMATCH 1
 
@@ -137,6 +138,56 @@ nirio_status nifpga_session::reset()
 	nirio_status_chain(NiFpga_Reset(_session), status);
 	_lock.release();
 	return status;
+}
+
+nirio_status nifpga_session::download_bitstream_to_flash(const std::string& bitstream_path)
+{
+    boost::scoped_array<uint8_t> buffer;
+    uint32_t bytes_read = 0;
+    if (!bitstream_path.empty()) {
+        bytes_read = _read_bitstream_from_file(bitstream_path, buffer);
+        return NiRio_Status_CorruptBitfile;
+    }
+
+    //@TODO: HACK: The interface number should come from the closed source helper.
+    uint32_t interface_num = -1;
+    boost::smatch iface_match;
+    if (boost::regex_search(_resource_name, iface_match, boost::regex("RIO([0-9]*)")))
+    {
+        interface_num = boost::lexical_cast<uint32_t>(std::string(iface_match[1].first, iface_match[1].second));
+    }
+
+    nirio_status status = NiRio_Status_Success;
+    uint64_t usrprio_hdl;
+    nirio_status_chain(niusrprio_open(interface_num, &usrprio_hdl), status);
+    nirio_status_chain(niusrprio_downloadToFlash(usrprio_hdl, buffer.get(), bytes_read), status);
+    nirio_status_chain(niusrprio_close(usrprio_hdl), status);
+
+    return status;
+}
+
+uint32_t nifpga_session::_read_bitstream_from_file(
+    const std::string& filename,
+    boost::scoped_array<uint8_t>& buffer)
+{
+    using namespace std;
+
+    size_t file_size = 0;
+    ifstream file(filename.c_str(), ios::in|ios::binary|ios::ate);
+    if (file.is_open())
+    {
+        file_size = file.tellg();
+        buffer.reset(new uint8_t[file_size + 1]);
+
+        file.seekg(0, ios::beg);
+        file.read((char*)buffer.get(), file_size);
+        file.close();
+    }
+
+    for (size_t i = 0; i < file_size; i++)
+        buffer.get()[i] = _reverse(buffer.get()[i]);
+
+    return file_size;
 }
 
 template<>

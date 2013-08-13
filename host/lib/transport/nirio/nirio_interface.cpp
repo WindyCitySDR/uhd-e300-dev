@@ -289,44 +289,6 @@ namespace nirio_interface
 		return nirio_driver_iface::rio_munmap(map);
     }
 
-    nirio_status niriok_proxy::download_fpga(
-		tRioDeviceDownloadAttribute destination,
-		const uint8_t* const bitstream,
-		const uint32_t size)
-	{
-		if (size > UNCOMPRESSED_FPGA_IMAGE_SIZE) return NiRio_Status_IncompatibleBitfile;
-
-		nNIRIOSRV200::tRioDeviceSocketInputParameters in = {};
-		nNIRIOSRV200::tRioDeviceSocketOutputParameters out = {};
-
-		uint8_t* temp_bitstream = NULL;
-    	if (bitstream != NULL && destination == kRioDeviceDownloadAttributeDestinationFlash) {
-			temp_bitstream = new uint8_t[UNCOMPRESSED_FPGA_IMAGE_SIZE];
-			for (uint32_t i = 0; i < size; i++)
-				temp_bitstream[i] =  _reverse(bitstream[i]);
-			for (uint32_t i = size; i < UNCOMPRESSED_FPGA_IMAGE_SIZE; i++)
-				temp_bitstream[i] = 0;
-
-    		nNIRIOSRV200::initRioDeviceSocketInputParameters(in, temp_bitstream, size);
-    	} else {
-    		nNIRIOSRV200::initRioDeviceSocketInputParameters(in, bitstream, size);
-    	}
-
-		in.function = nNIRIOSRV200::nRioFunction::kDownload;
-		in.params.download.attribute = destination;
-
-		nirio_status status = sync_operation(&in, sizeof(in), &out, sizeof(out));
-		delete[] temp_bitstream;
-		return status;
-	}
-
-    uint8_t niriok_proxy::_reverse(uint8_t b) {
-       b = (b & 0xF0) >> 4 | (b & 0x0F) << 4;
-       b = (b & 0xCC) >> 2 | (b & 0x33) << 2;
-       b = (b & 0xAA) >> 1 | (b & 0x55) << 1;
-       return b;
-    }
-
     //-------------------------------------------------------
 	// niriok_proxy_factory
 	//-------------------------------------------------------

@@ -1,7 +1,6 @@
 
 #include <uhd/transport/nirio/nirio_interface.h>
 #include <uhd/transport/nirio/nifpga_interface.h>
-#include <uhd/transport/nirio/fpga_utils.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <fcntl.h>
@@ -18,19 +17,15 @@ int main(int argc, char *argv[])
 
     //Setup the program options
     uint32_t interface_num, peek_addr, poke_addr, poke_data;
-    int32_t load_mode;
-    std::string fpga_bin_path, fpga_lvbitx_path, flash_path, peek_tokens_str, poke_tokens_str;
+    std::string fpga_lvbitx_path, flash_path, peek_tokens_str, poke_tokens_str;
 
     namespace po = boost::program_options;
     po::options_description desc("Allowed options");
     desc.add_options()
         ("help", "help message")
         ("interface", po::value<uint32_t>(&interface_num)->default_value(0), "The interface number to communicate with.")
-        ("fpga-lvbitx", po::value<std::string>(&fpga_lvbitx_path)->default_value(""), "The path to the LVBITX file to download to the FPGA.")
-        ("fpga-bin", po::value<std::string>(&fpga_bin_path)->default_value(""), "The path to the BIN file to download to the FPGA.")
-        ("auto-load", po::value<int32_t>(&load_mode)->default_value(-1), "The auto-load-mode value to write to flash. {0=None, 1=AnyReset, 2=PowerOnReset}")
+        ("fpga", po::value<std::string>(&fpga_lvbitx_path)->default_value(""), "The path to the LVBITX file to download to the FPGA.")
         ("flash", po::value<std::string>(&flash_path)->default_value(""), "The path to the image to download to the flash OR 'erase' to erase the FPGA image from flash.")
-        ("start-fly-by", "Start fly-by FPGA configuration from flash.")
         ("en-fpga-master", "Allow FPGA to master the Chinch in the packet network.")
         ("peek", po::value<std::string>(&peek_tokens_str)->default_value(""), "Peek32.")
         ("poke", po::value<std::string>(&poke_tokens_str)->default_value(""), "Poke32.")
@@ -57,6 +52,20 @@ int main(int argc, char *argv[])
                 nifpga_interface::nifpga_session::OPEN_ATTR_FORCE_DOWNLOAD;
         nifpga_interface::nifpga_session fpga_session(resource_name);
         nirio_status_chain(fpga_session.open(fpga_lvbitx_path, NULL, attributes), status);
+        //Download BIN to flash or erase
+        if (flash_path != "erase") {
+            if (flash_path != "") {
+                printf("Writing FPGA image %s to flash...", flash_path.c_str());
+                fflush(stdout);
+                nirio_status_chain(fpga_session.download_bitstream_to_flash(flash_path), status);
+                printf("DONE\n");
+            }
+        } else {
+            printf("Erasing FPGA image from flash...");
+            fflush(stdout);
+            nirio_status_chain(fpga_session.download_bitstream_to_flash(""), status);
+            printf("DONE\n");
+        }
         fpga_session.close();
         nifpga_interface::nifpga_session::unload_lib();
         printf("DONE\n");
@@ -67,49 +76,6 @@ int main(int argc, char *argv[])
     if (nirio_status_fatal(niriok_proxy_factory::get_by_interface_num(interface_num, dev_proxy))) {
         printf("ERROR: Could not open a proxy to interface %u. If it exists, try downloading an LVBITX to the FPGA first.\n", interface_num);
         exit(EXIT_FAILURE);
-    }
-
-//    //Write kBoardFlashAutoLoadMode
-//    if (load_mode >= 0 && load_mode <= 2) {
-//        printf("Writing BoardFlashAutoLoadMode = %u...", load_mode);
-//        fflush(stdout);
-//        uint32_t attr_val;
-//        nirio_status_chain(dev_proxy.set_attribute(kBoardFlashAutoLoadMode, load_mode), status);
-//        nirio_status_chain(dev_proxy.get_attribute(kBoardFlashAutoLoadMode, attr_val), status);
-//        printf("%s\n", (load_mode==attr_val?"DONE":"ERROR!"));
-//    }
-
-    boost::scoped_array<uint8_t> fpga_buffer, flash_buffer;
-
-    //Download BIN to FPGA
-    if (fpga_bin_path != "") {
-        printf("Loading image %s to FPGA...", fpga_bin_path.c_str());
-        fflush(stdout);
-        nirio_status_chain(fpga_utils::download_fpga(dev_proxy, fpga_utils::PROGRAM_FPGA, fpga_bin_path), status);
-        printf("DONE\n");
-    }
-
-    //Download BIN to flash or erase
-    if (flash_path != "erase") {
-        if (flash_path != "") {
-            printf("Writing FPGA image %s to flash...", flash_path.c_str());
-            fflush(stdout);
-            nirio_status_chain(fpga_utils::download_fpga(dev_proxy, fpga_utils::DOWNLOAD_TO_FLASH, flash_path), status);
-            printf("DONE\n");
-        }
-    } else {
-        printf("Erasing FPGA image from flash...");
-        fflush(stdout);
-        nirio_status_chain(fpga_utils::erase_fpga_from_flash(dev_proxy), status);
-        printf("DONE\n");
-    }
-
-    //Start fly-by configuration
-    if (vm.count("start-fly-by")){
-        printf("Starting fly-by FPGA configuration from flash...");
-        fflush(stdout);
-        nirio_status_chain(fpga_utils::configure_fpga_from_flash(dev_proxy), status);
-        printf("DONE\n");
     }
 
     //Handle FPGA master mode
@@ -200,9 +166,6 @@ int main(int argc, char *argv[])
         nirio_status_chain(dev_proxy.set_attribute(kRioAddressSpace, kRioAddressSpaceFpga), status);
         nirio_status_chain(dev_proxy.peek(0, reg_val), status);
         printf("* PCIe FPGA Signature = %x\n", reg_val);
-
-//      nirio_status_chain(dev_proxy.get_attribute(kBoardFlashAutoLoadMode, attr_val), status);
-//      printf("* Board Flash Auto Load Mode = %u {0=None, 1=AnyReset, 2=PowerOnReset}\n", attr_val);
 
         printf("\n[DMA Stream Status]\n");
 
