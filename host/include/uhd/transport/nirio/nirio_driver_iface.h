@@ -18,6 +18,7 @@
 #include <sys/mman.h>
 #include <errno.h>
 #include <uhd/transport/nirio/status.h>
+#include <uhd/config.hpp>
 
 typedef int32_t tRioStatusCode;
 
@@ -457,72 +458,95 @@ static inline void initRioDeviceSocketOutputParameters(tRioDeviceSocketOutputPar
 } // namespace nNIRIOSRV200
 
 
-namespace nirio_transport {
+namespace nirio_driver_iface {
 
-struct rio_memory_map {
-	rio_memory_map() : addr(NULL), size(0) {}
-    void *addr;
-    size_t size;
+//Device handle definition
+#if defined(UHD_PLATFORM_LINUX)
+    typedef int rio_dev_handle_t;
+#elif defined(UHD_PLATFORM_WIN32)
+    typedef HANDLE rio_dev_handle_t;
+#elif defined(UHD_PLATFORM_MACOS)
+    typedef io_connect_t rio_dev_handle_t;
+#else
+    #error OS not supported by nirio_driver_iface.
+#endif
+static const rio_dev_handle_t INVALID_RIO_HANDLE = -1;
 
-    bool is_null() { return size == 0; }
-};
+//Memory mapping container definition
+#if defined(UHD_PLATFORM_LINUX)
+    struct rio_mmap_t {
+        rio_mmap_t() : addr(NULL), size(0) {}
+        void *addr;
+        size_t size;
 
-inline static nirio_status rio_ioctl(
-	int device_handle,
-	uint32_t ioctl_code,
-	const void *write_buf,
-	size_t write_buf_len,
-	void *read_buf,
-	size_t read_buf_len)
-{
-	nNIRIOSRV200::tRioIoctlBlock ioctl_block = {0,0,0,0,0,0};
+        bool is_null() { return (size == 0 || addr == NULL); }
+    };
+#elif defined(UHD_PLATFORM_WIN32)
+    struct rio_mmap_params_t
+    {
+       uint64_t mappedVaPtr;
+       uint64_t mapReadyEventHandle;
+       uint32_t size;
+       uint16_t memoryType;
+       uint8_t  accessMode;
+    };
 
-	// two-casts necessary to prevent pointer sign-extension
-	ioctl_block.inBuf        = static_cast<uint64_t>(reinterpret_cast<uintptr_t>(write_buf));
-	ioctl_block.inBufLength  = write_buf_len;
-	ioctl_block.outBuf       = static_cast<uint64_t>(reinterpret_cast<uintptr_t>(read_buf));
-	ioctl_block.outBufLength = read_buf_len;
+    struct rio_mmap_threadargs_t
+    {
+        rio_dev_handle_t device_handle;
+        rio_mmap_params_t params;
+        nirio_status status;
+    };
 
-	return ::ioctl(device_handle, ioctl_code, &ioctl_block);
-}
+    struct rio_mmap_t
+    {
+        rio_mmap_t() : addr(NULL) {}
+        void *addr;
+        HANDLE map_thread_handle;
+        rio_mmap_threadargs_t map_thread_args;
 
-inline static nirio_status rio_mmap(
-	int device_handle,
-	uint16_t memory_type,
-	size_t size,
-	int access_mode,
-	rio_memory_map &map)
-{
-	if (access_mode == PROT_WRITE) access_mode |= PROT_READ;	//Write-only mode not supported
-	map.addr = ::mmap(NULL, size, access_mode, MAP_SHARED, device_handle, (off_t) memory_type * sysconf(_SC_PAGESIZE));
-	map.size = size;
+        bool is_null() { return addr == NULL; }
+    private:
+        rio_mmap_t &operator=(const rio_mmap_t &);
+    };
+#elif defined(UHD_PLATFORM_MACOS)
+     struct rio_mmap_t {
+         rio_mmap_t() : addr(NULL) {}
+         void *addr;
 
-	if (map.addr == MAP_FAILED)	{
-		map.addr = NULL;
-		map.size = 0;
-		if (errno == EINVAL)
-		    return NiRio_Status_InvalidParameter;
-		else if (errno == ENOMEM)
-		    return NiRio_Status_MemoryFull;
-		else
-		    return NiRio_Status_SoftwareFault;
-	}
-	return 0;
-}
+         bool is_null() { return addr == NULL; }
+     };
+#else
+    #error OS not supported by nirio_driver_iface.
+#endif
 
-inline static nirio_status rio_munmap(
-	rio_memory_map &map)
-{
-	nirio_status status = 0;
-	if (map.addr != NULL) {
-		status = ::munmap(map.addr, map.size);
+    nirio_status rio_open(
+        const char* device_path,
+        rio_dev_handle_t& device_handle);
 
-		map.addr = NULL;
-		map.size = 0;
-	}
-	return status;
-}
+    void rio_close(
+        rio_dev_handle_t& device_handle);
 
+    bool rio_isopen(
+        rio_dev_handle_t device_handle);
+
+    nirio_status rio_ioctl(
+        rio_dev_handle_t device_handle,
+        uint32_t ioctl_code,
+        const void *write_buf,
+        size_t write_buf_len,
+        void *read_buf,
+        size_t read_buf_len);
+
+    nirio_status rio_mmap(
+        rio_dev_handle_t device_handle,
+        uint16_t memory_type,
+        size_t size,
+        int access_mode,
+        rio_mmap_t &map);
+
+    nirio_status rio_munmap(
+        rio_mmap_t &map);
 }
 
 #endif

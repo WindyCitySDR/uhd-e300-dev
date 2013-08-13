@@ -10,7 +10,7 @@
 #define NIRIO_INTERFACE_H_
 
 #include <uhd/transport/nirio/RioConstants.h>
-#include <uhd/transport/nirio/nirio_transport.h>
+#include <uhd/transport/nirio/nirio_driver_iface.h>
 #include <boost/smart_ptr.hpp>
 #include <cstring>
 #include <glob.h>
@@ -30,7 +30,6 @@ namespace nirio_interface
     	//File operations
     	nirio_status open(const char* filename);
         void close(void);
-        bool is_open(void) const;
 
         nirio_status reset();
 
@@ -80,10 +79,10 @@ namespace nirio_interface
         nirio_status map_fifo_memory(
         	uint32_t fifo_instance,
         	size_t size,
-        	nirio_transport::rio_memory_map& map);
+        	nirio_driver_iface::rio_mmap_t& map);
 
         nirio_status unmap_fifo_memory(
-        	nirio_transport::rio_memory_map& map);
+        	nirio_driver_iface::rio_mmap_t& map);
 
         nirio_status download_fpga(
     		tRioDeviceDownloadAttribute destination,
@@ -97,8 +96,8 @@ namespace nirio_interface
     private:	//Members
         static uint8_t _reverse(uint8_t b);
 
-        int			_device_handle;
-        uint32_t 	_interface_num;
+        nirio_driver_iface::rio_dev_handle_t    _device_handle;
+        uint32_t 	                            _interface_num;
     };
 
     typedef std::vector<niriok_proxy> niriok_proxy_vtr;

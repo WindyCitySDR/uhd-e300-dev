@@ -97,7 +97,7 @@ private:	//Members
 	uint32_t							_fifo_channel;
 	datatype_info_t						_datatype_info;
     size_t                              _acquired_pending;
-	nirio_transport::rio_memory_map		_mem_map;
+	nirio_driver_iface::rio_mmap_t		_mem_map;
 	nirio_fifo_lock						_lock;
 
 	niriok_proxy* 						_riok_proxy_ptr;

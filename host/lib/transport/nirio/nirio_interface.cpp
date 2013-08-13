@@ -8,11 +8,8 @@
 #include <uhd/transport/nirio/nirio_interface.h>
 #include <stdio.h>
 #include <errno.h>
-#include <fcntl.h>
-#include <unistd.h>
 
 #define PATH_MAX 		4096
-#define NI_PROC_ROOT 	"/proc/driver/ni/"
 #define NI_VENDOR_NUM 	0x1093
 
 #define VERSION_BUILD_SHIFT		0
@@ -35,8 +32,7 @@ namespace nirio_interface
 	//-------------------------------------------------------
 	// niriok_proxy
 	//-------------------------------------------------------
-	niriok_proxy::niriok_proxy():
-			_device_handle(-1)
+	niriok_proxy::niriok_proxy(): _device_handle(nirio_driver_iface::INVALID_RIO_HANDLE)
 	{
 	}
 
@@ -46,43 +42,37 @@ namespace nirio_interface
 
 	nirio_status niriok_proxy::open(const char* filename)
     {
-		if(!is_open()) close();
-		_device_handle = ::open(filename, O_RDWR | O_CLOEXEC);
+        nirio_status status = NiRio_Status_Success;
 
-		if (_device_handle < 0) return _device_handle;
+        //close if already open.
+        close();
 
-		nirio_status status = NiRio_Status_Success;
-		nirio_status_chain(nirio_transport::rio_ioctl(_device_handle,
-									nNIRIOSRV200::kRioIoctlPostOpen,
-									NULL, 0, NULL, 0), status);
+        nirio_status_chain(nirio_driver_iface::rio_open(
+            filename, _device_handle), status);
+        if (nirio_status_not_fatal(status)) {
+            nirio_status_chain(nirio_driver_iface::rio_ioctl(_device_handle,
+                                        nNIRIOSRV200::kRioIoctlPostOpen,
+                                        NULL, 0, NULL, 0), status);
+            nNIRIOSRV200::tIoctlPacketOut out(&_interface_num, sizeof(_interface_num), 0);
+            nirio_status_chain(nirio_driver_iface::rio_ioctl(_device_handle,
+                                        nNIRIOSRV200::kRioIoctlGetInterfaceNumber,
+                                        NULL, 0,
+                                        &out, sizeof(out)), status);
 
-		nNIRIOSRV200::tIoctlPacketOut out(&_interface_num, sizeof(_interface_num), 0);
-		nirio_status_chain(nirio_transport::rio_ioctl(_device_handle,
-									nNIRIOSRV200::kRioIoctlGetInterfaceNumber,
-									NULL, 0,
-									&out, sizeof(out)), status);
-
-		if (nirio_status_fatal(status)) close();
-
+            if (nirio_status_fatal(status)) close();
+        }
 		return status;
     }
 
     void niriok_proxy::close(void)
     {
-       if(is_open())
+       if(nirio_driver_iface::rio_isopen(_device_handle))
        {
-			nirio_transport::rio_ioctl(
+			nirio_driver_iface::rio_ioctl(
 				_device_handle, nNIRIOSRV200::kRioIoctlPreClose, NULL, 0, NULL, 0);
-
-			::close(_device_handle);
-			_device_handle = -1;
+            nirio_driver_iface::rio_close(_device_handle);
        }
     }
-
-    bool niriok_proxy::is_open() const
-	{
-    	return (_device_handle >= 0);
-	}
 
     nirio_status niriok_proxy::reset()
     {
@@ -98,7 +88,7 @@ namespace nirio_interface
 		uint32_t& session)
 	{
 		nNIRIOSRV200::tIoctlPacketOut out(&session, sizeof(session), 0);
-		return nirio_transport::rio_ioctl(_device_handle,
+		return nirio_driver_iface::rio_ioctl(_device_handle,
 									nNIRIOSRV200::kRioIoctlGetSession,
 									NULL, 0,
 									&out, sizeof(out));
@@ -139,7 +129,7 @@ namespace nirio_interface
 		size_t readBufferLength)
 	{
 		nNIRIOSRV200::tIoctlPacketOut out(readBuffer, readBufferLength, 0);
-		nirio_status ioctl_status = nirio_transport::rio_ioctl(_device_handle,
+		nirio_status ioctl_status = nirio_driver_iface::rio_ioctl(_device_handle,
 									nNIRIOSRV200::kRioIoctlSyncOp,
 									writeBuffer, writeBufferLength,
 									&out, sizeof(out));
@@ -286,17 +276,17 @@ namespace nirio_interface
     nirio_status niriok_proxy::map_fifo_memory(
     	uint32_t fifo_instance,
     	size_t size,
-    	nirio_transport::rio_memory_map& map)
+    	nirio_driver_iface::rio_mmap_t& map)
     {
-		return nirio_transport::rio_mmap(_device_handle,
+		return nirio_driver_iface::rio_mmap(_device_handle,
 				GET_FIFO_MEMORY_TYPE(fifo_instance),
 				size, PROT_WRITE, map);
     }
 
     nirio_status niriok_proxy::unmap_fifo_memory(
-    	nirio_transport::rio_memory_map& map)
+    	nirio_driver_iface::rio_mmap_t& map)
     {
-		return nirio_transport::rio_munmap(map);
+		return nirio_driver_iface::rio_munmap(map);
     }
 
     nirio_status niriok_proxy::download_fpga(
@@ -355,45 +345,6 @@ namespace nirio_interface
 		return _get_proxy_vtr(device_id, _filter_by_device_id, proxy_vtr);
 	}
 
-    nirio_status niriok_proxy_factory::_get_proxy_vtr(
-		uint32_t filter_value,
-		bool (*filter)(niriok_proxy& proxy, uint32_t filter_value),
-		niriok_proxy_vtr& proxy_vtr)
-	{
-		//Clear any incoming proxies
-		proxy_vtr.clear();
-
-        glob_t glob_instance;
-        nirio_status status = glob(NI_PROC_ROOT "*/deviceInterfaces/nirio_transport\\\\*", GLOB_ONLYDIR, NULL, &glob_instance);
-
-        if (nirio_status_fatal(status) || status == GLOB_NOMATCH) return status;
-
-        for (size_t i = 0; i < glob_instance.gl_pathc; i++) {
-        	char* current_path = glob_instance.gl_pathv[i];
-
-        	char path[PATH_MAX];
-        	snprintf(path, sizeof(path), "%s/interfacePath", current_path);
-
-			FILE* prop_file_ptr = fopen(path, "r");
-			if (prop_file_ptr == NULL) return -EIO;
-			char file_buffer[4096];
-			size_t num_read = fread(file_buffer, 1 /* size of element */, sizeof(file_buffer), prop_file_ptr);
-			fclose(prop_file_ptr);
-
-			niriok_proxy temp_proxy;
-			status = temp_proxy.open(file_buffer);
-
-	        if (nirio_status_fatal(status) && num_read > 0) return status;
-
-	        if (filter(temp_proxy, filter_value)) {
-	        	proxy_vtr.push_back(temp_proxy);
-	        } else {
-	        	temp_proxy.close();
-	        }
-        }
-        return status;
-	}
-
 	bool niriok_proxy_factory::_filter_by_interface_num(
 		niriok_proxy& proxy,
 		uint32_t filter_value)
@@ -415,5 +366,58 @@ namespace nirio_interface
 
         return (nirio_status_not_fatal(status) && prod_num == filter_value && ven_num == NI_VENDOR_NUM);
 	}
+
+#if defined(UHD_PLATFORM_LINUX)
+    nirio_status niriok_proxy_factory::_get_proxy_vtr(
+        uint32_t filter_value,
+        bool (*filter)(niriok_proxy& proxy, uint32_t filter_value),
+        niriok_proxy_vtr& proxy_vtr)
+    {
+        //Clear any incoming proxies
+        proxy_vtr.clear();
+
+        glob_t glob_instance;
+        nirio_status status = glob("/proc/driver/ni/*/deviceInterfaces/nirio_transport\\\\*", GLOB_ONLYDIR, NULL, &glob_instance);
+
+        if (nirio_status_fatal(status) || status == GLOB_NOMATCH) return status;
+
+        for (size_t i = 0; i < glob_instance.gl_pathc; i++) {
+            char* current_path = glob_instance.gl_pathv[i];
+
+            char path[PATH_MAX];
+            snprintf(path, sizeof(path), "%s/interfacePath", current_path);
+
+            FILE* prop_file_ptr = fopen(path, "r");
+            if (prop_file_ptr == NULL) return -EIO;
+            char file_buffer[4096];
+            size_t num_read = fread(file_buffer, 1 /* size of element */, sizeof(file_buffer), prop_file_ptr);
+            fclose(prop_file_ptr);
+
+            niriok_proxy temp_proxy;
+            status = temp_proxy.open(file_buffer);
+
+            if (nirio_status_fatal(status) && num_read > 0) return status;
+
+            if (filter(temp_proxy, filter_value)) {
+                proxy_vtr.push_back(temp_proxy);
+            } else {
+                temp_proxy.close();
+            }
+        }
+        return status;
+    }
+#elif defined(UHD_PLATFORM_WIN32)
+    nirio_status niriok_proxy_factory::_get_proxy_vtr(
+        uint32_t filter_value,
+        bool (*filter)(niriok_proxy& proxy, uint32_t filter_value),
+        niriok_proxy_vtr& proxy_vtr)
+    {
+        //@TODO: Implement me!
+        return -1;
+    }
+#else
+    #error OS not supported by niriok_proxy_factory::_get_proxy_vtr.
+#endif
+
 }
 #pragma GCC diagnostic pop

@@ -44,9 +44,16 @@ SET(niro_prog_sources nirio_programmer.cpp
     ../lib/transport/nirio/nirio_interface.cpp
     ../lib/transport/nirio/fpga_utils.cpp
     ../lib/transport/nirio/nirio_resource_manager.cpp
+    ../lib/transport/nirio/nirio_driver_iface_linux.cpp
     ../lib/transport/nirio/NiFpga/NiFpga.c
     ../lib/transport/nirio/NiFpga/niusrprio.c
 )
+IF(WIN32)
+    LIST(APPEND niro_prog_sources ../lib/transport/nirio/nirio_driver_iface_win.cpp)
+ELSE()
+    LIST(APPEND niro_prog_sources ../lib/transport/nirio/nirio_driver_iface_linux.cpp)
+ENDIF()
+
 ADD_EXECUTABLE(nirio_programmer ${niro_prog_sources})
 TARGET_LINK_LIBRARIES(nirio_programmer uhd)
 

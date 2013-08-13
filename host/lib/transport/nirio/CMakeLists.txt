@@ -31,3 +31,9 @@ LIBUHD_APPEND_SOURCES(
     ${CMAKE_CURRENT_SOURCE_DIR}/NiFpga/NiFpga.c
     ${CMAKE_CURRENT_SOURCE_DIR}/NiFpga/niusrprio.c
 )
+
+IF(WIN32)
+    LIBUHD_APPEND_SOURCES(${CMAKE_CURRENT_SOURCE_DIR}/nirio_driver_iface_win.cpp)
+ELSE()
+    LIBUHD_APPEND_SOURCES(${CMAKE_CURRENT_SOURCE_DIR}/nirio_driver_iface_linux.cpp)
+ENDIF()
