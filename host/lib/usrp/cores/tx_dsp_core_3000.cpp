@@ -163,7 +163,7 @@ public:
             _dsp_extra_scaling = 1.0/peak;
         }
         else if (stream_args.otw_format == "fc32"){
-            _host_extra_scaling = double(1 << 15);
+            _host_extra_scaling = 1.0;
             _dsp_extra_scaling = 1.0;
         }
         else throw uhd::value_error("USRP TX cannot handle requested wire format: " + stream_args.otw_format);
