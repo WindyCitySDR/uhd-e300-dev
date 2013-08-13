@@ -13,7 +13,6 @@
 #include <uhd/transport/nirio/nirio_driver_iface.h>
 #include <boost/smart_ptr.hpp>
 #include <cstring>
-#include <glob.h>
 #include <vector>
 
 namespace nirio_interface

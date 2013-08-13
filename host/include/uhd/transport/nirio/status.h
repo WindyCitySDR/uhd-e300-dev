@@ -8,8 +8,6 @@
 #ifndef STATUS_H_
 #define STATUS_H_
 
-#include <unistd.h>
-
 #define ENABLE_EXTENDED_ERROR_INFO false
 
 typedef int32_t nirio_status;

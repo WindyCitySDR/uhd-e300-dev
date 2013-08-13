@@ -3,8 +3,14 @@
 #define LOCKS_H_
 
 #include <uhd/transport/nirio/status.h>
-#include <boost/thread/pthread/recursive_mutex.hpp>
-#include <unistd.h>
+#include <boost/thread/recursive_mutex.hpp>
+#if defined(UHD_PLATFORM_LINUX)
+    #include <unistd.h>
+#elif defined(UHD_PLATFORM_WIN32)
+    #include <Windows.h>
+#else
+    #error OS not supported by locks.h
+#endif
 
 namespace nifpga_interface
 {
@@ -17,7 +23,11 @@ public:
 
 	void initialize(uint32_t session) {
 		_session = session;
-		_pid = getpid();
+#if defined(UHD_PLATFORM_LINUX)
+        _pid = getpid();
+#elif defined(UHD_PLATFORM_WIN32)
+        _pid = GetCurrentProcessId();
+#endif
 	}
 
 	nirio_status acquire(uint32_t timeout) {
@@ -34,7 +44,7 @@ public:
 
 private:
 	uint32_t 	            _session;
-	pid_t 		            _pid;
+	int 		            _pid;
     boost::recursive_mutex  _mutex;
 };
 

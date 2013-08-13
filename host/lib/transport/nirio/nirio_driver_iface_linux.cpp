@@ -3,6 +3,8 @@
 #include <errno.h>
 #include <fcntl.h>
 #include <unistd.h>
+#include <sys/ioctl.h>
+#include <sys/mman.h>
 
 namespace nirio_driver_iface {
 
@@ -48,10 +50,11 @@ nirio_status rio_mmap(
     rio_dev_handle_t device_handle,
 	uint16_t memory_type,
 	size_t size,
-	int access_mode,
+	bool writable,
 	rio_mmap_t &map)
 {
-	if (access_mode == PROT_WRITE) access_mode |= PROT_READ;	//Write-only mode not supported
+    int access_mode = PROT_READ;    //Write-only mode not supported
+	if (writable) access_mode |= PROT_WRITE;
 	map.addr = ::mmap(NULL, size, access_mode, MAP_SHARED, device_handle, (off_t) memory_type * sysconf(_SC_PAGESIZE));
 	map.size = size;
 

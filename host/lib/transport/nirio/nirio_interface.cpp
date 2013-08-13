@@ -280,7 +280,7 @@ namespace nirio_interface
     {
 		return nirio_driver_iface::rio_mmap(_device_handle,
 				GET_FIFO_MEMORY_TYPE(fifo_instance),
-				size, PROT_WRITE, map);
+				size, true, map);
     }
 
     nirio_status niriok_proxy::unmap_fifo_memory(
@@ -330,7 +330,9 @@ namespace nirio_interface
 	}
 
 #if defined(UHD_PLATFORM_LINUX)
-    nirio_status niriok_proxy_factory::_get_proxy_vtr(
+    #include <glob.h>
+
+	nirio_status niriok_proxy_factory::_get_proxy_vtr(
         uint32_t filter_value,
         bool (*filter)(niriok_proxy& proxy, uint32_t filter_value),
         niriok_proxy_vtr& proxy_vtr)

@@ -13,13 +13,11 @@
 
 #include <stddef.h>
 #include <stdint.h>
-#include <unistd.h>
-#include <sys/ioctl.h>
-#include <sys/mman.h>
-#include <errno.h>
 #include <uhd/transport/nirio/status.h>
 #include <uhd/config.hpp>
-
+#if defined(UHD_PLATFORM_WIN32)
+#include <Windows.h>
+#endif
 typedef int32_t tRioStatusCode;
 
 namespace nNIRIOSRV200
@@ -470,7 +468,7 @@ namespace nirio_driver_iface {
 #else
     #error OS not supported by nirio_driver_iface.
 #endif
-static const rio_dev_handle_t INVALID_RIO_HANDLE = -1;
+static const rio_dev_handle_t INVALID_RIO_HANDLE = ((rio_dev_handle_t)-1);
 
 //Memory mapping container definition
 #if defined(UHD_PLATFORM_LINUX)
@@ -506,8 +504,10 @@ static const rio_dev_handle_t INVALID_RIO_HANDLE = -1;
         rio_mmap_threadargs_t map_thread_args;
 
         bool is_null() { return addr == NULL; }
-    private:
-        rio_mmap_t &operator=(const rio_mmap_t &);
+
+//@TODO: Fix this
+//    private:
+//        rio_mmap_t &operator=(const rio_mmap_t &);
     };
 #elif defined(UHD_PLATFORM_MACOS)
      struct rio_mmap_t {
@@ -542,7 +542,7 @@ static const rio_dev_handle_t INVALID_RIO_HANDLE = -1;
         rio_dev_handle_t device_handle,
         uint16_t memory_type,
         size_t size,
-        int access_mode,
+        bool writable,
         rio_mmap_t &map);
 
     nirio_status rio_munmap(
