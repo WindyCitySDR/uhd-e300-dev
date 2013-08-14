@@ -23,9 +23,10 @@ public:
     typedef boost::shared_ptr<nifpga_session> sptr;
 
     struct nirio_device_info {
-        uint32_t interface_num;
+        uint32_t    interface_num;
         std::string resource_name;
         std::string serial_num;
+        std::string interface_path;
     };
     typedef std::vector<nirio_device_info> nirio_device_info_vtr;
 

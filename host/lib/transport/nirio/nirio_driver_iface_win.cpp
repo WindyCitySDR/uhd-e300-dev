@@ -7,10 +7,10 @@
 namespace nirio_driver_iface {
 
 nirio_status rio_open(
-    const char* device_path,
+    const std::string& device_path,
     rio_dev_handle_t& device_handle)
 {
-    device_handle = CreateFileA(device_path, GENERIC_READ | GENERIC_WRITE,
+    device_handle = CreateFileA(device_path.c_str(), GENERIC_READ | GENERIC_WRITE,
                                 FILE_SHARE_READ | FILE_SHARE_WRITE, NULL,  /* default security */
                                 OPEN_EXISTING, FILE_FLAG_OVERLAPPED, NULL /* template file */);
 

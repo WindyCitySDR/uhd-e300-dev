@@ -117,8 +117,7 @@ static device_addrs_t b250_find_pcie(const device_addr_t &hint)
         new_addr["resource"] = dev_info.resource_name;
 
         niriok_proxy kernel_proxy;
-        niriok_proxy_factory::get_by_interface_num(dev_info.interface_num, kernel_proxy);
-
+        kernel_proxy.open(dev_info.interface_path);
         //Attempt to read the name from the EEPROM and perform filtering.
         //This operation can throw due to compatibility mismatch.
         try

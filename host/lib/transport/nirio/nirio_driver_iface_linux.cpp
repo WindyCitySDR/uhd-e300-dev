@@ -9,10 +9,10 @@
 namespace nirio_driver_iface {
 
 nirio_status rio_open(
-    const char* device_path,
+    const std::string& device_path,
     rio_dev_handle_t& device_handle)
 {
-    device_handle = ::open(device_path, O_RDWR | O_CLOEXEC);
+    device_handle = ::open(device_path.c_str(), O_RDWR | O_CLOEXEC);
     return (device_handle < 0) ? NiRio_Status_InvalidParameter : NiRio_Status_Success;
 }
 

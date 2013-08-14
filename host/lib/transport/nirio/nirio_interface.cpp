@@ -43,7 +43,7 @@ namespace nirio_interface
 	{
 	}
 
-	nirio_status niriok_proxy::open(const char* filename)
+	nirio_status niriok_proxy::open(const std::string& interface_path)
     {
         nirio_status status = NiRio_Status_Success;
 
@@ -51,7 +51,7 @@ namespace nirio_interface
         close();
 
         nirio_status_chain(nirio_driver_iface::rio_open(
-            filename, _device_handle), status);
+            interface_path, _device_handle), status);
         if (nirio_status_not_fatal(status)) {
             nirio_status_chain(nirio_driver_iface::rio_ioctl(_device_handle,
                                         nNIRIOSRV200::kRioIoctlPostOpen,
@@ -292,70 +292,27 @@ namespace nirio_interface
 		return nirio_driver_iface::rio_munmap(map);
     }
 
-    //-------------------------------------------------------
-	// niriok_proxy_factory
-	//-------------------------------------------------------
-    nirio_status niriok_proxy_factory::get_by_interface_num(uint32_t interface_num, niriok_proxy& proxy)
-	{
-		niriok_proxy_vtr proxy_vtr;
-		nirio_status status = _get_proxy_vtr(interface_num, _filter_by_interface_num, proxy_vtr);
-		if (proxy_vtr.empty()) return -1;	//@TODO: Figure out error code.
-
-		proxy = proxy_vtr.front();
-		return status;
-	}
-
-    nirio_status niriok_proxy_factory::get_by_device_id(uint32_t device_id, niriok_proxy_vtr& proxy_vtr)
-	{
-		return _get_proxy_vtr(device_id, _filter_by_device_id, proxy_vtr);
-	}
-
-	bool niriok_proxy_factory::_filter_by_interface_num(
-		niriok_proxy& proxy,
-		uint32_t filter_value)
-	{
-	    uint32_t actual_interface_num = -1;
-	    nirio_status status = proxy.get_attribute(kRioInterfaceNumber, actual_interface_num);
-
-        return (nirio_status_not_fatal(status) && actual_interface_num == filter_value);
-	}
-
-	bool niriok_proxy_factory::_filter_by_device_id(
-		niriok_proxy& proxy,
-		uint32_t filter_value)
-	{
-	    uint32_t prod_num, ven_num = -1;
-	    nirio_status status = NiRio_Status_Success;
-	    nirio_status_chain(proxy.get_attribute(kRioProductNumber, prod_num), status);
-	    nirio_status_chain(proxy.get_attribute(kRioVendorNumber, ven_num), status);
-
-        return (nirio_status_not_fatal(status) && prod_num == filter_value && ven_num == NI_VENDOR_NUM);
-	}
-
 #if defined(UHD_PLATFORM_LINUX)
     #include <glob.h>
 
-	nirio_status niriok_proxy_factory::_get_proxy_vtr(
-        uint32_t filter_value,
-        bool (*filter)(niriok_proxy& proxy, uint32_t filter_value),
-        niriok_proxy_vtr& proxy_vtr)
+    std::string niriok_proxy::get_interface_path(
+        uint32_t interface_num)
     {
-        //Clear any incoming proxies
-        proxy_vtr.clear();
-
         glob_t glob_instance;
         nirio_status status = glob("/proc/driver/ni/*/deviceInterfaces/nirio_transport\\\\*", GLOB_ONLYDIR, NULL, &glob_instance);
 
-        if (nirio_status_fatal(status) || status == GLOB_NOMATCH) return status;
+        if (nirio_status_fatal(status) || status == GLOB_NOMATCH) return "";
 
-        for (size_t i = 0; i < glob_instance.gl_pathc; i++) {
+        std::string iface_path;
+
+        for (size_t i = 0; i < glob_instance.gl_pathc && iface_path.empty(); i++) {
             char* current_path = glob_instance.gl_pathv[i];
 
             char path[PATH_MAX];
             snprintf(path, sizeof(path), "%s/interfacePath", current_path);
 
             FILE* prop_file_ptr = fopen(path, "r");
-            if (prop_file_ptr == NULL) return -EIO;
+            if (prop_file_ptr == NULL) return "";
             char file_buffer[4096];
             size_t num_read = fread(file_buffer, 1 /* size of element */, sizeof(file_buffer), prop_file_ptr);
             fclose(prop_file_ptr);
@@ -363,27 +320,25 @@ namespace nirio_interface
             niriok_proxy temp_proxy;
             status = temp_proxy.open(file_buffer);
 
-            if (nirio_status_fatal(status) && num_read > 0) return status;
+            if (nirio_status_fatal(status) && num_read > 0) return "";
 
-            if (filter(temp_proxy, filter_value)) {
-                proxy_vtr.push_back(temp_proxy);
-            } else {
-                temp_proxy.close();
-            }
+            uint32_t actual_interface_num = -1;
+            status = temp_proxy.get_attribute(kRioInterfaceNumber, actual_interface_num);
+            if (nirio_status_not_fatal(status) && actual_interface_num == interface_num)
+                iface_path = file_buffer;
+
+            temp_proxy.close();
         }
-        return status;
+        return iface_path;
     }
 #elif defined(UHD_PLATFORM_WIN32)
-    nirio_status niriok_proxy_factory::_get_proxy_vtr(
-        uint32_t filter_value,
-        bool (*filter)(niriok_proxy& proxy, uint32_t filter_value),
-        niriok_proxy_vtr& proxy_vtr)
+    std::string niriok_proxy::get_interface_path(
+        uint32_t interface_num)
     {
-        //@TODO: Implement me!
-        return -1;
+        return "";
     }
 #else
-    #error OS not supported by niriok_proxy_factory::_get_proxy_vtr.
+    #error OS not supported by niriok_proxy::get_interface_path.
 #endif
 
 }

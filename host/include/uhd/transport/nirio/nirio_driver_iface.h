@@ -3,6 +3,7 @@
 
 #include <stddef.h>
 #include <stdint.h>
+#include <string>
 #include <uhd/transport/nirio/status.h>
 #include <uhd/config.hpp>
 #ifdef UHD_PLATFORM_WIN32
@@ -543,7 +544,7 @@ static const rio_dev_handle_t INVALID_RIO_HANDLE = ((rio_dev_handle_t)-1);
 #endif
 
     nirio_status rio_open(
-        const char* device_path,
+        const std::string& device_path,
         rio_dev_handle_t& device_handle);
 
     void rio_close(

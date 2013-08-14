@@ -66,7 +66,11 @@ nirio_status nifpga_session::enumerate(nirio_device_info_vtr& device_info_vtr)
             info.interface_num = nodes[i];
             info.resource_name = "RIO" + boost::lexical_cast<std::string>(nodes[i]);
             info.serial_num = boost::lexical_cast<std::string>(serials[i]);
-            device_info_vtr.push_back(info);
+            //@TODO: The interface path should come from niusrprio / helper
+            info.interface_path = nirio_interface::niriok_proxy::get_interface_path(info.interface_num);
+
+            if (info.interface_num != ((uint32_t)-1) && !info.interface_path.empty())
+                device_info_vtr.push_back(info);
         }
     }
 
@@ -102,12 +106,13 @@ nirio_status nifpga_session::open(
 		}
 	}
 
-	nirio_status_chain(
-		niriok_proxy_factory::get_by_interface_num(interface_num, _riok_proxy),
-		status);
+    std::string interface_path = niriok_proxy::get_interface_path(interface_num);
+    if (interface_path.empty()) nirio_status_chain(NiRio_Status_ResourceNotFound, status);
 
 	if (nirio_status_not_fatal(status)) {
-		_signature = signature ? signature : "";
+	    _riok_proxy.open(interface_path);
+
+	    _signature = signature ? signature : "";
 
 		nirio_register_info_vtr reg_vtr;
 		nirio_fifo_info_vtr fifo_vtr;

@@ -73,10 +73,13 @@ int main(int argc, char *argv[])
 
     niriok_proxy dev_proxy;
     fflush(stdout);
-    if (nirio_status_fatal(niriok_proxy_factory::get_by_interface_num(interface_num, dev_proxy))) {
+    std::string interface_path = niriok_proxy::get_interface_path(interface_num);
+    if (interface_path.empty()) {
         printf("ERROR: Could not open a proxy to interface %u. If it exists, try downloading an LVBITX to the FPGA first.\n", interface_num);
         exit(EXIT_FAILURE);
     }
+
+    dev_proxy.open(interface_path);
 
     //Handle FPGA master mode
     if (vm.count("en-fpga-master")){
