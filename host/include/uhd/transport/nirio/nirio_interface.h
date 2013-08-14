@@ -84,6 +84,8 @@ namespace nirio_interface
         nirio_status unmap_fifo_memory(
         	nirio_driver_iface::rio_mmap_t& map);
 
+        //@TODO: Ashish: This function should be removed when enumeration is done
+        //               using niusrprio / helper.
         static std::string get_interface_path(
             uint32_t interface_num);
 

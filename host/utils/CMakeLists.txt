@@ -53,7 +53,11 @@ ELSE()
 ENDIF()
 
 ADD_EXECUTABLE(nirio_programmer ${niro_prog_sources})
-TARGET_LINK_LIBRARIES(nirio_programmer uhd)
+IF(WIN32)
+    TARGET_LINK_LIBRARIES(nirio_programmer uhd Setupapi.lib)
+ELSE()
+    TARGET_LINK_LIBRARIES(nirio_programmer uhd)
+ENDIF()
 
 ########################################################################
 # Utilities that get installed into the share path

@@ -292,6 +292,8 @@ namespace nirio_interface
 		return nirio_driver_iface::rio_munmap(map);
     }
 
+//@TODO: Ashish: This function should be removed when enumeration is done
+//               using niusrprio / helper.
 #if defined(UHD_PLATFORM_LINUX)
     #include <glob.h>
 
@@ -332,10 +334,100 @@ namespace nirio_interface
         return iface_path;
     }
 #elif defined(UHD_PLATFORM_WIN32)
+    #include <setupapi.h>
+    #include <guiddef.h>
+
+    LPWSTR MAGICAL_GUID = L"{C7110F75-8354-442E-8EE8-24556DC68714}";
+
     std::string niriok_proxy::get_interface_path(
         uint32_t interface_num)
     {
-        return "";
+        GUID                       interfaceGUID_;
+        HDEVINFO                   devInfoSet_ = INVALID_HANDLE_VALUE;
+        DWORD                      indexIntoSet_ = 0;
+        SP_DEVICE_INTERFACE_DATA   deviceInterfaceData_;
+        BOOL                       isValid = false;
+        deviceInterfaceData_.cbSize = sizeof(SP_DEVICE_INTERFACE_DATA);
+
+        CLSIDFromString(MAGICAL_GUID, (LPCLSID)&interfaceGUID_);
+
+        DWORD flags = DIGCF_PRESENT | DIGCF_DEVICEINTERFACE;
+
+        devInfoSet_ = SetupDiGetClassDevs( &interfaceGUID_,
+                            NULL, // Define no enumerator (global)
+                            NULL, // Define no parent
+                            flags);
+
+        if( devInfoSet_ == INVALID_HANDLE_VALUE )
+        {
+            return "";
+        }
+
+        isValid = SetupDiEnumDeviceInterfaces(  devInfoSet_,
+                                    NULL,
+                                    &interfaceGUID_,
+                                    indexIntoSet_,
+                                    &deviceInterfaceData_ );
+
+        std::string iface_path;
+
+        while (isValid && !iface_path.empty())
+        {
+            size_t BUF_SIZE = 1024;
+            char buffer[1024];
+
+            PSP_DEVICE_INTERFACE_DETAIL_DATA_A diDetail =
+                reinterpret_cast<PSP_DEVICE_INTERFACE_DETAIL_DATA_A>(buffer);
+            DWORD diDetailRealSize = static_cast<DWORD>(BUF_SIZE);
+            DWORD diDetailNeededSize;
+            BOOL pass;
+
+            diDetail->cbSize = sizeof(SP_DEVICE_INTERFACE_DETAIL_DATA_A);
+            pass = SetupDiGetDeviceInterfaceDetailA(
+                                                    devInfoSet_,
+                                                    &deviceInterfaceData_,
+                                                    diDetail,
+                                                    diDetailRealSize,
+                                                    &diDetailNeededSize,
+                                                    NULL
+                                                    );
+
+            if (diDetailNeededSize > BUF_SIZE)
+            {
+                return "";
+            }
+
+            if (pass)
+            {
+                std::string temp_str;
+                // if success, shift back the data that's now at an offset inside the diDetail
+                size_t length = strlen(diDetail->DevicePath)+1;
+                memmove(buffer, buffer+offsetof(SP_DEVICE_INTERFACE_DETAIL_DATA_A, DevicePath), length);
+                buffer[length] = '\0';
+
+                nirio_status status = 0;
+                niriok_proxy temp_proxy;
+                status = temp_proxy.open(buffer);
+
+                if (nirio_status_fatal(status)) return "";
+
+                uint32_t actual_interface_num = -1;
+                status = temp_proxy.get_attribute(kRioInterfaceNumber, actual_interface_num);
+                if (nirio_status_not_fatal(status) && actual_interface_num == interface_num)
+                    iface_path = buffer;
+
+                temp_proxy.close();
+            }
+
+            indexIntoSet_++;
+            isValid = SetupDiEnumDeviceInterfaces( devInfoSet_,
+                                                    NULL,
+                                                    &interfaceGUID_,
+                                                    indexIntoSet_,
+                                                    &deviceInterfaceData_ );
+        }
+
+        return iface_path;
     }
 #else
     #error OS not supported by niriok_proxy::get_interface_path.
