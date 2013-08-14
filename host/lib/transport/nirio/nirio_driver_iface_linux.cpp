@@ -43,7 +43,17 @@ nirio_status rio_ioctl(
 	ioctl_block.outBuf       = static_cast<uint64_t>(reinterpret_cast<uintptr_t>(read_buf));
 	ioctl_block.outBufLength = read_buf_len;
 
-	return ::ioctl(device_handle, ioctl_code, &ioctl_block);
+	int status = ::ioctl(device_handle, ioctl_code, &ioctl_block);
+	if (status == -1) {
+        if (errno == EINVAL)
+            return NiRio_Status_InvalidParameter;
+        else if (errno == EFAULT)
+            return NiRio_Status_MemoryFull;
+        else
+            return NiRio_Status_SoftwareFault;
+	} else {
+        return NiRio_Status_Success;
+	}
 }
 
 nirio_status rio_mmap(
@@ -68,7 +78,7 @@ nirio_status rio_mmap(
 		else
 		    return NiRio_Status_SoftwareFault;
 	}
-	return 0;
+	return NiRio_Status_Success;
 }
 
 nirio_status rio_munmap(rio_mmap_t &map)

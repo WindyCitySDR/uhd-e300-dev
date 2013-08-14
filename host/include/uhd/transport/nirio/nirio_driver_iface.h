@@ -1,47 +1,64 @@
-/**
-    \file       nirio_transport.h
-    \author     Erik Hons <erik.hons@ni.com>
-    \date       12/06/2007
-
-    \brief Constants for RIO IOCTLs
-
-    � Copyright 2007. National Instruments. All rights reserved.
-*/
-
-#ifndef __NIRIO_TRANSPORT_H__
-#define __NIRIO_TRANSPORT_H__
+#ifndef __NIRIO_DRIVER_IFACE_H__
+#define __NIRIO_DRIVER_IFACE_H__
 
 #include <stddef.h>
 #include <stdint.h>
 #include <uhd/transport/nirio/status.h>
 #include <uhd/config.hpp>
-#if defined(UHD_PLATFORM_WIN32)
-#include <Windows.h>
+#ifdef UHD_PLATFORM_WIN32
+    #include <Windows.h>
+    #pragma warning(disable:4201)  // nonstandard extension used : nameless struct/union
+        #include <WinIoCtl.h>
+    #pragma warning(pop)
 #endif
+
+// CTL_CODE macro for non-win OSes
+#ifndef UHD_PLATFORM_WIN32
+    #define CTL_CODE(a,controlCode,b,c) (controlCode)
+#endif
+
 typedef int32_t tRioStatusCode;
 
 namespace nNIRIOSRV200
 {
 
-const uint32_t kPrivateIoctlBase 			= 0x800;
+const uint32_t kPrivateIoctlBase = 0x800;
 
-/// The synchronous operation code. Note: We
-/// must use METHOD_OUT_DIRECT on the syncOp()
-/// IOCTL to ensure the contents of the output
-/// block are available in the kernel.
-const uint32_t kRioIoctlSyncOp              = kPrivateIoctlBase + 4;
+const uint32_t kRioIoctlSyncOp =
+   CTL_CODE(FILE_DEVICE_UNKNOWN,
+            kPrivateIoctlBase + 4,
+            METHOD_OUT_DIRECT,
+            FILE_READ_DATA | FILE_WRITE_DATA);
+                                ///< The synchronous operation code. Note: We
+                                /// must use METHOD_OUT_DIRECT on the syncOp()
+                                /// IOCTL to ensure the contents of the output
+                                /// block are available in the kernel.
 
-/// Get the interface number for a device
-const uint32_t kRioIoctlGetInterfaceNumber	= kPrivateIoctlBase + 6;
+const uint32_t kRioIoctlGetInterfaceNumber =
+   CTL_CODE(FILE_DEVICE_UNKNOWN,
+            kPrivateIoctlBase + 6,
+            METHOD_BUFFERED,
+            FILE_READ_DATA);    ///< Get the interface number for a device
 
-/// Gets a previously opened session to a device
-const uint32_t kRioIoctlGetSession 			= kPrivateIoctlBase + 8;
+const uint32_t kRioIoctlGetSession =
+   CTL_CODE(FILE_DEVICE_UNKNOWN,
+            kPrivateIoctlBase + 8,
+            METHOD_BUFFERED,
+            FILE_READ_ACCESS);  ///< Gets a previously opened session to a device
 
-/// Called after opening a session
-const uint32_t kRioIoctlPostOpen            = kPrivateIoctlBase + 9;
 
-/// Called before closing a session
-const uint32_t kRioIoctlPreClose            = kPrivateIoctlBase + 10;
+const uint32_t kRioIoctlPostOpen =
+   CTL_CODE(FILE_DEVICE_UNKNOWN,
+            kPrivateIoctlBase + 9,
+            METHOD_BUFFERED,
+            FILE_READ_ACCESS);  ///< Called after opening a session
+
+
+const uint32_t kRioIoctlPreClose =
+   CTL_CODE(FILE_DEVICE_UNKNOWN,
+            kPrivateIoctlBase + 10,
+            METHOD_BUFFERED,
+            FILE_READ_ACCESS);  ///< Called before closing a session
 
 struct tIoctlPacketOut {
    tIoctlPacketOut(void* const _outBuf,
@@ -480,13 +497,18 @@ static const rio_dev_handle_t INVALID_RIO_HANDLE = ((rio_dev_handle_t)-1);
         bool is_null() { return (size == 0 || addr == NULL); }
     };
 #elif defined(UHD_PLATFORM_WIN32)
+    enum access_mode_t {
+       nNIAPAL200_kAccessModeRead,
+       nNIAPAL200_kAccessModeWrite
+    };
+
     struct rio_mmap_params_t
     {
-       uint64_t mappedVaPtr;
-       uint64_t mapReadyEventHandle;
+       uint64_t mapped_va_ptr;
+       uint64_t map_ready_event_handle;
        uint32_t size;
        uint16_t memoryType;
-       uint8_t  accessMode;
+       uint8_t access_mode;
     };
 
     struct rio_mmap_threadargs_t

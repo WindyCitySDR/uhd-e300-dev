@@ -43,7 +43,6 @@ SET(niro_prog_sources nirio_programmer.cpp
     ../lib/transport/nirio/nifpga_interface.cpp
     ../lib/transport/nirio/nirio_interface.cpp
     ../lib/transport/nirio/nirio_resource_manager.cpp
-    ../lib/transport/nirio/nirio_driver_iface_linux.cpp
     ../lib/transport/nirio/NiFpga/NiFpga.c
     ../lib/transport/nirio/NiFpga/niusrprio.c
 )
