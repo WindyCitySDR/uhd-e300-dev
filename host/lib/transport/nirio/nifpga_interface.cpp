@@ -57,8 +57,8 @@ nirio_status nifpga_session::enumerate(nirio_device_info_vtr& device_info_vtr)
     uint64_t ndevs;
     nirio_status_chain(niusrprio_getNumberOfDevices(&ndevs), status);
     if (ndevs > 0) {
-        std::vector<uint32_t> nodes(ndevs);
-        std::vector<uint64_t> serials(ndevs);
+        std::vector<uint32_t> nodes(static_cast<size_t>(ndevs));
+        std::vector<uint64_t> serials(static_cast<size_t>(ndevs));
 
         nirio_status_chain(niusrprio_getDevicesInformation(ndevs, &nodes[0], &serials[0]), status);
         for(size_t i = 0; i < ndevs && nirio_status_not_fatal(status); i++) {
@@ -176,7 +176,7 @@ uint32_t nifpga_session::_read_bitstream_from_file(
     ifstream file(filename.c_str(), ios::in|ios::binary|ios::ate);
     if (file.is_open())
     {
-        file_size = file.tellg();
+        file_size = static_cast<size_t>(file.tellg());
         buffer.reset(new uint8_t[file_size + 1]);
 
         file.seekg(0, ios::beg);

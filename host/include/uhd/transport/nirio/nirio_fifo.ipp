@@ -6,7 +6,9 @@
  */
 
 //@TODO: Figure out a better way to suppress anonymous struct init warnings
-#pragma GCC diagnostic ignored "-Wmissing-field-initializers"
+#ifdef __GNUC__
+    #pragma GCC diagnostic ignored "-Wmissing-field-initializers"
+#endif
 
 template <typename data_t>
 nirio_fifo<data_t>::nirio_fifo() :
@@ -273,4 +275,7 @@ nirio_status nirio_fifo<data_t>::write(
     _lock.release();
 	return status;
 }
-#pragma GCC diagnostic pop
+
+#ifdef __GNUC__
+    #pragma GCC diagnostic pop
+#endif

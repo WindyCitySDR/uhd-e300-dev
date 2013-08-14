@@ -26,7 +26,10 @@
 #define GET_FIFO_MEMORY_TYPE(fifo_inst) (static_cast<uint16_t>(0x0100 | static_cast<uint16_t>(fifo_inst)))
 
 //@TODO: Figure out a better way to suppress anonymous struct init warnings
-#pragma GCC diagnostic ignored "-Wmissing-field-initializers"
+#ifdef __GNUC__
+    #pragma GCC diagnostic ignored "-Wmissing-field-initializers"
+#endif
+
 namespace nirio_interface
 {
 	//-------------------------------------------------------
@@ -384,4 +387,7 @@ namespace nirio_interface
 #endif
 
 }
-#pragma GCC diagnostic pop
+
+#ifdef __GNUC__
+    #pragma GCC diagnostic pop
+#endif

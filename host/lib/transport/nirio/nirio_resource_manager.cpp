@@ -8,7 +8,10 @@
 #include <uhd/transport/nirio/nirio_resource_manager.h>
 
 //@TODO: Figure out a better way to suppress anonymous struct init warnings
-#pragma GCC diagnostic ignored "-Wmissing-field-initializers"
+#ifdef __GNUC__
+    #pragma GCC diagnostic ignored "-Wmissing-field-initializers"
+#endif
+
 namespace nirio_interface
 {
 
@@ -99,4 +102,7 @@ nirio_fifo_info_t* nirio_resource_manager::_lookup_fifo_info(const char* fifo_na
 }
 
 } /* namespace nirio_interface */
-#pragma GCC diagnostic pop
+
+#ifdef __GNUC__
+    #pragma GCC diagnostic pop
+#endif

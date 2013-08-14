@@ -9,7 +9,7 @@
     #include <Windows.h>
     #pragma warning(disable:4201)  // nonstandard extension used : nameless struct/union
         #include <WinIoCtl.h>
-    #pragma warning(pop)
+    #pragma warning(default:4201)
 #endif
 
 // CTL_CODE macro for non-win OSes
