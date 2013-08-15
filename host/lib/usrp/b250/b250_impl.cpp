@@ -107,7 +107,19 @@ static device_addrs_t b250_find(const device_addr_t &hint_)
     //use the address given
     if (hint.has_key("addr"))
     {
-        device_addrs_t reply_addrs = b250_find_with_addr(hint);
+        device_addrs_t reply_addrs;
+        try
+        {
+            reply_addrs = b250_find_with_addr(hint);
+        }
+        catch(const std::exception &ex)
+        {
+            UHD_MSG(error) << "X300 Network discovery error " << ex.what() << std::endl;
+        }
+        catch(...)
+        {
+            UHD_MSG(error) << "X300 Network discovery unknown error " << std::endl;
+        }
         BOOST_FOREACH(const device_addr_t &reply_addr, reply_addrs)
         {
             device_addrs_t new_addrs = b250_find_with_addr(reply_addr);
