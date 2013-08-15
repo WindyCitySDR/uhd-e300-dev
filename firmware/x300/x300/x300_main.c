@@ -329,8 +329,12 @@ static void handle_uarts(void)
     const int rxch = wb_uart_getc(UART0_BASE);
     if (rxch != -1)
     {
-        rxoffset = (rxoffset+1) % X300_FW_SHMEM_UART_POOL_WORDS32;
-        shmem[X300_FW_SHMEM_UART_RX_POOL+rxoffset] = (uint32_t) rxch;
+        rxoffset = (rxoffset+1) % (X300_FW_SHMEM_UART_POOL_WORDS32*4);
+        const int shift = ((rxoffset%4) * 8);
+        static uint32_t rxword32 = 0;
+        if (shift == 0) rxword32 = 0;
+        rxword32 |= ((uint32_t) rxch) << ((rxoffset%4) * 8);
+        shmem[X300_FW_SHMEM_UART_RX_POOL+rxoffset/4] = rxword32;
         shmem[X300_FW_SHMEM_UART_RX_INDEX] = rxoffset;
     }
 
@@ -340,9 +344,10 @@ static void handle_uarts(void)
     static uint32_t txoffset = 0;
     if (txoffset != shmem[X300_FW_SHMEM_UART_TX_INDEX])
     {
-        const int txch = shmem[X300_FW_SHMEM_UART_TX_POOL+txoffset];
+        const int shift = ((txoffset%4) * 8);
+        const int txch = shmem[X300_FW_SHMEM_UART_TX_POOL+txoffset/4] >> shift;
         wb_uart_putc(UART0_BASE, txch);
-        txoffset = (txoffset+1) % X300_FW_SHMEM_UART_POOL_WORDS32;
+        txoffset = (txoffset+1) % (X300_FW_SHMEM_UART_POOL_WORDS32*4);
     }
 }
 
