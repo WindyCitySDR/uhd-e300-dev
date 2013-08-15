@@ -16,7 +16,6 @@
 //
 
 #include <uhd/transport/nirio/nirio_fifo.h>
-#include <uhd/transport/nirio/nifpga_image.h>
 #include <uhd/transport/nirio_zero_copy.hpp>
 #include <uhd/transport/buffer_pool.hpp>
 #include <uhd/utils/msg.hpp>
@@ -154,10 +153,10 @@ public:
 
         //Create FIFOs
         nirio_status_chain(
-            fpga_session->create_rx_fifo(nifpga_image::INPUT_FIFOS[_fifo_instance], _recv_fifo),
+            fpga_session->create_rx_fifo(_fifo_instance, _recv_fifo),
             status);
         nirio_status_chain(
-            fpga_session->create_tx_fifo(nifpga_image::OUTPUT_FIFOS[_fifo_instance], _send_fifo),
+            fpga_session->create_tx_fifo(_fifo_instance, _send_fifo),
             status);
         //Initialize FIFOs
         nirio_status_chain(

@@ -17,6 +17,7 @@
 
 #include "b250_impl.hpp"
 #include "b250_regs.hpp"
+#include "x300_lvbitx.hpp"
 #include <uhd/utils/static.hpp>
 #include <uhd/utils/msg.hpp>
 #include <uhd/utils/images.hpp>
@@ -32,7 +33,6 @@
 #include <uhd/transport/udp_zero_copy.hpp>
 #include <uhd/transport/nirio_zero_copy.hpp>
 #include <uhd/transport/nirio/nifpga_interface.h>
-#include <uhd/transport/nirio/nifpga_image.h>
 
 using namespace uhd;
 using namespace uhd::usrp;
@@ -246,10 +246,12 @@ b250_impl::b250_impl(const uhd::device_addr_t &dev_addr)
         UHD_MSG(status) << "Loading NI shared libs...\n";
         nirio_status_not_fatal(nifpga_session::load_lib());
 
-        UHD_MSG(status) << boost::format("Loading bitfile %s...\n") % nifpga_image::SIGNATURE;
+        nifpga_lvbitx::sptr lvbitx(new x300_lvbitx());
+
+        UHD_MSG(status) << boost::format("Loading bitfile %s...\n") % lvbitx->get_signature();
         _rio_fpga_interface.reset(new nifpga_session(dev_addr["resource"]));
         nirio_status status = 0;
-        nirio_status_chain(_rio_fpga_interface->open(nifpga_image::BITFILE, nifpga_image::SIGNATURE), status);
+        nirio_status_chain(_rio_fpga_interface->open(lvbitx), status);
 
         UHD_ASSERT_THROW(nirio_status_not_fatal(status));
     }

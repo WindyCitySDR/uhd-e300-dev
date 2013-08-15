@@ -11,6 +11,7 @@
 #include <uhd/transport/nirio/nirio_interface.h>
 #include <uhd/transport/nirio/nirio_resource_manager.h>
 #include <uhd/transport/nirio/locks.h>
+#include <uhd/transport/nirio/nifpga_lvbitx.h>
 #include <boost/smart_ptr.hpp>
 #include <string>
 
@@ -39,8 +40,7 @@ public:
 	virtual ~nifpga_session();
 
 	nirio_status open(
-		const std::string& bitfile_path,
-		const char* signature,
+        nifpga_lvbitx::sptr lvbitx,
 		uint32_t attribute = 0);
 
 	void close(bool reset_fpga = false);
@@ -69,7 +69,18 @@ public:
 		return status;
 	}
 
-	template<typename data_t>
+    template<typename data_t>
+    nirio_status create_tx_fifo(
+        uint32_t fifo_instance,
+        nirio_interface::nirio_fifo<data_t>& fifo)
+    {
+        if (_lvbitx.get() == NULL) return NiRio_Status_ResourceNotInitialized;
+        if ((size_t)fifo_instance >= _lvbitx->get_output_fifo_count()) return NiRio_Status_InvalidParameter;
+
+        return create_tx_fifo(_lvbitx->get_output_fifo_names()[fifo_instance], fifo);
+    }
+
+    template<typename data_t>
 	nirio_status create_rx_fifo(
 		const char* fifo_name,
 		nirio_interface::nirio_fifo<data_t>& fifo)
@@ -81,8 +92,18 @@ public:
 		return status;
 	}
 
-	nirio_interface::niriok_proxy& get_kernel_proxy()
-	{
+    template<typename data_t>
+    nirio_status create_rx_fifo(
+        uint32_t fifo_instance,
+        nirio_interface::nirio_fifo<data_t>& fifo)
+    {
+        if (_lvbitx.get() == NULL) return NiRio_Status_ResourceNotInitialized;
+        if ((size_t)fifo_instance >= _lvbitx->get_input_fifo_count()) return NiRio_Status_InvalidParameter;
+
+        return create_rx_fifo(_lvbitx->get_input_fifo_names()[fifo_instance], fifo);
+    }
+
+	nirio_interface::niriok_proxy& get_kernel_proxy() {
 	    return _riok_proxy;
 	}
 
@@ -105,9 +126,9 @@ private:
        return b;
     }
 
-	uint32_t								_session;
 	std::string								_resource_name;
-	std::string								_signature;
+	nifpga_lvbitx::sptr                     _lvbitx;
+    uint32_t                                _session;
 	nirio_interface::niriok_proxy			_riok_proxy;
 	nirio_interface::nirio_resource_manager	_resource_manager;
 	nifpga_session_lock						_lock;

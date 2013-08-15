@@ -7,7 +7,6 @@
 
 #include <uhd/transport/nirio/nifpga_interface.h>
 #include <uhd/transport/nirio/nirio_fifo.h>
-#include <uhd/transport/nirio/nifpga_image.h>
 #include <uhd/transport/nirio/status.h>
 #include <stdio.h>
 #include "NiFpga/NiFpga.h"
@@ -16,14 +15,12 @@
 #include <boost/lexical_cast.hpp>
 #include <fstream>
 
-#define REDOWNLOAD_IF_BIN_SIG_MISMATCH 1
-
 namespace nifpga_interface
 {
 
 nifpga_session::nifpga_session(const std::string& resource_name) :
-    _session(0),
 	_resource_name(resource_name),
+    _session(0),
 	_resource_manager(_riok_proxy)
 {
 }
@@ -78,20 +75,17 @@ nirio_status nifpga_session::enumerate(nirio_device_info_vtr& device_info_vtr)
 }
 
 nirio_status nifpga_session::open(
-	const std::string& bitfile_path,
-	const char* signature,
+    nifpga_lvbitx::sptr lvbitx,
 	uint32_t attribute)
 {
 	using namespace nirio_interface;
 
-	nirio_status status = NiRio_Status_Success;
-	const char* signature_without_checksum = signature ? signature + 32 : NULL;
-#if REDOWNLOAD_IF_BIN_SIG_MISMATCH
-	if ((attribute & OPEN_ATTR_SKIP_SIGNATURE_CHECK) == 0 && _signature != signature)
-		attribute |= OPEN_ATTR_FORCE_DOWNLOAD;
-#endif
+	_lvbitx = lvbitx;
 
-	nirio_status_chain(NiFpga_Open(bitfile_path.c_str(), signature_without_checksum, _resource_name.c_str(), attribute, &_session), status);
+	nirio_status status = NiRio_Status_Success;
+	const char* signature_without_checksum = _lvbitx->get_signature() + 32;
+
+	nirio_status_chain(NiFpga_Open(_lvbitx->get_bitfile_path(), signature_without_checksum, _resource_name.c_str(), attribute, &_session), status);
 	_lock.initialize(_session);
 	nirio_status_chain(_lock.acquire(SESSION_LOCK_TIMEOUT_IN_MS), status);
 
@@ -112,12 +106,10 @@ nirio_status nifpga_session::open(
 	if (nirio_status_not_fatal(status)) {
 	    _riok_proxy.open(interface_path);
 
-	    _signature = signature ? signature : "";
-
 		nirio_register_info_vtr reg_vtr;
 		nirio_fifo_info_vtr fifo_vtr;
-		nifpga_image::initialize_register_info(reg_vtr);
-		nifpga_image::initialize_fifo_info(fifo_vtr);
+		_lvbitx->init_register_info(reg_vtr);
+		_lvbitx->init_fifo_info(fifo_vtr);
 		_resource_manager.initialize(reg_vtr, fifo_vtr);
 	}
 

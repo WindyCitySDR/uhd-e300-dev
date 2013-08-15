@@ -1,6 +1,7 @@
 
 #include <uhd/transport/nirio/nirio_interface.h>
 #include <uhd/transport/nirio/nifpga_interface.h>
+#include <uhd/transport/nirio/nifpga_lvbitx.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <fcntl.h>
@@ -9,6 +10,33 @@
 #include <boost/format.hpp>
 #include <boost/thread/thread.hpp>
 #include <boost/algorithm/string.hpp>
+
+class dummy_lvbitx : public nifpga_interface::nifpga_lvbitx {
+public:
+    dummy_lvbitx(const std::string& fpga_lvbitx_path) : _fpga_lvbitx_path(fpga_lvbitx_path) {}
+    ~dummy_lvbitx() {}
+
+    virtual const char* get_bitfile_path() { return _fpga_lvbitx_path.c_str(); }
+    virtual const char* get_signature() { return ""; }
+
+    virtual size_t get_input_fifo_count() { return 0; }
+    virtual const char** get_input_fifo_names() { return NULL; }
+
+    virtual size_t get_output_fifo_count() { return 0; }
+    virtual const char** get_output_fifo_names() { return NULL; }
+
+    virtual size_t get_control_count() { return 0; }
+    virtual const char** get_control_names() { return NULL; }
+
+    virtual size_t get_indicator_count() { return 0; }
+    virtual const char** get_indicator_names() { return NULL; }
+
+    virtual void init_register_info(nirio_interface::nirio_register_info_vtr& vtr) { vtr.clear(); }
+    virtual void init_fifo_info(nirio_interface::nirio_fifo_info_vtr& vtr) { vtr.clear(); }
+
+private:
+    std::string _fpga_lvbitx_path;
+};
 
 int main(int argc, char *argv[])
 {
@@ -26,10 +54,9 @@ int main(int argc, char *argv[])
         ("interface", po::value<uint32_t>(&interface_num)->default_value(0), "The interface number to communicate with.")
         ("fpga", po::value<std::string>(&fpga_lvbitx_path)->default_value(""), "The path to the LVBITX file to download to the FPGA.")
         ("flash", po::value<std::string>(&flash_path)->default_value(""), "The path to the image to download to the flash OR 'erase' to erase the FPGA image from flash.")
-        ("en-fpga-master", "Allow FPGA to master the Chinch in the packet network.")
         ("peek", po::value<std::string>(&peek_tokens_str)->default_value(""), "Peek32.")
         ("poke", po::value<std::string>(&poke_tokens_str)->default_value(""), "Poke32.")
-        ("status", "Dump status information. WARNING: This required the IoPort2 to be up.")
+        ("status", "Dump status information.")
     ;
     po::variables_map vm;
     po::store(po::parse_command_line(argc, argv, desc), vm);
@@ -51,7 +78,8 @@ int main(int argc, char *argv[])
         uint32_t attributes = nifpga_interface::nifpga_session::OPEN_ATTR_SKIP_SIGNATURE_CHECK |
                 nifpga_interface::nifpga_session::OPEN_ATTR_FORCE_DOWNLOAD;
         nifpga_interface::nifpga_session fpga_session(resource_name);
-        nirio_status_chain(fpga_session.open(fpga_lvbitx_path, NULL, attributes), status);
+        nifpga_interface::nifpga_lvbitx::sptr lvbitx(new dummy_lvbitx(fpga_lvbitx_path));
+        nirio_status_chain(fpga_session.open(lvbitx, attributes), status);
         //Download BIN to flash or erase
         if (flash_path != "erase") {
             if (flash_path != "") {
@@ -80,28 +108,6 @@ int main(int argc, char *argv[])
     }
 
     dev_proxy.open(interface_path);
-
-    //Handle FPGA master mode
-    if (vm.count("en-fpga-master")){
-        printf("Configuring STC3 and FPGA to master the Chinch...");
-        fflush(stdout);
-
-        uint32_t reg_value;
-
-        //Write HBRCR
-        nirio_status_chain(dev_proxy.set_attribute(kRioAddressSpace, kRioAddressSpaceBusInterface), status);
-        nirio_status_chain(dev_proxy.peek(0xA4, reg_value), status);
-        reg_value |= 0x80000000;
-        nirio_status_chain(dev_proxy.poke(0xA4, reg_value), status);
-
-        //Write BIM Caps Register
-        nirio_status_chain(dev_proxy.set_attribute(kRioAddressSpace, kRioAddressSpaceFpga), status);
-        nirio_status_chain(dev_proxy.peek(0x1810, reg_value), status);
-        reg_value &= 0xFFFFFF00;
-        nirio_status_chain(dev_proxy.poke(0x1810, reg_value), status);
-
-        printf("DONE\n");
-    }
 
     if (poke_tokens_str != ""){
         std::stringstream ss;
