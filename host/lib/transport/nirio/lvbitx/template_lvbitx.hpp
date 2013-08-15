@@ -1,7 +1,7 @@
 {autogen_msg}
 
-#ifndef INCLUDED_{lvbitx_classname}_LVBITX_HPP
-#define INCLUDED_{lvbitx_classname}_LVBITX_HPP
+#ifndef INCLUDED_{lvbitx_classname_u}_LVBITX_HPP
+#define INCLUDED_{lvbitx_classname_u}_LVBITX_HPP
 
 #include <uhd/transport/nirio/nifpga_lvbitx.h>
 
@@ -35,5 +35,5 @@ public:
 
 }}
 
-#endif /* INCLUDED_{lvbitx_classname}_LVBITX_HPP */
+#endif /* INCLUDED_{lvbitx_classname_u}_LVBITX_HPP */
 

@@ -27,6 +27,7 @@ MACRO(LIBUHD_LVBITX_GEN_SOURCE lvbitx)
     ADD_CUSTOM_COMMAND(
         OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/${lvbitxprefix}_lvbitx.hpp 
         OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/${lvbitxprefix}_lvbitx.cpp 
+        DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/process-lvbitx.py
         DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/template_lvbitx.hpp
         DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/template_lvbitx.cpp
         DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/${lvbitx}
@@ -44,6 +45,6 @@ INCLUDE_DIRECTORIES(${CMAKE_CURRENT_BINARY_DIR})
 # Add generation code here
 ########################################################################
 
-SET(lvbitx_install_dir /usr/local/share/uhd/images)
+FILE(TO_NATIVE_PATH ${CMAKE_INSTALL_PREFIX}/share/uhd/images lvbitx_install_dir)
 
 LIBUHD_LVBITX_GEN_SOURCE(x300.lvbitx)
