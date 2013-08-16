@@ -634,7 +634,7 @@ uhd::transport::udp_zero_copy::sptr b250_impl::make_transport(
     UHD_LOG << "programming packet for new xport on "
         << addr << std::hex << "sid 0x" << sid << std::dec << std::endl;
     managed_send_buffer::sptr mb = xport->get_send_buff();
-    mb->cast<boost::uint32_t *>()[0] = uhd::htonx(0); //eth dispatch looks for != 0
+    mb->cast<boost::uint32_t *>()[0] = 0; //eth dispatch looks for != 0
     mb->cast<boost::uint32_t *>()[1] = uhd::htonx(sid);
     mb->commit(8);
     mb.reset();
