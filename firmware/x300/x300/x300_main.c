@@ -28,7 +28,7 @@ void handle_udp_prog_framer(
 )
 {
     const size_t ethbase = (ethno == 0)? SR_ETHINT0 : SR_ETHINT1;
-    const uint32_t sid = ((const uint32_t *)buff)[0];
+    const uint32_t sid = ((const uint32_t *)buff)[1];
     const size_t vdest = (sid >> 16) & 0xff;
     printf("handle_udp_prog_framer sid %u vdest %u\n", sid, vdest);
 
