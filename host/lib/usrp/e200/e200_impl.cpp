@@ -504,7 +504,7 @@ void e200_impl::setup_radio(const size_t dspno)
     ////////////////////////////////////////////////////////////////////
     // radio control
     ////////////////////////////////////////////////////////////////////
-    perif.ctrl = radio_ctrl_core_3000::make(vrt::if_packet_info_t::LINK_TYPE_CHDR, perif.send_ctrl_xport, perif.recv_ctrl_xport, 1 | (1 << 16));
+    perif.ctrl = radio_ctrl_core_3000::make(false/*lilE*/, perif.send_ctrl_xport, perif.recv_ctrl_xport, 1 | (1 << 16));
     this->register_loopback_self_test(perif.ctrl);
     perif.atr0 = gpio_core_200_32wo::make(perif.ctrl, TOREG(SR_GPIO));
     perif.atr1 = gpio_core_200_32wo::make(perif.ctrl, TOREG(SR_GPIO2));

@@ -148,7 +148,7 @@ static void b250_if_hdr_unpack_be(
     const boost::uint32_t *packet_buff,
     vrt::if_packet_info_t &if_packet_info
 ){
-    if_packet_info.link_type = vrt::if_packet_info_t::LINK_TYPE_VRLP;
+    if_packet_info.link_type = vrt::if_packet_info_t::LINK_TYPE_CHDR;
     return vrt::if_hdr_unpack_be(packet_buff, if_packet_info);
 }
 
@@ -156,7 +156,7 @@ static void b250_if_hdr_pack_be(
     boost::uint32_t *packet_buff,
     vrt::if_packet_info_t &if_packet_info
 ){
-    if_packet_info.link_type = vrt::if_packet_info_t::LINK_TYPE_VRLP;
+    if_packet_info.link_type = vrt::if_packet_info_t::LINK_TYPE_CHDR;
     return vrt::if_hdr_pack_be(packet_buff, if_packet_info);
 }
 
