@@ -32,7 +32,7 @@ using namespace uhd;
 using namespace uhd::usrp;
 using namespace uhd::transport;
 
-static const double ACK_TIMEOUT = 0.5;
+static const double ACK_TIMEOUT = 2.0; //supposed to be worst case practical timeout
 static const double MASSIVE_TIMEOUT = 10.0; //for when we wait on a timed command
 static const size_t SR_READBACK  = 32;
 
