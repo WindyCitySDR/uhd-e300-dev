@@ -207,6 +207,8 @@ namespace nirio_interface
     template<>
     nirio_status niriok_proxy::peek(uint32_t offset, uint32_t& value)
     {
+        if (offset % 4 != 0) return NiRio_Status_MisalignedAccess;
+
 		nNIRIOSRV200::tRioDeviceSocketInputParameters in = {};
 		nNIRIOSRV200::tRioDeviceSocketOutputParameters out = {};
 
@@ -222,7 +224,9 @@ namespace nirio_interface
     template<>
     nirio_status niriok_proxy::peek(uint32_t offset, uint64_t& value)
     {
-		nNIRIOSRV200::tRioDeviceSocketInputParameters in = {};
+        if (offset % 8 != 0) return NiRio_Status_MisalignedAccess;
+
+        nNIRIOSRV200::tRioDeviceSocketInputParameters in = {};
 		nNIRIOSRV200::tRioDeviceSocketOutputParameters out = {};
 
 		in.function    		= nNIRIOSRV200::nRioFunction::kIO;
@@ -237,7 +241,7 @@ namespace nirio_interface
     template<>
     nirio_status niriok_proxy::poke(uint32_t offset, const uint8_t& value)
     {
-		nNIRIOSRV200::tRioDeviceSocketInputParameters in = {};
+        nNIRIOSRV200::tRioDeviceSocketInputParameters in = {};
 		nNIRIOSRV200::tRioDeviceSocketOutputParameters out = {};
 
 		in.function    				= nNIRIOSRV200::nRioFunction::kIO;
@@ -251,7 +255,9 @@ namespace nirio_interface
     template<>
     nirio_status niriok_proxy::poke(uint32_t offset, const uint32_t& value)
     {
-		nNIRIOSRV200::tRioDeviceSocketInputParameters in = {};
+        if (offset % 4 != 0) return NiRio_Status_MisalignedAccess;
+
+        nNIRIOSRV200::tRioDeviceSocketInputParameters in = {};
 		nNIRIOSRV200::tRioDeviceSocketOutputParameters out = {};
 
 		in.function    				= nNIRIOSRV200::nRioFunction::kIO;
@@ -265,7 +271,9 @@ namespace nirio_interface
     template<>
     nirio_status niriok_proxy::poke(uint32_t offset, const uint64_t& value)
     {
-		nNIRIOSRV200::tRioDeviceSocketInputParameters in = {};
+        if (offset % 8 != 0) return NiRio_Status_MisalignedAccess;
+
+        nNIRIOSRV200::tRioDeviceSocketInputParameters in = {};
 		nNIRIOSRV200::tRioDeviceSocketOutputParameters out = {};
 
 		in.function    				= nNIRIOSRV200::nRioFunction::kIO;
@@ -371,7 +379,7 @@ namespace nirio_interface
 
         std::string iface_path;
 
-        while (isValid && !iface_path.empty())
+        while (isValid && iface_path.empty())
         {
             size_t BUF_SIZE = 1024;
             char buffer[1024];

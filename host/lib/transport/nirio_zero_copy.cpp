@@ -138,17 +138,21 @@ public:
 
         //Configure frame width
         nirio_status_chain(
-            _reg_int.poke(PCIE_TX_DMA_REG(DMA_FRAME_SIZE_REG, _fifo_instance), _send_frame_size/sizeof(fifo_data_t)),
+            _reg_int.poke(PCIE_TX_DMA_REG(DMA_FRAME_SIZE_REG, _fifo_instance),
+                          static_cast<uint32_t>(_send_frame_size/sizeof(fifo_data_t))),
             status);
         nirio_status_chain(
-            _reg_int.poke(PCIE_RX_DMA_REG(DMA_FRAME_SIZE_REG, _fifo_instance), _recv_frame_size/sizeof(fifo_data_t)),
+            _reg_int.poke(PCIE_RX_DMA_REG(DMA_FRAME_SIZE_REG, _fifo_instance),
+                          static_cast<uint32_t>(_recv_frame_size/sizeof(fifo_data_t))),
             status);
         //Config 32-bit word flipping and Reset DMA streams
         nirio_status_chain(
-            _reg_int.poke(PCIE_TX_DMA_REG(DMA_CTRL_STATUS_REG, _fifo_instance), DMA_CTRL_SW_BUF_U32 | DMA_CTRL_RESET),
+            _reg_int.poke(PCIE_TX_DMA_REG(DMA_CTRL_STATUS_REG, _fifo_instance),
+                          DMA_CTRL_SW_BUF_U32 | DMA_CTRL_RESET),
             status);
         nirio_status_chain(
-            _reg_int.poke(PCIE_RX_DMA_REG(DMA_CTRL_STATUS_REG, _fifo_instance), DMA_CTRL_SW_BUF_U32 | DMA_CTRL_RESET),
+            _reg_int.poke(PCIE_RX_DMA_REG(DMA_CTRL_STATUS_REG, _fifo_instance),
+                          DMA_CTRL_SW_BUF_U32 | DMA_CTRL_RESET),
             status);
 
         //Create FIFOs

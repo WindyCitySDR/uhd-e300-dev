@@ -36,6 +36,8 @@ nirio_status rio_ioctl(
     void *read_buf,
     size_t read_buf_len)
 {
+    if (!rio_isopen(device_handle)) return NiRio_Status_ResourceNotInitialized;
+
     /* Note, if the file handle was opened with the OVERLAPPED flag,  you must
     * supply an OVERLAPPED structure to ReadFile, WriteFile, and
     * DeviceIoControl, even when doing synchronous IO. */
@@ -49,9 +51,10 @@ nirio_status rio_ioctl(
             &outLen, &zeroedOverlapped )))
     {
         lastError = GetLastError();
+        return NiRio_Status_InternalError;
     }
 
-    return lastError;
+    return NiRio_Status_Success;
 }
 
 unsigned int __stdcall memory_map_thread_routine(void *context)
@@ -72,6 +75,8 @@ nirio_status rio_mmap(
     bool writable,
     rio_mmap_t &map)
 {
+    if (!rio_isopen(device_handle)) return NiRio_Status_ResourceNotInitialized;
+
     access_mode_t access_mode = writable ? nNIAPAL200_kAccessModeWrite : nNIAPAL200_kAccessModeRead;
 
     uint64_t mapped_addr = 0;
@@ -87,7 +92,7 @@ nirio_status rio_mmap(
         return NiRio_Status_SoftwareFault;
     }
     map.map_thread_args.params.map_ready_event_handle = reinterpret_cast<uint64_t>(map_ready_event_handle);
-    map.map_thread_handle = (HANDLE)_beginthreadex(NULL, 0, memory_map_thread_routine, &(map.map_thread_args), 0, NULL);
+    map.map_thread_handle = (HANDLE) _beginthreadex(NULL, 0, memory_map_thread_routine, &(map.map_thread_args), 0, NULL);
 
     nirio_status status = NiRio_Status_Success;
     if (map.map_thread_handle == NULL) {
@@ -108,7 +113,9 @@ nirio_status rio_mmap(
 
 nirio_status rio_munmap(rio_mmap_t &map)
 {
-    nirio_status status = 0;
+    if (!rio_isopen(device_handle)) return NiRio_Status_ResourceNotInitialized;
+
+    nirio_status status = NiRio_Status_Success;
     if (map.addr != NULL) {
         uint64_t mapped_addr = reinterpret_cast<uintptr_t>(map.addr);
         status = rio_ioctl(map.map_thread_args.device_handle, nNIAPAL210_kIoctlUnmapMemory, &mapped_addr, sizeof(mapped_addr), NULL, 0);
