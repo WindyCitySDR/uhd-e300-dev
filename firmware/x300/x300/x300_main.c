@@ -374,8 +374,8 @@ int main(void)
             handle_claim(); //deal with the host claim register
             update_leds(); //run the link and activity leds
             garp(); //send periodic garps
-            xge_poll_sfpp_status(0); // Every so often poll XGE Phy to look for SFP+ hotplug events.
-            xge_poll_sfpp_status(1); // Every so often poll XGE Phy to look for SFP+ hotplug events.
+            //xge_poll_sfpp_status(0); // Every so often poll XGE Phy to look for SFP+ hotplug events.
+            //xge_poll_sfpp_status(1); // Every so often poll XGE Phy to look for SFP+ hotplug events.
             last_cronjob = wb_peek32(SR_ADDR(RB0_BASE, RB_COUNTER));
         }
 
