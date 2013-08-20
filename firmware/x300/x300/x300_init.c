@@ -107,13 +107,14 @@ static void init_network(void)
 
 static void putc(void *p, char c)
 {
-    //wb_uart_putc(UART0_BASE, c);
+    wb_uart_putc(UART1_BASE, c);
 }
 
 void x300_init(void)
 {
     //first - uart
     wb_uart_init(UART0_BASE, CPU_CLOCK/UART0_BAUD);
+    wb_uart_init(UART1_BASE, CPU_CLOCK/UART1_BAUD);
     init_printf(NULL,putc);
     //udp_uart_init(UART0_BASE, X300_GPSDO_UDP_PORT);
 

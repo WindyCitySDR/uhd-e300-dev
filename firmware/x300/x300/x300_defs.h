@@ -12,6 +12,8 @@
 #define BOOT_LDR_BASE 0xFC00
 #define UART0_BASE 0xfd00
 #define UART0_BAUD 115200
+#define UART1_BASE 0xf900
+#define UART1_BAUD 115200
 #define I2C0_BASE 0xfe00
 #define I2C1_BASE 0xff00
 #define I2C2_BASE 0xfc00
