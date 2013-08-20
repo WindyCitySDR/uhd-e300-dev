@@ -107,7 +107,7 @@ static void init_network(void)
 
 static void putc(void *p, char c)
 {
-    wb_uart_putc(UART1_BASE, c);
+  //wb_uart_putc(UART1_BASE, c);
 }
 
 void x300_init(void)
