@@ -92,7 +92,6 @@ public:
 			return NiRio_Status_ResourceNotFound;
 		}
 
-		//@TODO: Pick better errors
 		if (fifo.get_channel() != fifo_info_ptr->channel) return NiRio_Status_InvalidParameter;
 		if (fifo.get_scalar_type() != fifo_info_ptr->scalar_type) return NiRio_Status_InvalidParameter;
 
@@ -109,7 +108,6 @@ public:
 			return NiRio_Status_ResourceNotFound;
 		}
 
-		//@TODO: Pick better errors
 		if (fifo.get_channel() != fifo_info_ptr->channel) return NiRio_Status_InvalidParameter;
 		if (fifo.get_scalar_type() != fifo_info_ptr->scalar_type) return NiRio_Status_InvalidParameter;
 

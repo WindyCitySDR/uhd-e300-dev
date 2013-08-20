@@ -170,23 +170,23 @@ static device_addrs_t b250_find(const device_addr_t &hint_)
         return addrs;
     }
 
-    //otherwise, no address was specified, send a broadcast on each interface
-    BOOST_FOREACH(const if_addrs_t &if_addrs, get_if_addrs())
+    if (!hint.has_key("resource"))
     {
-        //avoid the loopback device
-        if (if_addrs.inet == asio::ip::address_v4::loopback().to_string()) continue;
+        //otherwise, no address was specified, send a broadcast on each interface
+        BOOST_FOREACH(const if_addrs_t &if_addrs, get_if_addrs())
+        {
+            //avoid the loopback device
+            if (if_addrs.inet == asio::ip::address_v4::loopback().to_string()) continue;
 
-        //create a new hint with this broadcast address
-        device_addr_t new_hint = hint;
-        new_hint["addr"] = if_addrs.bcast;
+            //create a new hint with this broadcast address
+            device_addr_t new_hint = hint;
+            new_hint["addr"] = if_addrs.bcast;
 
-        //call discover with the new hint and append results
-        device_addrs_t new_addrs = b250_find(new_hint);
-        addrs.insert(addrs.begin(), new_addrs.begin(), new_addrs.end());
+            //call discover with the new hint and append results
+            device_addrs_t new_addrs = b250_find(new_hint);
+            addrs.insert(addrs.begin(), new_addrs.begin(), new_addrs.end());
+        }
     }
-
-    //@TODO: Why clear insted of skipping populating addrs? Workaround for device enumeration bug.
-    if (hint.has_key("resource")) addrs.clear();
 
     device_addrs_t pcie_addrs = b250_find_pcie(hint);
     if (not pcie_addrs.empty()) addrs.insert(addrs.end(), pcie_addrs.begin(), pcie_addrs.end());
@@ -496,7 +496,7 @@ b250_impl::~b250_impl(void)
         _radio_perifs[0].ctrl->poke32(TOREG(SR_MISC_OUTS), (1 << 2)); //disable/reset ADC/DAC
         _radio_perifs[1].ctrl->poke32(TOREG(SR_MISC_OUTS), (1 << 2)); //disable/reset ADC/DAC
 
-//@TODO: Handle lifetime issus for these objects.
+//@TODO: Handle lifetime issus for these objects. Can be fixed when the shared lib loading/unloading is removed.
 //        if (_xport_path == "nirio") {
 //            _rio_fpga_interface->close(true);
 //            nifpga_session::unload_lib();

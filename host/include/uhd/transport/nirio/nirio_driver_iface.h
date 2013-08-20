@@ -527,10 +527,6 @@ static const rio_dev_handle_t INVALID_RIO_HANDLE = ((rio_dev_handle_t)-1);
         rio_mmap_threadargs_t map_thread_args;
 
         bool is_null() { return addr == NULL; }
-
-//@TODO: Fix this
-//    private:
-//        rio_mmap_t &operator=(const rio_mmap_t &);
     };
 #elif defined(UHD_PLATFORM_MACOS)
      struct rio_mmap_t {
