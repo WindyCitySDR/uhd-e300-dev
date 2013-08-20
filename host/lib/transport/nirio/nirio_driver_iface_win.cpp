@@ -113,7 +113,7 @@ nirio_status rio_mmap(
 
 nirio_status rio_munmap(rio_mmap_t &map)
 {
-    if (!rio_isopen(device_handle)) return NiRio_Status_ResourceNotInitialized;
+    if (!rio_isopen(map.map_thread_args.device_handle)) return NiRio_Status_ResourceNotInitialized;
 
     nirio_status status = NiRio_Status_Success;
     if (map.addr != NULL) {

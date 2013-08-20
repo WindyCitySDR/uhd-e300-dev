@@ -213,7 +213,7 @@ protected:
         nirio_status_chain(_drv_proxy.poke(PCIE_ZPU_DATA_REG(addr), data), status);
         if (nirio_status_not_fatal(status)) {
             do {
-                boost::this_thread::sleep(boost::posix_time::microsec(100));
+                boost::this_thread::sleep(boost::posix_time::microsec(50)); //Avoid flooding the bus
                 elapsed = boost::posix_time::microsec_clock::local_time() - start_time;
                 nirio_status_chain(_drv_proxy.peek(PCIE_ZPU_STATUS_REG(addr), reg_data), status);
             } while (
@@ -240,7 +240,7 @@ protected:
         nirio_status_chain(_drv_proxy.poke(PCIE_ZPU_READ_REG(addr), PCIE_ZPU_READ_START), status);
         if (nirio_status_not_fatal(status)) {
             do {
-                boost::this_thread::sleep(boost::posix_time::microsec(100));
+                boost::this_thread::sleep(boost::posix_time::microsec(50)); //Avoid flooding the bus
                 elapsed = boost::posix_time::microsec_clock::local_time() - start_time;
                 nirio_status_chain(_drv_proxy.peek(PCIE_ZPU_STATUS_REG(addr), reg_data), status);
             } while (

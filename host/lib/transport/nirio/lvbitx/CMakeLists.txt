@@ -19,25 +19,35 @@
 # This file included, use CMake directory variables
 ########################################################################
 
-MACRO(LIBUHD_LVBITX_GEN_SOURCE lvbitx)
+MACRO(LIBUHD_LVBITX_GEN_SOURCE_AND_LVBITX lvbitx binfile)
     GET_FILENAME_COMPONENT(lvbitxprefix ${lvbitx} NAME_WE)
-    SET(OUTPUT_PATH_OPT --output-path=${CMAKE_CURRENT_BINARY_DIR})
+
+    IF( ${binfile} STREQUAL "OFF" )
+        SET( GEN_OPTIONS )
+        SET( LVBITX_DEP OFF )
+    ELSE( ${binfile} STREQUAL "OFF" )
+        SET( GEN_OPTIONS --merge-bin=${CMAKE_SOURCE_DIR}/../binaries/${binfile} --output-lvbitx-path=${CMAKE_SOURCE_DIR}/../binaries )
+        SET( LVBITX_DEP ${CMAKE_SOURCE_DIR}/../binaries/${lvbitxprefix}.lvbitx )
+        MESSAGE( STATUS "X300 LVBITX generation ENABLED with binaries/${binfile}" )
+    ENDIF( ${binfile} STREQUAL "OFF" )
+
+    SET(OUTPUT_PATH_OPT --output-src-path=${CMAKE_CURRENT_BINARY_DIR})
     SET(IMAGES_PATH_OPT --uhd-images-path=${lvbitx_install_dir})
 
     ADD_CUSTOM_COMMAND(
         OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/${lvbitxprefix}_lvbitx.hpp 
-        OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/${lvbitxprefix}_lvbitx.cpp 
+        OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/${lvbitxprefix}_lvbitx.cpp
         DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/process-lvbitx.py
         DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/template_lvbitx.hpp
         DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/template_lvbitx.cpp
         DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/${lvbitx}
-        COMMAND ${PYTHON_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/process-lvbitx.py ${OUTPUT_PATH_OPT} ${IMAGES_PATH_OPT} ${CMAKE_CURRENT_SOURCE_DIR}/${lvbitx}
+        COMMAND ${PYTHON_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/process-lvbitx.py ${OUTPUT_PATH_OPT} ${IMAGES_PATH_OPT} ${GEN_OPTIONS} ${CMAKE_CURRENT_SOURCE_DIR}/${lvbitx}
         COMMENT "Generating ${CMAKE_CURRENT_BINARY_DIR}/${lvbitxprefix}_lvbitx.cpp"
     )
 
     #make libuhd depend on the output file
     LIBUHD_APPEND_SOURCES(${CMAKE_CURRENT_BINARY_DIR}/${lvbitxprefix}_lvbitx.cpp)
-ENDMACRO(LIBUHD_LVBITX_GEN_SOURCE)
+ENDMACRO(LIBUHD_LVBITX_GEN_SOURCE_AND_LVBITX)
 
 INCLUDE_DIRECTORIES(${CMAKE_CURRENT_BINARY_DIR})
 
@@ -47,4 +57,9 @@ INCLUDE_DIRECTORIES(${CMAKE_CURRENT_BINARY_DIR})
 
 FILE(TO_NATIVE_PATH ${CMAKE_INSTALL_PREFIX}/share/uhd/images lvbitx_install_dir)
 
-LIBUHD_LVBITX_GEN_SOURCE(x300.lvbitx)
+# X300 Stuff
+SET( X300_FPGA_BIN "OFF" CACHE STRING "X300 FPGA config bitstream to generate LVBITX" )
+OPTION( X300_FPGA_BIN "FPGA config bitstream to generate LVBITX" "" )
+
+LIBUHD_LVBITX_GEN_SOURCE_AND_LVBITX(x300.lvbitx ${X300_FPGA_BIN})
+
