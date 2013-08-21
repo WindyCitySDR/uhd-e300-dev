@@ -25,29 +25,20 @@
 #include <uhd/exception.hpp>
 #include <boost/format.hpp>
 #include <boost/thread/mutex.hpp>
+#include <uhd/transport/nirio/status.h>
+#include <uhd/transport/nirio/nirio_interface.h>
+#include "b250_regs.hpp"
+#include <boost/date_time/posix_time/posix_time.hpp>
+#include <boost/thread/thread.hpp>
 
-struct b250_ctrl_iface : wb_iface
+class b250_ctrl_iface : public wb_iface
 {
+public:
     enum {num_retries = 3};
-
-    b250_ctrl_iface(uhd::transport::udp_simple::sptr udp):
-        udp(udp), seq(0)
-    {
-        try
-        {
-            this->peek32(0);
-        }
-        catch(...){}
-    }
-
-    uhd::transport::udp_simple::sptr udp;
-    size_t seq;
-    boost::mutex mutex;
 
     void flush(void)
     {
-        char buff[X300_FW_COMMS_MTU] = {};
-        while (udp->recv(boost::asio::buffer(buff), 0.0)){} //flush
+        __flush();
     }
 
     void poke32(const wb_addr_type addr, const boost::uint32_t data)
@@ -74,7 +65,8 @@ struct b250_ctrl_iface : wb_iface
         {
             try
             {
-                return this->__peek32(addr);
+                boost::uint32_t data = this->__peek32(addr);
+                return data;
             }
             catch(const std::exception &ex)
             {
@@ -87,7 +79,33 @@ struct b250_ctrl_iface : wb_iface
         return 0;
     }
 
-    void __poke32(const wb_addr_type addr, const boost::uint32_t data)
+protected:
+    virtual void __poke32(const wb_addr_type addr, const boost::uint32_t data) = 0;
+    virtual boost::uint32_t __peek32(const wb_addr_type addr) = 0;
+    virtual void __flush() = 0;
+
+    boost::mutex mutex;
+};
+
+
+//-----------------------------------------------------
+// Ethernet impl
+//-----------------------------------------------------
+class b250_ctrl_iface_enet : public b250_ctrl_iface
+{
+public:
+    b250_ctrl_iface_enet(uhd::transport::udp_simple::sptr udp):
+        udp(udp), seq(0)
+    {
+        try
+        {
+            this->peek32(0);
+        }
+        catch(...){}
+    }
+
+protected:
+    virtual void __poke32(const wb_addr_type addr, const boost::uint32_t data)
     {
         boost::mutex::scoped_lock lock(mutex);
 
@@ -118,7 +136,7 @@ struct b250_ctrl_iface : wb_iface
         UHD_ASSERT_THROW(reply.data == request.data);
     }
 
-    boost::uint32_t __peek32(const wb_addr_type addr)
+    virtual boost::uint32_t __peek32(const wb_addr_type addr)
     {
         boost::mutex::scoped_lock lock(mutex);
 
@@ -150,6 +168,104 @@ struct b250_ctrl_iface : wb_iface
         //return result!
         return uhd::ntohx<boost::uint32_t>(reply.data);
     }
+
+    virtual void __flush(void)
+    {
+        char buff[X300_FW_COMMS_MTU] = {};
+        while (udp->recv(boost::asio::buffer(buff), 0.0)){} //flush
+    }
+
+private:
+    uhd::transport::udp_simple::sptr udp;
+    size_t seq;
+};
+
+
+//-----------------------------------------------------
+// PCIe impl
+//-----------------------------------------------------
+class b250_ctrl_iface_pcie : public b250_ctrl_iface
+{
+public:
+    b250_ctrl_iface_pcie(nirio_interface::niriok_proxy& drv_proxy):
+        _drv_proxy(drv_proxy)
+    {
+        UHD_ASSERT_THROW(nirio_status_not_fatal(
+            _drv_proxy.set_attribute(kRioAddressSpace, kRioAddressSpaceBusInterface)));
+
+        try
+        {
+            this->peek32(0);
+        }
+        catch(...){}
+    }
+
+protected:
+    virtual void __poke32(const wb_addr_type addr, const boost::uint32_t data)
+    {
+        boost::mutex::scoped_lock lock(mutex);
+
+        nirio_status status = 0;
+        boost::uint32_t reg_data = 0xffffffff;
+        boost::posix_time::ptime start_time = boost::posix_time::microsec_clock::local_time();
+        boost::posix_time::time_duration elapsed;
+
+        nirio_status_chain(_drv_proxy.poke(PCIE_ZPU_DATA_REG(addr), data), status);
+        if (nirio_status_not_fatal(status)) {
+            do {
+                boost::this_thread::sleep(boost::posix_time::microsec(50)); //Avoid flooding the bus
+                elapsed = boost::posix_time::microsec_clock::local_time() - start_time;
+                nirio_status_chain(_drv_proxy.peek(PCIE_ZPU_STATUS_REG(addr), reg_data), status);
+            } while (
+                nirio_status_not_fatal(status) &&
+                (reg_data & PCIE_ZPU_STATUS_BUSY) &&
+                elapsed.total_milliseconds() < READ_TIMEOUT_IN_MS);
+        }
+
+        if (nirio_status_fatal(status))
+            throw uhd::io_error("b250 fw poke32 - hardware IO error");
+        if (elapsed.total_milliseconds() > READ_TIMEOUT_IN_MS)
+            throw uhd::io_error("b250 fw poke32 - operation timed out");
+}
+
+    virtual boost::uint32_t __peek32(const wb_addr_type addr)
+    {
+        boost::mutex::scoped_lock lock(mutex);
+
+        nirio_status status = 0;
+        boost::uint32_t reg_data = 0xffffffff;
+        boost::posix_time::ptime start_time = boost::posix_time::microsec_clock::local_time();
+        boost::posix_time::time_duration elapsed;
+
+        nirio_status_chain(_drv_proxy.poke(PCIE_ZPU_READ_REG(addr), PCIE_ZPU_READ_START), status);
+        if (nirio_status_not_fatal(status)) {
+            do {
+                boost::this_thread::sleep(boost::posix_time::microsec(50)); //Avoid flooding the bus
+                elapsed = boost::posix_time::microsec_clock::local_time() - start_time;
+                nirio_status_chain(_drv_proxy.peek(PCIE_ZPU_STATUS_REG(addr), reg_data), status);
+            } while (
+                nirio_status_not_fatal(status) &&
+                (reg_data & PCIE_ZPU_STATUS_BUSY) &&
+                elapsed.total_milliseconds() < READ_TIMEOUT_IN_MS);
+        }
+        nirio_status_chain(_drv_proxy.peek(PCIE_ZPU_DATA_REG(addr), reg_data), status);
+
+        if (nirio_status_fatal(status))
+            throw uhd::io_error("b250 fw peek32 - hardware IO error");
+        if (elapsed.total_milliseconds() > READ_TIMEOUT_IN_MS)
+            throw uhd::io_error("b250 fw peek32 - operation timed out");
+
+        return reg_data;
+    }
+
+    virtual void __flush(void)
+    {
+        __peek32(0);
+    }
+
+private:
+    nirio_interface::niriok_proxy& _drv_proxy;
+    static const uint32_t READ_TIMEOUT_IN_MS = 10;
 };
 
 #endif /* INCLUDED_B250_FW_CTRL_HPP */

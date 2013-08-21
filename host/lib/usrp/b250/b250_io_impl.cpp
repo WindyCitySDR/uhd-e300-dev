@@ -20,6 +20,7 @@
 #include "validate_subdev_spec.hpp"
 #include "../../transport/super_recv_packet_handler.hpp"
 #include "../../transport/super_send_packet_handler.hpp"
+#include <uhd/transport/nirio_zero_copy.hpp>
 #include "async_packet_handler.hpp"
 #include <uhd/transport/bounded_buffer.hpp>
 #include <boost/bind.hpp>
@@ -144,7 +145,7 @@ void b250_impl::update_tx_subdev_spec(const subdev_spec_t &spec)
 /***********************************************************************
  * VITA stuff
  **********************************************************************/
-static void b250_if_hdr_unpack_be(
+static void b250_if_hdr_unpack_vrlp(
     const boost::uint32_t *packet_buff,
     vrt::if_packet_info_t &if_packet_info
 ){
@@ -152,7 +153,7 @@ static void b250_if_hdr_unpack_be(
     return vrt::if_hdr_unpack_be(packet_buff, if_packet_info);
 }
 
-static void b250_if_hdr_pack_be(
+static void b250_if_hdr_pack_vrlp(
     boost::uint32_t *packet_buff,
     vrt::if_packet_info_t &if_packet_info
 ){
@@ -160,10 +161,26 @@ static void b250_if_hdr_pack_be(
     return vrt::if_hdr_pack_be(packet_buff, if_packet_info);
 }
 
+static void b250_if_hdr_unpack_chdr(
+    const boost::uint32_t *packet_buff,
+    vrt::if_packet_info_t &if_packet_info
+){
+    if_packet_info.link_type = vrt::if_packet_info_t::LINK_TYPE_CHDR;
+    return vrt::if_hdr_unpack_le(packet_buff, if_packet_info);
+}
+
+static void b250_if_hdr_pack_chdr(
+    boost::uint32_t *packet_buff,
+    vrt::if_packet_info_t &if_packet_info
+){
+    if_packet_info.link_type = vrt::if_packet_info_t::LINK_TYPE_CHDR;
+    return vrt::if_hdr_pack_le(packet_buff, if_packet_info);
+}
+
 /***********************************************************************
  * RX flow control handler
  **********************************************************************/
-static void handle_rx_flowctrl(const boost::uint32_t sid, zero_copy_if::sptr xport, boost::shared_ptr<boost::uint32_t> seq32_state, const size_t last_seq)
+static void handle_rx_flowctrl(const boost::uint32_t sid, zero_copy_if::sptr xport, vrt::if_packet_info_t::link_type_t link_type, boost::shared_ptr<boost::uint32_t> seq32_state, const size_t last_seq)
 {
     managed_send_buffer::sptr buff = xport->get_send_buff(0.0);
     if (not buff)
@@ -195,7 +212,10 @@ static void handle_rx_flowctrl(const boost::uint32_t sid, zero_copy_if::sptr xpo
     packet_info.has_tlr = false;
 
     //load header
-    b250_if_hdr_pack_be(pkt, packet_info);
+    if (link_type == vrt::if_packet_info_t::LINK_TYPE_VRLP)
+        b250_if_hdr_pack_vrlp(pkt, packet_info);
+    else
+        b250_if_hdr_pack_chdr(pkt, packet_info);
 
     //load payload
     pkt[packet_info.num_header_words32+0] = uhd::htonx<boost::uint32_t>(0);
@@ -226,7 +246,7 @@ struct b250_tx_fc_guts_t
     boost::shared_ptr<b250_impl::async_md_type> old_async_queue;
 };
 
-static void handle_tx_async_msgs(boost::shared_ptr<b250_tx_fc_guts_t> guts, zero_copy_if::sptr xport, b250_clock_ctrl::sptr clock)
+static void handle_tx_async_msgs(boost::shared_ptr<b250_tx_fc_guts_t> guts, zero_copy_if::sptr xport, vrt::if_packet_info_t::link_type_t link_type, b250_clock_ctrl::sptr clock)
 {
     managed_recv_buffer::sptr buff = xport->get_recv_buff();
     if (not buff) return;
@@ -237,9 +257,19 @@ static void handle_tx_async_msgs(boost::shared_ptr<b250_tx_fc_guts_t> guts, zero
     const boost::uint32_t *packet_buff = buff->cast<const boost::uint32_t *>();
 
     //unpacking can fail
+    uint32_t (*endian_conv)(uint32_t) = uhd::ntohx;
     try
     {
-        b250_if_hdr_unpack_be(packet_buff, if_packet_info);
+        if (link_type == vrt::if_packet_info_t::LINK_TYPE_VRLP)
+        {
+            b250_if_hdr_unpack_vrlp(packet_buff, if_packet_info);
+            endian_conv = uhd::ntohx;
+        }
+        else
+        {
+            b250_if_hdr_unpack_chdr(packet_buff, if_packet_info);
+            endian_conv = uhd::wtohx;
+        }
     }
     catch(const std::exception &ex)
     {
@@ -248,9 +278,9 @@ static void handle_tx_async_msgs(boost::shared_ptr<b250_tx_fc_guts_t> guts, zero
     }
 
     //catch the flow control packets and react
-    if (uhd::ntohx(packet_buff[if_packet_info.num_header_words32+0]) == 0)
+    if (endian_conv(packet_buff[if_packet_info.num_header_words32+0]) == 0)
     {
-        const size_t seq = uhd::ntohx(packet_buff[if_packet_info.num_header_words32+1]);
+        const size_t seq = endian_conv(packet_buff[if_packet_info.num_header_words32+1]);
         guts->seq_queue.push_with_haste(seq);
         return;
     }
@@ -258,7 +288,7 @@ static void handle_tx_async_msgs(boost::shared_ptr<b250_tx_fc_guts_t> guts, zero
     //fill in the async metadata
     async_metadata_t metadata;
     load_metadata_from_buff(
-        uhd::ntohx<boost::uint32_t>, metadata, if_packet_info, packet_buff,
+        endian_conv, metadata, if_packet_info, packet_buff,
         clock->get_master_clock_rate(), guts->stream_channel);
     guts->async_queue->push_with_pop_on_full(metadata);
     metadata.channel = guts->device_channel;
@@ -321,24 +351,25 @@ rx_streamer::sptr b250_impl::get_rx_stream(const uhd::stream_args_t &args_)
         device_addr_t device_addr = _recv_args;
         if (not device_addr.has_key("recv_buff_size"))
         {
-            #if defined(UHD_PLATFORM_MACOS) || defined(UHD_PLATFORM_BSD)
-                //limit buffer resize on macos or it will error
-                device_addr["recv_buff_size"] = "1e6";
-            #elif defined(UHD_PLATFORM_LINUX) || defined(UHD_PLATFORM_WIN32)
-                //set to half-a-second of buffering at max rate
-                device_addr["recv_buff_size"] = "50e6";
-            #endif
+            if (_xport_path == "nirio") {
+                device_addr["recv_buff_size"] = boost::lexical_cast<std::string>(
+                        uhd::transport::nirio_zero_copy::get_default_buffer_size());
+            } else {
+                #if defined(UHD_PLATFORM_MACOS) || defined(UHD_PLATFORM_BSD)
+                    //limit buffer resize on macos or it will error
+                    device_addr["recv_buff_size"] = "1e6";
+                #elif defined(UHD_PLATFORM_LINUX) || defined(UHD_PLATFORM_WIN32)
+                    //set to half-a-second of buffering at max rate
+                    device_addr["recv_buff_size"] = "50e6";
+                #endif
+            }
         }
 
         //allocate sid and create transport
-        sid_config_t data_config;
-        data_config.router_addr_there = B250_DEVICE_THERE;
-        data_config.dst_prefix = B250_RADIO_DEST_PREFIX_RX;
-        data_config.router_dst_there = (chan == 0)? B250_XB_DST_R0 : B250_XB_DST_R1;
-        data_config.router_dst_here = _router_dst_here;
-        const boost::uint32_t data_sid = this->allocate_sid(data_config);
+        uint8_t dest = (chan == 0)? B250_XB_DST_R0 : B250_XB_DST_R1;
+        boost::uint32_t data_sid;
         UHD_LOG << "creating rx stream " << device_addr.to_string() << std::endl;
-        zero_copy_if::sptr data_xport = this->make_transport(_addr, data_sid, device_addr);
+        zero_copy_if::sptr data_xport = this->make_transport(_addr, _xport_path, dest, B250_RADIO_DEST_PREFIX_RX, device_addr, data_sid);
         UHD_LOG << boost::format("data_sid = 0x%08x\n") % data_sid << std::endl;
 
         //calculate packet size
@@ -358,11 +389,18 @@ rx_streamer::sptr b250_impl::get_rx_stream(const uhd::stream_args_t &args_)
         my_streamer->resize(args.channels.size());
 
         //init some streamer stuff
-        my_streamer->set_vrt_unpacker(&b250_if_hdr_unpack_be);
+        std::string conv_endianness;
+        if (_if_pkt_link_type == vrt::if_packet_info_t::LINK_TYPE_VRLP) {
+            my_streamer->set_vrt_unpacker(&b250_if_hdr_unpack_vrlp);
+            conv_endianness = "be";
+        } else {
+            my_streamer->set_vrt_unpacker(&b250_if_hdr_unpack_chdr);
+            conv_endianness = "le";
+        }
 
         //set the converter
         uhd::convert::id_type id;
-        id.input_format = args.otw_format + "_item32_be";
+        id.input_format = args.otw_format + "_item32_" + conv_endianness;
         id.num_inputs = 1;
         id.output_format = args.cpu_format;
         id.num_outputs = 1;
@@ -387,7 +425,7 @@ rx_streamer::sptr b250_impl::get_rx_stream(const uhd::stream_args_t &args_)
             &rx_vita_core_3000::handle_overflow, perif.framer
         ));
         my_streamer->set_xport_handle_flowctrl(stream_i, boost::bind(
-            &handle_rx_flowctrl, data_sid, data_xport, seq32, _1
+            &handle_rx_flowctrl, data_sid, data_xport, _if_pkt_link_type, seq32, _1
         ), fc_window, true/*init*/);
         my_streamer->set_issue_stream_cmd(stream_i, boost::bind(
             &rx_vita_core_3000::issue_stream_command, perif.framer, _1
@@ -428,14 +466,10 @@ tx_streamer::sptr b250_impl::get_tx_stream(const uhd::stream_args_t &args_)
         radio_perifs_t &perif = _radio_perifs[chan];
 
         //allocate sid and create transport
-        sid_config_t data_config;
-        data_config.router_addr_there = B250_DEVICE_THERE;
-        data_config.dst_prefix = B250_RADIO_DEST_PREFIX_TX;
-        data_config.router_dst_there = (chan == 0)? B250_XB_DST_R0 : B250_XB_DST_R1;
-        data_config.router_dst_here = _router_dst_here;
-        const boost::uint32_t data_sid = this->allocate_sid(data_config);
+        uint8_t dest = (chan == 0)? B250_XB_DST_R0 : B250_XB_DST_R1;
+        boost::uint32_t data_sid;
         UHD_LOG << "creating tx stream " << _send_args.to_string() << std::endl;
-        zero_copy_if::sptr data_xport = this->make_transport(_addr, data_sid, _send_args);
+        zero_copy_if::sptr data_xport = this->make_transport(_addr, _xport_path, dest, B250_RADIO_DEST_PREFIX_TX, _send_args, data_sid);
         UHD_LOG << boost::format("data_sid = 0x%08x\n") % data_sid << std::endl;
 
         //calculate packet size
@@ -454,14 +488,20 @@ tx_streamer::sptr b250_impl::get_tx_stream(const uhd::stream_args_t &args_)
         if (not my_streamer) my_streamer = boost::make_shared<sph::send_packet_streamer>(spp);
         my_streamer->resize(args.channels.size());
 
-        //init some streamer stuff
-        my_streamer->set_vrt_packer(&b250_if_hdr_pack_be);
+        std::string conv_endianness;
+        if (_if_pkt_link_type == vrt::if_packet_info_t::LINK_TYPE_VRLP) {
+            my_streamer->set_vrt_packer(&b250_if_hdr_pack_vrlp);
+            conv_endianness = "be";
+        } else {
+            my_streamer->set_vrt_packer(&b250_if_hdr_pack_chdr);
+            conv_endianness = "le";
+        }
 
         //set the converter
         uhd::convert::id_type id;
         id.input_format = args.cpu_format;
         id.num_inputs = 1;
-        id.output_format = args.otw_format + "_item32_be";
+        id.output_format = args.otw_format + "_item32_" + conv_endianness;
         id.num_outputs = 1;
         my_streamer->set_converter(id);
 
@@ -476,7 +516,7 @@ tx_streamer::sptr b250_impl::get_tx_stream(const uhd::stream_args_t &args_)
         guts->device_channel = chan;
         guts->async_queue = async_md;
         guts->old_async_queue = _async_md;
-        task::sptr task = task::make(boost::bind(&handle_tx_async_msgs, guts, data_xport, _clock));
+        task::sptr task = task::make(boost::bind(&handle_tx_async_msgs, guts, data_xport, _if_pkt_link_type, _clock));
 
         my_streamer->set_xport_chan_get_buff(stream_i, boost::bind(
             &get_tx_buff_with_flowctrl, task, guts, data_xport, _1
