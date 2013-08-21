@@ -165,8 +165,6 @@ int32_t niusrprio_Initialize(void)
       #elif NiFpga_Linux
          const char* const library = "libniusrprio.so";
          niusrprio_library = dlopen(library, RTLD_LAZY);
-         if (!niusrprio_library)
-            fprintf(stderr, "Error opening %s: %s\n", library, dlerror());
       #elif NiFpga_MacOS
          niusrprio_library = NULL;
       #else

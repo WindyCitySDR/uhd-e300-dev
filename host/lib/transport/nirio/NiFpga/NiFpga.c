@@ -1986,8 +1986,6 @@ NiFpga_Status NiFpga_Initialize(void)
       #elif NiFpga_Linux
          const char* const library = "libNiFpga.so";
          NiFpga_library = dlopen(library, RTLD_LAZY);
-         if (!NiFpga_library)
-            fprintf(stderr, "Error opening %s: %s\n", library, dlerror());
       #elif NiFpga_MacOS
          NiFpga_library = NULL;
       #else
