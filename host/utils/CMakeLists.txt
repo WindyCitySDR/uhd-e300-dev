@@ -45,6 +45,7 @@ SET(niro_prog_sources nirio_programmer.cpp
     ../lib/transport/nirio/nirio_resource_manager.cpp
     ../lib/transport/nirio/NiFpga/NiFpga.c
     ../lib/transport/nirio/NiFpga/niusrprio.c
+    ../lib/utils/platform.cpp
 )
 
 IF(WIN32)

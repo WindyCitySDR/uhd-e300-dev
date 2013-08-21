@@ -34,6 +34,7 @@
 #include <uhd/transport/udp_zero_copy.hpp>
 #include <uhd/transport/nirio_zero_copy.hpp>
 #include <uhd/transport/nirio/nifpga_interface.h>
+#include <uhd/utils/platform.hpp>
 
 using namespace uhd;
 using namespace uhd::usrp;
@@ -77,7 +78,8 @@ static device_addrs_t b250_find_with_addr(const device_addr_t &hint)
         try
         {
             wb_iface::sptr zpu_ctrl(new b250_ctrl_iface_enet(udp_simple::make_connected(new_addr["addr"], BOOST_STRINGIZE(X300_FW_COMMS_UDP_PORT))));
-            if (zpu_ctrl->peek32(SR_ADDR(X300_FW_SHMEM_BASE, X300_FW_SHMEM_CLAIM_STATUS)) != 0) continue; //claimed by another process
+            if (b250_impl::is_claimed(zpu_ctrl)) continue; //claimed by another process
+
             i2c_core_100_wb32::sptr zpu_i2c = i2c_core_100_wb32::make(zpu_ctrl, I2C1_BASE);
             i2c_iface::sptr eeprom16 = zpu_i2c->eeprom16();
             const mboard_eeprom_t mb_eeprom(*eeprom16, "X300");
@@ -125,7 +127,8 @@ static device_addrs_t b250_find_pcie(const device_addr_t &hint)
         try
         {
             wb_iface::sptr zpu_ctrl(new b250_ctrl_iface_pcie(kernel_proxy));
-            if (zpu_ctrl->peek32(SR_ADDR(X300_FW_SHMEM_BASE, X300_FW_SHMEM_CLAIM_STATUS)) != 0) continue; //claimed by another process
+            if (b250_impl::is_claimed(zpu_ctrl)) continue; //claimed by another process
+
             i2c_core_100_wb32::sptr zpu_i2c = i2c_core_100_wb32::make(zpu_ctrl, I2C1_BASE);
             i2c_iface::sptr eeprom16 = zpu_i2c->eeprom16();
             const mboard_eeprom_t mb_eeprom(*eeprom16, "X300");
@@ -519,6 +522,7 @@ b250_impl::~b250_impl(void)
         //kill the claimer task and unclaim the device
         _claimer_task.reset();
         _zpu_ctrl->poke32(SR_ADDR(X300_FW_SHMEM_BASE, X300_FW_SHMEM_CLAIM_TIME), 0);
+        _zpu_ctrl->poke32(SR_ADDR(X300_FW_SHMEM_BASE, X300_FW_SHMEM_CLAIM_SRC), 0);
 
 //@TODO: Handle lifetime issus for these objects. Can be fixed when the shared lib loading/unloading is removed.
 //        if (_xport_path == "nirio") {
@@ -914,5 +918,17 @@ void b250_impl::set_fp_gpio(const std::string &attr, const boost::uint64_t setti
 void b250_impl::claimer_loop(wb_iface::sptr iface)
 {
     iface->poke32(SR_ADDR(X300_FW_SHMEM_BASE, X300_FW_SHMEM_CLAIM_TIME), time(NULL));
+    iface->poke32(SR_ADDR(X300_FW_SHMEM_BASE, X300_FW_SHMEM_CLAIM_SRC), get_process_hash());
     boost::this_thread::sleep(boost::posix_time::milliseconds(1500)); //1.5 seconds
 }
+
+bool b250_impl::is_claimed(wb_iface::sptr iface)
+{
+    //If timed out then device is definitely unclaimed
+    if (iface->peek32(SR_ADDR(X300_FW_SHMEM_BASE, X300_FW_SHMEM_CLAIM_STATUS)) == 0)
+        return false;
+
+    //otherwise check claim src to determine if another thread with the same src has claimed the device
+    return iface->peek32(SR_ADDR(X300_FW_SHMEM_BASE, X300_FW_SHMEM_CLAIM_SRC)) != get_process_hash();
+}
+

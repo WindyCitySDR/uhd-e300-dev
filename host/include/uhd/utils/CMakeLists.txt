@@ -29,6 +29,7 @@ UHD_INSTALL(FILES
     msg.hpp
     paths.hpp
     pimpl.hpp
+    platform.hpp
     safe_call.hpp
     safe_main.hpp
     static.hpp

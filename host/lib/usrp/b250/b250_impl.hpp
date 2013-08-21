@@ -105,6 +105,7 @@ struct b250_impl : public uhd::device
 
     //task for periodically reclaiming the device from others
     void claimer_loop(wb_iface::sptr);
+    static bool is_claimed(wb_iface::sptr);
     uhd::task::sptr _claimer_task;
 
     //the io interface

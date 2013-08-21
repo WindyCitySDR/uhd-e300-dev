@@ -4,11 +4,7 @@
 
 #include <uhd/transport/nirio/status.h>
 #include <boost/thread/recursive_mutex.hpp>
-#if defined(UHD_PLATFORM_WIN32)
-    #include <Windows.h>
-#else
-    #include <unistd.h>
-#endif
+#include <uhd/utils/platform.hpp>
 
 namespace nifpga_interface
 {
@@ -21,11 +17,7 @@ public:
 
 	void initialize(uint32_t session) {
 		_session = session;
-#if defined(UHD_PLATFORM_WIN32)
-        _pid = GetCurrentProcessId();
-#else
-        _pid = getpid();
-#endif
+        _pid = uhd::get_process_id();
 	}
 
 	nirio_status acquire(uint32_t timeout) {
@@ -42,7 +34,7 @@ public:
 
 private:
 	uint32_t 	            _session;
-	int 		            _pid;
+	int32_t 		        _pid;
     boost::recursive_mutex  _mutex;
 };
 
