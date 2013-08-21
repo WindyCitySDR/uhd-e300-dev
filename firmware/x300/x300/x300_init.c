@@ -81,8 +81,8 @@ static void init_network(void)
     wb_i2c_read(I2C1_BASE, MBOARD_EEPROM_ADDR, (uint8_t *)(&eeprom_map), sizeof(eeprom_map));
 
     //determine interface number
-    const size_t eth0no = 0;//wb_peek32(SR_ADDR(RB0_BASE, RB_ETH_TYPE0))? 2 : 0;
-    const size_t eth1no = 1;//wb_peek32(SR_ADDR(RB0_BASE, RB_ETH_TYPE1))? 3 : 1;
+    const size_t eth0no = wb_peek32(SR_ADDR(RB0_BASE, RB_ETH_TYPE0))? 2 : 0;
+    const size_t eth1no = wb_peek32(SR_ADDR(RB0_BASE, RB_ETH_TYPE1))? 3 : 1;
 
     //pick the address from eeprom or default
     const eth_mac_addr_t *my_mac0 = (const eth_mac_addr_t *)pick_inited_field(&eeprom_map.mac_addr0, &default_map.mac_addr0, 6);
@@ -140,9 +140,9 @@ void x300_init(void)
     // For 10GE interfaces only, initialize the PHY's
     mdelay(100);
     if (wb_peek32(SR_ADDR(RB0_BASE, RB_ETH_TYPE0)) != 0) {
-      //xge_ethernet_init(0);
+      xge_ethernet_init(0);
     }
     if (wb_peek32(SR_ADDR(RB0_BASE, RB_ETH_TYPE1)) != 0) {
-      //xge_ethernet_init(1);
+      xge_ethernet_init(1);
     }
 }
