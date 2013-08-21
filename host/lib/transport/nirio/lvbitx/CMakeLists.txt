@@ -15,20 +15,15 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
 
-########################################################################
-# This file included, use CMake directory variables
-########################################################################
-
-MACRO(LIBUHD_LVBITX_GEN_SOURCE_AND_LVBITX lvbitx binfile)
+MACRO(LIBUHD_LVBITX_GEN_SOURCE_AND_BITSTREAM lvbitx binfile)
     GET_FILENAME_COMPONENT(lvbitxprefix ${lvbitx} NAME_WE)
 
     IF( ${binfile} STREQUAL "OFF" )
         SET( GEN_OPTIONS )
-        SET( LVBITX_DEP OFF )
+        MESSAGE( STATUS "  Using ${lvbitx} for codegen" )
     ELSE( ${binfile} STREQUAL "OFF" )
         SET( GEN_OPTIONS --merge-bin=${CMAKE_SOURCE_DIR}/../binaries/${binfile} --output-lvbitx-path=${CMAKE_SOURCE_DIR}/../binaries )
-        SET( LVBITX_DEP ${CMAKE_SOURCE_DIR}/../binaries/${lvbitxprefix}.lvbitx )
-        MESSAGE( STATUS "X300 LVBITX generation ENABLED with binaries/${binfile}" )
+        MESSAGE( STATUS "  Merging ${lvbitx} with ${binfile} for codegen" )
     ENDIF( ${binfile} STREQUAL "OFF" )
 
     SET(OUTPUT_PATH_OPT --output-src-path=${CMAKE_CURRENT_BINARY_DIR})
@@ -47,19 +42,25 @@ MACRO(LIBUHD_LVBITX_GEN_SOURCE_AND_LVBITX lvbitx binfile)
 
     #make libuhd depend on the output file
     LIBUHD_APPEND_SOURCES(${CMAKE_CURRENT_BINARY_DIR}/${lvbitxprefix}_lvbitx.cpp)
-ENDMACRO(LIBUHD_LVBITX_GEN_SOURCE_AND_LVBITX)
+ENDMACRO(LIBUHD_LVBITX_GEN_SOURCE_AND_BITSTREAM)
 
 INCLUDE_DIRECTORIES(${CMAKE_CURRENT_BINARY_DIR})
 
 ########################################################################
-# Add generation code here
+# Generation code
 ########################################################################
 
 FILE(TO_NATIVE_PATH ${CMAKE_INSTALL_PREFIX}/share/uhd/images lvbitx_install_dir)
 
+MESSAGE(STATUS "")
+MESSAGE(STATUS "Processing NI-RIO FPGA LVBITX Bitstreams...")
+
 # X300 Stuff
 SET( X300_FPGA_BIN "OFF" CACHE STRING "X300 FPGA config bitstream to generate LVBITX" )
 OPTION( X300_FPGA_BIN "FPGA config bitstream to generate LVBITX" "" )
+LIBUHD_LVBITX_GEN_SOURCE_AND_BITSTREAM(x300.lvbitx ${X300_FPGA_BIN})
 
-LIBUHD_LVBITX_GEN_SOURCE_AND_LVBITX(x300.lvbitx ${X300_FPGA_BIN})
-
+# X310 Stuff
+SET( X310_FPGA_BIN "OFF" CACHE STRING "X310 FPGA config bitstream to generate LVBITX" )
+OPTION( X310_FPGA_BIN "FPGA config bitstream to generate LVBITX" "" )
+LIBUHD_LVBITX_GEN_SOURCE_AND_BITSTREAM(x310.lvbitx ${X310_FPGA_BIN})

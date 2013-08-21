@@ -18,6 +18,7 @@
 #include "b250_impl.hpp"
 #include "b250_regs.hpp"
 #include "x300_lvbitx.hpp"
+#include "x310_lvbitx.hpp"
 #include <uhd/utils/static.hpp>
 #include <uhd/utils/msg.hpp>
 #include <uhd/utils/images.hpp>
@@ -261,7 +262,9 @@ b250_impl::b250_impl(const uhd::device_addr_t &dev_addr)
         nirio_status status = 0;
         nirio_status_chain(nifpga_session::load_lib(), status);
 
-        nifpga_lvbitx::sptr lvbitx(new x300_lvbitx());
+        //@TODO: When we can tell the X300 and X310 apart, instantiate the correct LVBITX
+        //       objest here. Both of them are codegen'ed currently.
+        nifpga_lvbitx::sptr lvbitx(new x310_lvbitx());
 
         UHD_MSG(status) << boost::format("Loading bitfile %s...\n") % lvbitx->get_signature();
         _rio_fpga_interface.reset(new nifpga_session(dev_addr["resource"]));
