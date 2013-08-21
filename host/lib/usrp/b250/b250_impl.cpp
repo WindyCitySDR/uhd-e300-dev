@@ -76,6 +76,7 @@ static device_addrs_t b250_find_with_addr(const device_addr_t &hint)
         try
         {
             wb_iface::sptr zpu_ctrl(new b250_ctrl_iface_enet(udp_simple::make_connected(new_addr["addr"], BOOST_STRINGIZE(X300_FW_COMMS_UDP_PORT))));
+            if (zpu_ctrl->peek32(SR_ADDR(X300_FW_SHMEM_BASE, X300_FW_SHMEM_CLAIM_STATUS)) != 0) continue; //claimed by another process
             i2c_core_100_wb32::sptr zpu_i2c = i2c_core_100_wb32::make(zpu_ctrl, I2C1_BASE);
             i2c_iface::sptr eeprom16 = zpu_i2c->eeprom16();
             const mboard_eeprom_t mb_eeprom(*eeprom16, "X300");
@@ -123,6 +124,7 @@ static device_addrs_t b250_find_pcie(const device_addr_t &hint)
         try
         {
             wb_iface::sptr zpu_ctrl(new b250_ctrl_iface_pcie(kernel_proxy));
+            if (zpu_ctrl->peek32(SR_ADDR(X300_FW_SHMEM_BASE, X300_FW_SHMEM_CLAIM_STATUS)) != 0) continue; //claimed by another process
             i2c_core_100_wb32::sptr zpu_i2c = i2c_core_100_wb32::make(zpu_ctrl, I2C1_BASE);
             i2c_iface::sptr eeprom16 = zpu_i2c->eeprom16();
             const mboard_eeprom_t mb_eeprom(*eeprom16, "X300");
@@ -161,7 +163,19 @@ static device_addrs_t b250_find(const device_addr_t &hint_)
     //use the address given
     if (hint.has_key("addr"))
     {
-        device_addrs_t reply_addrs = b250_find_with_addr(hint);
+        device_addrs_t reply_addrs;
+        try
+        {
+            reply_addrs = b250_find_with_addr(hint);
+        }
+        catch(const std::exception &ex)
+        {
+            UHD_MSG(error) << "X300 Network discovery error " << ex.what() << std::endl;
+        }
+        catch(...)
+        {
+            UHD_MSG(error) << "X300 Network discovery unknown error " << std::endl;
+        }
         BOOST_FOREACH(const device_addr_t &reply_addr, reply_addrs)
         {
             device_addrs_t new_addrs = b250_find_with_addr(reply_addr);
@@ -270,6 +284,8 @@ b250_impl::b250_impl(const uhd::device_addr_t &dev_addr)
         _zpu_ctrl.reset(new b250_ctrl_iface_pcie(_rio_fpga_interface->get_kernel_proxy()));
     else
         _zpu_ctrl.reset(new b250_ctrl_iface_enet(udp_simple::make_connected(_addr, BOOST_STRINGIZE(X300_FW_COMMS_UDP_PORT))));
+
+    _claimer_task = uhd::task::make(boost::bind(&b250_impl::claimer_loop, this, _zpu_ctrl));
 
     //extract the FW path for the B250
     //and live load fw over ethernet link
@@ -495,6 +511,10 @@ b250_impl::~b250_impl(void)
     (
         _radio_perifs[0].ctrl->poke32(TOREG(SR_MISC_OUTS), (1 << 2)); //disable/reset ADC/DAC
         _radio_perifs[1].ctrl->poke32(TOREG(SR_MISC_OUTS), (1 << 2)); //disable/reset ADC/DAC
+
+        //kill the claimer task and unclaim the device
+        _claimer_task.reset();
+        _zpu_ctrl->poke32(SR_ADDR(X300_FW_SHMEM_BASE, X300_FW_SHMEM_CLAIM_TIME), 0);
 
 //@TODO: Handle lifetime issus for these objects. Can be fixed when the shared lib loading/unloading is removed.
 //        if (_xport_path == "nirio") {
@@ -885,4 +905,10 @@ void b250_impl::set_fp_gpio(const std::string &attr, const boost::uint64_t setti
     if (attr == "ATR_RX") return _fp_gpio->set_atr_reg(dboard_iface::UNIT_RX, dboard_iface::ATR_REG_RX_ONLY, new_value);
     if (attr == "ATR_TX") return _fp_gpio->set_atr_reg(dboard_iface::UNIT_RX, dboard_iface::ATR_REG_TX_ONLY, new_value);
     if (attr == "ATR_XX") return _fp_gpio->set_atr_reg(dboard_iface::UNIT_RX, dboard_iface::ATR_REG_FULL_DUPLEX, new_value);
+}
+
+void b250_impl::claimer_loop(wb_iface::sptr iface)
+{
+    iface->poke32(SR_ADDR(X300_FW_SHMEM_BASE, X300_FW_SHMEM_CLAIM_TIME), time(NULL));
+    boost::this_thread::sleep(boost::posix_time::milliseconds(1500)); //1.5 seconds
 }

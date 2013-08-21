@@ -30,7 +30,7 @@ using namespace uhd;
 struct b250_uart_iface : uart_iface
 {
     b250_uart_iface(wb_iface::sptr iface):
-        rxoffset(0), txoffset(0)
+        rxoffset(0), txoffset(0), txword32(0)
     {
         _iface = iface;
         rxoffset = _iface->peek32(SR_ADDR(X300_FW_SHMEM_BASE, X300_FW_SHMEM_UART_RX_INDEX));
@@ -41,8 +41,11 @@ struct b250_uart_iface : uart_iface
 
     void putchar(const char ch)
     {
-        txoffset = (txoffset + 1) % X300_FW_SHMEM_UART_POOL_WORDS32;
-        _iface->poke32(SR_ADDR(X300_FW_SHMEM_BASE, X300_FW_SHMEM_UART_TX_POOL+txoffset), ch);
+        txoffset = (txoffset + 1) % (X300_FW_SHMEM_UART_POOL_WORDS32*4);
+        const int shift = ((txoffset%4) * 8);
+        if (shift == 0) txword32 = 0;
+        txword32 |= boost::uint32_t(ch) << shift;
+        _iface->poke32(SR_ADDR(X300_FW_SHMEM_BASE, X300_FW_SHMEM_UART_TX_POOL+txoffset/4), txword32);
         _iface->poke32(SR_ADDR(X300_FW_SHMEM_BASE, X300_FW_SHMEM_UART_TX_INDEX), txoffset);
     }
 
@@ -59,8 +62,9 @@ struct b250_uart_iface : uart_iface
     {
         if (_iface->peek32(SR_ADDR(X300_FW_SHMEM_BASE, X300_FW_SHMEM_UART_RX_INDEX)) != rxoffset)
         {
-            const char ch = _iface->peek32(SR_ADDR(X300_FW_SHMEM_BASE, X300_FW_SHMEM_UART_RX_POOL+rxoffset));
-            rxoffset = (rxoffset + 1) % X300_FW_SHMEM_UART_POOL_WORDS32;
+            const int shift = ((rxoffset%4) * 8);
+            const char ch = _iface->peek32(SR_ADDR(X300_FW_SHMEM_BASE, X300_FW_SHMEM_UART_RX_POOL+rxoffset/4)) >> shift;
+            rxoffset = (rxoffset + 1) % (X300_FW_SHMEM_UART_POOL_WORDS32*4);
             return ch;
         }
         return -1;
@@ -88,7 +92,7 @@ struct b250_uart_iface : uart_iface
     }
 
     wb_iface::sptr _iface;
-    boost::uint32_t rxoffset, txoffset;
+    boost::uint32_t rxoffset, txoffset, txword32;
 };
 
 uart_iface::sptr b250_make_uart_iface(wb_iface::sptr iface)

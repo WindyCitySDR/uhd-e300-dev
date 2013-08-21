@@ -15,6 +15,8 @@
 #include <printf.h>
 #include <string.h>
 
+static uint32_t *shmem = (uint32_t *) X300_FW_SHMEM_BASE;
+
 /***********************************************************************
  * Handler for UDP framer program packets
  **********************************************************************/
@@ -205,6 +207,35 @@ void run_flash_access_test()
 }
 
 /***********************************************************************
+ * Deal with host claims and claim timeout
+ **********************************************************************/
+static void handle_claim(void)
+{
+    static uint32_t last_time = 0;
+    static size_t timeout = 0;
+
+    //time is 0 if the claim was forfeit
+    if (shmem[X300_FW_SHMEM_CLAIM_TIME] == 0)
+    {
+        shmem[X300_FW_SHMEM_CLAIM_STATUS] = 0;
+    }
+    //if the time changes, reset timeout
+    else if (last_time != shmem[X300_FW_SHMEM_CLAIM_TIME])
+    {
+        shmem[X300_FW_SHMEM_CLAIM_STATUS] = 1;
+        timeout = 0;
+    }
+    //otherwise increment for timeout
+    else timeout++;
+
+    //always stash the last seen time
+    last_time = shmem[X300_FW_SHMEM_CLAIM_TIME];
+
+    //the claim has timed out after 2 seconds
+    if (timeout > 2000) shmem[X300_FW_SHMEM_CLAIM_STATUS] = 0;
+}
+
+/***********************************************************************
  * LED blinky logic and support utilities
  **********************************************************************/
 static uint32_t get_xbar_total(const uint8_t port)
@@ -259,6 +290,7 @@ static void update_leds(void)
     const bool act1 = cnt1*8 > (counter % 64);
     const bool link0 = ethernet_get_link_up(0);
     const bool link1 = ethernet_get_link_up(1);
+    const bool claimed = shmem[X300_FW_SHMEM_CLAIM_STATUS];
 
     wb_poke32(SET0_BASE + SR_LEDS*4, 0
         | (link0? LED_LINK2 : 0)
@@ -266,6 +298,7 @@ static void update_leds(void)
         | (act0? LED_ACT2 : 0)
         | (act1? LED_ACT1 : 0)
         | ((act0 || act1)? LED_LINKACT : 0)
+        | (claimed? LED_LINKSTAT : 0)
     );
 }
 
@@ -275,14 +308,12 @@ static void update_leds(void)
 static void garp(void)
 {
     static size_t count = 0;
-    if (count++ == 60000) //60 seconds
+    if (count++ < 60000) return; //60 seconds
+    count = 0;
+    for (size_t e = 0; e < ethernet_ninterfaces(); e++)
     {
-        count = 0;
-        for (size_t e = 0; e < ethernet_ninterfaces(); e++)
-        {
-            if (!ethernet_get_link_up(e)) continue;
-            u3_net_stack_send_arp_request(e, u3_net_stack_get_ip_addr(e));
-        }
+        if (!ethernet_get_link_up(e)) continue;
+        u3_net_stack_send_arp_request(e, u3_net_stack_get_ip_addr(e));
     }
 }
 
@@ -291,7 +322,6 @@ static void garp(void)
  **********************************************************************/
 static void handle_uarts(void)
 {
-    uint32_t *shmem = (uint32_t *) X300_FW_SHMEM_BASE;
     ////////////////////////////////////////////////////////////////////
     // RX UART - try to get a character and post it to the shmem buffer
     ////////////////////////////////////////////////////////////////////
@@ -299,8 +329,12 @@ static void handle_uarts(void)
     const int rxch = wb_uart_getc(UART0_BASE);
     if (rxch != -1)
     {
-        rxoffset = (rxoffset+1) % X300_FW_SHMEM_UART_POOL_WORDS32;
-        shmem[X300_FW_SHMEM_UART_RX_POOL+rxoffset] = (uint32_t) rxch;
+        rxoffset = (rxoffset+1) % (X300_FW_SHMEM_UART_POOL_WORDS32*4);
+        const int shift = ((rxoffset%4) * 8);
+        static uint32_t rxword32 = 0;
+        if (shift == 0) rxword32 = 0;
+        rxword32 |= ((uint32_t) rxch) << ((rxoffset%4) * 8);
+        shmem[X300_FW_SHMEM_UART_RX_POOL+rxoffset/4] = rxword32;
         shmem[X300_FW_SHMEM_UART_RX_INDEX] = rxoffset;
     }
 
@@ -310,9 +344,10 @@ static void handle_uarts(void)
     static uint32_t txoffset = 0;
     if (txoffset != shmem[X300_FW_SHMEM_UART_TX_INDEX])
     {
-        const int txch = shmem[X300_FW_SHMEM_UART_TX_POOL+txoffset];
+        const int shift = ((txoffset%4) * 8);
+        const int txch = shmem[X300_FW_SHMEM_UART_TX_POOL+txoffset/4] >> shift;
         wb_uart_putc(UART0_BASE, txch);
-        txoffset = (txoffset+1) % X300_FW_SHMEM_UART_POOL_WORDS32;
+        txoffset = (txoffset+1) % (X300_FW_SHMEM_UART_POOL_WORDS32*4);
     }
 }
 
@@ -336,6 +371,7 @@ int main(void)
         static const uint32_t tick_delta = CPU_CLOCK/1000;
         if (ticks_passed > tick_delta)
         {
+            handle_claim(); //deal with the host claim register
             update_leds(); //run the link and activity leds
             garp(); //send periodic garps
             xge_poll_sfpp_status(0); // Every so often poll XGE Phy to look for SFP+ hotplug events.
