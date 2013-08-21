@@ -22,6 +22,8 @@
    #include <stdlib.h>
    #include <stdio.h>
    #include <dlfcn.h>
+#elif NiFpga_MacOS
+   //Nothing
 #else
    #error
 #endif
@@ -45,6 +47,8 @@
 #elif NiFpga_VxWorks
    static MODULE_ID niusrprio_library = NULL;
 #elif NiFpga_Linux
+   static void* niusrprio_library = NULL;
+#elif NiFpga_MacOS
    static void* niusrprio_library = NULL;
 #else
    #error
@@ -163,6 +167,8 @@ int32_t niusrprio_Initialize(void)
          niusrprio_library = dlopen(library, RTLD_LAZY);
          if (!niusrprio_library)
             fprintf(stderr, "Error opening %s: %s\n", library, dlerror());
+      #elif NiFpga_MacOS
+         niusrprio_library = NULL;
       #else
          #error
       #endif
@@ -188,6 +194,8 @@ int32_t niusrprio_Initialize(void)
             *address = dlsym(niusrprio_library, name);
             if (!*address)
                return NiFpga_Status_VersionMismatch;
+         #elif NiFpga_MacOS
+            return NiFpga_Status_FeatureNotSupported;
          #else
             #error
          #endif
@@ -213,6 +221,8 @@ int32_t niusrprio_Finalize(void)
       #elif NiFpga_Linux
          if (dlclose(niusrprio_library))
             status = NiFpga_Status_ResourceNotInitialized;
+      #elif NiFpga_MacOS
+         status = NiFpga_Status_ResourceNotInitialized;
       #else
          #error
       #endif

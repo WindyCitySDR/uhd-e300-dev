@@ -437,6 +437,12 @@ namespace nirio_interface
 
         return iface_path;
     }
+#elif defined(UHD_PLATFORM_MACOS) || defined(UHD_PLATFORM_BSD)
+    std::string niriok_proxy::get_interface_path(
+        uint32_t interface_num)
+    {
+        return "";
+    }
 #else
     #error OS not supported by niriok_proxy::get_interface_path.
 #endif

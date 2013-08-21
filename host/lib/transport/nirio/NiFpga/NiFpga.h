@@ -53,7 +53,7 @@
       || defined(__gnu_linux__)
       #define NiFpga_Linux 1
    #else
-      #error Unsupported OS.
+      #define NiFpga_MacOS 1
    #endif
 #elif defined(__powerpc) \
    || defined(__powerpc__) \
@@ -67,7 +67,7 @@
    #if defined(__vxworks)
       #define NiFpga_VxWorks 1
    #else
-      #error Unsupported OS.
+      #define NiFpga_MacOS 1
    #endif
 #elif defined(__arm__) \
    || defined(__thumb__) \
@@ -82,7 +82,7 @@
     || defined(__gnu_linux__)
       #define NiFpga_Linux 1
    #else
-      #error Unsupported OS.
+      #define NiFpga_MacOS 1
    #endif
 #else
    #error Unsupported architecture.

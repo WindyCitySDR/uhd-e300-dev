@@ -24,6 +24,8 @@
    #include <stdlib.h>
    #include <stdio.h>
    #include <dlfcn.h>
+#elif NiFpga_MacOS
+   //Nothing
 #else
    #error
 #endif
@@ -47,6 +49,8 @@
 #elif NiFpga_VxWorks
    static MODULE_ID NiFpga_library = NULL;
 #elif NiFpga_Linux
+   static void* NiFpga_library = NULL;
+#elif NiFpga_MacOS
    static void* NiFpga_library = NULL;
 #else
    #error
@@ -1984,6 +1988,8 @@ NiFpga_Status NiFpga_Initialize(void)
          NiFpga_library = dlopen(library, RTLD_LAZY);
          if (!NiFpga_library)
             fprintf(stderr, "Error opening %s: %s\n", library, dlerror());
+      #elif NiFpga_MacOS
+         NiFpga_library = NULL;
       #else
          #error
       #endif
@@ -2009,6 +2015,8 @@ NiFpga_Status NiFpga_Initialize(void)
             *address = dlsym(NiFpga_library, name);
             if (!*address)
                return NiFpga_Status_VersionMismatch;
+         #elif NiFpga_MacOS
+            return NiFpga_Status_FeatureNotSupported;
          #else
             #error
          #endif
@@ -2059,6 +2067,8 @@ NiFpga_Status NiFpga_Finalize(void)
       #elif NiFpga_Linux
          if (dlclose(NiFpga_library))
             status = NiFpga_Status_ResourceNotInitialized;
+      #elif NiFpga_MacOS
+          status = NiFpga_Status_ResourceNotInitialized;
       #else
          #error
       #endif

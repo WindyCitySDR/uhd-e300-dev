@@ -46,11 +46,16 @@ SET(niro_prog_sources nirio_programmer.cpp
     ../lib/transport/nirio/NiFpga/NiFpga.c
     ../lib/transport/nirio/NiFpga/niusrprio.c
 )
+
 IF(WIN32)
     LIST(APPEND niro_prog_sources ../lib/transport/nirio/nirio_driver_iface_win.cpp)
-ELSE()
-    LIST(APPEND niro_prog_sources ../lib/transport/nirio/nirio_driver_iface_linux.cpp)
-ENDIF()
+ELSE(WIN32)
+    IF(APPLE)
+        LIST(APPEND niro_prog_sources ../lib/transport/nirio/nirio_driver_iface_macos.cpp)
+    ELSE(APPLE)
+        LIST(APPEND niro_prog_sources ../lib/transport/nirio/nirio_driver_iface_linux.cpp)
+    ENDIF(APPLE)
+ENDIF(WIN32)
 
 ADD_EXECUTABLE(nirio_programmer ${niro_prog_sources})
 IF(WIN32)

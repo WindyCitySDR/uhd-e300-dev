@@ -4,12 +4,10 @@
 
 #include <uhd/transport/nirio/status.h>
 #include <boost/thread/recursive_mutex.hpp>
-#if defined(UHD_PLATFORM_LINUX)
-    #include <unistd.h>
-#elif defined(UHD_PLATFORM_WIN32)
+#if defined(UHD_PLATFORM_WIN32)
     #include <Windows.h>
 #else
-    #error OS not supported by locks.h
+    #include <unistd.h>
 #endif
 
 namespace nifpga_interface
@@ -23,10 +21,10 @@ public:
 
 	void initialize(uint32_t session) {
 		_session = session;
-#if defined(UHD_PLATFORM_LINUX)
-        _pid = getpid();
-#elif defined(UHD_PLATFORM_WIN32)
+#if defined(UHD_PLATFORM_WIN32)
         _pid = GetCurrentProcessId();
+#else
+        _pid = getpid();
 #endif
 	}
 

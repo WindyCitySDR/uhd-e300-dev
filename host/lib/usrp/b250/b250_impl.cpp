@@ -104,13 +104,13 @@ static device_addrs_t b250_find_with_addr(const device_addr_t &hint)
 
 static device_addrs_t b250_find_pcie(const device_addr_t &hint)
 {
+    device_addrs_t addrs;
     //@TODO: Remove this when we have the helper process
-    nirio_status_not_fatal(nifpga_session::load_lib());
+    if (nirio_status_fatal(nifpga_session::load_lib())) return addrs;
 
     nifpga_session::nirio_device_info_vtr dev_info_vtr;
     nifpga_session::enumerate(dev_info_vtr);
 
-    device_addrs_t addrs;
     BOOST_FOREACH(nifpga_session::nirio_device_info &dev_info, dev_info_vtr)
     {
         device_addr_t new_addr;
@@ -258,16 +258,17 @@ b250_impl::b250_impl(const uhd::device_addr_t &dev_addr)
     if (_xport_path == "nirio") {
         //@TODO: Remove this when we have the helper process
         UHD_MSG(status) << "Loading NI shared libs...\n";
-        nirio_status_not_fatal(nifpga_session::load_lib());
+        nirio_status status = 0;
+        nirio_status_chain(nifpga_session::load_lib(), status);
 
         nifpga_lvbitx::sptr lvbitx(new x300_lvbitx());
 
         UHD_MSG(status) << boost::format("Loading bitfile %s...\n") % lvbitx->get_signature();
         _rio_fpga_interface.reset(new nifpga_session(dev_addr["resource"]));
-        nirio_status status = 0;
         nirio_status_chain(_rio_fpga_interface->open(lvbitx), status);
 
-        UHD_ASSERT_THROW(nirio_status_not_fatal(status));
+        if(nirio_status_fatal(status))
+            throw uhd::runtime_error("b250_impl: could not download LVBITX file to the device");
     }
 
     BOOST_FOREACH(const std::string &key, dev_addr.keys())

@@ -6,11 +6,13 @@
 #include <string>
 #include <uhd/transport/nirio/status.h>
 #include <uhd/config.hpp>
-#ifdef UHD_PLATFORM_WIN32
+#if defined(UHD_PLATFORM_WIN32)
     #include <Windows.h>
     #pragma warning(disable:4201)  // nonstandard extension used : nameless struct/union
         #include <WinIoCtl.h>
     #pragma warning(default:4201)
+#elif defined(UHD_PLATFORM_MACOS) || defined(UHD_PLATFORM_BSD)
+    #include <IOKit/IOKitLib.h>
 #endif
 
 // CTL_CODE macro for non-win OSes
@@ -481,7 +483,7 @@ namespace nirio_driver_iface {
     typedef int rio_dev_handle_t;
 #elif defined(UHD_PLATFORM_WIN32)
     typedef HANDLE rio_dev_handle_t;
-#elif defined(UHD_PLATFORM_MACOS)
+#elif defined(UHD_PLATFORM_MACOS) || defined(UHD_PLATFORM_BSD)
     typedef io_connect_t rio_dev_handle_t;
 #else
     #error OS not supported by nirio_driver_iface.
@@ -528,7 +530,7 @@ static const rio_dev_handle_t INVALID_RIO_HANDLE = ((rio_dev_handle_t)-1);
 
         bool is_null() { return addr == NULL; }
     };
-#elif defined(UHD_PLATFORM_MACOS)
+#elif defined(UHD_PLATFORM_MACOS) || defined(UHD_PLATFORM_BSD)
      struct rio_mmap_t {
          rio_mmap_t() : addr(NULL) {}
          void *addr;
