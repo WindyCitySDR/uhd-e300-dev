@@ -16,6 +16,7 @@
 //
 
 #include <uhd/utils/platform.hpp>
+#include <uhd/config.hpp>
 #include <boost/functional/hash.hpp>
 #ifdef UHD_PLATFORM_WIN32
 #include <Windows.h>
