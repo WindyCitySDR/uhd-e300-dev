@@ -290,8 +290,6 @@ xge_poll_sfpp_status(const uint32_t eth)
 
   if (x & (SFPP_STATUS_RXLOS_CHG|SFPP_STATUS_TXFAULT_CHG|SFPP_STATUS_MODABS_CHG))
     if (( x & (SFPP_STATUS_RXLOS|SFPP_STATUS_TXFAULT|SFPP_STATUS_MODABS)) == 0) {
-      // Only re-init if it's 10GE
-      if (wb_peek32(SR_ADDR(RB0_BASE, (eth==0) ? RB_ETH_TYPE0 : RB_ETH_TYPE1)) != 0) {
 	xge_ethernet_init(eth);
 	dump_mdio_regs((eth==0) ? XGE0_BASE : XGE1_BASE,MDIO_PORT);
 	mdelay(100);
@@ -299,7 +297,6 @@ xge_poll_sfpp_status(const uint32_t eth)
 	mdelay(100);
 	dump_mdio_regs((eth==0) ? XGE0_BASE : XGE1_BASE,MDIO_PORT);
       }
-    }
 
   if (x & SFPP_STATUS_MODABS_CHG) {
     // MODDET has changed state since last checked
@@ -316,9 +313,7 @@ xge_poll_sfpp_status(const uint32_t eth)
 
     //update the link up status
     const bool old_link_up = links_up[eth];
-    //TODO eth 1G and 10G
-    //TODO (xge_read_mdio((eth==0) ? XGE0_BASE : XGE1_BASE, 0x1,XGE_MDIO_DEVICE_PMA,MDIO_PORT)) & 0x2;
-    links_up[eth] = false;
+    links_up[eth] = ((xge_read_mdio((eth==0) ? XGE0_BASE : XGE1_BASE, XGE_MDIO_STATUS1,XGE_MDIO_DEVICE_PMA,MDIO_PORT)) & (1 << 2)) != 0;
     //The link became up, send a GARP so everyone knows our mac/ip association
     if (!old_link_up && links_up[eth]) u3_net_stack_send_arp_request(eth, u3_net_stack_get_ip_addr(eth));
 }
