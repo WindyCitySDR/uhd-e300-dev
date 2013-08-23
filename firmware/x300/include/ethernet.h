@@ -39,7 +39,7 @@ void xge_ethernet_init(const uint32_t eth);
 int ethernet_ninterfaces(void);
 
 
-void dump_mdio_regs(const uint32_t base, uint32_t mdio_port);
+void dump_mdio_regs(const uint8_t eth, uint32_t mdio_port);
 
 /*!
  * \brief Test status of SFP+ modules

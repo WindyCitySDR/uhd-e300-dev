@@ -26,6 +26,8 @@
 #define MDIO_ADDRESS 0
 #define MDIO_WRITE 1
 #define MDIO_READ 3
+#define MDIO_C22_WRITE 2
+#define MDIO_C22_READ 1
 #define MDIO_READ_POST 2
 #define XGE_MDIO_ADDR(n)   ((n & 0x1f) << 5)
 #define XGE_MDIO_MMD(n)    ((n & 0x1f) << 0)

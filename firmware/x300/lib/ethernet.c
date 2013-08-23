@@ -76,7 +76,8 @@ ethernet_ninterfaces(void)
 {
   return NETHS;
 }
-  
+
+////////////////////////////////////////////////////////////////////////
 //
 // Clause 45 MDIO used for 10Gig Ethernet has two bus transactions to complete a transfer.
 // An initial transaction sets up the address, and a subsequent one transfers the read or write data.
@@ -123,6 +124,70 @@ xge_write_mdio(const uint32_t base, const uint32_t address, const uint32_t devic
   while (xge_regs->mdio_control == 1);
 }
 
+////////////////////////////////////////////////////////////////////////
+//
+// Clause 22 MDIO used for 1Gig Ethernet has one bus transaction to complete a transfer.
+//
+static uint32_t 
+ge_read_mdio(const uint32_t base, const uint32_t address, const uint32_t port)
+{
+  // Its a clause 22 device. We want to READ
+  xge_regs->mdio_op = XGE_MDIO_CLAUSE(CLAUSE22) | XGE_MDIO_OP(MDIO_C22_READ) | XGE_MDIO_ADDR(port) | address;
+  // Start MDIO bus transaction
+  xge_regs->mdio_control = 1;
+  // Wait until bus transaction complete
+  while (xge_regs->mdio_control == 1);
+  // Read MDIO data
+  return(xge_regs->mdio_data);
+}
+
+static void 
+ge_write_mdio(const uint32_t base, const uint32_t address, const uint32_t port, const uint32_t data)
+{
+  // Write new value to mdio_write_data reg. 
+  xge_regs->mdio_data = data; 
+  // Its a clause 22 device. We want to WRITE 
+  xge_regs->mdio_op = XGE_MDIO_CLAUSE(CLAUSE22) | XGE_MDIO_OP(MDIO_C22_WRITE) | XGE_MDIO_ADDR(port) | address;
+  // Start MDIO bus transaction 
+  xge_regs->mdio_control = 1; 
+  // Wait until bus transaction complete  
+  while (xge_regs->mdio_control == 1);
+}
+
+////////////////////////////////////////////////////////////////////////
+//
+// Read and write MDIO independent of type
+//
+
+static uint32_t read_mdio(const uint8_t eth, const uint32_t address, const uint32_t device, const uint32_t port)
+{
+    const uint32_t rb_addr = (eth==0) ? RB_ETH_TYPE0 : RB_ETH_TYPE1;
+    const uint32_t base = (eth==0) ? XGE0_BASE : XGE1_BASE;
+    if (wb_peek32(SR_ADDR(RB0_BASE, rb_addr)) != 0)
+    {
+        return xge_read_mdio(base, address, device, port);
+    }
+    else
+    {
+        return ge_read_mdio(base, address, port);
+    }
+}
+
+static void write_mdio(const uint8_t eth, const uint32_t address, const uint32_t device, const uint32_t port, const uint32_t data)
+{
+    const uint32_t rb_addr = (eth==0) ? RB_ETH_TYPE0 : RB_ETH_TYPE1;
+    const uint32_t base = (eth==0) ? XGE0_BASE : XGE1_BASE;
+    if (wb_peek32(SR_ADDR(RB0_BASE, rb_addr)) != 0)
+    {
+        return xge_write_mdio(base, address, device, port, data);
+    }
+    else
+    {
+        return ge_write_mdio(base, address, port, data);
+    }
+}
+
+////////////////////////////////////////////////////////////////////////
 //
 // Read an 8-bit word from a device attached to the PHY's i2c bus.
 //
@@ -144,6 +209,7 @@ xge_i2c_rd(const uint32_t base, const uint8_t i2c_dev_addr, const uint8_t i2c_wo
   return((int) buf);
 }
 
+////////////////////////////////////////////////////////////////////////
 //
 // Read identity of SFP+ module for XGE PHY
 //
@@ -260,18 +326,19 @@ xge_mac_init(const uint32_t base)
 
 // base is pointer to XGE MAC on Wishbone.
 static void
-xge_phy_init(const uint32_t base, const uint32_t mdio_port)
+xge_phy_init(const uint8_t eth, const uint32_t mdio_port)
 {
   int x;
   // Read LASI Ctrl register to capture state.
   //y = xge_read_mdio(0x9002,XGE_MDIO_DEVICE_PMA,XGE_MDIO_ADDR_PHY_A);
   printf("INFO: Begining XGE PHY init sequence.\n");
   // Software reset
-  x = xge_read_mdio(base, 0x0, XGE_MDIO_DEVICE_PMA,mdio_port);
+  x = read_mdio(eth, 0x0, XGE_MDIO_DEVICE_PMA,mdio_port);
   x = x | (1 << 15); 
-  xge_write_mdio(base, 0x0,XGE_MDIO_DEVICE_PMA,mdio_port,x);  
-  while(x&(1<<15)) 
-    x = xge_read_mdio(base, 0x0,XGE_MDIO_DEVICE_PMA,mdio_port);
+  write_mdio(eth, 0x0,XGE_MDIO_DEVICE_PMA,mdio_port,x);  
+  //FIXME uncomment lines below when 1gigE MDIO works
+  //while(x&(1<<15)) 
+  //  x = read_mdio(eth, 0x0,XGE_MDIO_DEVICE_PMA,mdio_port);
 }
 
 void
@@ -313,7 +380,7 @@ xge_poll_sfpp_status(const uint32_t eth)
 
     //update the link up status
     const bool old_link_up = links_up[eth];
-    links_up[eth] = ((xge_read_mdio((eth==0) ? XGE0_BASE : XGE1_BASE, XGE_MDIO_STATUS1,XGE_MDIO_DEVICE_PMA,MDIO_PORT)) & (1 << 2)) != 0;
+    links_up[eth] = ((read_mdio(eth, XGE_MDIO_STATUS1,XGE_MDIO_DEVICE_PMA,MDIO_PORT)) & (1 << 2)) != 0;
     //The link became up, send a GARP so everyone knows our mac/ip association
     if (!old_link_up && links_up[eth]) u3_net_stack_send_arp_request(eth, u3_net_stack_get_ip_addr(eth));
 }
@@ -324,7 +391,7 @@ xge_ethernet_init(const uint32_t eth)
 { 
   xge_mac_init((eth==0) ? XGE0_BASE : XGE1_BASE); 
  //xge_hard_phy_reset();  
-  xge_phy_init((eth==0) ? XGE0_BASE : XGE1_BASE ,MDIO_PORT);    
+  xge_phy_init(eth ,MDIO_PORT);    
   uint32_t x = wb_peek32(SR_ADDR(RB0_BASE, (eth==0) ? RB_SFPP_STATUS0 : RB_SFPP_STATUS1 ));
   printf(" eth%1d SFP initial state: RXLOS: %d  TXFAULT: %d  MODABS: %d\n",
 	 eth,
@@ -526,7 +593,7 @@ void decode_reg(uint32_t address, uint32_t device, uint32_t data)
 }
 
 void 
-dump_mdio_regs(const uint32_t base, uint32_t mdio_port)
+dump_mdio_regs(const uint8_t eth, uint32_t mdio_port)
 {
     volatile unsigned int x;
     int y;
@@ -538,14 +605,14 @@ dump_mdio_regs(const uint32_t base, uint32_t mdio_port)
     for (y = 0; y < 10; y++)       
 	{
 	  // Read MDIO data
-	  x = xge_read_mdio(base,regs_b[y],XGE_MDIO_DEVICE_PMA,mdio_port);
+	  x = read_mdio(eth,regs_b[y],XGE_MDIO_DEVICE_PMA,mdio_port);
 	  decode_reg(regs_b[y],XGE_MDIO_DEVICE_PMA,x);
 	}
     
       for (y = 0; y < 9; y++)
 	{
 	  // Read MDIO data
-	  x = xge_read_mdio(base,regs_a[y],XGE_MDIO_DEVICE_PCS,mdio_port);
+	  x = read_mdio(eth,regs_a[y],XGE_MDIO_DEVICE_PCS,mdio_port);
 	  decode_reg(regs_a[y],XGE_MDIO_DEVICE_PCS,x);
 	}
 
