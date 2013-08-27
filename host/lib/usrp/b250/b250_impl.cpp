@@ -548,7 +548,6 @@ void b250_impl::setup_radio(const size_t i, const std::string &db_name)
     ////////////////////////////////////////////////////////////////////
     // radio control
     ////////////////////////////////////////////////////////////////////
-    UHD_HERE();
     uint8_t dest = (i == 0)? B250_XB_DST_R0 : B250_XB_DST_R1;
     boost::uint32_t ctrl_sid;
     zero_copy_if::sptr ctrl_xport = this->make_transport(_addr, _xport_path, dest, B250_RADIO_DEST_PREFIX_CTRL, device_addr_t(), ctrl_sid);
