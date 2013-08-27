@@ -34,7 +34,7 @@ struct b250_uart_iface : uart_iface
     {
         _iface = iface;
         rxoffset = _iface->peek32(SR_ADDR(X300_FW_SHMEM_BASE, X300_FW_SHMEM_UART_RX_INDEX));
-        _iface->poke32(SR_ADDR(X300_FW_SHMEM_BASE, X300_FW_SHMEM_UART_TX_INDEX), txoffset);
+        txoffset = _iface->peek32(SR_ADDR(X300_FW_SHMEM_BASE, X300_FW_SHMEM_UART_TX_INDEX));
         //this->write_uart("HELLO UART\n");
         //this->read_uart(0.1);
     }
