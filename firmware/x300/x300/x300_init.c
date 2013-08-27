@@ -107,13 +107,14 @@ static void init_network(void)
 
 static void putc(void *p, char c)
 {
-    //wb_uart_putc(UART0_BASE, c);
+  //wb_uart_putc(UART1_BASE, c);
 }
 
 void x300_init(void)
 {
     //first - uart
     wb_uart_init(UART0_BASE, CPU_CLOCK/UART0_BAUD);
+    wb_uart_init(UART1_BASE, CPU_CLOCK/UART1_BAUD);
     init_printf(NULL,putc);
     //udp_uart_init(UART0_BASE, X300_GPSDO_UDP_PORT);
 
@@ -136,12 +137,9 @@ void x300_init(void)
 
     //phy reset release
     wb_poke32(SR_ADDR(SET0_BASE, SR_SW_RST), 0);
-    // For 10GE interfaces only, initialize the PHY's
+
+    // For eth interfaces, initialize the PHY's
     mdelay(100);
-    if (wb_peek32(SR_ADDR(RB0_BASE, RB_ETH_TYPE0)) != 0) {
-      xge_ethernet_init(0);
-    }
-    if (wb_peek32(SR_ADDR(RB0_BASE, RB_ETH_TYPE1)) != 0) {
-      xge_ethernet_init(1);
-    }
+    xge_ethernet_init(0);
+    xge_ethernet_init(1);
 }

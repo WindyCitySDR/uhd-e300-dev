@@ -17,6 +17,8 @@
 
 #include "b250_impl.hpp"
 #include "b250_regs.hpp"
+#include "x300_lvbitx.hpp"
+#include "x310_lvbitx.hpp"
 #include <uhd/utils/static.hpp>
 #include <uhd/utils/msg.hpp>
 #include <uhd/utils/images.hpp>
@@ -29,10 +31,16 @@
 #include <boost/functional/hash.hpp>
 #include <boost/assign/list_of.hpp>
 #include <fstream>
+#include <uhd/transport/udp_zero_copy.hpp>
+#include <uhd/transport/nirio_zero_copy.hpp>
+#include <uhd/transport/nirio/nifpga_interface.h>
+#include <uhd/utils/platform.hpp>
 
 using namespace uhd;
 using namespace uhd::usrp;
 using namespace uhd::transport;
+using namespace nifpga_interface;
+using namespace nirio_interface;
 namespace asio = boost::asio;
 
 /***********************************************************************
@@ -69,8 +77,9 @@ static device_addrs_t b250_find_with_addr(const device_addr_t &hint)
         //This operation can throw due to compatibility mismatch.
         try
         {
-            wb_iface::sptr zpu_ctrl(new b250_ctrl_iface(udp_simple::make_connected(new_addr["addr"], BOOST_STRINGIZE(X300_FW_COMMS_UDP_PORT))));
-            if (zpu_ctrl->peek32(SR_ADDR(X300_FW_SHMEM_BASE, X300_FW_SHMEM_CLAIM_STATUS)) != 0) continue; //claimed by another process
+            wb_iface::sptr zpu_ctrl(new b250_ctrl_iface_enet(udp_simple::make_connected(new_addr["addr"], BOOST_STRINGIZE(X300_FW_COMMS_UDP_PORT))));
+            if (b250_impl::is_claimed(zpu_ctrl)) continue; //claimed by another process
+
             i2c_core_100_wb32::sptr zpu_i2c = i2c_core_100_wb32::make(zpu_ctrl, I2C1_BASE);
             i2c_iface::sptr eeprom16 = zpu_i2c->eeprom16();
             const mboard_eeprom_t mb_eeprom(*eeprom16, "X300");
@@ -93,6 +102,57 @@ static device_addrs_t b250_find_with_addr(const device_addr_t &hint)
         }
     }
 
+    return addrs;
+}
+
+static device_addrs_t b250_find_pcie(const device_addr_t &hint)
+{
+    device_addrs_t addrs;
+    //@TODO: Remove this when we have the helper process
+    if (nirio_status_fatal(nifpga_session::load_lib())) return addrs;
+
+    nifpga_session::nirio_device_info_vtr dev_info_vtr;
+    nifpga_session::enumerate(dev_info_vtr);
+
+    BOOST_FOREACH(nifpga_session::nirio_device_info &dev_info, dev_info_vtr)
+    {
+        device_addr_t new_addr;
+        new_addr["type"] = "x300";
+        new_addr["resource"] = dev_info.resource_name;
+
+        niriok_proxy kernel_proxy;
+        kernel_proxy.open(dev_info.interface_path);
+        //Attempt to read the name from the EEPROM and perform filtering.
+        //This operation can throw due to compatibility mismatch.
+        try
+        {
+            wb_iface::sptr zpu_ctrl(new b250_ctrl_iface_pcie(kernel_proxy));
+            if (b250_impl::is_claimed(zpu_ctrl)) continue; //claimed by another process
+
+            i2c_core_100_wb32::sptr zpu_i2c = i2c_core_100_wb32::make(zpu_ctrl, I2C1_BASE);
+            i2c_iface::sptr eeprom16 = zpu_i2c->eeprom16();
+            const mboard_eeprom_t mb_eeprom(*eeprom16, "X300");
+            new_addr["name"] = mb_eeprom["name"];
+            new_addr["serial"] = mb_eeprom["serial"];
+        }
+        catch(const std::exception &)
+        {
+            //set these values as empty string so the device may still be found
+            //and the filter's below can still operate on the discovered device
+            new_addr["name"] = "";
+            new_addr["serial"] = "";
+        }
+        kernel_proxy.close();
+
+        //filter the discovered device below by matching optional keys
+        if (
+            (not hint.has_key("resource") or hint["resource"] == new_addr["resource"]) and
+            (not hint.has_key("name")     or hint["name"]     == new_addr["name"]) and
+            (not hint.has_key("serial")   or hint["serial"]   == new_addr["serial"])
+        ){
+            addrs.push_back(new_addr);
+        }
+    }
     return addrs;
 }
 
@@ -128,20 +188,26 @@ static device_addrs_t b250_find(const device_addr_t &hint_)
         return addrs;
     }
 
-    //otherwise, no address was specified, send a broadcast on each interface
-    BOOST_FOREACH(const if_addrs_t &if_addrs, get_if_addrs())
+    if (!hint.has_key("resource"))
     {
-        //avoid the loopback device
-        if (if_addrs.inet == asio::ip::address_v4::loopback().to_string()) continue;
+        //otherwise, no address was specified, send a broadcast on each interface
+        BOOST_FOREACH(const if_addrs_t &if_addrs, get_if_addrs())
+        {
+            //avoid the loopback device
+            if (if_addrs.inet == asio::ip::address_v4::loopback().to_string()) continue;
 
-        //create a new hint with this broadcast address
-        device_addr_t new_hint = hint;
-        new_hint["addr"] = if_addrs.bcast;
+            //create a new hint with this broadcast address
+            device_addr_t new_hint = hint;
+            new_hint["addr"] = if_addrs.bcast;
 
-        //call discover with the new hint and append results
-        device_addrs_t new_addrs = b250_find(new_hint);
-        addrs.insert(addrs.begin(), new_addrs.begin(), new_addrs.end());
+            //call discover with the new hint and append results
+            device_addrs_t new_addrs = b250_find(new_hint);
+            addrs.insert(addrs.begin(), new_addrs.begin(), new_addrs.end());
+        }
     }
+
+    device_addrs_t pcie_addrs = b250_find_pcie(hint);
+    if (not pcie_addrs.empty()) addrs.insert(addrs.end(), pcie_addrs.begin(), pcie_addrs.end());
 
     return addrs;
 }
@@ -159,11 +225,8 @@ UHD_STATIC_BLOCK(register_b250_device)
     device::register_device(&b250_find, &b250_make);
 }
 
-static void b250_load_fw(const std::string &addr, const std::string &file_name)
+static void b250_load_fw(wb_iface::sptr fw_reg_ctrl, const std::string &file_name)
 {
-    udp_simple::sptr comm = udp_simple::make_connected(
-        addr, BOOST_STRINGIZE(X300_FW_COMMS_UDP_PORT));
-
     UHD_MSG(status) << "Loading firmware " << file_name << std::flush;
 
     //load file into memory
@@ -172,35 +235,13 @@ static void b250_load_fw(const std::string &addr, const std::string &file_name)
     fw_file.read((char *)fw_file_buff, sizeof(fw_file_buff));
     fw_file.close();
 
-    //poke the fw words into the upper bootram half
-    size_t seq = 0;
-    x300_fw_comms_t request = x300_fw_comms_t();
-    char buff[X300_FW_COMMS_MTU] = {};
-
-    request.flags = uhd::htonx<boost::uint32_t>(X300_FW_COMMS_FLAGS_POKE32 | X300_FW_COMMS_FLAGS_ACK);
-    request.sequence = uhd::htonx<boost::uint32_t>(seq++);
-    request.addr = uhd::htonx<boost::uint32_t>(SR_ADDR(BOOT_LDR_BASE, BL_ADDRESS));
-    request.data = 0;
-    comm->send(asio::buffer(&request, sizeof(request)));
-    comm->recv(asio::buffer(buff));
-
+    //Poke the fw words into the WB boot loader
+    fw_reg_ctrl->poke32(SR_ADDR(BOOT_LDR_BASE, BL_ADDRESS), 0);
     for (size_t i = 0; i < X300_FW_NUM_BYTES; i+=sizeof(boost::uint32_t))
     {
-        //do ack for occasional backpressure
-        const bool ack = (i & 0xf) == 0;
-
-        //load request struct
-        request.flags = uhd::htonx<boost::uint32_t>(X300_FW_COMMS_FLAGS_POKE32 | (ack?X300_FW_COMMS_FLAGS_ACK : 0));
-        request.sequence = uhd::htonx<boost::uint32_t>(seq++);
-        request.addr = uhd::htonx<boost::uint32_t>(SR_ADDR(BOOT_LDR_BASE, BL_DATA));
-        request.data = uhd::htonx(uhd::byteswap(fw_file_buff[i/sizeof(boost::uint32_t)]));
-
-        //send request
-        comm->send(asio::buffer(&request, sizeof(request)));
-
-        //do ack for occasional backpressure
-        if (ack) comm->recv(asio::buffer(buff));
-
+        //@TODO: FIXME: Since b250_ctrl_iface acks each write and traps exceptions, the first try for the last word
+        //              written will print an error because it triggers a FW reload and fails to reply.
+        fw_reg_ctrl->poke32(SR_ADDR(BOOT_LDR_BASE, BL_DATA), uhd::byteswap(fw_file_buff[i/sizeof(boost::uint32_t)]));
         if ((i & 0x1fff) == 0) UHD_MSG(status) << "." << std::flush;
     }
 
@@ -213,12 +254,44 @@ b250_impl::b250_impl(const uhd::device_addr_t &dev_addr)
     _async_md.reset(new async_md_type(1000/*messages deep*/));
     _tree = uhd::property_tree::make();
     _sid_framer = 0;
-    _addr = dev_addr["addr"];
+    _addr = dev_addr.has_key("resource") ? dev_addr["resource"] : dev_addr["addr"];
+    _xport_path = dev_addr.has_key("resource") ? "nirio" : "eth";
+    _if_pkt_is_big_endian = _xport_path != "nirio";
+
+    if (_xport_path == "nirio") {
+        //@TODO: Remove this when we have the helper process
+        UHD_MSG(status) << "Loading NI shared libs...\n";
+        nirio_status status = 0;
+        nirio_status_chain(nifpga_session::load_lib(), status);
+
+        //@TODO: When we can tell the X300 and X310 apart, instantiate the correct LVBITX
+        //       objest here. Both of them are codegen'ed currently.
+        nifpga_lvbitx::sptr lvbitx(new x310_lvbitx());
+
+        UHD_MSG(status) << boost::format("Loading bitfile %s...\n") % lvbitx->get_signature();
+        _rio_fpga_interface.reset(new nifpga_session(dev_addr["resource"]));
+        nirio_status_chain(_rio_fpga_interface->open(lvbitx), status);
+
+        if(nirio_status_fatal(status))
+            throw uhd::runtime_error("b250_impl: could not download LVBITX file to the device");
+    }
+
     BOOST_FOREACH(const std::string &key, dev_addr.keys())
     {
         if (key[0] == 'r') _recv_args[key] = dev_addr[key];
         if (key[0] == 's') _send_args[key] = dev_addr[key];
     }
+
+    const std::vector<std::string> DB_NAMES = boost::assign::list_of("A")("B");
+
+    //create basic communication
+    UHD_MSG(status) << "Setup basic communication..." << std::endl;
+    if (_xport_path == "nirio")
+        _zpu_ctrl.reset(new b250_ctrl_iface_pcie(_rio_fpga_interface->get_kernel_proxy()));
+    else
+        _zpu_ctrl.reset(new b250_ctrl_iface_enet(udp_simple::make_connected(_addr, BOOST_STRINGIZE(X300_FW_COMMS_UDP_PORT))));
+
+    _claimer_task = uhd::task::make(boost::bind(&b250_impl::claimer_loop, this, _zpu_ctrl));
 
     //extract the FW path for the B250
     //and live load fw over ethernet link
@@ -227,15 +300,9 @@ b250_impl::b250_impl(const uhd::device_addr_t &dev_addr)
         const std::string b250_fw_image = find_image_path(
             dev_addr.has_key("fw")? dev_addr["fw"] : B250_FW_FILE_NAME
         );
-        b250_load_fw(_addr, b250_fw_image);
+        b250_load_fw(_zpu_ctrl, b250_fw_image);
     }
 
-    const std::vector<std::string> DB_NAMES = boost::assign::list_of("A")("B");
-
-    //create basic communication
-    UHD_MSG(status) << "Setup basic communication..." << std::endl;
-    _zpu_ctrl.reset(new b250_ctrl_iface(udp_simple::make_connected(_addr, BOOST_STRINGIZE(X300_FW_COMMS_UDP_PORT))));
-    _claimer_task = uhd::task::make(boost::bind(&b250_impl::claimer_loop, this, _zpu_ctrl));
     _zpu_spi = spi_core_3000::make(_zpu_ctrl, SR_ADDR(SET0_BASE, ZPU_SR_SPI), SR_ADDR(SET0_BASE, ZPU_RB_SPI));
     _zpu_i2c = i2c_core_100_wb32::make(_zpu_ctrl, I2C1_BASE);
     _zpu_i2c->set_clock_rate(B250_BUS_CLOCK_RATE);
@@ -264,11 +331,14 @@ b250_impl::b250_impl(const uhd::device_addr_t &dev_addr)
     // determine routing based on address match
     ////////////////////////////////////////////////////////////////////
     _router_dst_here = B250_XB_DST_E0; //some default if eeprom not match
-    if (_addr == mb_eeprom["ip-addr0"]) _router_dst_here = B250_XB_DST_E0;
-    if (_addr == mb_eeprom["ip-addr1"]) _router_dst_here = B250_XB_DST_E1;
-    if (_addr == mb_eeprom["ip-addr2"]) _router_dst_here = B250_XB_DST_E0;
-    if (_addr == mb_eeprom["ip-addr3"]) _router_dst_here = B250_XB_DST_E1;
-
+    if (_xport_path == "nirio") {
+        _router_dst_here = B250_XB_DST_PCI;
+    } else {
+        if (_addr == mb_eeprom["ip-addr0"]) _router_dst_here = B250_XB_DST_E0;
+        if (_addr == mb_eeprom["ip-addr1"]) _router_dst_here = B250_XB_DST_E1;
+        if (_addr == mb_eeprom["ip-addr2"]) _router_dst_here = B250_XB_DST_E0;
+        if (_addr == mb_eeprom["ip-addr3"]) _router_dst_here = B250_XB_DST_E1;
+    }
     ////////////////////////////////////////////////////////////////////
     // read dboard eeproms
     ////////////////////////////////////////////////////////////////////
@@ -451,6 +521,13 @@ b250_impl::~b250_impl(void)
         //kill the claimer task and unclaim the device
         _claimer_task.reset();
         _zpu_ctrl->poke32(SR_ADDR(X300_FW_SHMEM_BASE, X300_FW_SHMEM_CLAIM_TIME), 0);
+        _zpu_ctrl->poke32(SR_ADDR(X300_FW_SHMEM_BASE, X300_FW_SHMEM_CLAIM_SRC), 0);
+
+//@TODO: Handle lifetime issus for these objects. Can be fixed when the shared lib loading/unloading is removed.
+//        if (_xport_path == "nirio") {
+//            _rio_fpga_interface->close(true);
+//            nifpga_session::unload_lib();
+//        }
     )
 }
 
@@ -471,14 +548,12 @@ void b250_impl::setup_radio(const size_t i, const std::string &db_name)
     ////////////////////////////////////////////////////////////////////
     // radio control
     ////////////////////////////////////////////////////////////////////
-    sid_config_t config;
-    config.router_addr_there = B250_DEVICE_THERE;
-    config.dst_prefix = B250_RADIO_DEST_PREFIX_CTRL;
-    config.router_dst_there = (i == 0)? B250_XB_DST_R0 : B250_XB_DST_R1;
-    config.router_dst_here = _router_dst_here;
-    const boost::uint32_t ctrl_sid = this->allocate_sid(config);
-    udp_zero_copy::sptr ctrl_xport = this->make_transport(_addr, ctrl_sid);
-    perif.ctrl = radio_ctrl_core_3000::make(true/*bigE*/, ctrl_xport, ctrl_xport, ctrl_sid, db_name);
+    UHD_HERE();
+    uint8_t dest = (i == 0)? B250_XB_DST_R0 : B250_XB_DST_R1;
+    boost::uint32_t ctrl_sid;
+    zero_copy_if::sptr ctrl_xport = this->make_transport(_addr, _xport_path, dest, B250_RADIO_DEST_PREFIX_CTRL, device_addr_t(), ctrl_sid);
+    perif.ctrl = radio_ctrl_core_3000::make(_if_pkt_is_big_endian, ctrl_xport, ctrl_xport, ctrl_sid, db_name);
+    perif.ctrl->poke32(TOREG(SR_MISC_OUTS), (1 << 2)); //reset adc + dac
     perif.ctrl->poke32(TOREG(SR_MISC_OUTS),  (1 << 1) | (1 << 0)); //out of reset + dac enable
 
     this->register_loopback_self_test(perif.ctrl);
@@ -616,42 +691,74 @@ void b250_impl::setup_radio(const size_t i, const std::string &db_name)
     this->update_atr_leds(i, ""); //init anyway, even if never called
 }
 
-uhd::transport::udp_zero_copy::sptr b250_impl::make_transport(
-    const std::string &addr,
-    const boost::uint32_t sid,
-    const uhd::device_addr_t &device_addr
+boost::uint32_t get_pcie_dma_channel(boost::uint8_t destination, boost::uint8_t prefix)
+{
+    static const boost::uint32_t RADIO_GRP_SIZE = 3;
+    static const boost::uint32_t RADIO0_GRP     = 0;
+    static const boost::uint32_t RADIO1_GRP     = 1;
+
+    boost::uint32_t radio_grp = (destination == B250_XB_DST_R0) ? RADIO0_GRP : RADIO1_GRP;
+    return ((radio_grp * RADIO_GRP_SIZE) + prefix);
+}
+
+uhd::transport::zero_copy_if::sptr b250_impl::make_transport(
+    const std::string& addr,
+    const std::string& xport_path,
+    const uint8_t& destination,
+    const uint8_t& prefix,
+    const uhd::device_addr_t& args,
+    boost::uint32_t& sid
 )
 {
-    //make a new transport - fpga has no idea how to talk to use on this yet
-    udp_zero_copy::sptr xport = udp_zero_copy::make(addr, BOOST_STRINGIZE(X300_VITA_UDP_PORT), device_addr);
+    zero_copy_if::sptr xport;
 
-    //clear the ethernet dispatcher's udp port
-    //NOT clearing this, the dispatcher is now intelligent
-    //_zpu_ctrl->poke32(SR_ADDR(SET0_BASE, (ZPU_SR_ETHINT0+8+3)), 0);
+    sid_config_t config;
+    config.router_addr_there    = B250_DEVICE_THERE;
+    config.dst_prefix           = prefix;
+    config.router_dst_there     = destination;
+    config.router_dst_here      = _router_dst_here;
+    sid = this->allocate_sid(config, xport_path);
 
-    //send a mini packet with SID into the ZPU
-    //ZPU will reprogram the ethernet framer
-    UHD_LOG << "programming packet for new xport on "
-        << addr << std::hex << "sid 0x" << sid << std::dec << std::endl;
-    managed_send_buffer::sptr mb = xport->get_send_buff();
-    mb->cast<boost::uint32_t *>()[0] = 0; //eth dispatch looks for != 0
-    mb->cast<boost::uint32_t *>()[1] = uhd::htonx(sid);
-    mb->commit(8);
-    mb.reset();
+    if (xport_path == "nirio") {
+        device_addr_t xport_args(args);
+        xport_args["send_frame_size"] = boost::lexical_cast<std::string>(
+            (prefix == B250_RADIO_DEST_PREFIX_TX) ? B250_PCIE_DATA_FRAME_SIZE : B250_PCIE_MSG_FRAME_SIZE);
+        xport_args["recv_frame_size"] = boost::lexical_cast<std::string>(
+            (prefix == B250_RADIO_DEST_PREFIX_RX) ? B250_PCIE_DATA_FRAME_SIZE : B250_PCIE_MSG_FRAME_SIZE);
 
-    //reprogram the ethernet dispatcher's udp port (should be safe to always set)
-    UHD_LOG << "reprogram the ethernet dispatcher's udp port" << std::endl;
-    _zpu_ctrl->poke32(SR_ADDR(SET0_BASE, (ZPU_SR_ETHINT0+8+3)), X300_VITA_UDP_PORT);
-    _zpu_ctrl->poke32(SR_ADDR(SET0_BASE, (ZPU_SR_ETHINT1+8+3)), X300_VITA_UDP_PORT);
+        xport = nirio_zero_copy::make(_rio_fpga_interface, get_pcie_dma_channel(destination, prefix), xport_args);
+    } else {
+        //make a new transport - fpga has no idea how to talk to use on this yet
+        xport = udp_zero_copy::make(addr, BOOST_STRINGIZE(X300_VITA_UDP_PORT), args);
 
-    //Do a peek to an arbitrary address to guarantee that the
-    //ethernet framer has been programmed before we return.
-    _zpu_ctrl->peek32(0);
+        //clear the ethernet dispatcher's udp port
+        //NOT clearing this, the dispatcher is now intelligent
+        //_zpu_ctrl->poke32(SR_ADDR(SET0_BASE, (ZPU_SR_ETHINT0+8+3)), 0);
 
+        //send a mini packet with SID into the ZPU
+        //ZPU will reprogram the ethernet framer
+        UHD_LOG << "programming packet for new xport on "
+            << addr << std::hex << "sid 0x" << sid << std::dec << std::endl;
+        managed_send_buffer::sptr mb = xport->get_send_buff();
+        mb->cast<boost::uint32_t *>()[0] = 0; //eth dispatch looks for != 0
+        mb->cast<boost::uint32_t *>()[1] = uhd::htonx(sid);
+        mb->commit(8);
+        mb.reset();
+
+        //reprogram the ethernet dispatcher's udp port (should be safe to always set)
+        UHD_LOG << "reprogram the ethernet dispatcher's udp port" << std::endl;
+        _zpu_ctrl->poke32(SR_ADDR(SET0_BASE, (ZPU_SR_ETHINT0+8+3)), X300_VITA_UDP_PORT);
+        _zpu_ctrl->poke32(SR_ADDR(SET0_BASE, (ZPU_SR_ETHINT1+8+3)), X300_VITA_UDP_PORT);
+
+        //Do a peek to an arbitrary address to guarantee that the
+        //ethernet framer has been programmed before we return.
+        _zpu_ctrl->peek32(0);
+    }
     return xport;
 }
 
-boost::uint32_t b250_impl::allocate_sid(const sid_config_t &config)
+
+boost::uint32_t b250_impl::allocate_sid(const sid_config_t &config, std::string xport_path)
 {
     const boost::uint32_t stream = (config.dst_prefix | (config.router_dst_there << 2)) & 0xff;
 
@@ -669,9 +776,6 @@ boost::uint32_t b250_impl::allocate_sid(const sid_config_t &config)
         << " router_addr_there 0x" << int(config.router_addr_there)
         << std::dec << std::endl;
 
-    //increment for next setup
-    _sid_framer++;
-
     // Program the B250 to recognise it's own local address.
     _zpu_ctrl->poke32(SR_ADDR(SET0_BASE, ZPU_SR_XB_LOCAL), config.router_addr_there);
     // Program CAM entry for outgoing packets matching a B250 resource (for example a Radio)
@@ -681,9 +785,19 @@ boost::uint32_t b250_impl::allocate_sid(const sid_config_t &config)
     // This type of packet does not match the XB_LOCAL address and is looked up in the lower half of the CAM
     _zpu_ctrl->poke32(SR_ADDR(SETXB_BASE, 0 + (B250_DEVICE_HERE)), config.router_dst_here);
 
+    if (xport_path == "nirio") {
+        uint32_t router_config_word = ((_sid_framer & 0xff) << 16) |                                    //Return SID
+                                      get_pcie_dma_channel(config.router_dst_there, config.dst_prefix); //Dest
+        _rio_fpga_interface->get_kernel_proxy().poke(PCIE_ROUTER_REG(0), router_config_word);
+    }
+
     UHD_LOG << std::hex
         << "done router config for sid 0x" << sid
         << std::dec << std::endl;
+
+    //increment for next setup
+    _sid_framer++;
+
     return sid;
 }
 
@@ -804,5 +918,17 @@ void b250_impl::set_fp_gpio(const std::string &attr, const boost::uint64_t setti
 void b250_impl::claimer_loop(wb_iface::sptr iface)
 {
     iface->poke32(SR_ADDR(X300_FW_SHMEM_BASE, X300_FW_SHMEM_CLAIM_TIME), time(NULL));
+    iface->poke32(SR_ADDR(X300_FW_SHMEM_BASE, X300_FW_SHMEM_CLAIM_SRC), get_process_hash());
     boost::this_thread::sleep(boost::posix_time::milliseconds(1500)); //1.5 seconds
 }
+
+bool b250_impl::is_claimed(wb_iface::sptr iface)
+{
+    //If timed out then device is definitely unclaimed
+    if (iface->peek32(SR_ADDR(X300_FW_SHMEM_BASE, X300_FW_SHMEM_CLAIM_STATUS)) == 0)
+        return false;
+
+    //otherwise check claim src to determine if another thread with the same src has claimed the device
+    return iface->peek32(SR_ADDR(X300_FW_SHMEM_BASE, X300_FW_SHMEM_CLAIM_SRC)) != get_process_hash();
+}
+

@@ -36,6 +36,36 @@ FOREACH(util_source ${util_runtime_sources})
 ENDFOREACH(util_source)
 
 ########################################################################
+# @TODO: Ashish: Remove this after the initial testing phase
+########################################################################
+SET(CMAKE_C_COMPILE_OBJECT ${CMAKE_CXX_COMPILE_OBJECT})
+SET(niro_prog_sources nirio_programmer.cpp
+    ../lib/transport/nirio/nifpga_interface.cpp
+    ../lib/transport/nirio/nirio_interface.cpp
+    ../lib/transport/nirio/nirio_resource_manager.cpp
+    ../lib/transport/nirio/NiFpga/NiFpga.c
+    ../lib/transport/nirio/NiFpga/niusrprio.c
+    ../lib/utils/platform.cpp
+)
+
+IF(WIN32)
+    LIST(APPEND niro_prog_sources ../lib/transport/nirio/nirio_driver_iface_win.cpp)
+ELSE(WIN32)
+    IF(APPLE)
+        LIST(APPEND niro_prog_sources ../lib/transport/nirio/nirio_driver_iface_macos.cpp)
+    ELSE(APPLE)
+        LIST(APPEND niro_prog_sources ../lib/transport/nirio/nirio_driver_iface_linux.cpp)
+    ENDIF(APPLE)
+ENDIF(WIN32)
+
+ADD_EXECUTABLE(nirio_programmer ${niro_prog_sources})
+IF(WIN32)
+    TARGET_LINK_LIBRARIES(nirio_programmer uhd Setupapi.lib)
+ELSE()
+    TARGET_LINK_LIBRARIES(nirio_programmer uhd)
+ENDIF()
+
+########################################################################
 # Utilities that get installed into the share path
 ########################################################################
 SET(util_share_sources
@@ -43,7 +73,6 @@ SET(util_share_sources
     usrp_burn_db_eeprom.cpp
     usrp_burn_mb_eeprom.cpp
 )
-
 IF(ENABLE_USB)
     LIST(APPEND util_share_sources
         fx2_init_eeprom.cpp
