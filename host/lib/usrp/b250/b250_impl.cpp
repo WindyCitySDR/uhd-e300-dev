@@ -253,6 +253,7 @@ b250_impl::b250_impl(const uhd::device_addr_t &dev_addr)
     UHD_MSG(status) << "X300 initialization sequence..." << std::endl;
     _async_md.reset(new async_md_type(1000/*messages deep*/));
     _tree = uhd::property_tree::make();
+    const fs_path mb_path = "/mboards/0";
     _sid_framer = 0;
     _addr = dev_addr.has_key("resource") ? dev_addr["resource"] : dev_addr["addr"];
     _xport_path = dev_addr.has_key("resource") ? "nirio" : "eth";
@@ -308,16 +309,6 @@ b250_impl::b250_impl(const uhd::device_addr_t &dev_addr)
     _zpu_i2c->set_clock_rate(B250_BUS_CLOCK_RATE);
 
     ////////////////////////////////////////////////////////////////////
-    // Initialize the properties tree
-    ////////////////////////////////////////////////////////////////////
-    _tree->create<std::string>("/name").set("X-Series Device");
-    const fs_path mb_path = "/mboards/0";
-    _tree->create<std::string>(mb_path / "name").set("X300");
-    _tree->create<std::string>(mb_path / "codename").set("Yetti");
-    _tree->create<std::string>(mb_path / "fpga_version").set("1.0");
-    _tree->create<std::string>(mb_path / "fw_version").set("1.0");
-
-    ////////////////////////////////////////////////////////////////////
     // setup the mboard eeprom
     ////////////////////////////////////////////////////////////////////
     UHD_MSG(status) << "Loading values from EEPROM..." << std::endl;
@@ -326,6 +317,33 @@ b250_impl::b250_impl(const uhd::device_addr_t &dev_addr)
     _tree->create<mboard_eeprom_t>(mb_path / "eeprom")
         .set(mb_eeprom)
         .subscribe(boost::bind(&b250_impl::set_mb_eeprom, this, _1));
+
+    ////////////////////////////////////////////////////////////////////
+    // parse the product number
+    ////////////////////////////////////////////////////////////////////
+    std::string product_name = "X300?";
+    if (not mb_eeprom["product"].empty())
+    {
+        switch (boost::lexical_cast<boost::uint16_t>(mb_eeprom["product"]))
+        {
+        case 0x0001:
+            product_name = "X300";
+            break;
+        case 0x0002:
+            product_name = "X310";
+            break;
+        default: throw uhd::runtime_error("x300 unknown product code: " + mb_eeprom["product"]);
+        }
+    }
+
+    ////////////////////////////////////////////////////////////////////
+    // Initialize the properties tree
+    ////////////////////////////////////////////////////////////////////
+    _tree->create<std::string>("/name").set("X-Series Device");
+    _tree->create<std::string>(mb_path / "name").set(product_name);
+    _tree->create<std::string>(mb_path / "codename").set("Yetti");
+    _tree->create<std::string>(mb_path / "fpga_version").set("1.0");
+    _tree->create<std::string>(mb_path / "fw_version").set("1.0");
 
     ////////////////////////////////////////////////////////////////////
     // determine routing based on address match
