@@ -5,6 +5,8 @@
 #include <string.h> //memcmp
 #include <printf.h>
 
+#define MAX_NETHS 4
+
 typedef struct
 {
     padded_eth_hdr_t eth;
@@ -68,6 +70,15 @@ void u3_net_stack_arp_cache_update(const struct ip_addr *ip_addr, const eth_mac_
 
 const eth_mac_addr_t *u3_net_stack_arp_cache_lookup(const struct ip_addr *ip_addr)
 {
+    //do a local look up on our own ports
+    for (size_t e = 0; e < MAX_NETHS; e++)
+    {
+        if (memcmp(ip_addr, u3_net_stack_get_ip_addr(e), sizeof(struct ip_addr)) == 0)
+        {
+            return u3_net_stack_get_mac_addr(e);
+        }
+    }
+    //now check the arp cache
     for (size_t i = 0; i < ARP_CACHE_NENTRIES; i++)
     {
         if (memcmp(ip_addr, arp_cache_ips+i, sizeof(struct ip_addr)) == 0)
@@ -89,7 +100,6 @@ void u3_net_stack_init(wb_pkt_iface64_config_t *config)
     pkt_iface_config = config;
 }
 
-#define MAX_NETHS 4
 static struct ip_addr net_conf_ips[MAX_NETHS];
 static eth_mac_addr_t net_conf_macs[MAX_NETHS];
 static eth_mac_addr_t net_conf_subnets[MAX_NETHS];

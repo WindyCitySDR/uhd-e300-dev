@@ -19,6 +19,7 @@
 #define I2C2_BASE 0xfc00
 #define SET0_BASE 0xa000
 #define RB0_BASE 0xa000 //same as set
+#define SETXB_BASE 0xb000
 
 #define ETH1G
 //#define ETH10G 

@@ -18,17 +18,17 @@
 static uint32_t *shmem = (uint32_t *) X300_FW_SHMEM_BASE;
 
 /***********************************************************************
- * Handler for UDP framer program packets
+ * Setup call for udp framer
  **********************************************************************/
-void handle_udp_prog_framer(
+void program_udp_framer(
     const uint8_t ethno,
-    const struct ip_addr *src, const struct ip_addr *dst,
-    const uint16_t src_port, const uint16_t dst_port,
-    const void *buff, const size_t num_bytes
+    const uint32_t sid,
+    const struct ip_addr *dst_ip,
+    const uint16_t dst_port,
+    const uint16_t src_port
 )
 {
     const size_t ethbase = (ethno == 0)? SR_ETHINT0 : SR_ETHINT1;
-    const uint32_t sid = ((const uint32_t *)buff)[1];
     const size_t vdest = (sid >> 16) & 0xff;
     printf("handle_udp_prog_framer sid %u vdest %u\n", sid, vdest);
 
@@ -40,18 +40,32 @@ void handle_udp_prog_framer(
         (((uint32_t)src_mac->addr[2]) << 24) | (((uint32_t)src_mac->addr[3]) << 16) |
         (((uint32_t)src_mac->addr[4]) << 8) | (((uint32_t)src_mac->addr[5]) << 0));
     wb_poke32(SR_ADDR(SET0_BASE, ethbase + ETH_FRAMER_SRC_IP_ADDR), u3_net_stack_get_ip_addr(ethno)->addr);
-    wb_poke32(SR_ADDR(SET0_BASE, ethbase + ETH_FRAMER_SRC_UDP_PORT), dst_port);
+    wb_poke32(SR_ADDR(SET0_BASE, ethbase + ETH_FRAMER_SRC_UDP_PORT), src_port);
 
     //setup destination framer
-    const eth_mac_addr_t *dst_mac = u3_net_stack_arp_cache_lookup(src);
+    const eth_mac_addr_t *dst_mac = u3_net_stack_arp_cache_lookup(dst_ip);
     wb_poke32(SR_ADDR(SET0_BASE, ethbase + ETH_FRAMER_DST_RAM_ADDR), vdest);
-    wb_poke32(SR_ADDR(SET0_BASE, ethbase + ETH_FRAMER_DST_IP_ADDR), src->addr);
+    wb_poke32(SR_ADDR(SET0_BASE, ethbase + ETH_FRAMER_DST_IP_ADDR), dst_ip->addr);
     wb_poke32(SR_ADDR(SET0_BASE, ethbase + ETH_FRAMER_DST_UDP_MAC),
-        (((uint32_t)src_port) << 16) |
+        (((uint32_t)dst_port) << 16) |
         (((uint32_t)dst_mac->addr[0]) << 8) | (((uint32_t)dst_mac->addr[1]) << 0));
     wb_poke32(SR_ADDR(SET0_BASE, ethbase + ETH_FRAMER_DST_MAC_LO),
         (((uint32_t)dst_mac->addr[2]) << 24) | (((uint32_t)dst_mac->addr[3]) << 16) |
         (((uint32_t)dst_mac->addr[4]) << 8) | (((uint32_t)dst_mac->addr[5]) << 0));
+}
+
+/***********************************************************************
+ * Handler for UDP framer program packets
+ **********************************************************************/
+void handle_udp_prog_framer(
+    const uint8_t ethno,
+    const struct ip_addr *src, const struct ip_addr *dst,
+    const uint16_t src_port, const uint16_t dst_port,
+    const void *buff, const size_t num_bytes
+)
+{
+    const uint32_t sid = ((const uint32_t *)buff)[1];
+    program_udp_framer(ethno, sid, src, src_port, dst_port);
 }
 
 /***********************************************************************
