@@ -401,6 +401,9 @@ int main(void)
 
         //run the udp uart handler for incoming serial data
         handle_uarts(); //udp_uart_poll();
+
+        //always reload the compat number into the shmem to keep it persistent
+        shmem[X300_FW_SHMEM_COMPAT_NUM] = (X300_FW_COMPAT_MAJOR << 16) | X300_FW_COMPAT_MINOR;
     }
     return 0;
 }

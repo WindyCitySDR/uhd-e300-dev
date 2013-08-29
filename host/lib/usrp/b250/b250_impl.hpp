@@ -216,6 +216,9 @@ struct b250_impl : public uhd::device
     uhd::sensor_value_t get_ref_locked(void);
     void set_db_eeprom(const size_t, const uhd::usrp::dboard_eeprom_t &);
     void set_mb_eeprom(const uhd::usrp::mboard_eeprom_t &);
+
+    void check_fw_compat(wb_iface::sptr iface);
+    void check_fpga_compat(wb_iface::sptr iface);
 };
 
 #endif /* INCLUDED_B250_IMPL_HPP */
