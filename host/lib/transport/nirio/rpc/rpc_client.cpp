@@ -15,7 +15,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 //
 
-#include "rpc_client.hpp"
+#include <uhd/transport/nirio/rpc/rpc_client.hpp>
 #include <boost/bind.hpp>
 
 #define CHAIN_BLOCKING_XFER(func, exp, status) \
@@ -134,7 +134,7 @@ void rpc_client::_handle_response_hdr(const boost::system::error_code& err, size
 {
     boost::mutex::scoped_lock lock(_mutex);
     _exec_err = err;
-    if (!_exec_err) {
+    if (!_exec_err && (transferred == expected)) {
         //Response header received. Verify that it is expected
         if (func_args_header_t::match_function(_request.header, _response.header)) {
             _response.data.resize(_response.header.func_args_size);

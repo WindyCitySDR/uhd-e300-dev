@@ -22,6 +22,8 @@
 
 #include <string>
 #include <iostream>
+#include <sstream>
+#include <vector>
 #if (USE_BINARY_ARCHIVE)
     #include <boost/archive/binary_oarchive.hpp>
     #include <boost/archive/binary_iarchive.hpp>

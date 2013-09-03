@@ -46,6 +46,8 @@ SET(niro_prog_sources nirio_programmer.cpp
     ../lib/transport/nirio/NiFpga/NiFpga.c
     ../lib/transport/nirio/NiFpga/niusrprio.c
     ../lib/utils/platform.cpp
+    ../lib/transport/nirio/rpc/rpc_client.cpp
+    ../lib/transport/nirio/rpc/usrprio_rpc_client.cpp
 )
 
 IF(WIN32)

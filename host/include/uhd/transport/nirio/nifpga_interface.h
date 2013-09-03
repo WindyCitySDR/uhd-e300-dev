@@ -14,6 +14,7 @@
 #include <uhd/transport/nirio/nifpga_lvbitx.h>
 #include <boost/smart_ptr.hpp>
 #include <string>
+#include <uhd/transport/nirio/rpc/usrprio_rpc_client.hpp>
 
 namespace nifpga_interface
 {
@@ -132,6 +133,9 @@ private:
 	nirio_interface::niriok_proxy			_riok_proxy;
 	nirio_interface::nirio_resource_manager	_resource_manager;
 	nifpga_session_lock						_lock;
+	usrprio_rpc::usrprio_rpc_client         _rpc_client;
+
+
 
 	static const uint32_t SESSION_LOCK_TIMEOUT_IN_MS = 5000;
 };

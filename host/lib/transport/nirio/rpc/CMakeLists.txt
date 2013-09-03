@@ -20,32 +20,10 @@
 ########################################################################
 
 ########################################################################
-# Include subdirectories (different than add)
-########################################################################
-INCLUDE_SUBDIRECTORY(lvbitx)
-INCLUDE_SUBDIRECTORY(rpc)
-
-########################################################################
 # Append to the list of sources for lib uhd
 ########################################################################
 
 LIBUHD_APPEND_SOURCES(
-    ${CMAKE_CURRENT_SOURCE_DIR}/nifpga_interface.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/nirio_fifo.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/nirio_interface.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/nirio_resource_manager.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/NiFpga/NiFpga.c
-    ${CMAKE_CURRENT_SOURCE_DIR}/NiFpga/niusrprio.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/rpc_client.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/usrprio_rpc_client.cpp
 )
-
-IF(WIN32)
-    LIBUHD_APPEND_SOURCES(${CMAKE_CURRENT_SOURCE_DIR}/nirio_driver_iface_win.cpp)
-    #@TODO: Ashish: Setupapi should be removed when enumeration is done using niusrprio / helper.
-    LIBUHD_APPEND_LIBS(Setupapi)
-ELSE(WIN32)
-    IF(APPLE)
-        LIBUHD_APPEND_SOURCES(${CMAKE_CURRENT_SOURCE_DIR}/nirio_driver_iface_macos.cpp)
-    ELSE(APPLE)
-        LIBUHD_APPEND_SOURCES(${CMAKE_CURRENT_SOURCE_DIR}/nirio_driver_iface_linux.cpp)
-    ENDIF(APPLE)
-ENDIF(WIN32)

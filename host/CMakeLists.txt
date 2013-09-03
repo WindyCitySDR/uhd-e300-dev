@@ -134,6 +134,7 @@ SET(BOOST_REQUIRED_COMPONENTS
     system
     thread
     unit_test_framework
+    serialization
 )
 
 IF(UNIX AND NOT BOOST_ROOT AND EXISTS "/usr/lib64")

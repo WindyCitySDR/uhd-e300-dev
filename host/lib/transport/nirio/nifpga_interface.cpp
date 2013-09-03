@@ -21,7 +21,8 @@ namespace nifpga_interface
 nifpga_session::nifpga_session(const std::string& resource_name) :
 	_resource_name(resource_name),
     _session(0),
-	_resource_manager(_riok_proxy)
+	_resource_manager(_riok_proxy),
+	_rpc_client("localhost", "daytime")
 {
 }
 
@@ -80,6 +81,8 @@ nirio_status nifpga_session::open(
 {
 	using namespace nirio_interface;
 
+	_rpc_client.niusrprio_open_session(_resource_name, lvbitx->get_bitfile_path(), lvbitx->get_signature(), 0, _session);
+
 	_lvbitx = lvbitx;
 
 	nirio_status status = NiRio_Status_Success;
@@ -120,6 +123,8 @@ nirio_status nifpga_session::open(
 void nifpga_session::close(bool reset_fpga)
 {
     if (_session) {
+        _rpc_client.niusrprio_close_session(_session, 0);
+
         nirio_status status = NiRio_Status_Success;
         nirio_status_chain(_lock.acquire(SESSION_LOCK_TIMEOUT_IN_MS), status);
         if (reset_fpga) reset();
