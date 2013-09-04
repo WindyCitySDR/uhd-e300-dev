@@ -966,7 +966,8 @@ void b250_impl::check_fw_compat(wb_iface::sptr iface)
     boost::uint32_t compat_major = (compat_num >> 16);
     boost::uint32_t compat_minor = (compat_num & 0xffff);
 
-    if (compat_major != X300_FW_COMPAT_MAJOR){
+    if (compat_major != X300_FW_COMPAT_MAJOR)
+    {
         throw uhd::runtime_error(str(boost::format(
             "Expected firmware compatibility number 0x%x, but got 0x%x.%x:\n"
             "The firmware build is not compatible with the host code build.\n"
@@ -980,6 +981,19 @@ void b250_impl::check_fw_compat(wb_iface::sptr iface)
 
 void b250_impl::check_fpga_compat(wb_iface::sptr iface)
 {
+    boost::uint32_t compat_num = iface->peek32(SR_ADDR(SET0_BASE, ZPU_RB_COMPAT_NUM));
+    boost::uint32_t compat_major = (compat_num >> 16);
+    boost::uint32_t compat_minor = (compat_num & 0xffff);
+
+    if (compat_major != X300_FPGA_COMPAT_MAJOR)
+    {
+        throw uhd::runtime_error(str(boost::format(
+            "Expected FPGA compatibility number 0x%x, but got 0x%x.%x:\n"
+            "The FPGA build is not compatible with the host code build.\n"
+            "%s"
+        ) % int(X300_FPGA_COMPAT_MAJOR) % compat_major % compat_minor
+          % print_images_error()));
+    }
     _tree->create<std::string>("/mboards/0/fpga_version").set(str(boost::format("%u.%u")
-                % 0 % 0));
+                % compat_major % compat_minor));
 }
