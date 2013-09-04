@@ -60,7 +60,7 @@ control_list = ''
 indicator_list = ''
 control_idx = 0
 indicator_idx = 0
-for register in register_list.iter('Register'):
+for register in register_list.findall('Register'):
 	reg_type = 'INDICATOR' if (register.find('Indicator').text.lower() == 'true') else 'CONTROL'
 	reg_name = '\"' + register.find('Name').text + '\"'
 
@@ -97,7 +97,7 @@ in_fifo_idx = 0
 for dma_channel in dma_channel_list:
 	fifo_name = '\"' + dma_channel.attrib['name'] + '\"'
 	direction = 'OUTPUT_FIFO' if (dma_channel.find('Direction').text == 'HostToTarget') else 'INPUT_FIFO'
-	for reg_block in reg_block_list.iter('RegisterBlock'):
+	for reg_block in reg_block_list.findall('RegisterBlock'):
 		if (reg_block.attrib['name'] == dma_channel.find('BaseAddressTag').text):
 			base_addr = reg_block.find('Offset').text
 			break
