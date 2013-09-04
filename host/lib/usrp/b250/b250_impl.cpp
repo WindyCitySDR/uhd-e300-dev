@@ -326,13 +326,13 @@ b250_impl::b250_impl(const uhd::device_addr_t &dev_addr)
     {
         switch (boost::lexical_cast<boost::uint16_t>(mb_eeprom["product"]))
         {
-        case 0x0001:
+        case 0x7736:
             product_name = "X300";
             break;
-        case 0x0002:
+        case 0x76CA:
             product_name = "X310";
             break;
-        default: throw uhd::runtime_error("x300 unknown product code: " + mb_eeprom["product"]);
+        default: UHD_MSG(error) << "X300 unknown product code: " << mb_eeprom["product"] << std::endl;
         }
     }
 
