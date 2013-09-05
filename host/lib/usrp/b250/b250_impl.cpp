@@ -304,6 +304,11 @@ b250_impl::b250_impl(const uhd::device_addr_t &dev_addr)
         b250_load_fw(_zpu_ctrl, b250_fw_image);
     }
 
+    //check compat -- good place to do after conditional loading
+    this->check_fw_compat(_zpu_ctrl);
+    this->check_fpga_compat(_zpu_ctrl);
+
+    //low speed perif access
     _zpu_spi = spi_core_3000::make(_zpu_ctrl, SR_ADDR(SET0_BASE, ZPU_SR_SPI), SR_ADDR(SET0_BASE, ZPU_RB_SPI));
     _zpu_i2c = i2c_core_100_wb32::make(_zpu_ctrl, I2C1_BASE);
     _zpu_i2c->set_clock_rate(B250_BUS_CLOCK_RATE);
@@ -342,8 +347,6 @@ b250_impl::b250_impl(const uhd::device_addr_t &dev_addr)
     _tree->create<std::string>("/name").set("X-Series Device");
     _tree->create<std::string>(mb_path / "name").set(product_name);
     _tree->create<std::string>(mb_path / "codename").set("Yetti");
-    _tree->create<std::string>(mb_path / "fpga_version").set("1.0");
-    _tree->create<std::string>(mb_path / "fw_version").set("1.0");
 
     ////////////////////////////////////////////////////////////////////
     // determine routing based on address match
@@ -932,6 +935,10 @@ void b250_impl::set_fp_gpio(const std::string &attr, const boost::uint64_t setti
     if (attr == "ATR_XX") return _fp_gpio->set_atr_reg(dboard_iface::UNIT_RX, dboard_iface::ATR_REG_FULL_DUPLEX, new_value);
 }
 
+/***********************************************************************
+ * claimer logic
+ **********************************************************************/
+
 void b250_impl::claimer_loop(wb_iface::sptr iface)
 {
     iface->poke32(SR_ADDR(X300_FW_SHMEM_BASE, X300_FW_SHMEM_CLAIM_TIME), time(NULL));
@@ -949,3 +956,44 @@ bool b250_impl::is_claimed(wb_iface::sptr iface)
     return iface->peek32(SR_ADDR(X300_FW_SHMEM_BASE, X300_FW_SHMEM_CLAIM_SRC)) != get_process_hash();
 }
 
+/***********************************************************************
+ * compat checks
+ **********************************************************************/
+
+void b250_impl::check_fw_compat(wb_iface::sptr iface)
+{
+    boost::uint32_t compat_num = iface->peek32(SR_ADDR(X300_FW_SHMEM_BASE, X300_FW_SHMEM_COMPAT_NUM));
+    boost::uint32_t compat_major = (compat_num >> 16);
+    boost::uint32_t compat_minor = (compat_num & 0xffff);
+
+    if (compat_major != X300_FW_COMPAT_MAJOR)
+    {
+        throw uhd::runtime_error(str(boost::format(
+            "Expected firmware compatibility number 0x%x, but got 0x%x.%x:\n"
+            "The firmware build is not compatible with the host code build.\n"
+            "%s"
+        ) % int(X300_FW_COMPAT_MAJOR) % compat_major % compat_minor
+          % print_images_error()));
+    }
+    _tree->create<std::string>("/mboards/0/fw_version").set(str(boost::format("%u.%u")
+                % compat_major % compat_minor));
+}
+
+void b250_impl::check_fpga_compat(wb_iface::sptr iface)
+{
+    boost::uint32_t compat_num = iface->peek32(SR_ADDR(SET0_BASE, ZPU_RB_COMPAT_NUM));
+    boost::uint32_t compat_major = (compat_num >> 16);
+    boost::uint32_t compat_minor = (compat_num & 0xffff);
+
+    if (compat_major != X300_FPGA_COMPAT_MAJOR)
+    {
+        throw uhd::runtime_error(str(boost::format(
+            "Expected FPGA compatibility number 0x%x, but got 0x%x.%x:\n"
+            "The FPGA build is not compatible with the host code build.\n"
+            "%s"
+        ) % int(X300_FPGA_COMPAT_MAJOR) % compat_major % compat_minor
+          % print_images_error()));
+    }
+    _tree->create<std::string>("/mboards/0/fpga_version").set(str(boost::format("%u.%u")
+                % compat_major % compat_minor));
+}

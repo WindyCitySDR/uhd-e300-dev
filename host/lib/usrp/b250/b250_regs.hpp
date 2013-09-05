@@ -66,6 +66,7 @@ localparam ZPU_SR_ETHINT1    = 56;
 
 localparam ZPU_RB_SPI = 2;
 localparam ZPU_RB_CLK_STATUS = 3;
+localparam ZPU_RB_COMPAT_NUM = 6;
 
 //spi slaves on radio
 #define DB_DAC_SEN (1 << 7)
