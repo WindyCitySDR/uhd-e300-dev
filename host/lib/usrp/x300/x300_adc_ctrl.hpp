@@ -15,28 +15,30 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 //
 
-#ifndef INCLUDED_B250_DAC_CTRL_HPP
-#define INCLUDED_B250_DAC_CTRL_HPP
+#ifndef INCLUDED_X300_ADC_CTRL_HPP
+#define INCLUDED_X300_ADC_CTRL_HPP
 
 #include <uhd/types/serial.hpp>
 #include <boost/shared_ptr.hpp>
 #include <boost/utility.hpp>
 
-class b250_dac_ctrl : boost::noncopyable
+class x300_adc_ctrl : boost::noncopyable
 {
 public:
-    typedef boost::shared_ptr<b250_dac_ctrl> sptr;
+    typedef boost::shared_ptr<x300_adc_ctrl> sptr;
 
     /*!
-     * Make a codec control for the DAC.
+     * Make a codec control for the ADC.
      * \param iface a pointer to the interface object
      * \param spiface the interface to spi
      * \return a new codec control object
      */
-    static sptr make(uhd::spi_iface::sptr iface, const size_t slaveno, const double clock_rate);
+    static sptr make(uhd::spi_iface::sptr iface, const size_t slaveno);
 
-    //! Set the IQ data mode (swap means QI)
-    virtual void set_iq_swap(const bool swap) = 0;
+    virtual double set_gain(const double &) = 0;
+
+    virtual void set_test_word(const std::string &patterna, const std::string &patternb, const boost::uint32_t = 0) = 0;
+
 };
 
-#endif /* INCLUDED_B250_DAC_CTRL_HPP */
+#endif /* INCLUDED_X300_ADC_CTRL_HPP */

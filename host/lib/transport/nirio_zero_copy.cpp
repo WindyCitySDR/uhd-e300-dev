@@ -26,7 +26,7 @@
 #include <boost/thread/thread.hpp> //sleep
 #include <vector>
 //@TODO: Move the register defs required by the class to a common location
-#include "../usrp/b250/b250_regs.hpp"
+#include "../usrp/x300/x300_regs.hpp"
 
 using namespace uhd;
 using namespace uhd::transport;

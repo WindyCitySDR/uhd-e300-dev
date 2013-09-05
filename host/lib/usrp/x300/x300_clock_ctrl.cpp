@@ -1,6 +1,6 @@
 
 #include <cstdio>
-#include "b250_clock_ctrl.hpp"
+#include "x300_clock_ctrl.hpp"
 #include <uhd/utils/safe_call.hpp>
 #include <boost/cstdint.hpp>
 #include <boost/format.hpp>
@@ -8,9 +8,9 @@
 #include <stdexcept>
 
 using namespace uhd;
-struct b250_clock_ctrl_impl : b250_clock_ctrl	{
+struct x300_clock_ctrl_impl : x300_clock_ctrl	{
 
-	b250_clock_ctrl_impl(uhd::spi_iface::sptr spiface, const size_t slaveno, const double clock_rate):
+	x300_clock_ctrl_impl(uhd::spi_iface::sptr spiface, const size_t slaveno, const double clock_rate):
 		_spiface(spiface), _slaveno(slaveno), _clock_rate(clock_rate)
 	{
 
@@ -18,7 +18,7 @@ struct b250_clock_ctrl_impl : b250_clock_ctrl	{
 		if (clock_rate == 120e6) div = 20;
 		else if (clock_rate == 150e6) div = 16;
 		else if (clock_rate == 200e6) div = 12;
-		else throw uhd::runtime_error(str(boost::format("b250_clock_ctrl: cant handle rate %f") % clock_rate));
+		else throw uhd::runtime_error(str(boost::format("x300_clock_ctrl: cant handle rate %f") % clock_rate));
 
 		//calculate N div -- ok as long as integer multiple of 10e6
 		const int pll_1_n_div = int(clock_rate/10e6);
@@ -197,7 +197,7 @@ struct b250_clock_ctrl_impl : b250_clock_ctrl	{
  	}
 
 //empty destructor for testing
-	~b250_clock_ctrl_impl(void)	{}
+	~x300_clock_ctrl_impl(void)	{}
 	
 //master rate
 	double get_master_clock_rate(void) {
@@ -205,11 +205,11 @@ struct b250_clock_ctrl_impl : b250_clock_ctrl	{
 		return _clock_rate;
 	}
 //empty
-	void enable_clock(const b250_clock_which_t which, const bool enb) {}
+	void enable_clock(const x300_clock_which_t which, const bool enb) {}
 	
-	void set_rate(const b250_clock_which_t which, double rate) {}
+	void set_rate(const x300_clock_which_t which, double rate) {}
 
-	std::vector<double> get_rates(const b250_clock_which_t) {
+	std::vector<double> get_rates(const x300_clock_which_t) {
 		
 		std::vector<double> rates;
 		rates.push_back(get_master_clock_rate());
@@ -236,8 +236,8 @@ struct b250_clock_ctrl_impl : b250_clock_ctrl	{
 	const size_t _slaveno;
 	const double _clock_rate;
 	lmk04816_regs_t _lmk04816_regs;
-	//uhd::dict<b250_clock_which_t, bool> _enables;
-	//uhd::dict<b250_clock_which_t, double> _rates;
+	//uhd::dict<x300_clock_which_t, bool> _enables;
+	//uhd::dict<x300_clock_which_t, double> _rates;
 /*
 //read_reg: read a single register to the spi regs.
 
@@ -252,8 +252,8 @@ struct b250_clock_ctrl_impl : b250_clock_ctrl	{
 
 };
 
-b250_clock_ctrl::sptr b250_clock_ctrl::make(uhd::spi_iface::sptr spiface, const size_t slaveno, const double clock_rate)	{
-	return sptr(new b250_clock_ctrl_impl(spiface,slaveno,clock_rate));
+x300_clock_ctrl::sptr x300_clock_ctrl::make(uhd::spi_iface::sptr spiface, const size_t slaveno, const double clock_rate)	{
+	return sptr(new x300_clock_ctrl_impl(spiface,slaveno,clock_rate));
 }
 
 

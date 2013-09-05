@@ -15,9 +15,9 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 //
 
-#include "b250_impl.hpp"
+#include "x300_impl.hpp"
 #include "wb_iface.hpp"
-#include "b250_regs.hpp"
+#include "x300_regs.hpp"
 #include <uhd/utils/msg.hpp>
 #include <uhd/types/serial.hpp>
 #include <uhd/exception.hpp>
@@ -27,9 +27,9 @@
 
 using namespace uhd;
 
-struct b250_uart_iface : uart_iface
+struct x300_uart_iface : uart_iface
 {
-    b250_uart_iface(wb_iface::sptr iface):
+    x300_uart_iface(wb_iface::sptr iface):
         rxoffset(0), txoffset(0), txword32(0)
     {
         _iface = iface;
@@ -95,7 +95,7 @@ struct b250_uart_iface : uart_iface
     boost::uint32_t rxoffset, txoffset, txword32;
 };
 
-uart_iface::sptr b250_make_uart_iface(wb_iface::sptr iface)
+uart_iface::sptr x300_make_uart_iface(wb_iface::sptr iface)
 {
-    return uart_iface::sptr(new b250_uart_iface(iface));
+    return uart_iface::sptr(new x300_uart_iface(iface));
 }

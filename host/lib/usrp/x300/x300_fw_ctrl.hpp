@@ -15,8 +15,8 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 //
 
-#ifndef INCLUDED_B250_FW_CTRL_HPP
-#define INCLUDED_B250_FW_CTRL_HPP
+#ifndef INCLUDED_X300_FW_CTRL_HPP
+#define INCLUDED_X300_FW_CTRL_HPP
 
 #include "wb_iface.hpp"
 #include <uhd/transport/udp_simple.hpp>
@@ -27,11 +27,11 @@
 #include <boost/thread/mutex.hpp>
 #include <uhd/transport/nirio/status.h>
 #include <uhd/transport/nirio/nirio_interface.h>
-#include "b250_regs.hpp"
+#include "x300_regs.hpp"
 #include <boost/date_time/posix_time/posix_time.hpp>
 #include <boost/thread/thread.hpp>
 
-class b250_ctrl_iface : public wb_iface
+class x300_ctrl_iface : public wb_iface
 {
 public:
     enum {num_retries = 3};
@@ -52,7 +52,7 @@ public:
             catch(const std::exception &ex)
             {
                 const std::string error_msg = str(boost::format(
-                    "b250 fw communication failure #%u\n%s") % i % ex.what());
+                    "x300 fw communication failure #%u\n%s") % i % ex.what());
                 UHD_MSG(error) << error_msg << std::endl;
                 if (i == num_retries) throw uhd::io_error(error_msg);
             }
@@ -71,7 +71,7 @@ public:
             catch(const std::exception &ex)
             {
                 const std::string error_msg = str(boost::format(
-                    "b250 fw communication failure #%u\n%s") % i % ex.what());
+                    "x300 fw communication failure #%u\n%s") % i % ex.what());
                 UHD_MSG(error) << error_msg << std::endl;
                 if (i == num_retries) throw uhd::io_error(error_msg);
             }
@@ -91,10 +91,10 @@ protected:
 //-----------------------------------------------------
 // Ethernet impl
 //-----------------------------------------------------
-class b250_ctrl_iface_enet : public b250_ctrl_iface
+class x300_ctrl_iface_enet : public x300_ctrl_iface
 {
 public:
-    b250_ctrl_iface_enet(uhd::transport::udp_simple::sptr udp):
+    x300_ctrl_iface_enet(uhd::transport::udp_simple::sptr udp):
         udp(udp), seq(0)
     {
         try
@@ -123,7 +123,7 @@ protected:
         //recv reply
         x300_fw_comms_t reply = x300_fw_comms_t();
         const size_t nbytes = udp->recv(boost::asio::buffer(&reply, sizeof(reply)), 1.0);
-        if (nbytes == 0) throw uhd::io_error("b250 fw poke32 - reply timed out");
+        if (nbytes == 0) throw uhd::io_error("x300 fw poke32 - reply timed out");
 
         //sanity checks
         const size_t flags = uhd::ntohx<boost::uint32_t>(reply.flags);
@@ -154,7 +154,7 @@ protected:
         //recv reply
         x300_fw_comms_t reply = x300_fw_comms_t();
         const size_t nbytes = udp->recv(boost::asio::buffer(&reply, sizeof(reply)), 1.0);
-        if (nbytes == 0) throw uhd::io_error("b250 fw peek32 - reply timed out");
+        if (nbytes == 0) throw uhd::io_error("x300 fw peek32 - reply timed out");
 
         //sanity checks
         const size_t flags = uhd::ntohx<boost::uint32_t>(reply.flags);
@@ -184,10 +184,10 @@ private:
 //-----------------------------------------------------
 // PCIe impl
 //-----------------------------------------------------
-class b250_ctrl_iface_pcie : public b250_ctrl_iface
+class x300_ctrl_iface_pcie : public x300_ctrl_iface
 {
 public:
-    b250_ctrl_iface_pcie(nirio_interface::niriok_proxy& drv_proxy):
+    x300_ctrl_iface_pcie(nirio_interface::niriok_proxy& drv_proxy):
         _drv_proxy(drv_proxy)
     {
         UHD_ASSERT_THROW(nirio_status_not_fatal(
@@ -223,9 +223,9 @@ protected:
         }
 
         if (nirio_status_fatal(status))
-            throw uhd::io_error("b250 fw poke32 - hardware IO error");
+            throw uhd::io_error("x300 fw poke32 - hardware IO error");
         if (elapsed.total_milliseconds() > READ_TIMEOUT_IN_MS)
-            throw uhd::io_error("b250 fw poke32 - operation timed out");
+            throw uhd::io_error("x300 fw poke32 - operation timed out");
 }
 
     virtual boost::uint32_t __peek32(const wb_addr_type addr)
@@ -251,9 +251,9 @@ protected:
         nirio_status_chain(_drv_proxy.peek(PCIE_ZPU_DATA_REG(addr), reg_data), status);
 
         if (nirio_status_fatal(status))
-            throw uhd::io_error("b250 fw peek32 - hardware IO error");
+            throw uhd::io_error("x300 fw peek32 - hardware IO error");
         if (elapsed.total_milliseconds() > READ_TIMEOUT_IN_MS)
-            throw uhd::io_error("b250 fw peek32 - operation timed out");
+            throw uhd::io_error("x300 fw peek32 - operation timed out");
 
         return reg_data;
     }
@@ -268,4 +268,4 @@ private:
     static const uint32_t READ_TIMEOUT_IN_MS = 10;
 };
 
-#endif /* INCLUDED_B250_FW_CTRL_HPP */
+#endif /* INCLUDED_X300_FW_CTRL_HPP */

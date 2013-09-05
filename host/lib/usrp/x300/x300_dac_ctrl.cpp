@@ -15,7 +15,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 //
 
-#include "b250_dac_ctrl.hpp"
+#include "x300_dac_ctrl.hpp"
 #include <uhd/types/time_spec.hpp>
 #include <uhd/utils/msg.hpp>
 #include <uhd/utils/log.hpp>
@@ -32,12 +32,12 @@ using namespace uhd;
     (_iface->read_spi(_slaveno, spi_config_t::EDGE_RISE, ((addr) << 8) | (1 << 15), 16) & 0xff)
 
 /*!
- * A B250 codec control specific to the ad9146 ic.
+ * A X300 codec control specific to the ad9146 ic.
  */
-class b250_dac_ctrl_impl : public b250_dac_ctrl
+class x300_dac_ctrl_impl : public x300_dac_ctrl
 {
 public:
-    b250_dac_ctrl_impl(uhd::spi_iface::sptr iface, const size_t slaveno, const double refclk):
+    x300_dac_ctrl_impl(uhd::spi_iface::sptr iface, const size_t slaveno, const double refclk):
         _iface(iface), _slaveno(slaveno)
     {
         write_ad9146_reg(0x00, 0x20); //reset
@@ -68,7 +68,7 @@ public:
             const size_t reg_e = read_ad9146_reg(0x0E); /* Expect bit 7 = 0, bit 6 = 1 */
             if ((reg_e & ((1 << 7) | (1 << 6))) != 0) break;
             if (exit_time < time_spec_t::get_system_time()) throw uhd::runtime_error(
-                "b250_dac_ctrl: timeout waiting for DAC PLL to lock"
+                "x300_dac_ctrl: timeout waiting for DAC PLL to lock"
             );
             boost::this_thread::sleep(boost::posix_time::milliseconds(10));
         }
@@ -93,7 +93,7 @@ public:
 
     }
 
-    ~b250_dac_ctrl_impl(void)
+    ~x300_dac_ctrl_impl(void)
     {
         UHD_SAFE_CALL
         (
@@ -120,7 +120,7 @@ private:
 /***********************************************************************
  * Public make function for the DAC control
  **********************************************************************/
-b250_dac_ctrl::sptr b250_dac_ctrl::make(uhd::spi_iface::sptr iface, const size_t slaveno, const double clock_rate)
+x300_dac_ctrl::sptr x300_dac_ctrl::make(uhd::spi_iface::sptr iface, const size_t slaveno, const double clock_rate)
 {
-    return sptr(new b250_dac_ctrl_impl(iface, slaveno, clock_rate));
+    return sptr(new x300_dac_ctrl_impl(iface, slaveno, clock_rate));
 }

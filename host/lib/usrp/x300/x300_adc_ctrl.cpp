@@ -15,7 +15,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 //
 
-#include "b250_adc_ctrl.hpp"
+#include "x300_adc_ctrl.hpp"
 #include "ads62p48_regs.hpp"
 #include <uhd/types/ranges.hpp>
 #include <uhd/utils/log.hpp>
@@ -26,12 +26,12 @@
 using namespace uhd;
 
 /*!
- * A B250 codec control specific to the ads62p48 ic.
+ * A X300 codec control specific to the ads62p48 ic.
  */
-class b250_adc_ctrl_impl : public b250_adc_ctrl
+class x300_adc_ctrl_impl : public x300_adc_ctrl
 {
 public:
-    b250_adc_ctrl_impl(uhd::spi_iface::sptr iface, const size_t slaveno):
+    x300_adc_ctrl_impl(uhd::spi_iface::sptr iface, const size_t slaveno):
         _iface(iface), _slaveno(slaveno)
     {
         //power-up adc
@@ -103,7 +103,7 @@ public:
         this->send_ads62p48_reg(0x75);
     }
 
-    ~b250_adc_ctrl_impl(void)
+    ~x300_adc_ctrl_impl(void)
     {
         _ads62p48_regs.power_down = ads62p48_regs_t::POWER_DOWN_GLOBAL;
         UHD_SAFE_CALL
@@ -127,7 +127,7 @@ private:
 /***********************************************************************
  * Public make function for the ADC control
  **********************************************************************/
-b250_adc_ctrl::sptr b250_adc_ctrl::make(uhd::spi_iface::sptr iface, const size_t slaveno)
+x300_adc_ctrl::sptr x300_adc_ctrl::make(uhd::spi_iface::sptr iface, const size_t slaveno)
 {
-    return sptr(new b250_adc_ctrl_impl(iface, slaveno));
+    return sptr(new x300_adc_ctrl_impl(iface, slaveno));
 }

@@ -15,8 +15,8 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 //
 
-#include "b250_regs.hpp"
-#include "b250_impl.hpp"
+#include "x300_regs.hpp"
+#include "x300_impl.hpp"
 #include "validate_subdev_spec.hpp"
 #include "../../transport/super_recv_packet_handler.hpp"
 #include "../../transport/super_send_packet_handler.hpp"
@@ -36,7 +36,7 @@ using namespace uhd::transport;
 /***********************************************************************
  * update streamer rates
  **********************************************************************/
-void b250_impl::update_tick_rate(const double rate)
+void x300_impl::update_tick_rate(const double rate)
 {
     BOOST_FOREACH(const size_t &dspno, _rx_streamers.keys())
     {
@@ -52,7 +52,7 @@ void b250_impl::update_tick_rate(const double rate)
     }
 }
 
-void b250_impl::update_rx_samp_rate(const size_t dspno, const double rate)
+void x300_impl::update_rx_samp_rate(const size_t dspno, const double rate)
 {
     if (not _rx_streamers.has_key(dspno)) return;
     boost::shared_ptr<sph::recv_packet_streamer> my_streamer =
@@ -63,7 +63,7 @@ void b250_impl::update_rx_samp_rate(const size_t dspno, const double rate)
     my_streamer->set_scale_factor(adj);
 }
 
-void b250_impl::update_tx_samp_rate(const size_t dspno, const double rate)
+void x300_impl::update_tx_samp_rate(const size_t dspno, const double rate)
 {
     if (not _tx_streamers.has_key(dspno)) return;
     boost::shared_ptr<sph::send_packet_streamer> my_streamer =
@@ -77,7 +77,7 @@ void b250_impl::update_tx_samp_rate(const size_t dspno, const double rate)
 /***********************************************************************
  * Setup dboard muxing for IQ
  **********************************************************************/
-void b250_impl::update_rx_subdev_spec(const subdev_spec_t &spec)
+void x300_impl::update_rx_subdev_spec(const subdev_spec_t &spec)
 {
     fs_path root = "/mboards/0/dboards";
 
@@ -109,7 +109,7 @@ void b250_impl::update_rx_subdev_spec(const subdev_spec_t &spec)
     _rx_fe_map = spec;
 }
 
-void b250_impl::update_tx_subdev_spec(const subdev_spec_t &spec)
+void x300_impl::update_tx_subdev_spec(const subdev_spec_t &spec)
 {
     fs_path root = "/mboards/0/dboards";
 
@@ -145,7 +145,7 @@ void b250_impl::update_tx_subdev_spec(const subdev_spec_t &spec)
 /***********************************************************************
  * VITA stuff
  **********************************************************************/
-static void b250_if_hdr_unpack_be(
+static void x300_if_hdr_unpack_be(
     const boost::uint32_t *packet_buff,
     vrt::if_packet_info_t &if_packet_info
 ){
@@ -153,7 +153,7 @@ static void b250_if_hdr_unpack_be(
     return vrt::if_hdr_unpack_be(packet_buff, if_packet_info);
 }
 
-static void b250_if_hdr_pack_be(
+static void x300_if_hdr_pack_be(
     boost::uint32_t *packet_buff,
     vrt::if_packet_info_t &if_packet_info
 ){
@@ -161,7 +161,7 @@ static void b250_if_hdr_pack_be(
     return vrt::if_hdr_pack_be(packet_buff, if_packet_info);
 }
 
-static void b250_if_hdr_unpack_le(
+static void x300_if_hdr_unpack_le(
     const boost::uint32_t *packet_buff,
     vrt::if_packet_info_t &if_packet_info
 ){
@@ -169,7 +169,7 @@ static void b250_if_hdr_unpack_le(
     return vrt::if_hdr_unpack_le(packet_buff, if_packet_info);
 }
 
-static void b250_if_hdr_pack_le(
+static void x300_if_hdr_pack_le(
     boost::uint32_t *packet_buff,
     vrt::if_packet_info_t &if_packet_info
 ){
@@ -213,9 +213,9 @@ static void handle_rx_flowctrl(const boost::uint32_t sid, zero_copy_if::sptr xpo
 
     //load header
     if (big_endian)
-        b250_if_hdr_pack_be(pkt, packet_info);
+        x300_if_hdr_pack_be(pkt, packet_info);
     else
-        b250_if_hdr_pack_le(pkt, packet_info);
+        x300_if_hdr_pack_le(pkt, packet_info);
 
     //load payload
     pkt[packet_info.num_header_words32+0] = uhd::htonx<boost::uint32_t>(0);
@@ -229,9 +229,9 @@ static void handle_rx_flowctrl(const boost::uint32_t sid, zero_copy_if::sptr xpo
 /***********************************************************************
  * TX flow control handler
  **********************************************************************/
-struct b250_tx_fc_guts_t
+struct x300_tx_fc_guts_t
 {
-    b250_tx_fc_guts_t(void):
+    x300_tx_fc_guts_t(void):
         stream_channel(0),
         device_channel(0),
         last_seq_out(0),
@@ -242,11 +242,11 @@ struct b250_tx_fc_guts_t
     size_t last_seq_out;
     size_t last_seq_ack;
     bounded_buffer<size_t> seq_queue;
-    boost::shared_ptr<b250_impl::async_md_type> async_queue;
-    boost::shared_ptr<b250_impl::async_md_type> old_async_queue;
+    boost::shared_ptr<x300_impl::async_md_type> async_queue;
+    boost::shared_ptr<x300_impl::async_md_type> old_async_queue;
 };
 
-static void handle_tx_async_msgs(boost::shared_ptr<b250_tx_fc_guts_t> guts, zero_copy_if::sptr xport, bool big_endian, b250_clock_ctrl::sptr clock)
+static void handle_tx_async_msgs(boost::shared_ptr<x300_tx_fc_guts_t> guts, zero_copy_if::sptr xport, bool big_endian, x300_clock_ctrl::sptr clock)
 {
     managed_recv_buffer::sptr buff = xport->get_recv_buff();
     if (not buff) return;
@@ -262,12 +262,12 @@ static void handle_tx_async_msgs(boost::shared_ptr<b250_tx_fc_guts_t> guts, zero
     {
         if (big_endian)
         {
-            b250_if_hdr_unpack_be(packet_buff, if_packet_info);
+            x300_if_hdr_unpack_be(packet_buff, if_packet_info);
             endian_conv = uhd::ntohx;
         }
         else
         {
-            b250_if_hdr_unpack_le(packet_buff, if_packet_info);
+            x300_if_hdr_unpack_le(packet_buff, if_packet_info);
             endian_conv = uhd::wtohx;
         }
     }
@@ -298,14 +298,14 @@ static void handle_tx_async_msgs(boost::shared_ptr<b250_tx_fc_guts_t> guts, zero
 
 static managed_send_buffer::sptr get_tx_buff_with_flowctrl(
     task::sptr /*holds ref*/,
-    boost::shared_ptr<b250_tx_fc_guts_t> guts,
+    boost::shared_ptr<x300_tx_fc_guts_t> guts,
     zero_copy_if::sptr xport,
     const double timeout
 ){
     while (true)
     {
         const size_t delta = (guts->last_seq_out & 0xfff) - (guts->last_seq_ack & 0xfff);
-        if ((delta & 0xfff) <= B250_TX_FC_PKT_WINDOW) break;
+        if ((delta & 0xfff) <= X300_TX_FC_PKT_WINDOW) break;
 
         const bool ok = guts->seq_queue.pop_with_timed_wait(guts->last_seq_ack, timeout);
         if (not ok) return managed_send_buffer::sptr(); //timeout waiting for flow control
@@ -319,7 +319,7 @@ static managed_send_buffer::sptr get_tx_buff_with_flowctrl(
 /***********************************************************************
  * Async Data
  **********************************************************************/
-bool b250_impl::recv_async_msg(
+bool x300_impl::recv_async_msg(
     async_metadata_t &async_metadata, double timeout
 ){
     return _async_md->pop_with_timed_wait(async_metadata, timeout);
@@ -328,7 +328,7 @@ bool b250_impl::recv_async_msg(
 /***********************************************************************
  * Receive streamer
  **********************************************************************/
-rx_streamer::sptr b250_impl::get_rx_stream(const uhd::stream_args_t &args_)
+rx_streamer::sptr x300_impl::get_rx_stream(const uhd::stream_args_t &args_)
 {
     boost::mutex::scoped_lock lock(_transport_setup_mutex);
     stream_args_t args = args_;
@@ -336,7 +336,7 @@ rx_streamer::sptr b250_impl::get_rx_stream(const uhd::stream_args_t &args_)
     //setup defaults for unspecified values
     if (not args.otw_format.empty() and args.otw_format != "sc16")
     {
-        throw uhd::value_error("b250_impl::get_rx_stream only supports otw_format sc16");
+        throw uhd::value_error("x300_impl::get_rx_stream only supports otw_format sc16");
     }
     args.otw_format = "sc16";
     args.channels = args.channels.empty()? std::vector<size_t>(1, 0) : args.channels;
@@ -366,10 +366,10 @@ rx_streamer::sptr b250_impl::get_rx_stream(const uhd::stream_args_t &args_)
         }
 
         //allocate sid and create transport
-        uint8_t dest = (chan == 0)? B250_XB_DST_R0 : B250_XB_DST_R1;
+        uint8_t dest = (chan == 0)? X300_XB_DST_R0 : X300_XB_DST_R1;
         boost::uint32_t data_sid;
         UHD_LOG << "creating rx stream " << device_addr.to_string() << std::endl;
-        zero_copy_if::sptr data_xport = this->make_transport(_addr, _xport_path, dest, B250_RADIO_DEST_PREFIX_RX, device_addr, data_sid);
+        zero_copy_if::sptr data_xport = this->make_transport(_addr, _xport_path, dest, X300_RADIO_DEST_PREFIX_RX, device_addr, data_sid);
         UHD_LOG << boost::format("data_sid = 0x%08x\n") % data_sid << std::endl;
 
         //calculate packet size
@@ -391,10 +391,10 @@ rx_streamer::sptr b250_impl::get_rx_stream(const uhd::stream_args_t &args_)
         //init some streamer stuff
         std::string conv_endianness;
         if (_if_pkt_is_big_endian) {
-            my_streamer->set_vrt_unpacker(&b250_if_hdr_unpack_be);
+            my_streamer->set_vrt_unpacker(&x300_if_hdr_unpack_be);
             conv_endianness = "be";
         } else {
-            my_streamer->set_vrt_unpacker(&b250_if_hdr_unpack_le);
+            my_streamer->set_vrt_unpacker(&x300_if_hdr_unpack_le);
             conv_endianness = "le";
         }
 
@@ -443,7 +443,7 @@ rx_streamer::sptr b250_impl::get_rx_stream(const uhd::stream_args_t &args_)
 /***********************************************************************
  * Transmit streamer
  **********************************************************************/
-tx_streamer::sptr b250_impl::get_tx_stream(const uhd::stream_args_t &args_)
+tx_streamer::sptr x300_impl::get_tx_stream(const uhd::stream_args_t &args_)
 {
     boost::mutex::scoped_lock lock(_transport_setup_mutex);
     stream_args_t args = args_;
@@ -451,7 +451,7 @@ tx_streamer::sptr b250_impl::get_tx_stream(const uhd::stream_args_t &args_)
     //setup defaults for unspecified values
     if (not args.otw_format.empty() and args.otw_format != "sc16")
     {
-        throw uhd::value_error("b250_impl::get_rx_stream only supports otw_format sc16");
+        throw uhd::value_error("x300_impl::get_rx_stream only supports otw_format sc16");
     }
     args.otw_format = "sc16";
     args.channels = args.channels.empty()? std::vector<size_t>(1, 0) : args.channels;
@@ -466,10 +466,10 @@ tx_streamer::sptr b250_impl::get_tx_stream(const uhd::stream_args_t &args_)
         radio_perifs_t &perif = _radio_perifs[chan];
 
         //allocate sid and create transport
-        uint8_t dest = (chan == 0)? B250_XB_DST_R0 : B250_XB_DST_R1;
+        uint8_t dest = (chan == 0)? X300_XB_DST_R0 : X300_XB_DST_R1;
         boost::uint32_t data_sid;
         UHD_LOG << "creating tx stream " << _send_args.to_string() << std::endl;
-        zero_copy_if::sptr data_xport = this->make_transport(_addr, _xport_path, dest, B250_RADIO_DEST_PREFIX_TX, _send_args, data_sid);
+        zero_copy_if::sptr data_xport = this->make_transport(_addr, _xport_path, dest, X300_RADIO_DEST_PREFIX_TX, _send_args, data_sid);
         UHD_LOG << boost::format("data_sid = 0x%08x\n") % data_sid << std::endl;
 
         //calculate packet size
@@ -490,10 +490,10 @@ tx_streamer::sptr b250_impl::get_tx_stream(const uhd::stream_args_t &args_)
 
         std::string conv_endianness;
         if (_if_pkt_is_big_endian) {
-            my_streamer->set_vrt_packer(&b250_if_hdr_pack_be);
+            my_streamer->set_vrt_packer(&x300_if_hdr_pack_be);
             conv_endianness = "be";
         } else {
-            my_streamer->set_vrt_packer(&b250_if_hdr_pack_le);
+            my_streamer->set_vrt_packer(&x300_if_hdr_pack_le);
             conv_endianness = "le";
         }
 
@@ -510,8 +510,8 @@ tx_streamer::sptr b250_impl::get_tx_stream(const uhd::stream_args_t &args_)
         perif.duc->setup(args);
 
         //flow control setup
-        perif.deframer->configure_flow_control(0/*cycs off*/, B250_TX_FC_PKT_WINDOW/8/*pkts*/);
-        boost::shared_ptr<b250_tx_fc_guts_t> guts(new b250_tx_fc_guts_t());
+        perif.deframer->configure_flow_control(0/*cycs off*/, X300_TX_FC_PKT_WINDOW/8/*pkts*/);
+        boost::shared_ptr<x300_tx_fc_guts_t> guts(new x300_tx_fc_guts_t());
         guts->stream_channel = stream_i;
         guts->device_channel = chan;
         guts->async_queue = async_md;

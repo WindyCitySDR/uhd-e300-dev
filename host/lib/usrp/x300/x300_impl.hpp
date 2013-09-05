@@ -15,8 +15,8 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 //
 
-#ifndef INCLUDED_B250_IMPL_HPP
-#define INCLUDED_B250_IMPL_HPP
+#ifndef INCLUDED_X300_IMPL_HPP
+#define INCLUDED_X300_IMPL_HPP
 
 #include <uhd/property_tree.hpp>
 #include <uhd/device.hpp>
@@ -26,13 +26,13 @@
 #include <uhd/usrp/subdev_spec.hpp>
 #include <uhd/types/sensors.hpp>
 #include "wb_iface.hpp"
-#include "b250_clock_ctrl.hpp"
+#include "x300_clock_ctrl.hpp"
 #include "x300_fw_common.h"
-#include "b250_fw_ctrl.hpp"
+#include "x300_fw_ctrl.hpp"
 #include <uhd/utils/tasks.hpp>
 #include "spi_core_3000.hpp"
-#include "b250_adc_ctrl.hpp"
-#include "b250_dac_ctrl.hpp"
+#include "x300_adc_ctrl.hpp"
+#include "x300_dac_ctrl.hpp"
 #include "rx_vita_core_3000.hpp"
 #include "tx_vita_core_3000.hpp"
 #include "time_core_3000.hpp"
@@ -48,60 +48,60 @@
 #include <uhd/transport/vrt_if_packet.hpp>
 
 
-static const size_t B250_TX_FC_PKT_WINDOW = 2048; //16MB/8Kpkts
-static const std::string B250_FW_FILE_NAME = "usrp_b250_fw.bin";
-static const double B250_DEFAULT_TICK_RATE = 120e6;
-static const double B250_BUS_CLOCK_RATE = 175000000;
-static const bool B250_ENABLE_RX_FC = false;
-static const size_t B250_PCIE_DATA_FRAME_SIZE = 8192;   //bytes
-static const size_t B250_PCIE_MSG_FRAME_SIZE  = 256;    //bytes
+static const size_t X300_TX_FC_PKT_WINDOW = 2048; //16MB/8Kpkts
+static const std::string X300_FW_FILE_NAME = "usrp_x300_fw.bin";
+static const double X300_DEFAULT_TICK_RATE = 120e6;
+static const double X300_BUS_CLOCK_RATE = 175000000;
+static const bool X300_ENABLE_RX_FC = false;
+static const size_t X300_PCIE_DATA_FRAME_SIZE = 8192;   //bytes
+static const size_t X300_PCIE_MSG_FRAME_SIZE  = 256;    //bytes
 
-#define B250_RADIO_DEST_PREFIX_TX 0
-#define B250_RADIO_DEST_PREFIX_CTRL 1
-#define B250_RADIO_DEST_PREFIX_RX 2
+#define X300_RADIO_DEST_PREFIX_TX 0
+#define X300_RADIO_DEST_PREFIX_CTRL 1
+#define X300_RADIO_DEST_PREFIX_RX 2
 
-#define B250_XB_DST_E0 0
-#define B250_XB_DST_E1 1
-#define B250_XB_DST_R0 2
-#define B250_XB_DST_R1 3
-#define B250_XB_DST_CE0 4
-#define B250_XB_DST_CE1 5
-#define B250_XB_DST_CE2 5
-#define B250_XB_DST_PCI 7
+#define X300_XB_DST_E0 0
+#define X300_XB_DST_E1 1
+#define X300_XB_DST_R0 2
+#define X300_XB_DST_R1 3
+#define X300_XB_DST_CE0 4
+#define X300_XB_DST_CE1 5
+#define X300_XB_DST_CE2 5
+#define X300_XB_DST_PCI 7
 
-#define B250_DEVICE_THERE 2
-#define B250_DEVICE_HERE 0
+#define X300_DEVICE_THERE 2
+#define X300_DEVICE_HERE 0
 
 //eeprom addrs for various boards
 enum
 {
-    B250_DB0_RX_EEPROM = 0x5,
-    B250_DB0_TX_EEPROM = 0x4,
-    B250_DB0_GDB_EEPROM = 0x1,
-    B250_DB1_RX_EEPROM = 0x7,
-    B250_DB1_TX_EEPROM = 0x6,
-    B250_DB1_GDB_EEPROM = 0x3,
+    X300_DB0_RX_EEPROM = 0x5,
+    X300_DB0_TX_EEPROM = 0x4,
+    X300_DB0_GDB_EEPROM = 0x1,
+    X300_DB1_RX_EEPROM = 0x7,
+    X300_DB1_TX_EEPROM = 0x6,
+    X300_DB1_GDB_EEPROM = 0x3,
 };
 
-struct b250_dboard_iface_config_t
+struct x300_dboard_iface_config_t
 {
     gpio_core_200::sptr gpio;
     spi_core_3000::sptr spi;
     size_t rx_spi_slaveno;
     size_t tx_spi_slaveno;
     i2c_core_100_wb32::sptr i2c;
-    b250_clock_ctrl::sptr clock;
-    b250_clock_which_t which_rx_clk;
-    b250_clock_which_t which_tx_clk;
+    x300_clock_ctrl::sptr clock;
+    x300_clock_which_t which_rx_clk;
+    x300_clock_which_t which_tx_clk;
 };
 
-uhd::usrp::dboard_iface::sptr b250_make_dboard_iface(const b250_dboard_iface_config_t &);
-uhd::uart_iface::sptr b250_make_uart_iface(wb_iface::sptr iface);
+uhd::usrp::dboard_iface::sptr x300_make_dboard_iface(const x300_dboard_iface_config_t &);
+uhd::uart_iface::sptr x300_make_uart_iface(wb_iface::sptr iface);
 
-struct b250_impl : public uhd::device
+struct x300_impl : public uhd::device
 {
-    b250_impl(const uhd::device_addr_t &);
-    ~b250_impl(void);
+    x300_impl(const uhd::device_addr_t &);
+    ~x300_impl(void);
 
     //task for periodically reclaiming the device from others
     void claimer_loop(wb_iface::sptr);
@@ -147,8 +147,8 @@ struct b250_impl : public uhd::device
     {
         radio_ctrl_core_3000::sptr ctrl;
         spi_core_3000::sptr spi;
-        b250_adc_ctrl::sptr adc;
-        b250_dac_ctrl::sptr dac;
+        x300_adc_ctrl::sptr adc;
+        x300_dac_ctrl::sptr dac;
         time_core_3000::sptr time64;
         rx_vita_core_3000::sptr framer;
         rx_dsp_core_3000::sptr ddc;
@@ -163,7 +163,7 @@ struct b250_impl : public uhd::device
     uhd::usrp::subdev_spec_t _rx_fe_map;
     uhd::usrp::subdev_spec_t _tx_fe_map;
 
-    b250_clock_ctrl::sptr _clock;
+    x300_clock_ctrl::sptr _clock;
     uhd::gps_ctrl::sptr _gps;
 
     gpio_core_200::sptr _fp_gpio;
@@ -221,4 +221,4 @@ struct b250_impl : public uhd::device
     void check_fpga_compat(wb_iface::sptr iface);
 };
 
-#endif /* INCLUDED_B250_IMPL_HPP */
+#endif /* INCLUDED_X300_IMPL_HPP */

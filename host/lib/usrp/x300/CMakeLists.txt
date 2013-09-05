@@ -20,18 +20,18 @@
 ########################################################################
 
 ########################################################################
-# Conditionally configure the B250 support
+# Conditionally configure the X300 support
 ########################################################################
-LIBUHD_REGISTER_COMPONENT("B250" ENABLE_B250 ON "ENABLE_LIBUHD" OFF)
+LIBUHD_REGISTER_COMPONENT("X300" ENABLE_X300 ON "ENABLE_LIBUHD" OFF)
 
-IF(ENABLE_B250)
+IF(ENABLE_X300)
     LIBUHD_APPEND_SOURCES(
-        ${CMAKE_CURRENT_SOURCE_DIR}/b250_impl.cpp
-        ${CMAKE_CURRENT_SOURCE_DIR}/b250_fw_uart.cpp
-        ${CMAKE_CURRENT_SOURCE_DIR}/b250_adc_ctrl.cpp
-        ${CMAKE_CURRENT_SOURCE_DIR}/b250_dac_ctrl.cpp
-        ${CMAKE_CURRENT_SOURCE_DIR}/b250_io_impl.cpp
-        ${CMAKE_CURRENT_SOURCE_DIR}/b250_dboard_iface.cpp
-        ${CMAKE_CURRENT_SOURCE_DIR}/b250_clock_ctrl.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/x300_impl.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/x300_fw_uart.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/x300_adc_ctrl.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/x300_dac_ctrl.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/x300_io_impl.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/x300_dboard_iface.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/x300_clock_ctrl.cpp
     )
-ENDIF(ENABLE_B250)
+ENDIF(ENABLE_X300)

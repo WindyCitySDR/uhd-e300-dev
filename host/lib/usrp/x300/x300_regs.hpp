@@ -15,8 +15,8 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 //
 
-#ifndef INCLUDED_B250_REGS_HPP
-#define INCLUDED_B250_REGS_HPP
+#ifndef INCLUDED_X300_REGS_HPP
+#define INCLUDED_X300_REGS_HPP
 
 #include <boost/cstdint.hpp>
 
@@ -129,4 +129,4 @@ static const uint32_t PCIE_ZPU_READ_CLOBBER = 0x80000000;
 static const uint32_t PCIE_ZPU_STATUS_BUSY  = 0x1;
 
 
-#endif /* INCLUDED_B250_REGS_HPP */
+#endif /* INCLUDED_X300_REGS_HPP */
