@@ -36,15 +36,13 @@ FOREACH(util_source ${util_runtime_sources})
 ENDFOREACH(util_source)
 
 ########################################################################
-# @TODO: Ashish: Remove this after the initial testing phase
+# nirio_programmer @TODO: Ashish: Remove this after the initial testing phase
 ########################################################################
 SET(CMAKE_C_COMPILE_OBJECT ${CMAKE_CXX_COMPILE_OBJECT})
 SET(niro_prog_sources nirio_programmer.cpp
     ../lib/transport/nirio/nifpga_interface.cpp
     ../lib/transport/nirio/nirio_interface.cpp
     ../lib/transport/nirio/nirio_resource_manager.cpp
-    ../lib/transport/nirio/NiFpga/NiFpga.c
-    ../lib/transport/nirio/NiFpga/niusrprio.c
     ../lib/utils/platform.cpp
     ../lib/transport/nirio/rpc/rpc_client.cpp
     ../lib/transport/nirio/rpc/usrprio_rpc_client.cpp
@@ -66,6 +64,30 @@ IF(WIN32)
 ELSE()
     TARGET_LINK_LIBRARIES(nirio_programmer uhd)
 ENDIF()
+
+########################################################################
+# usrprio_server @TODO: Ashish: Remove this after the initial testing phase
+########################################################################
+SET(usrprio_server_sources usrprio_server.cpp
+    usrprio/NiFpga.c
+    usrprio/niusrprio.c
+    usrprio/rpc_connection.cpp
+    usrprio/rpc_logger.cpp
+    usrprio/rpc_server.cpp
+    ../lib/transport/nirio/nirio_interface.cpp
+)
+IF(WIN32)
+    LIST(APPEND usrprio_server_sources ../lib/transport/nirio/nirio_driver_iface_win.cpp)
+ELSE(WIN32)
+    IF(APPLE)
+        LIST(APPEND usrprio_server_sources ../lib/transport/nirio/nirio_driver_iface_macos.cpp)
+    ELSE(APPLE)
+        LIST(APPEND usrprio_server_sources ../lib/transport/nirio/nirio_driver_iface_linux.cpp)
+    ENDIF(APPLE)
+ENDIF(WIN32)
+
+ADD_EXECUTABLE(usrprio_server ${usrprio_server_sources})
+TARGET_LINK_LIBRARIES(usrprio_server uhd)
 
 ########################################################################
 # Utilities that get installed into the share path

@@ -40,12 +40,16 @@ public:
         NIUSRPRIO_INITIALIZE_ARGS);
     nirio_status niusrprio_finalize(
         NIUSRPRIO_FINALIZE_ARGS);
+    nirio_status niusrprio_enumerate(
+            NIUSRPRIO_ENUMERATE_ARGS);
     nirio_status niusrprio_open_session(
         NIUSRPRIO_OPEN_SESSION_ARGS);
     nirio_status niusrprio_close_session(
         NIUSRPRIO_CLOSE_SESSION_ARGS);
     nirio_status niusrprio_reset_device(
         NIUSRPRIO_RESET_SESSION_ARGS);
+    nirio_status niusrprio_download_fpga_to_flash(
+            NIUSRPRIO_DOWNLOAD_FPGA_TO_FLASH_ARGS);
 
     static const boost::int64_t DEFAULT_TIMEOUT_IN_MS = 5000;
 

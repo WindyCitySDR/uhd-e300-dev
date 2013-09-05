@@ -23,19 +23,10 @@ class nifpga_session
 {
 public:
     typedef boost::shared_ptr<nifpga_session> sptr;
+    typedef usrprio_rpc::usrprio_device_info device_info;
+    typedef usrprio_rpc::usrprio_device_info_vtr device_info_vtr;
 
-    struct nirio_device_info {
-        uint32_t    interface_num;
-        std::string resource_name;
-        std::string serial_num;
-        std::string interface_path;
-    };
-    typedef std::vector<nirio_device_info> nirio_device_info_vtr;
-
-	static nirio_status load_lib();
-	static nirio_status unload_lib();
-
-	static nirio_status enumerate(nirio_device_info_vtr& device_info_vtr);
+	static nirio_status enumerate(device_info_vtr& device_info_vtr);
 
 	nifpga_session(const std::string& resource_name);
 	virtual ~nifpga_session();
@@ -47,16 +38,6 @@ public:
 	void close(bool reset_fpga = false);
 
 	nirio_status reset();
-
-	template<typename data_t>
-	nirio_status read(
-		const char* indicator_name,
-		data_t& value);
-
-	template<typename data_t>
-	nirio_status write(
-		const char* control_name,
-		const data_t& value);
 
 	template<typename data_t>
 	nirio_status create_tx_fifo(
@@ -116,26 +97,14 @@ public:
 private:
 	void _init_fifo_info(nirio_interface::nirio_fifo_info_vtr& vtr);
 
-	static uint32_t _read_bitstream_from_file(
-        const std::string& filename,
-        boost::scoped_array<uint8_t>& buffer);
-
-    static inline uint8_t _reverse(uint8_t b) {
-       b = (b & 0xF0) >> 4 | (b & 0x0F) << 4;
-       b = (b & 0xCC) >> 2 | (b & 0x33) << 2;
-       b = (b & 0xAA) >> 1 | (b & 0x55) << 1;
-       return b;
-    }
-
 	std::string								_resource_name;
+	uint32_t                                _interface_num;
 	nifpga_lvbitx::sptr                     _lvbitx;
     uint32_t                                _session;
 	nirio_interface::niriok_proxy			_riok_proxy;
 	nirio_interface::nirio_resource_manager	_resource_manager;
 	nifpga_session_lock						_lock;
 	usrprio_rpc::usrprio_rpc_client         _rpc_client;
-
-
 
 	static const uint32_t SESSION_LOCK_TIMEOUT_IN_MS = 5000;
 };

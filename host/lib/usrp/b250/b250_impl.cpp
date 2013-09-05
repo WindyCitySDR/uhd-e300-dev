@@ -108,13 +108,10 @@ static device_addrs_t b250_find_with_addr(const device_addr_t &hint)
 static device_addrs_t b250_find_pcie(const device_addr_t &hint)
 {
     device_addrs_t addrs;
-    //@TODO: Remove this when we have the helper process
-    if (nirio_status_fatal(nifpga_session::load_lib())) return addrs;
-
-    nifpga_session::nirio_device_info_vtr dev_info_vtr;
+    nifpga_session::device_info_vtr dev_info_vtr;
     nifpga_session::enumerate(dev_info_vtr);
 
-    BOOST_FOREACH(nifpga_session::nirio_device_info &dev_info, dev_info_vtr)
+    BOOST_FOREACH(nifpga_session::device_info &dev_info, dev_info_vtr)
     {
         device_addr_t new_addr;
         new_addr["type"] = "x300";
@@ -263,8 +260,6 @@ b250_impl::b250_impl(const uhd::device_addr_t &dev_addr)
         //@TODO: Remove this when we have the helper process
         UHD_MSG(status) << "Loading NI shared libs...\n";
         nirio_status status = 0;
-        nirio_status_chain(nifpga_session::load_lib(), status);
-
         //@TODO: When we can tell the X300 and X310 apart, instantiate the correct LVBITX
         //       objest here. Both of them are codegen'ed currently.
         nifpga_lvbitx::sptr lvbitx(new x310_lvbitx());

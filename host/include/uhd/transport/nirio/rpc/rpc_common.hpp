@@ -36,18 +36,18 @@ namespace usrprio_rpc {
 
 //[Over-the-wire] IDs
 typedef boost::int32_t  func_id_t;
-typedef boost::uint64_t hshake_id_t;
+typedef boost::uint64_t client_id_t;
 
 //[Over-the-wire] Handshake format
 struct hshake_args_t {
     boost::uint32_t version;
     boost::uint32_t oldest_comp_version;
     union {
-        hshake_id_t         hshake_id;
+        client_id_t         client_id;
         struct {
             boost::uint32_t pid;
             boost::uint32_t hid;
-        };
+        } id;
     };
 };
 
@@ -55,11 +55,11 @@ struct hshake_args_t {
 class func_args_header_t {
 public:
     func_id_t       func_id;
-    hshake_id_t     hshake_id;
+    client_id_t     client_id;
     boost::uint32_t func_args_size;
 
     static bool match_function(const func_args_header_t& a, const func_args_header_t& b) {
-        return ((a.func_id == b.func_id) && (a.hshake_id == b.hshake_id));
+        return ((a.func_id == b.func_id) && (a.client_id == b.client_id));
     }
 };
 

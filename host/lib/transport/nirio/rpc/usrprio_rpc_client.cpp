@@ -73,6 +73,35 @@ nirio_status usrprio_rpc_client::niusrprio_finalize(NIUSRPRIO_FINALIZE_ARGS)
     return status;
 }
 
+nirio_status usrprio_rpc_client::niusrprio_enumerate(NIUSRPRIO_ENUMERATE_ARGS)
+/*
+#define NIUSRPRIO_ENUMERATE_ARGS         \
+    usrprio_device_info_vtr& device_info_vtr
+*/
+{
+    usrprio_rpc::func_args_writer_t in_args;
+    usrprio_rpc::func_args_reader_t out_args;
+    nirio_status status = NiRio_Status_Success;
+    boost::uint32_t vtr_size = 0;
+
+    status = _boost_error_to_nirio_status(
+        _rpc_client.call(NIUSRPRIO_ENUMERATE, in_args, out_args, _timeout));
+
+    if (nirio_status_not_fatal(status)) {
+        out_args >> status;
+        out_args >> vtr_size;
+    }
+    if (nirio_status_not_fatal(status) && vtr_size > 0) {
+        device_info_vtr.resize(vtr_size);
+        for (size_t i = 0; i < (size_t)vtr_size; i++) {
+            usrprio_device_info info;
+            out_args >> info;
+            device_info_vtr[i] = info;
+        }
+    }
+    return status;
+}
+
 nirio_status usrprio_rpc_client::niusrprio_open_session(NIUSRPRIO_OPEN_SESSION_ARGS)
 /*
 #define NIUSRPRIO_OPEN_SESSION_ARGS     \
@@ -141,6 +170,30 @@ nirio_status usrprio_rpc_client::niusrprio_reset_device(NIUSRPRIO_RESET_SESSION_
 
     status = _boost_error_to_nirio_status(
         _rpc_client.call(NIUSRPRIO_RESET_SESSION, in_args, out_args, _timeout));
+
+    if (nirio_status_not_fatal(status)) {
+        out_args >> status;
+    }
+
+    return status;
+}
+
+nirio_status usrprio_rpc_client::niusrprio_download_fpga_to_flash(NIUSRPRIO_DOWNLOAD_FPGA_TO_FLASH_ARGS)
+/*
+#define NIUSRPRIO_DOWNLOAD_FPGA_TO_FLASH_ARGS   \
+    const boost::uint32_t& interface_num,       \
+    const std::string& bitstream_path
+*/
+{
+    usrprio_rpc::func_args_writer_t in_args;
+    usrprio_rpc::func_args_reader_t out_args;
+    nirio_status status = NiRio_Status_Success;
+
+    in_args << interface_num;
+    in_args << bitstream_path;
+
+    status = _boost_error_to_nirio_status(
+        _rpc_client.call(NIUSRPRIO_DOWNLOAD_FPGA_TO_FLASH, in_args, out_args, _timeout));
 
     if (nirio_status_not_fatal(status)) {
         out_args >> status;

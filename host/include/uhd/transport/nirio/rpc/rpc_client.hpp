@@ -65,7 +65,8 @@ private:
 
     inline void _stop_io_service() {
         if (_io_service_thread.get()) {
-            _io_service.reset();
+            _io_service.stop();
+            _io_service_thread->join();
             _io_service_thread.reset();
         }
     }

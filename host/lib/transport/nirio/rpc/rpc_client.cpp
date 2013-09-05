@@ -35,8 +35,8 @@ rpc_client::rpc_client (
     //Fill in handshake info
     _hshake_args_client.version = CURRENT_VERSION;
     _hshake_args_client.oldest_comp_version = OLDEST_COMPATIBLE_VERSION;
-    _hshake_args_client.pid = process_id;
-    _hshake_args_client.hid = host_id;
+    _hshake_args_client.id.pid = process_id;
+    _hshake_args_client.id.hid = host_id;
 
     try {
         //Synchronous resolve + connect
@@ -55,7 +55,7 @@ rpc_client::rpc_client (
                 boost::asio::read(_socket, boost::asio::buffer(&_hshake_args_server, sizeof(_hshake_args_server))),
                 sizeof(_hshake_args_server), status);
 
-            _request.header.hshake_id = _hshake_args_server.hshake_id;
+            _request.header.client_id = _hshake_args_server.client_id;
 
             if (_hshake_args_server.version >= _hshake_args_client.oldest_comp_version &&
                 _hshake_args_client.version >= _hshake_args_server.oldest_comp_version &&
@@ -68,10 +68,10 @@ rpc_client::rpc_client (
             } else {
                 _exec_err.assign(boost::asio::error::connection_refused, boost::system::system_category());
             }
-        } catch (boost::exception& e) {
+        } catch (boost::exception&) {
             _exec_err.assign(boost::asio::error::connection_refused, boost::system::system_category());
         }
-    } catch (boost::exception& e) {
+    } catch (boost::exception&) {
         _exec_err.assign(boost::asio::error::connection_aborted, boost::system::system_category());
     }
 }
@@ -105,7 +105,7 @@ const boost::system::error_code& rpc_client::call(
             CHAIN_BLOCKING_XFER(
                 boost::asio::write(_socket, boost::asio::buffer(&(*_request.data.begin()), _request.data.size())),
                 _request.data.size(), status);
-        } catch (boost::exception& e) {
+        } catch (boost::exception&) {
             status = false;
         }
 
@@ -120,7 +120,7 @@ const boost::system::error_code& rpc_client::call(
         }
 
         //Verify that we are talking to the correct endpoint
-        if ((_request.header.hshake_id != _response.header.hshake_id) && !_exec_err) {
+        if ((_request.header.client_id != _response.header.client_id) && !_exec_err) {
             _exec_err.assign(boost::asio::error::operation_aborted, boost::system::system_category());
         }
 
