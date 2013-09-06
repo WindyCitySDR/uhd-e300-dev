@@ -20,7 +20,7 @@
 
 #include <uhd/config.hpp>
 #include <uhd/transport/zero_copy.hpp>
-#include <uhd/transport/nirio/nifpga_interface.h>
+#include <uhd/transport/nirio/niusrprio_session.h>
 #include <uhd/types/device_addr.hpp>
 #include <boost/shared_ptr.hpp>
 
@@ -31,7 +31,7 @@ public:
     typedef boost::shared_ptr<nirio_zero_copy> sptr;
 
     static sptr make(
-        nifpga_interface::nifpga_session::sptr fpga_session,
+        nifpga_interface::niusrprio_session::sptr fpga_session,
         const uint32_t instance,
         const device_addr_t &hints = device_addr_t()
     );

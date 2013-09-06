@@ -117,7 +117,7 @@ public:
     typedef boost::shared_ptr<nirio_zero_copy_impl> sptr;
 
     nirio_zero_copy_impl(
-        nifpga_interface::nifpga_session::sptr fpga_session,
+        nifpga_interface::niusrprio_session::sptr fpga_session,
         uint32_t instance,
         const device_addr_t &hints
     ):
@@ -240,7 +240,7 @@ private:
 
 
 nirio_zero_copy::sptr nirio_zero_copy::make(
-    nifpga_interface::nifpga_session::sptr fpga_session,
+    nifpga_interface::niusrprio_session::sptr fpga_session,
     const uint32_t instance,
     const device_addr_t &hints
 ){

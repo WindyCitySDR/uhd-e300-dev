@@ -33,7 +33,7 @@
 #include <fstream>
 #include <uhd/transport/udp_zero_copy.hpp>
 #include <uhd/transport/nirio_zero_copy.hpp>
-#include <uhd/transport/nirio/nifpga_interface.h>
+#include <uhd/transport/nirio/niusrprio_session.h>
 #include <uhd/utils/platform.hpp>
 
 using namespace uhd;
@@ -108,10 +108,10 @@ static device_addrs_t b250_find_with_addr(const device_addr_t &hint)
 static device_addrs_t b250_find_pcie(const device_addr_t &hint)
 {
     device_addrs_t addrs;
-    nifpga_session::device_info_vtr dev_info_vtr;
-    nifpga_session::enumerate(dev_info_vtr);
+    niusrprio_session::device_info_vtr dev_info_vtr;
+    niusrprio_session::enumerate(dev_info_vtr);
 
-    BOOST_FOREACH(nifpga_session::device_info &dev_info, dev_info_vtr)
+    BOOST_FOREACH(niusrprio_session::device_info &dev_info, dev_info_vtr)
     {
         device_addr_t new_addr;
         new_addr["type"] = "x300";
@@ -265,7 +265,7 @@ b250_impl::b250_impl(const uhd::device_addr_t &dev_addr)
         nifpga_lvbitx::sptr lvbitx(new x310_lvbitx());
 
         UHD_MSG(status) << boost::format("Loading bitfile %s...\n") % lvbitx->get_signature();
-        _rio_fpga_interface.reset(new nifpga_session(dev_addr["resource"]));
+        _rio_fpga_interface.reset(new niusrprio_session(dev_addr["resource"]));
         nirio_status_chain(_rio_fpga_interface->open(lvbitx), status);
 
         if(nirio_status_fatal(status))

@@ -40,7 +40,7 @@ ENDFOREACH(util_source)
 ########################################################################
 SET(CMAKE_C_COMPILE_OBJECT ${CMAKE_CXX_COMPILE_OBJECT})
 SET(niro_prog_sources nirio_programmer.cpp
-    ../lib/transport/nirio/nifpga_interface.cpp
+    ../lib/transport/nirio/niusrprio_session.cpp
     ../lib/transport/nirio/nirio_interface.cpp
     ../lib/transport/nirio/nirio_resource_manager.cpp
     ../lib/utils/platform.cpp

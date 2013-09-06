@@ -44,7 +44,7 @@
 #include <boost/weak_ptr.hpp>
 #include <uhd/usrp/gps_ctrl.hpp>
 #include <uhd/transport/bounded_buffer.hpp>
-#include <uhd/transport/nirio/nifpga_interface.h>
+#include <uhd/transport/nirio/niusrprio_session.h>
 #include <uhd/transport/vrt_if_packet.hpp>
 
 
@@ -135,7 +135,7 @@ struct b250_impl : public uhd::device
     uhd::device_addr_t _recv_args;
     bool _if_pkt_is_big_endian;
 
-    nifpga_interface::nifpga_session::sptr  _rio_fpga_interface;
+    nifpga_interface::niusrprio_session::sptr  _rio_fpga_interface;
 
     //perifs in the zpu
     wb_iface::sptr _zpu_ctrl;

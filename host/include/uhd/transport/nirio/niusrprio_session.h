@@ -5,8 +5,8 @@
  *      Author: ashish
  */
 
-#ifndef NIFPGA_INTERFACE_H_
-#define NIFPGA_INTERFACE_H_
+#ifndef NIUSRPRIO_SESSION_H_
+#define NIUSRPRIO_SESSION_H_
 
 #include <uhd/transport/nirio/nirio_interface.h>
 #include <uhd/transport/nirio/nirio_resource_manager.h>
@@ -19,17 +19,17 @@
 namespace nifpga_interface
 {
 
-class nifpga_session
+class niusrprio_session
 {
 public:
-    typedef boost::shared_ptr<nifpga_session> sptr;
+    typedef boost::shared_ptr<niusrprio_session> sptr;
     typedef usrprio_rpc::usrprio_device_info device_info;
     typedef usrprio_rpc::usrprio_device_info_vtr device_info_vtr;
 
 	static nirio_status enumerate(device_info_vtr& device_info_vtr);
 
-	nifpga_session(const std::string& resource_name);
-	virtual ~nifpga_session();
+	niusrprio_session(const std::string& resource_name);
+	virtual ~niusrprio_session();
 
 	nirio_status open(
         nifpga_lvbitx::sptr lvbitx,
@@ -111,4 +111,4 @@ private:
 
 }
 
-#endif /* NIFPGA_INTERFACE_H_ */
+#endif /* NIUSRPRIO_SESSION_H_ */

@@ -1,6 +1,6 @@
 
 #include <uhd/transport/nirio/nirio_interface.h>
-#include <uhd/transport/nirio/nifpga_interface.h>
+#include <uhd/transport/nirio/niusrprio_session.h>
 #include <uhd/transport/nirio/nifpga_lvbitx.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -74,9 +74,9 @@ int main(int argc, char *argv[])
         std::string resource_name = boost::str(boost::format("RIO%u") % interface_num);
         printf("Downloading image %s to FPGA as %s...", fpga_lvbitx_path.c_str(), resource_name.c_str());
         fflush(stdout);
-        uint32_t attributes = nifpga_interface::nifpga_session::OPEN_ATTR_SKIP_SIGNATURE_CHECK |
-                nifpga_interface::nifpga_session::OPEN_ATTR_FORCE_DOWNLOAD;
-        nifpga_interface::nifpga_session fpga_session(resource_name);
+        uint32_t attributes = nifpga_interface::niusrprio_session::OPEN_ATTR_SKIP_SIGNATURE_CHECK |
+                nifpga_interface::niusrprio_session::OPEN_ATTR_FORCE_DOWNLOAD;
+        nifpga_interface::niusrprio_session fpga_session(resource_name);
         nifpga_interface::nifpga_lvbitx::sptr lvbitx(new dummy_lvbitx(fpga_lvbitx_path));
         nirio_status_chain(fpga_session.open(lvbitx, attributes), status);
         //Download BIN to flash or erase

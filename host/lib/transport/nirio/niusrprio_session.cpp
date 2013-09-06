@@ -5,7 +5,7 @@
  *      Author: ashish
  */
 
-#include <uhd/transport/nirio/nifpga_interface.h>
+#include <uhd/transport/nirio/niusrprio_session.h>
 #include <uhd/transport/nirio/nirio_fifo.h>
 #include <uhd/transport/nirio/status.h>
 #include <stdio.h>
@@ -18,7 +18,7 @@
 namespace nifpga_interface
 {
 
-nifpga_session::nifpga_session(const std::string& resource_name) :
+niusrprio_session::niusrprio_session(const std::string& resource_name) :
 	_resource_name(resource_name),
     _session(0),
 	_resource_manager(_riok_proxy),
@@ -35,12 +35,12 @@ nifpga_session::nifpga_session(const std::string& resource_name) :
     }
 }
 
-nifpga_session::~nifpga_session()
+niusrprio_session::~niusrprio_session()
 {
     close();
 }
 
-nirio_status nifpga_session::enumerate(device_info_vtr& device_info_vtr)
+nirio_status niusrprio_session::enumerate(device_info_vtr& device_info_vtr)
 {
     usrprio_rpc::usrprio_rpc_client temp_rpc_client(RPC_CLIENT_ARGS);
     nirio_status status = NiRio_Status_Success;
@@ -49,7 +49,7 @@ nirio_status nifpga_session::enumerate(device_info_vtr& device_info_vtr)
     return status;
 }
 
-nirio_status nifpga_session::open(
+nirio_status niusrprio_session::open(
     nifpga_lvbitx::sptr lvbitx,
 	uint32_t attribute)
 {
@@ -86,7 +86,7 @@ nirio_status nifpga_session::open(
 	return status;
 }
 
-void nifpga_session::close(bool reset_fpga)
+void niusrprio_session::close(bool reset_fpga)
 {
     if (_session) {
         nirio_status status = NiRio_Status_Success;
@@ -97,7 +97,7 @@ void nifpga_session::close(bool reset_fpga)
     }
 }
 
-nirio_status nifpga_session::reset()
+nirio_status niusrprio_session::reset()
 {
 	nirio_status status = NiRio_Status_Success;
 	nirio_status_chain(_lock.acquire(SESSION_LOCK_TIMEOUT_IN_MS), status);
@@ -106,7 +106,7 @@ nirio_status nifpga_session::reset()
 	return status;
 }
 
-nirio_status nifpga_session::download_bitstream_to_flash(const std::string& bitstream_path)
+nirio_status niusrprio_session::download_bitstream_to_flash(const std::string& bitstream_path)
 {
     nirio_status status = NiRio_Status_Success;
     nirio_status_chain(_lock.acquire(SESSION_LOCK_TIMEOUT_IN_MS), status);
