@@ -101,16 +101,14 @@ uhd::uart_iface::sptr x300_make_uart_iface(wb_iface::sptr iface);
 struct x300_impl : public uhd::device
 {
     x300_impl(const uhd::device_addr_t &);
+    void setup_mb(const size_t which, const uhd::device_addr_t &);
     ~x300_impl(void);
-
-    //task for periodically reclaiming the device from others
-    void claimer_loop(wb_iface::sptr);
-    static bool is_claimed(wb_iface::sptr);
-    uhd::task::sptr _claimer_task;
 
     //the io interface
     uhd::rx_streamer::sptr get_rx_stream(const uhd::stream_args_t &);
     uhd::tx_streamer::sptr get_tx_stream(const uhd::stream_args_t &);
+    uhd::dict<size_t, boost::weak_ptr<uhd::rx_streamer> > _rx_streamers;
+    uhd::dict<size_t, boost::weak_ptr<uhd::tx_streamer> > _tx_streamers;
 
     //support old async call
     typedef uhd::transport::bounded_buffer<uhd::async_metadata_t> async_md_type;
@@ -123,24 +121,6 @@ struct x300_impl : public uhd::device
     {
         return _tree;
     }
-
-    boost::mutex _transport_setup_mutex;
-
-    void register_loopback_self_test(wb_iface::sptr iface);
-
-    std::string _addr;
-    std::string _xport_path;
-    int _router_dst_here;
-    uhd::device_addr_t _send_args;
-    uhd::device_addr_t _recv_args;
-    bool _if_pkt_is_big_endian;
-
-    nifpga_interface::nifpga_session::sptr  _rio_fpga_interface;
-
-    //perifs in the zpu
-    wb_iface::sptr _zpu_ctrl;
-    spi_core_3000::sptr _zpu_spi;
-    i2c_core_100_wb32::sptr _zpu_i2c;
 
     //perifs in the radio core
     struct radio_perifs_t
@@ -156,19 +136,53 @@ struct x300_impl : public uhd::device
         tx_dsp_core_3000::sptr duc;
         gpio_core_200_32wo::sptr leds;
     };
-    radio_perifs_t _radio_perifs[2];
-    uhd::usrp::dboard_eeprom_t _db_eeproms[8];
-    void setup_radio(const size_t which_radio, const std::string &db_name);
 
-    uhd::usrp::subdev_spec_t _rx_fe_map;
-    uhd::usrp::subdev_spec_t _tx_fe_map;
+    //vector of member objects per motherboard
+    struct mboard_members_t
+    {
+        uhd::task::sptr claimer_task;
+        std::string addr;
+        std::string xport_path;
+        int router_dst_here;
+        uhd::device_addr_t send_args;
+        uhd::device_addr_t recv_args;
+        bool if_pkt_is_big_endian;
+        nifpga_interface::nifpga_session::sptr  rio_fpga_interface;
 
-    x300_clock_ctrl::sptr _clock;
-    uhd::gps_ctrl::sptr _gps;
+        //perifs in the zpu
+        wb_iface::sptr zpu_ctrl;
+        spi_core_3000::sptr zpu_spi;
+        i2c_core_100_wb32::sptr zpu_i2c;
 
-    gpio_core_200::sptr _fp_gpio;
-    boost::uint64_t get_fp_gpio(const std::string &);
-    void set_fp_gpio(const std::string &, const boost::uint64_t);
+        //perifs in each radio
+        radio_perifs_t radio_perifs[2];
+        uhd::usrp::dboard_eeprom_t db_eeproms[8];
+
+        //per mboard frontend mapping
+        uhd::usrp::subdev_spec_t rx_fe_map;
+        uhd::usrp::subdev_spec_t tx_fe_map;
+
+        //other perifs on mboard
+        x300_clock_ctrl::sptr clock;
+        uhd::gps_ctrl::sptr gps;
+        gpio_core_200::sptr fp_gpio;
+
+        //clock control register bits
+        int clock_control_regs__clock_source;
+        int clock_control_regs__pps_select;
+        int clock_control_regs__pps_out_enb;
+    };
+    std::vector<mboard_members_t> _mb;
+
+    //task for periodically reclaiming the device from others
+    void claimer_loop(wb_iface::sptr);
+    static bool is_claimed(wb_iface::sptr);
+
+    boost::mutex _transport_setup_mutex;
+
+    void register_loopback_self_test(wb_iface::sptr iface);
+
+    void setup_radio(const size_t, const size_t which_radio, const std::string &db_name);
 
     size_t _sid_framer;
     struct sid_config_t
@@ -178,8 +192,9 @@ struct x300_impl : public uhd::device
         boost::uint8_t router_dst_there;
         boost::uint8_t router_dst_here;
     };
-    boost::uint32_t allocate_sid(const sid_config_t &config, std::string xport_path);
+    boost::uint32_t allocate_sid(mboard_members_t &mb, const sid_config_t &config, std::string xport_path);
     uhd::transport::zero_copy_if::sptr make_transport(
+        mboard_members_t &mb,
         const std::string& addr,
         const std::string& transport,
         const uint8_t& destination,
@@ -187,8 +202,6 @@ struct x300_impl : public uhd::device
         const uhd::device_addr_t& args,
         boost::uint32_t& sid);
 
-    uhd::dict<size_t, boost::weak_ptr<uhd::rx_streamer> > _rx_streamers;
-    uhd::dict<size_t, boost::weak_ptr<uhd::tx_streamer> > _tx_streamers;
 
     uhd::dict<std::string, uhd::usrp::dboard_manager::sptr> _dboard_managers;
     uhd::dict<std::string, uhd::usrp::dboard_iface::sptr> _dboard_ifaces;
@@ -201,24 +214,23 @@ struct x300_impl : public uhd::device
     void update_rx_samp_rate(const size_t, const double);
     void update_tx_samp_rate(const size_t, const double);
 
-    struct clock_control_regs_t
-    {
-        int clock_source;
-        int pps_select;
-        int pps_out_enb;
-    } clock_control_regs;
-    void update_clock_control(void);
+    void update_clock_control(mboard_members_t&);
 
-    void set_time_source_out(const bool);
-    void update_clock_source(const std::string &);
-    void update_time_source(const std::string &);
-    void update_atr_leds(const size_t, const std::string &ant);
-    uhd::sensor_value_t get_ref_locked(void);
-    void set_db_eeprom(const size_t, const uhd::usrp::dboard_eeprom_t &);
-    void set_mb_eeprom(const uhd::usrp::mboard_eeprom_t &);
+    void set_time_source_out(mboard_members_t&, const bool);
+    void update_clock_source(mboard_members_t&, const std::string &);
+    void update_time_source(mboard_members_t&, const std::string &);
+
+    uhd::sensor_value_t get_ref_locked(wb_iface::sptr);
+
+    void set_db_eeprom(uhd::i2c_iface::sptr i2c, const size_t, const uhd::usrp::dboard_eeprom_t &);
+    void set_mb_eeprom(uhd::i2c_iface::sptr i2c, const uhd::usrp::mboard_eeprom_t &);
 
     void check_fw_compat(wb_iface::sptr iface);
     void check_fpga_compat(wb_iface::sptr iface);
+
+    void update_atr_leds(gpio_core_200_32wo::sptr, const std::string &ant);
+    boost::uint64_t get_fp_gpio(gpio_core_200::sptr, const std::string &);
+    void set_fp_gpio(gpio_core_200::sptr, const std::string &, const boost::uint64_t);
 };
 
 #endif /* INCLUDED_X300_IMPL_HPP */
