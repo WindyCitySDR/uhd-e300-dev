@@ -193,11 +193,9 @@ struct x300_impl : public uhd::device
         boost::uint8_t router_dst_there;
         boost::uint8_t router_dst_here;
     };
-    boost::uint32_t allocate_sid(mboard_members_t &mb, const sid_config_t &config, std::string xport_path);
+    boost::uint32_t allocate_sid(mboard_members_t &mb, const sid_config_t &config);
     uhd::transport::zero_copy_if::sptr make_transport(
         mboard_members_t &mb,
-        const std::string& addr,
-        const std::string& transport,
         const uint8_t& destination,
         const uint8_t& prefix,
         const uhd::device_addr_t& args,
@@ -216,7 +214,6 @@ struct x300_impl : public uhd::device
     void update_tx_samp_rate(mboard_members_t&, const size_t, const double);
 
     void update_clock_control(mboard_members_t&);
-
     void set_time_source_out(mboard_members_t&, const bool);
     void update_clock_source(mboard_members_t&, const std::string &);
     void update_time_source(mboard_members_t&, const std::string &);

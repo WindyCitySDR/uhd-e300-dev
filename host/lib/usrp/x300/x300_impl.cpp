@@ -595,7 +595,7 @@ void x300_impl::setup_radio(const size_t mb_i, const size_t i, const std::string
     ////////////////////////////////////////////////////////////////////
     uint8_t dest = (i == 0)? X300_XB_DST_R0 : X300_XB_DST_R1;
     boost::uint32_t ctrl_sid;
-    zero_copy_if::sptr ctrl_xport = this->make_transport(mb, mb.addr, mb.xport_path, dest, X300_RADIO_DEST_PREFIX_CTRL, device_addr_t(), ctrl_sid);
+    zero_copy_if::sptr ctrl_xport = this->make_transport(mb, dest, X300_RADIO_DEST_PREFIX_CTRL, device_addr_t(), ctrl_sid);
     perif.ctrl = radio_ctrl_core_3000::make(mb.if_pkt_is_big_endian, ctrl_xport, ctrl_xport, ctrl_sid, db_name);
     perif.ctrl->poke32(TOREG(SR_MISC_OUTS), (1 << 2)); //reset adc + dac
     perif.ctrl->poke32(TOREG(SR_MISC_OUTS),  (1 << 1) | (1 << 0)); //out of reset + dac enable
@@ -747,14 +747,14 @@ boost::uint32_t get_pcie_dma_channel(boost::uint8_t destination, boost::uint8_t 
 
 uhd::transport::zero_copy_if::sptr x300_impl::make_transport(
     mboard_members_t &mb,
-    const std::string& addr,
-    const std::string& xport_path,
     const uint8_t& destination,
     const uint8_t& prefix,
     const uhd::device_addr_t& args,
     boost::uint32_t& sid
 )
 {
+    const std::string& addr = mb.addr;
+    const std::string& xport_path = mb.xport_path;
     zero_copy_if::sptr xport;
 
     sid_config_t config;
@@ -762,7 +762,7 @@ uhd::transport::zero_copy_if::sptr x300_impl::make_transport(
     config.dst_prefix           = prefix;
     config.router_dst_there     = destination;
     config.router_dst_here      = mb.router_dst_here;
-    sid = this->allocate_sid(mb, config, xport_path);
+    sid = this->allocate_sid(mb, config);
 
     if (xport_path == "nirio") {
         device_addr_t xport_args(args);
@@ -803,8 +803,9 @@ uhd::transport::zero_copy_if::sptr x300_impl::make_transport(
 }
 
 
-boost::uint32_t x300_impl::allocate_sid(mboard_members_t &mb, const sid_config_t &config, std::string xport_path)
+boost::uint32_t x300_impl::allocate_sid(mboard_members_t &mb, const sid_config_t &config)
 {
+    const std::string &xport_path = mb.xport_path;
     const boost::uint32_t stream = (config.dst_prefix | (config.router_dst_there << 2)) & 0xff;
 
     const boost::uint32_t sid = 0
