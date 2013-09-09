@@ -107,8 +107,6 @@ struct x300_impl : public uhd::device
     //the io interface
     uhd::rx_streamer::sptr get_rx_stream(const uhd::stream_args_t &);
     uhd::tx_streamer::sptr get_tx_stream(const uhd::stream_args_t &);
-    uhd::dict<size_t, boost::weak_ptr<uhd::rx_streamer> > _rx_streamers;
-    uhd::dict<size_t, boost::weak_ptr<uhd::tx_streamer> > _tx_streamers;
 
     //support old async call
     typedef uhd::transport::bounded_buffer<uhd::async_metadata_t> async_md_type;
@@ -140,6 +138,9 @@ struct x300_impl : public uhd::device
     //vector of member objects per motherboard
     struct mboard_members_t
     {
+        uhd::dict<size_t, boost::weak_ptr<uhd::rx_streamer> > rx_streamers;
+        uhd::dict<size_t, boost::weak_ptr<uhd::tx_streamer> > tx_streamers;
+
         uhd::task::sptr claimer_task;
         std::string addr;
         std::string xport_path;
@@ -206,13 +207,13 @@ struct x300_impl : public uhd::device
     uhd::dict<std::string, uhd::usrp::dboard_manager::sptr> _dboard_managers;
     uhd::dict<std::string, uhd::usrp::dboard_iface::sptr> _dboard_ifaces;
 
-    void update_rx_subdev_spec(const uhd::usrp::subdev_spec_t &spec);
-    void update_tx_subdev_spec(const uhd::usrp::subdev_spec_t &spec);
+    void update_rx_subdev_spec(mboard_members_t &, const uhd::usrp::subdev_spec_t &spec);
+    void update_tx_subdev_spec(mboard_members_t &, const uhd::usrp::subdev_spec_t &spec);
 
     void set_tick_rate(const double);
     void update_tick_rate(const double);
-    void update_rx_samp_rate(const size_t, const double);
-    void update_tx_samp_rate(const size_t, const double);
+    void update_rx_samp_rate(mboard_members_t&, const size_t, const double);
+    void update_tx_samp_rate(mboard_members_t&, const size_t, const double);
 
     void update_clock_control(mboard_members_t&);
 

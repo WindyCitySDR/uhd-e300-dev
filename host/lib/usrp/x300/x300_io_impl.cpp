@@ -38,46 +38,49 @@ using namespace uhd::transport;
  **********************************************************************/
 void x300_impl::update_tick_rate(const double rate)
 {
-    BOOST_FOREACH(const size_t &dspno, _rx_streamers.keys())
+    BOOST_FOREACH(mboard_members_t &mb, _mb)
     {
-        boost::shared_ptr<sph::recv_packet_streamer> my_streamer =
-            boost::dynamic_pointer_cast<sph::recv_packet_streamer>(_rx_streamers[dspno].lock());
-        if (my_streamer) my_streamer->set_tick_rate(rate);
-    }
-    BOOST_FOREACH(const size_t &dspno, _tx_streamers.keys())
-    {
-        boost::shared_ptr<sph::send_packet_streamer> my_streamer =
-            boost::dynamic_pointer_cast<sph::send_packet_streamer>(_tx_streamers[dspno].lock());
-        if (my_streamer) my_streamer->set_tick_rate(rate);
+        BOOST_FOREACH(const size_t &dspno, mb.rx_streamers.keys())
+        {
+            boost::shared_ptr<sph::recv_packet_streamer> my_streamer =
+                boost::dynamic_pointer_cast<sph::recv_packet_streamer>(mb.rx_streamers[dspno].lock());
+            if (my_streamer) my_streamer->set_tick_rate(rate);
+        }
+        BOOST_FOREACH(const size_t &dspno, mb.tx_streamers.keys())
+        {
+            boost::shared_ptr<sph::send_packet_streamer> my_streamer =
+                boost::dynamic_pointer_cast<sph::send_packet_streamer>(mb.tx_streamers[dspno].lock());
+            if (my_streamer) my_streamer->set_tick_rate(rate);
+        }
     }
 }
 
-void x300_impl::update_rx_samp_rate(const size_t dspno, const double rate)
+void x300_impl::update_rx_samp_rate(mboard_members_t &mb, const size_t dspno, const double rate)
 {
-    if (not _rx_streamers.has_key(dspno)) return;
+    if (not mb.rx_streamers.has_key(dspno)) return;
     boost::shared_ptr<sph::recv_packet_streamer> my_streamer =
-        boost::dynamic_pointer_cast<sph::recv_packet_streamer>(_rx_streamers[dspno].lock());
+        boost::dynamic_pointer_cast<sph::recv_packet_streamer>(mb.rx_streamers[dspno].lock());
     if (not my_streamer) return;
     my_streamer->set_samp_rate(rate);
-    const double adj = _radio_perifs[dspno].ddc->get_scaling_adjustment();
+    const double adj = mb.radio_perifs[dspno].ddc->get_scaling_adjustment();
     my_streamer->set_scale_factor(adj);
 }
 
-void x300_impl::update_tx_samp_rate(const size_t dspno, const double rate)
+void x300_impl::update_tx_samp_rate(mboard_members_t &mb, const size_t dspno, const double rate)
 {
-    if (not _tx_streamers.has_key(dspno)) return;
+    if (not mb.tx_streamers.has_key(dspno)) return;
     boost::shared_ptr<sph::send_packet_streamer> my_streamer =
-        boost::dynamic_pointer_cast<sph::send_packet_streamer>(_tx_streamers[dspno].lock());
+        boost::dynamic_pointer_cast<sph::send_packet_streamer>(mb.tx_streamers[dspno].lock());
     if (not my_streamer) return;
     my_streamer->set_samp_rate(rate);
-    const double adj = _radio_perifs[dspno].duc->get_scaling_adjustment();
+    const double adj = mb.radio_perifs[dspno].duc->get_scaling_adjustment();
     my_streamer->set_scale_factor(adj);
 }
 
 /***********************************************************************
  * Setup dboard muxing for IQ
  **********************************************************************/
-void x300_impl::update_rx_subdev_spec(const subdev_spec_t &spec)
+void x300_impl::update_rx_subdev_spec(mboard_members_t &mb, const subdev_spec_t &spec)
 {
     fs_path root = "/mboards/0/dboards";
 
@@ -103,13 +106,13 @@ void x300_impl::update_rx_subdev_spec(const subdev_spec_t &spec)
         const std::string conn = _tree->access<std::string>(root / db_name / "rx_frontends" / fe_name / "connection").get();
 
         //swap condition
-        _radio_perifs[i].ddc->set_mux(conn, false);
+        mb.radio_perifs[i].ddc->set_mux(conn, false);
     }
 
-    _rx_fe_map = spec;
+    mb.rx_fe_map = spec;
 }
 
-void x300_impl::update_tx_subdev_spec(const subdev_spec_t &spec)
+void x300_impl::update_tx_subdev_spec(mboard_members_t &mb, const subdev_spec_t &spec)
 {
     fs_path root = "/mboards/0/dboards";
 
@@ -136,10 +139,10 @@ void x300_impl::update_tx_subdev_spec(const subdev_spec_t &spec)
 
         //swap condition
         const bool swap = (conn[0] == 'Q');
-        _radio_perifs[i].dac->set_iq_swap(swap);
+        mb.radio_perifs[i].dac->set_iq_swap(swap);
     }
 
-    _tx_fe_map = spec;
+    mb.tx_fe_map = spec;
 }
 
 /***********************************************************************
@@ -345,13 +348,22 @@ rx_streamer::sptr x300_impl::get_rx_stream(const uhd::stream_args_t &args_)
     for (size_t stream_i = 0; stream_i < args.channels.size(); stream_i++)
     {
         const size_t chan = args.channels[stream_i];
-        radio_perifs_t &perif = _radio_perifs[chan];
+        size_t mb_chan = chan, mb_index = 0;
+        BOOST_FOREACH(mboard_members_t &mb, _mb)
+        {
+            if (mb_chan < mb.rx_fe_map.size()) break;
+            else mb_chan -= mb.rx_fe_map.size();
+            mb_index++;
+        }
+        mboard_members_t &mb = _mb[mb_index];
+        const std::string mb_name = std::string(1, '0'+mb_index);
+        radio_perifs_t &perif = mb.radio_perifs[mb_chan];
 
         //setup the dsp transport hints (default to a large recv buff)
-        device_addr_t device_addr = _recv_args;
+        device_addr_t device_addr = mb.recv_args;
         if (not device_addr.has_key("recv_buff_size"))
         {
-            if (_xport_path == "nirio") {
+            if (mb.xport_path == "nirio") {
                 device_addr["recv_buff_size"] = boost::lexical_cast<std::string>(
                         uhd::transport::nirio_zero_copy::get_default_buffer_size());
             } else {
@@ -366,10 +378,10 @@ rx_streamer::sptr x300_impl::get_rx_stream(const uhd::stream_args_t &args_)
         }
 
         //allocate sid and create transport
-        uint8_t dest = (chan == 0)? X300_XB_DST_R0 : X300_XB_DST_R1;
+        uint8_t dest = (mb_chan == 0)? X300_XB_DST_R0 : X300_XB_DST_R1;
         boost::uint32_t data_sid;
         UHD_LOG << "creating rx stream " << device_addr.to_string() << std::endl;
-        zero_copy_if::sptr data_xport = this->make_transport(_addr, _xport_path, dest, X300_RADIO_DEST_PREFIX_RX, device_addr, data_sid);
+        zero_copy_if::sptr data_xport = this->make_transport(mb, mb.addr, mb.xport_path, dest, X300_RADIO_DEST_PREFIX_RX, device_addr, data_sid);
         UHD_LOG << boost::format("data_sid = 0x%08x\n") % data_sid << std::endl;
 
         //calculate packet size
@@ -390,7 +402,7 @@ rx_streamer::sptr x300_impl::get_rx_stream(const uhd::stream_args_t &args_)
 
         //init some streamer stuff
         std::string conv_endianness;
-        if (_if_pkt_is_big_endian) {
+        if (mb.if_pkt_is_big_endian) {
             my_streamer->set_vrt_unpacker(&x300_if_hdr_unpack_be);
             conv_endianness = "be";
         } else {
@@ -425,16 +437,16 @@ rx_streamer::sptr x300_impl::get_rx_stream(const uhd::stream_args_t &args_)
             &rx_vita_core_3000::handle_overflow, perif.framer
         ));
         my_streamer->set_xport_handle_flowctrl(stream_i, boost::bind(
-            &handle_rx_flowctrl, data_sid, data_xport, _if_pkt_is_big_endian, seq32, _1
+            &handle_rx_flowctrl, data_sid, data_xport, mb.if_pkt_is_big_endian, seq32, _1
         ), fc_window, true/*init*/);
         my_streamer->set_issue_stream_cmd(stream_i, boost::bind(
             &rx_vita_core_3000::issue_stream_command, perif.framer, _1
         ));
-        _rx_streamers[chan] = my_streamer; //store weak pointer
+        mb.rx_streamers[mb_chan] = my_streamer; //store weak pointer
 
         //sets all tick and samp rates on this streamer
-        _tree->access<double>("/mboards/0/tick_rate").update();
-        _tree->access<double>(str(boost::format("/mboards/0/rx_dsps/%u/rate/value") % chan)).update();
+        _tree->access<double>("/mboards/"+mb_name+"/tick_rate").update();
+        _tree->access<double>(str(boost::format("/mboards/"+mb_name+"/rx_dsps/%u/rate/value") % mb_chan)).update();
     }
 
     return my_streamer;
@@ -463,13 +475,22 @@ tx_streamer::sptr x300_impl::get_tx_stream(const uhd::stream_args_t &args_)
     for (size_t stream_i = 0; stream_i < args.channels.size(); stream_i++)
     {
         const size_t chan = args.channels[stream_i];
-        radio_perifs_t &perif = _radio_perifs[chan];
+        size_t mb_chan = chan, mb_index = 0;
+        BOOST_FOREACH(mboard_members_t &mb, _mb)
+        {
+            if (mb_chan < mb.tx_fe_map.size()) break;
+            else mb_chan -= mb.tx_fe_map.size();
+            mb_index++;
+        }
+        mboard_members_t &mb = _mb[mb_index];
+        const std::string mb_name = std::string(1, '0'+mb_index);
+        radio_perifs_t &perif = mb.radio_perifs[mb_chan];
 
         //allocate sid and create transport
-        uint8_t dest = (chan == 0)? X300_XB_DST_R0 : X300_XB_DST_R1;
+        uint8_t dest = (mb_chan == 0)? X300_XB_DST_R0 : X300_XB_DST_R1;
         boost::uint32_t data_sid;
-        UHD_LOG << "creating tx stream " << _send_args.to_string() << std::endl;
-        zero_copy_if::sptr data_xport = this->make_transport(_addr, _xport_path, dest, X300_RADIO_DEST_PREFIX_TX, _send_args, data_sid);
+        UHD_LOG << "creating tx stream " << mb.send_args.to_string() << std::endl;
+        zero_copy_if::sptr data_xport = this->make_transport(mb, mb.addr, mb.xport_path, dest, X300_RADIO_DEST_PREFIX_TX, mb.send_args, data_sid);
         UHD_LOG << boost::format("data_sid = 0x%08x\n") % data_sid << std::endl;
 
         //calculate packet size
@@ -489,7 +510,7 @@ tx_streamer::sptr x300_impl::get_tx_stream(const uhd::stream_args_t &args_)
         my_streamer->resize(args.channels.size());
 
         std::string conv_endianness;
-        if (_if_pkt_is_big_endian) {
+        if (mb.if_pkt_is_big_endian) {
             my_streamer->set_vrt_packer(&x300_if_hdr_pack_be);
             conv_endianness = "be";
         } else {
@@ -516,7 +537,7 @@ tx_streamer::sptr x300_impl::get_tx_stream(const uhd::stream_args_t &args_)
         guts->device_channel = chan;
         guts->async_queue = async_md;
         guts->old_async_queue = _async_md;
-        task::sptr task = task::make(boost::bind(&handle_tx_async_msgs, guts, data_xport, _if_pkt_is_big_endian, _clock));
+        task::sptr task = task::make(boost::bind(&handle_tx_async_msgs, guts, data_xport, mb.if_pkt_is_big_endian, mb.clock));
 
         my_streamer->set_xport_chan_get_buff(stream_i, boost::bind(
             &get_tx_buff_with_flowctrl, task, guts, data_xport, _1
@@ -526,11 +547,11 @@ tx_streamer::sptr x300_impl::get_tx_stream(const uhd::stream_args_t &args_)
         ));
         my_streamer->set_xport_chan_sid(stream_i, true, data_sid);
         my_streamer->set_enable_trailer(false); //TODO not implemented trailer support yet
-        _tx_streamers[chan] = my_streamer; //store weak pointer
+        mb.tx_streamers[mb_chan] = my_streamer; //store weak pointer
 
         //sets all tick and samp rates on this streamer
-        _tree->access<double>("/mboards/0/tick_rate").update();
-        _tree->access<double>(str(boost::format("/mboards/0/tx_dsps/%u/rate/value") % chan)).update();
+        _tree->access<double>("/mboards/"+mb_name+"/tick_rate").update();
+        _tree->access<double>(str(boost::format("/mboards/"+mb_name+"/tx_dsps/%u/rate/value") % mb_chan)).update();
     }
 
     return my_streamer;

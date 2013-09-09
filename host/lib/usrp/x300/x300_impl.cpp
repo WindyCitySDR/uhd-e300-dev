@@ -494,9 +494,9 @@ void x300_impl::setup_mb(const size_t mb_i, const uhd::device_addr_t &dev_addr)
     // create frontend mapping
     ////////////////////////////////////////////////////////////////////
     _tree->create<subdev_spec_t>(mb_path / "rx_subdev_spec")
-        .subscribe(boost::bind(&x300_impl::update_rx_subdev_spec, this, _1));
+        .subscribe(boost::bind(&x300_impl::update_rx_subdev_spec, this, mb, _1));
     _tree->create<subdev_spec_t>(mb_path / "tx_subdev_spec")
-        .subscribe(boost::bind(&x300_impl::update_tx_subdev_spec, this, _1));
+        .subscribe(boost::bind(&x300_impl::update_tx_subdev_spec, this, mb, _1));
 
     ////////////////////////////////////////////////////////////////////
     // and do the misc mboard sensors
@@ -654,7 +654,7 @@ void x300_impl::setup_radio(const size_t mb_i, const size_t i, const std::string
         .publish(boost::bind(&rx_dsp_core_3000::get_host_rates, perif.ddc));
     _tree->create<double>(rx_dsp_path / "rate" / "value")
         .coerce(boost::bind(&rx_dsp_core_3000::set_host_rate, perif.ddc, _1))
-        .subscribe(boost::bind(&x300_impl::update_rx_samp_rate, this, dspno, _1))
+        .subscribe(boost::bind(&x300_impl::update_rx_samp_rate, this, mb, dspno, _1))
         .set(1e6);
     _tree->create<double>(rx_dsp_path / "freq" / "value")
         .coerce(boost::bind(&rx_dsp_core_3000::set_freq, perif.ddc, _1))
@@ -678,7 +678,7 @@ void x300_impl::setup_radio(const size_t mb_i, const size_t i, const std::string
         .publish(boost::bind(&tx_dsp_core_3000::get_host_rates, perif.duc));
     _tree->create<double>(tx_dsp_path / "rate" / "value")
         .coerce(boost::bind(&tx_dsp_core_3000::set_host_rate, perif.duc, _1))
-        .subscribe(boost::bind(&x300_impl::update_tx_samp_rate, this, dspno, _1))
+        .subscribe(boost::bind(&x300_impl::update_tx_samp_rate, this, mb, dspno, _1))
         .set(1e6);
     _tree->create<double>(tx_dsp_path / "freq" / "value")
         .coerce(boost::bind(&tx_dsp_core_3000::set_freq, perif.duc, _1))
