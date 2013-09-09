@@ -208,8 +208,8 @@ struct x300_impl : public uhd::device
     void update_rx_subdev_spec(const size_t, const uhd::usrp::subdev_spec_t &spec);
     void update_tx_subdev_spec(const size_t, const uhd::usrp::subdev_spec_t &spec);
 
-    void set_tick_rate(const double);
-    void update_tick_rate(const double);
+    void set_tick_rate(mboard_members_t &, const double);
+    void update_tick_rate(mboard_members_t &, const double);
     void update_rx_samp_rate(mboard_members_t&, const size_t, const double);
     void update_tx_samp_rate(mboard_members_t&, const size_t, const double);
 
@@ -223,8 +223,8 @@ struct x300_impl : public uhd::device
     void set_db_eeprom(uhd::i2c_iface::sptr i2c, const size_t, const uhd::usrp::dboard_eeprom_t &);
     void set_mb_eeprom(uhd::i2c_iface::sptr i2c, const uhd::usrp::mboard_eeprom_t &);
 
-    void check_fw_compat(wb_iface::sptr iface);
-    void check_fpga_compat(wb_iface::sptr iface);
+    void check_fw_compat(const uhd::fs_path &mb_path, wb_iface::sptr iface);
+    void check_fpga_compat(const uhd::fs_path &mb_path, wb_iface::sptr iface);
 
     void update_atr_leds(gpio_core_200_32wo::sptr, const std::string &ant);
     boost::uint64_t get_fp_gpio(gpio_core_200::sptr, const std::string &);

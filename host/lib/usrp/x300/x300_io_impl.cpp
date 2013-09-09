@@ -36,22 +36,19 @@ using namespace uhd::transport;
 /***********************************************************************
  * update streamer rates
  **********************************************************************/
-void x300_impl::update_tick_rate(const double rate)
+void x300_impl::update_tick_rate(mboard_members_t &mb, const double rate)
 {
-    BOOST_FOREACH(mboard_members_t &mb, _mb)
+    BOOST_FOREACH(const size_t &dspno, mb.rx_streamers.keys())
     {
-        BOOST_FOREACH(const size_t &dspno, mb.rx_streamers.keys())
-        {
-            boost::shared_ptr<sph::recv_packet_streamer> my_streamer =
-                boost::dynamic_pointer_cast<sph::recv_packet_streamer>(mb.rx_streamers[dspno].lock());
-            if (my_streamer) my_streamer->set_tick_rate(rate);
-        }
-        BOOST_FOREACH(const size_t &dspno, mb.tx_streamers.keys())
-        {
-            boost::shared_ptr<sph::send_packet_streamer> my_streamer =
-                boost::dynamic_pointer_cast<sph::send_packet_streamer>(mb.tx_streamers[dspno].lock());
-            if (my_streamer) my_streamer->set_tick_rate(rate);
-        }
+        boost::shared_ptr<sph::recv_packet_streamer> my_streamer =
+            boost::dynamic_pointer_cast<sph::recv_packet_streamer>(mb.rx_streamers[dspno].lock());
+        if (my_streamer) my_streamer->set_tick_rate(rate);
+    }
+    BOOST_FOREACH(const size_t &dspno, mb.tx_streamers.keys())
+    {
+        boost::shared_ptr<sph::send_packet_streamer> my_streamer =
+            boost::dynamic_pointer_cast<sph::send_packet_streamer>(mb.tx_streamers[dspno].lock());
+        if (my_streamer) my_streamer->set_tick_rate(rate);
     }
 }
 

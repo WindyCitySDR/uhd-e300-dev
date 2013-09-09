@@ -158,9 +158,29 @@ static device_addrs_t x300_find_pcie(const device_addr_t &hint)
 
 static device_addrs_t x300_find(const device_addr_t &hint_)
 {
-    //we only do single device discovery for now
-    const device_addr_t hint = separate_device_addr(hint_).at(0);
+    //handle the multi-device discovery
+    device_addrs_t hints = separate_device_addr(hint_);
+    if (hints.size() > 1)
+    {
+        device_addrs_t found_devices;
+        std::string error_msg;
+        BOOST_FOREACH(const device_addr_t &hint_i, hints)
+        {
+            device_addrs_t found_devices_i = x300_find(hint_i);
+            if (found_devices_i.size() != 1) error_msg += str(boost::format(
+                "Could not resolve device hint \"%s\" to a single device."
+            ) % hint_i.to_string());
+            else found_devices.push_back(found_devices_i[0]);
+        }
+        if (found_devices.empty()) return device_addrs_t();
+        if (not error_msg.empty()) throw uhd::value_error(error_msg);
+        return device_addrs_t(1, combine_device_addrs(found_devices));
+    }
 
+    //initialize the hint for a single device case
+    UHD_ASSERT_THROW(hints.size() <= 1);
+    hints.resize(1); //in case it was empty
+    device_addr_t hint = hints[0];
     device_addrs_t addrs;
     if (hint.has_key("type") and hint["type"] != "x300") return addrs;
 
@@ -253,6 +273,7 @@ x300_impl::x300_impl(const uhd::device_addr_t &dev_addr)
     UHD_MSG(status) << "X300 initialization sequence..." << std::endl;
     _async_md.reset(new async_md_type(1000/*messages deep*/));
     _tree = uhd::property_tree::make();
+    _tree->create<std::string>("/name").set("X-Series Device");
     _sid_framer = 0;
 
     const device_addrs_t device_args = separate_device_addr(dev_addr);
@@ -319,8 +340,8 @@ void x300_impl::setup_mb(const size_t mb_i, const uhd::device_addr_t &dev_addr)
     }
 
     //check compat -- good place to do after conditional loading
-    this->check_fw_compat(mb.zpu_ctrl);
-    this->check_fpga_compat(mb.zpu_ctrl);
+    this->check_fw_compat(mb_path, mb.zpu_ctrl);
+    this->check_fpga_compat(mb_path, mb.zpu_ctrl);
 
     //low speed perif access
     mb.zpu_spi = spi_core_3000::make(mb.zpu_ctrl, SR_ADDR(SET0_BASE, ZPU_SR_SPI), SR_ADDR(SET0_BASE, ZPU_RB_SPI));
@@ -354,11 +375,6 @@ void x300_impl::setup_mb(const size_t mb_i, const uhd::device_addr_t &dev_addr)
         default: UHD_MSG(error) << "X300 unknown product code: " << mb_eeprom["product"] << std::endl;
         }
     }
-
-    ////////////////////////////////////////////////////////////////////
-    // Initialize the properties tree
-    ////////////////////////////////////////////////////////////////////
-    _tree->create<std::string>("/name").set("X-Series Device");
     _tree->create<std::string>(mb_path / "name").set(product_name);
     _tree->create<std::string>(mb_path / "codename").set("Yetti");
 
@@ -507,8 +523,8 @@ void x300_impl::setup_mb(const size_t mb_i, const uhd::device_addr_t &dev_addr)
     // do some post-init tasks
     ////////////////////////////////////////////////////////////////////
     _tree->access<double>(mb_path / "tick_rate") //now subscribe the clock rate setter
-        .subscribe(boost::bind(&x300_impl::set_tick_rate, this, _1))
-        .subscribe(boost::bind(&x300_impl::update_tick_rate, this, _1))
+        .subscribe(boost::bind(&x300_impl::set_tick_rate, this, boost::ref(mb), _1))
+        .subscribe(boost::bind(&x300_impl::update_tick_rate, this, boost::ref(mb), _1))
         .set(mb.clock->get_master_clock_rate());
 
     subdev_spec_t rx_fe_spec, tx_fe_spec;
@@ -859,15 +875,12 @@ void x300_impl::update_atr_leds(gpio_core_200_32wo::sptr leds, const std::string
     leds->set_atr_reg(dboard_iface::ATR_REG_FULL_DUPLEX, rx_led | tx_led);
 }
 
-void x300_impl::set_tick_rate(const double rate)
+void x300_impl::set_tick_rate(mboard_members_t &mb, const double rate)
 {
-    BOOST_FOREACH(mboard_members_t &mb, _mb)
+    BOOST_FOREACH(radio_perifs_t &perif, mb.radio_perifs)
     {
-        BOOST_FOREACH(radio_perifs_t &perif, mb.radio_perifs)
-        {
-            perif.time64->set_tick_rate(rate);
-            perif.time64->self_test();
-        }
+        perif.time64->set_tick_rate(rate);
+        perif.time64->self_test();
     }
 }
 
@@ -989,7 +1002,7 @@ bool x300_impl::is_claimed(wb_iface::sptr iface)
  * compat checks
  **********************************************************************/
 
-void x300_impl::check_fw_compat(wb_iface::sptr iface)
+void x300_impl::check_fw_compat(const fs_path &mb_path, wb_iface::sptr iface)
 {
     boost::uint32_t compat_num = iface->peek32(SR_ADDR(X300_FW_SHMEM_BASE, X300_FW_SHMEM_COMPAT_NUM));
     boost::uint32_t compat_major = (compat_num >> 16);
@@ -1004,11 +1017,11 @@ void x300_impl::check_fw_compat(wb_iface::sptr iface)
         ) % int(X300_FW_COMPAT_MAJOR) % compat_major % compat_minor
           % print_images_error()));
     }
-    _tree->create<std::string>("/mboards/0/fw_version").set(str(boost::format("%u.%u")
+    _tree->create<std::string>(mb_path / "fw_version").set(str(boost::format("%u.%u")
                 % compat_major % compat_minor));
 }
 
-void x300_impl::check_fpga_compat(wb_iface::sptr iface)
+void x300_impl::check_fpga_compat(const fs_path &mb_path, wb_iface::sptr iface)
 {
     boost::uint32_t compat_num = iface->peek32(SR_ADDR(SET0_BASE, ZPU_RB_COMPAT_NUM));
     boost::uint32_t compat_major = (compat_num >> 16);
@@ -1023,6 +1036,6 @@ void x300_impl::check_fpga_compat(wb_iface::sptr iface)
         ) % int(X300_FPGA_COMPAT_MAJOR) % compat_major % compat_minor
           % print_images_error()));
     }
-    _tree->create<std::string>("/mboards/0/fpga_version").set(str(boost::format("%u.%u")
+    _tree->create<std::string>(mb_path / "fpga_version").set(str(boost::format("%u.%u")
                 % compat_major % compat_minor));
 }
