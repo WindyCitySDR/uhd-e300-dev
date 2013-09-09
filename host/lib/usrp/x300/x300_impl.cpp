@@ -265,8 +265,7 @@ x300_impl::x300_impl(const uhd::device_addr_t &dev_addr)
 
 void x300_impl::setup_mb(const size_t mb_i, const uhd::device_addr_t &dev_addr)
 {
-    const std::string mb_name = std::string(1, '0'+mb_i);
-    const fs_path mb_path = "/mboards/"+mb_name;
+    const fs_path mb_path = "/mboards/"+boost::lexical_cast<std::string>(mb_i);
     mboard_members_t &mb = _mb[mb_i];
 
     mb.addr = dev_addr.has_key("resource") ? dev_addr["resource"] : dev_addr["addr"];
@@ -586,8 +585,7 @@ static void check_adc(wb_iface::sptr iface, const boost::uint32_t val)
 
 void x300_impl::setup_radio(const size_t mb_i, const size_t i, const std::string &db_name)
 {
-    const std::string mb_name = std::string(1, '0'+mb_i);
-    const fs_path mb_path = "/mboards/"+mb_name;
+    const fs_path mb_path = "/mboards/"+boost::lexical_cast<std::string>(mb_i);
     mboard_members_t &mb = _mb[mb_i];
     radio_perifs_t &perif = mb.radio_perifs[i];
     const size_t dspno = i;

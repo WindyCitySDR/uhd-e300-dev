@@ -356,7 +356,6 @@ rx_streamer::sptr x300_impl::get_rx_stream(const uhd::stream_args_t &args_)
             mb_index++;
         }
         mboard_members_t &mb = _mb[mb_index];
-        const std::string mb_name = std::string(1, '0'+mb_index);
         radio_perifs_t &perif = mb.radio_perifs[mb_chan];
 
         //setup the dsp transport hints (default to a large recv buff)
@@ -445,8 +444,9 @@ rx_streamer::sptr x300_impl::get_rx_stream(const uhd::stream_args_t &args_)
         mb.rx_streamers[mb_chan] = my_streamer; //store weak pointer
 
         //sets all tick and samp rates on this streamer
-        _tree->access<double>("/mboards/"+mb_name+"/tick_rate").update();
-        _tree->access<double>(str(boost::format("/mboards/"+mb_name+"/rx_dsps/%u/rate/value") % mb_chan)).update();
+        const fs_path mb_path = "/mboards/"+boost::lexical_cast<std::string>(mb_index);
+        _tree->access<double>(mb_path / "tick_rate").update();
+        _tree->access<double>(mb_path / "rx_dsps" / boost::lexical_cast<std::string>(mb_chan) / "rate" / "value").update();
     }
 
     return my_streamer;
@@ -483,7 +483,6 @@ tx_streamer::sptr x300_impl::get_tx_stream(const uhd::stream_args_t &args_)
             mb_index++;
         }
         mboard_members_t &mb = _mb[mb_index];
-        const std::string mb_name = std::string(1, '0'+mb_index);
         radio_perifs_t &perif = mb.radio_perifs[mb_chan];
 
         //allocate sid and create transport
@@ -550,8 +549,9 @@ tx_streamer::sptr x300_impl::get_tx_stream(const uhd::stream_args_t &args_)
         mb.tx_streamers[mb_chan] = my_streamer; //store weak pointer
 
         //sets all tick and samp rates on this streamer
-        _tree->access<double>("/mboards/"+mb_name+"/tick_rate").update();
-        _tree->access<double>(str(boost::format("/mboards/"+mb_name+"/tx_dsps/%u/rate/value") % mb_chan)).update();
+        const fs_path mb_path = "/mboards/"+boost::lexical_cast<std::string>(mb_index);
+        _tree->access<double>(mb_path / "tick_rate").update();
+        _tree->access<double>(mb_path / "tx_dsps" / boost::lexical_cast<std::string>(mb_chan) / "rate" / "value").update();
     }
 
     return my_streamer;
