@@ -207,8 +207,8 @@ struct x300_impl : public uhd::device
     uhd::dict<std::string, uhd::usrp::dboard_manager::sptr> _dboard_managers;
     uhd::dict<std::string, uhd::usrp::dboard_iface::sptr> _dboard_ifaces;
 
-    void update_rx_subdev_spec(mboard_members_t &, const uhd::usrp::subdev_spec_t &spec);
-    void update_tx_subdev_spec(mboard_members_t &, const uhd::usrp::subdev_spec_t &spec);
+    void update_rx_subdev_spec(const size_t, const uhd::usrp::subdev_spec_t &spec);
+    void update_tx_subdev_spec(const size_t, const uhd::usrp::subdev_spec_t &spec);
 
     void set_tick_rate(const double);
     void update_tick_rate(const double);

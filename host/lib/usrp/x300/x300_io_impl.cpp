@@ -80,12 +80,13 @@ void x300_impl::update_tx_samp_rate(mboard_members_t &mb, const size_t dspno, co
 /***********************************************************************
  * Setup dboard muxing for IQ
  **********************************************************************/
-void x300_impl::update_rx_subdev_spec(mboard_members_t &mb, const subdev_spec_t &spec)
+void x300_impl::update_rx_subdev_spec(const size_t mb_i, const subdev_spec_t &spec)
 {
-    fs_path root = "/mboards/0/dboards";
+    const std::string mb_name = boost::lexical_cast<std::string>(mb_i);
+    fs_path root = "/mboards/"+mb_name+"/dboards";
 
     //sanity checking
-    validate_subdev_spec(_tree, spec, "rx");
+    validate_subdev_spec(_tree, spec, "rx", mb_name);
     UHD_ASSERT_THROW(spec.size() <= 2);
     if (spec.size() > 0) UHD_ASSERT_THROW(spec[0].db_name == "A");
     if (spec.size() > 1) UHD_ASSERT_THROW(spec[1].db_name == "B");
@@ -106,18 +107,19 @@ void x300_impl::update_rx_subdev_spec(mboard_members_t &mb, const subdev_spec_t 
         const std::string conn = _tree->access<std::string>(root / db_name / "rx_frontends" / fe_name / "connection").get();
 
         //swap condition
-        mb.radio_perifs[i].ddc->set_mux(conn, false);
+        _mb[mb_i].radio_perifs[i].ddc->set_mux(conn, false);
     }
 
-    mb.rx_fe_map = spec;
+    _mb[mb_i].rx_fe_map = spec;
 }
 
-void x300_impl::update_tx_subdev_spec(mboard_members_t &mb, const subdev_spec_t &spec)
+void x300_impl::update_tx_subdev_spec(const size_t mb_i, const subdev_spec_t &spec)
 {
-    fs_path root = "/mboards/0/dboards";
+    const std::string mb_name = boost::lexical_cast<std::string>(mb_i);
+    fs_path root = "/mboards/"+mb_name+"/dboards";
 
     //sanity checking
-    validate_subdev_spec(_tree, spec, "tx");
+    validate_subdev_spec(_tree, spec, "tx", mb_name);
     UHD_ASSERT_THROW(spec.size() <= 2);
     if (spec.size() > 0) UHD_ASSERT_THROW(spec[0].db_name == "A");
     if (spec.size() > 1) UHD_ASSERT_THROW(spec[1].db_name == "B");
@@ -139,10 +141,10 @@ void x300_impl::update_tx_subdev_spec(mboard_members_t &mb, const subdev_spec_t 
 
         //swap condition
         const bool swap = (conn[0] == 'Q');
-        mb.radio_perifs[i].dac->set_iq_swap(swap);
+        _mb[mb_i].radio_perifs[i].dac->set_iq_swap(swap);
     }
 
-    mb.tx_fe_map = spec;
+    _mb[mb_i].tx_fe_map = spec;
 }
 
 /***********************************************************************

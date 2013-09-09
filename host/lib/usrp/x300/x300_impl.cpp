@@ -474,15 +474,15 @@ void x300_impl::setup_mb(const size_t mb_i, const uhd::device_addr_t &dev_addr)
         .subscribe(boost::bind(&time_core_3000::set_time_next_pps, mb.radio_perifs[1].time64, _1));
     //setup time source props
     _tree->create<std::string>(mb_path / "time_source" / "value")
-        .subscribe(boost::bind(&x300_impl::update_time_source, this, mb, _1));
+        .subscribe(boost::bind(&x300_impl::update_time_source, this, boost::ref(mb), _1));
     _tree->create<bool>(mb_path / "time_source" / "output")
-        .subscribe(boost::bind(&x300_impl::set_time_source_out, this, mb, _1))
+        .subscribe(boost::bind(&x300_impl::set_time_source_out, this, boost::ref(mb), _1))
         .set(true);
     static const std::vector<std::string> time_sources = boost::assign::list_of("internal")("external")("gpsdo");
     _tree->create<std::vector<std::string> >(mb_path / "time_source" / "options").set(time_sources);
     //setup reference source props
     _tree->create<std::string>(mb_path / "clock_source" / "value")
-        .subscribe(boost::bind(&x300_impl::update_clock_source, this, mb, _1));
+        .subscribe(boost::bind(&x300_impl::update_clock_source, this, boost::ref(mb), _1));
     _tree->create<bool>(mb_path / "clock_source" / "output")
         .subscribe(boost::bind(&x300_clock_ctrl::set_ref_out, mb.clock, _1))
         .set(true);
@@ -493,9 +493,9 @@ void x300_impl::setup_mb(const size_t mb_i, const uhd::device_addr_t &dev_addr)
     // create frontend mapping
     ////////////////////////////////////////////////////////////////////
     _tree->create<subdev_spec_t>(mb_path / "rx_subdev_spec")
-        .subscribe(boost::bind(&x300_impl::update_rx_subdev_spec, this, mb, _1));
+        .subscribe(boost::bind(&x300_impl::update_rx_subdev_spec, this, mb_i, _1));
     _tree->create<subdev_spec_t>(mb_path / "tx_subdev_spec")
-        .subscribe(boost::bind(&x300_impl::update_tx_subdev_spec, this, mb, _1));
+        .subscribe(boost::bind(&x300_impl::update_tx_subdev_spec, this, mb_i, _1));
 
     ////////////////////////////////////////////////////////////////////
     // and do the misc mboard sensors
@@ -652,7 +652,7 @@ void x300_impl::setup_radio(const size_t mb_i, const size_t i, const std::string
         .publish(boost::bind(&rx_dsp_core_3000::get_host_rates, perif.ddc));
     _tree->create<double>(rx_dsp_path / "rate" / "value")
         .coerce(boost::bind(&rx_dsp_core_3000::set_host_rate, perif.ddc, _1))
-        .subscribe(boost::bind(&x300_impl::update_rx_samp_rate, this, mb, dspno, _1))
+        .subscribe(boost::bind(&x300_impl::update_rx_samp_rate, this, boost::ref(mb), dspno, _1))
         .set(1e6);
     _tree->create<double>(rx_dsp_path / "freq" / "value")
         .coerce(boost::bind(&rx_dsp_core_3000::set_freq, perif.ddc, _1))
@@ -676,7 +676,7 @@ void x300_impl::setup_radio(const size_t mb_i, const size_t i, const std::string
         .publish(boost::bind(&tx_dsp_core_3000::get_host_rates, perif.duc));
     _tree->create<double>(tx_dsp_path / "rate" / "value")
         .coerce(boost::bind(&tx_dsp_core_3000::set_host_rate, perif.duc, _1))
-        .subscribe(boost::bind(&x300_impl::update_tx_samp_rate, this, mb, dspno, _1))
+        .subscribe(boost::bind(&x300_impl::update_tx_samp_rate, this, boost::ref(mb), dspno, _1))
         .set(1e6);
     _tree->create<double>(tx_dsp_path / "freq" / "value")
         .coerce(boost::bind(&tx_dsp_core_3000::set_freq, perif.duc, _1))
