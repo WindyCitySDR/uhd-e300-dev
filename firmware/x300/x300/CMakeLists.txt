@@ -17,7 +17,7 @@
 
 ########################################################################
 include_directories(${CMAKE_CURRENT_SOURCE_DIR})
-include_directories(${CMAKE_SOURCE_DIR}/../../host/lib/usrp/b250)
+include_directories(${CMAKE_SOURCE_DIR}/../../host/lib/usrp/x300)
 
 list(APPEND x300_sources x300_init.c x300_main.c)
 
