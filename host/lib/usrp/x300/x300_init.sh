@@ -1,9 +1,9 @@
 #!/bin/bash
 
-utils/usrp_burn_mb_eeprom --key=serial --val="x290_4realz"
-utils/usrp_burn_mb_eeprom --key=name --val="whalp"
+utils/usrp_burn_mb_eeprom --key=serial --val="x310_6789"
+utils/usrp_burn_mb_eeprom --key=name --val="virginia"
 
-utils/usrp_burn_mb_eeprom --key=product --val="1"
+utils/usrp_burn_mb_eeprom --key=product --val="30410"
 utils/usrp_burn_mb_eeprom --key=revision --val="2"
 
 mac0=$(python -c "import random; mac = [0x00, 0x16, 0x3e, random.randint(0x00, 0x7f),random.randint(0x00, 0xff),random.randint(0x00, 0xff)]; print ':'.join(map(lambda x: '%02x' % x, mac))")
