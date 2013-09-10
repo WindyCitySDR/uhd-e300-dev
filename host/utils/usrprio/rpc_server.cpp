@@ -25,18 +25,15 @@ namespace usrprio_rpc {
 using boost::asio::ip::tcp;
 
 rpc_server::rpc_server(
-    const std::string& address,
-    const std::string& port,
+    uint32_t port,
     callback_func_t callback_func,
     boost::uint32_t max_pool_size)
 : _io_service(),
-  _acceptor(_io_service),
+  _acceptor(),
   _stop_sig_handler(_io_service),
   _max_thread_pool_size(max_pool_size),
   _callback_func(callback_func)
 {
-    RPC_LOG(boost::format("RPC Server starting on %s:%s") % address % port, LOG_VERBOSE)
-
     // Register to handle the signals that indicate when the server should exit.
     // It is safe to register for the same signal multiple times in a program,
     // provided all registration for the specified signal is made through Asio.
@@ -47,51 +44,58 @@ rpc_server::rpc_server(
 #endif // defined(SIGQUIT)
     _stop_sig_handler.async_wait(boost::bind(&rpc_server::_handle_stop, this));
 
-    // Open the acceptor with the option to reuse the address (i.e. SO_REUSEADDR).
-    boost::asio::ip::tcp::resolver resolver(_io_service);
-    boost::asio::ip::tcp::resolver::query query(address, port);
-    boost::asio::ip::tcp::endpoint endpoint = *resolver.resolve(query);
 
-    _acceptor.open(endpoint.protocol());
-    _acceptor.set_option(boost::asio::ip::tcp::acceptor::reuse_address(true));
-    _acceptor.bind(endpoint);
-    _acceptor.listen();
+    static const bool REUSE_ADDRS = true;
+    boost::asio::ip::tcp::endpoint endpoint(boost::asio::ip::tcp::v4(), port);
+    RPC_LOG(boost::format("RPC Server starting on %s:%d") % endpoint.address() % port, LOG_VERBOSE)
+
+    _acceptor.reset(new boost::asio::ip::tcp::acceptor(_io_service, endpoint, REUSE_ADDRS));
+
+    if (!_acceptor || !_acceptor->is_open())
+        _svr_err.assign(boost::asio::error::service_not_found, boost::system::system_category());
 }
 
-void rpc_server::run()
+rpc_server::~rpc_server()
+{
+    stop();
+}
+
+boost::system::error_code& rpc_server::run()
 {
     boost::mutex::scoped_lock lock(_mutex);
 
-    RPC_LOG("RPC server started", LOG_STATUS)
-    bool success = true;
-    while (success) {
-        if (_io_service.stopped() || !_acceptor.is_open()) break;
+    if (!_svr_err) {
+        RPC_LOG("RPC server started", LOG_STATUS)
+        bool success = true;
+        while (success) {
+            if (_io_service.stopped() || !_acceptor->is_open()) break;
 
-        //Block until a client connects and use the io_service handler
-        //to process the connection
-        success = _accept_new_connection();
+            //Block until a client connects and use the io_service handler
+            //to process the connection
+            success = _accept_new_connection();
+        }
+
+        //Wait for all io_service handlers to finish executing
+        _thread_pool.join_all();
+        RPC_LOG("RPC server stopped", LOG_STATUS)
     }
-
-    //Wait for all io_service handlers to finish executing
-    _thread_pool.join_all();
-    RPC_LOG("RPC server stopped", LOG_STATUS)
+    return _svr_err;
 }
 
 void rpc_server::stop() {
-    boost::mutex::scoped_lock lock(_mutex);
     _handle_stop();
 }
 
 void rpc_server::_handle_stop()
 {
     RPC_LOG("RPC server stopping", LOG_VERBOSE)
-    _acceptor.close();
+    _acceptor->close();
     _io_service.stop();
 }
 
 bool rpc_server::_accept_new_connection() {
     rpc_connection::sptr new_conn(
-        new rpc_connection(_io_service, _acceptor, _callback_func, CURRENT_VERSION, OLDEST_COMPATIBLE_VERSION));
+        new rpc_connection(_io_service, *_acceptor, _callback_func, CURRENT_VERSION, OLDEST_COMPATIBLE_VERSION));
 
     if (!new_conn->start()) {
         if (_num_connected() < _thread_pool.size()) {

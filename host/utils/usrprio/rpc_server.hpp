@@ -41,11 +41,12 @@ public:
     typedef rpc_connection::callback_func_t callback_func_t;
 
     explicit rpc_server(
-        const std::string& address,
-        const std::string& port,
+        uint32_t port,
         callback_func_t callback_func,
         boost::uint32_t max_pool_size = std::numeric_limits<boost::uint32_t>::max());
-    void run();
+    ~rpc_server();
+
+    boost::system::error_code& run();
     void stop();
 
 private:
@@ -54,17 +55,18 @@ private:
      void _handle_stop();
 
      //Services
-    boost::asio::io_service             _io_service;
-    boost::asio::ip::tcp::acceptor      _acceptor;
-    boost::asio::signal_set             _stop_sig_handler;
+    boost::asio::io_service                             _io_service;
+    boost::scoped_ptr<boost::asio::ip::tcp::acceptor>   _acceptor;
+    boost::asio::signal_set                             _stop_sig_handler;
     //Connections and threads
-    std::vector<rpc_connection::sptr>   _connections;
-    boost::thread_group                 _thread_pool;
-    boost::uint32_t                     _max_thread_pool_size;
+    std::vector<rpc_connection::sptr>                   _connections;
+    boost::thread_group                                 _thread_pool;
+    boost::uint32_t                                     _max_thread_pool_size;
     //Callback func
-    callback_func_t                     _callback_func;
+    callback_func_t                                     _callback_func;
     //Synchronization
-    boost::mutex                        _mutex;
+    boost::mutex                                        _mutex;
+    boost::system::error_code                           _svr_err;
 };
 
 }
