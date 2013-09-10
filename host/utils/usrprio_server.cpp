@@ -229,7 +229,7 @@ int main(int argc, char *argv[])
     RPC_SET_LOG_LEVEL(log_lvl);
     RPC_SET_SVR_ID("usrprio_server")
 
-    usrprio_rpc::rpc_server srv("localhost", "13",
+    usrprio_rpc::rpc_server srv("localhost", "50000",
         usrprio_rpc::rpc_server::callback_func_t(&handle_usrprio_function_call));
     srv.run();
 

@@ -13,7 +13,7 @@
 #include <boost/lexical_cast.hpp>
 #include <fstream>
 
-#define RPC_CLIENT_ARGS "localhost", "13"
+#define RPC_CLIENT_ARGS "localhost", "50000"
 
 namespace nifpga_interface
 {
