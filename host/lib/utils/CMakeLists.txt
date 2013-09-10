@@ -87,6 +87,7 @@ CHECK_CXX_SOURCE_COMPILES("
 UNSET(CMAKE_REQUIRED_LIBRARIES)
 
 CHECK_CXX_SOURCE_COMPILES("
+    #define WIN32_LEAN_AND_MEAN
     #include <windows.h>
     int main(){
         LoadLibrary(0);

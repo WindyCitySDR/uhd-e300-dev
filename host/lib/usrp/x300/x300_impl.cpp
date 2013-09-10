@@ -19,6 +19,7 @@
 #include "x300_regs.hpp"
 #include "x300_lvbitx.hpp"
 #include "x310_lvbitx.hpp"
+#include <boost/asio.hpp>
 #include <uhd/utils/static.hpp>
 #include <uhd/utils/msg.hpp>
 #include <uhd/utils/images.hpp>
@@ -26,7 +27,6 @@
 #include <uhd/usrp/subdev_spec.hpp>
 #include <uhd/transport/if_addrs.hpp>
 #include <boost/foreach.hpp>
-#include <boost/asio.hpp>
 #include <boost/bind.hpp>
 #include <boost/functional/hash.hpp>
 #include <boost/assign/list_of.hpp>

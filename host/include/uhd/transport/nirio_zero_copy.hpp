@@ -18,9 +18,9 @@
 #ifndef INCLUDED_UHD_TRANSPORT_NIRIO_ZERO_COPY_HPP
 #define INCLUDED_UHD_TRANSPORT_NIRIO_ZERO_COPY_HPP
 
+#include <uhd/transport/nirio/niusrprio_session.h>
 #include <uhd/config.hpp>
 #include <uhd/transport/zero_copy.hpp>
-#include <uhd/transport/nirio/niusrprio_session.h>
 #include <uhd/types/device_addr.hpp>
 #include <boost/shared_ptr.hpp>
 

@@ -8,13 +8,13 @@
 #ifndef NIUSRPRIO_SESSION_H_
 #define NIUSRPRIO_SESSION_H_
 
+#include <uhd/transport/nirio/rpc/usrprio_rpc_client.hpp>
 #include <uhd/transport/nirio/nirio_interface.h>
 #include <uhd/transport/nirio/nirio_resource_manager.h>
 #include <uhd/transport/nirio/locks.h>
 #include <uhd/transport/nirio/nifpga_lvbitx.h>
 #include <boost/smart_ptr.hpp>
 #include <string>
-#include <uhd/transport/nirio/rpc/usrprio_rpc_client.hpp>
 
 namespace nifpga_interface
 {

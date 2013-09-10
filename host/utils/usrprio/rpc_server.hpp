@@ -22,8 +22,8 @@
 #include <iostream>
 #include <istream>
 #include <ostream>
-#include <boost/bind.hpp>
 #include <boost/asio.hpp>
+#include <boost/bind.hpp>
 #include <boost/smart_ptr.hpp>
 #include <boost/thread/thread.hpp>
 #include <boost/thread/condition_variable.hpp>

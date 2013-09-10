@@ -18,7 +18,6 @@
 #ifndef INCLUDED_RPC_CLIENT_HPP
 #define INCLUDED_RPC_CLIENT_HPP
 
-#include <string>
 #include <boost/asio.hpp>
 #include <boost/smart_ptr.hpp>
 #include <boost/thread/thread.hpp>

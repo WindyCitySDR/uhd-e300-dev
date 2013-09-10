@@ -1,3 +1,6 @@
+#include <uhd/transport/nirio/rpc/usrprio_rpc_common.hpp>
+#include "usrprio/rpc_server.hpp"
+#include "usrprio/rpc_logger.hpp"
 #include <boost/program_options.hpp>
 #include <boost/format.hpp>
 #include <boost/thread/thread.hpp>
@@ -5,9 +8,6 @@
 #include <fstream>
 #include <uhd/transport/nirio/status.h>
 #include <uhd/transport/nirio/nirio_interface.h>
-#include <uhd/transport/nirio/rpc/usrprio_rpc_common.hpp>
-#include "usrprio/rpc_server.hpp"
-#include "usrprio/rpc_logger.hpp"
 #include "usrprio/NiFpga.h"
 #include "usrprio/niusrprio.h"
 

@@ -1,6 +1,6 @@
 
-#include <uhd/transport/nirio/nirio_interface.h>
 #include <uhd/transport/nirio/niusrprio_session.h>
+#include <uhd/transport/nirio/nirio_interface.h>
 #include <uhd/transport/nirio/nifpga_lvbitx.h>
 #include <stdio.h>
 #include <stdlib.h>
