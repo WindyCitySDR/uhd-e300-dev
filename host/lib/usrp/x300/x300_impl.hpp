@@ -228,7 +228,7 @@ struct x300_impl : public uhd::device
 
     void update_atr_leds(gpio_core_200_32wo::sptr, const std::string &ant);
     boost::uint64_t get_fp_gpio(gpio_core_200::sptr, const std::string &);
-    void set_fp_gpio(gpio_core_200::sptr, const std::string &, const boost::uint64_t);
+    void set_fp_gpio(const uhd::fs_path &mb_path, gpio_core_200::sptr, const std::string &, const boost::uint64_t);
 };
 
 #endif /* INCLUDED_X300_IMPL_HPP */

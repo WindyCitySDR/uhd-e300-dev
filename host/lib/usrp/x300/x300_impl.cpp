@@ -471,7 +471,7 @@ void x300_impl::setup_mb(const size_t mb_i, const uhd::device_addr_t &dev_addr)
     {
         _tree->create<boost::uint64_t>(mb_path / "gpio" / "FP0" / attr)
             .set(0)
-            .subscribe(boost::bind(&x300_impl::set_fp_gpio, this, mb.fp_gpio, attr, _1));
+            .subscribe(boost::bind(&x300_impl::set_fp_gpio, this, mb_path, mb.fp_gpio, attr, _1));
     }
     _tree->create<boost::uint64_t>(mb_path / "gpio" / "FP0" / "READBACK")
         .publish(boost::bind(&x300_impl::get_fp_gpio, this, mb.fp_gpio, "READBACK"));
@@ -961,11 +961,11 @@ static T shadow_it(const T &shadow, const T &value, const T &mask)
     return (shadow & ~mask) | (value & mask);
 }
 
-void x300_impl::set_fp_gpio(gpio_core_200::sptr gpio, const std::string &attr, const boost::uint64_t setting)
+void x300_impl::set_fp_gpio(const uhd::fs_path &mb_path, gpio_core_200::sptr gpio, const std::string &attr, const boost::uint64_t setting)
 {
     const boost::uint32_t value = boost::uint32_t(setting >> 0);
     const boost::uint32_t mask = boost::uint32_t(setting >> 32);
-    const boost::uint32_t shadow = boost::uint32_t(_tree->access<boost::uint64_t>("/mboards/0/gpio/FP0/"+attr).get());
+    const boost::uint32_t shadow = boost::uint32_t(_tree->access<boost::uint64_t>(mb_path / "gpio" / "FP0" / attr).get());
     const boost::uint32_t new_value = shadow_it(shadow, value, mask);
     if (attr == "CTRL") return gpio->set_pin_ctrl(dboard_iface::UNIT_RX, new_value);
     if (attr == "DDR") return gpio->set_gpio_ddr(dboard_iface::UNIT_RX, new_value);
