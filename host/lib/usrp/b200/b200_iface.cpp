@@ -436,7 +436,7 @@ public:
 
         unsigned char rx_data[1];
 
-        fx3_control_read(B200_VREQ_GET_STATUS, 0x00, 0x00, rx_data, 1);
+        fx3_control_read(B200_VREQ_GET_STATUS, 0x00, 0x00, &rx_data[0], 1);
 
         return boost::lexical_cast<boost::uint8_t>(rx_data[0]);
     }
@@ -485,15 +485,9 @@ public:
         hash_type loaded_hash; usrp_get_fpga_hash(loaded_hash);
         if (hash == loaded_hash) return 0;
 
-            UHD_HERE();
-            std::cout << "\tStatus: " << (int) get_fx3_status() << std::endl;
-
         unsigned char out_buff[64];
         memset(out_buff, 0x00, sizeof(out_buff));
         fx3_control_write(B200_VREQ_FPGA_CONFIG, 0, 0, out_buff, 1, 1000);
-
-            UHD_HERE();
-            std::cout << "\tStatus: " << (int) get_fx3_status() << std::endl;
 
         size_t file_size = 0;
         {
@@ -504,14 +498,9 @@ public:
         std::ifstream file;
         file.open(filename, std::ios::in | std::ios::binary);
 
-            UHD_HERE();
-            std::cout << "\tStatus: " << (int) get_fx3_status() << std::endl;
-
         if(!file.good()) {
             throw uhd::io_error("load_fpga: cannot open FPGA input file.");
         }
-            UHD_HERE();
-            std::cout << "\tStatus: " << (int) get_fx3_status() << std::endl;
 
         wait_count = 0;
         do {
@@ -524,45 +513,25 @@ public:
             boost::this_thread::sleep(boost::posix_time::milliseconds(10));
 
             wait_count++;
-            UHD_HERE();
-            std::cout << "\tStatus: " << (int) get_fx3_status() << std::endl;
         } while(fx3_state != FX3_STATE_FPGA_READY);
-
-        UHD_HERE();
-            std::cout << "\tStatus: " << (int) get_fx3_status() << std::endl;
-            std::cout << "\tCount: " << wait_count << std::endl;
 
         if (load_img_msg) UHD_MSG(status) << "Loading FPGA image: " \
             << filestring << "..." << std::flush;
 
         fx3_control_write(B200_VREQ_FPGA_START, 0, 0, out_buff, 1, 1000);
 
-        UHD_HERE();
-            std::cout << "\tStatus: " << (int) get_fx3_status() << std::endl;
-
         wait_count = 0;
         do {
             fx3_state = get_fx3_status();
-        UHD_HERE();
-            std::cout << "\tStatus: " << (int) get_fx3_status() << std::endl;
 
             if((wait_count >= 1000) || (fx3_state == FX3_STATE_ERROR)) {
                 return fx3_state;
             }
 
-        UHD_HERE();
-            std::cout << "\tStatus: " << (int) get_fx3_status() << std::endl;
             boost::this_thread::sleep(boost::posix_time::milliseconds(10));
 
             wait_count++;
-        UHD_HERE();
-            std::cout << "\tStatus: " << (int) fx3_state << std::endl;
-
         } while(fx3_state != FX3_STATE_CONFIGURING_FPGA);
-
-        UHD_HERE();
-            std::cout << "\tStatus: " << (int) get_fx3_status() << std::endl;
-            std::cout << "\tCount: " << wait_count << std::endl;
 
         size_t bytes_sent = 0;
         while(!file.eof()) {
@@ -590,8 +559,6 @@ public:
 
         file.close();
 
-        UHD_HERE();
-            std::cout << "\tStatus: " << (int) get_fx3_status() << std::endl;
         wait_count = 0;
         do {
             fx3_state = get_fx3_status();
@@ -604,16 +571,10 @@ public:
 
             wait_count++;
         } while(fx3_state != FX3_STATE_RUNNING);
-        UHD_HERE();
-
-        UHD_HERE();
-            std::cout << "\tStatus: " << (int) get_fx3_status() << std::endl;
-            std::cout << "\tCount: " << wait_count << std::endl;
 
         usrp_set_fpga_hash(hash);
 
         if (load_img_msg) UHD_MSG(status) << "\b\b\b\b done" << std::endl;
-        UHD_HERE();
 
         return 0;
     }
