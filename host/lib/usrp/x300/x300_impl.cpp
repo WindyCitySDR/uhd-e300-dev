@@ -271,10 +271,9 @@ x300_impl::x300_impl(const uhd::device_addr_t &dev_addr)
 
         UHD_MSG(status) << boost::format("Loading bitfile %s...\n") % lvbitx->get_signature();
         _rio_fpga_interface.reset(new nifpga_session(dev_addr["resource"]));
-        nirio_status_chain(_rio_fpga_interface->open(lvbitx), status);
+        nirio_status_chain(_rio_fpga_interface->open(lvbitx, nifpga_session::OPEN_ATTR_FORCE_DOWNLOAD), status);
 
-        if(nirio_status_fatal(status))
-            throw uhd::runtime_error("x300_impl: could not download LVBITX file to the device");
+        nirio_status_to_exception(status, "x300_impl: Could not download LVBITX file to the device.");
     }
 
     BOOST_FOREACH(const std::string &key, dev_addr.keys())

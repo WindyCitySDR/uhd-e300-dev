@@ -190,8 +190,8 @@ public:
     x300_ctrl_iface_pcie(nirio_interface::niriok_proxy& drv_proxy):
         _drv_proxy(drv_proxy)
     {
-        UHD_ASSERT_THROW(nirio_status_not_fatal(
-            _drv_proxy.set_attribute(kRioAddressSpace, kRioAddressSpaceBusInterface)));
+        nirio_interface::nirio_status_to_exception(
+            _drv_proxy.set_attribute(kRioAddressSpace, kRioAddressSpaceBusInterface));
 
         try
         {

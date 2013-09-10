@@ -185,9 +185,7 @@ public:
                 _send_fifo, get_send_frame_size())));
         }
 
-        if (nirio_status_fatal(status)) {
-            throw uhd::runtime_error((boost::format("Error %d occured when creating nirio_zero_copy transport.") % status).str());
-        }
+        nirio_interface::nirio_status_to_exception(status, "Could not create nirio_zero_copy transport.");
     }
 
     ~nirio_zero_copy_impl() {
