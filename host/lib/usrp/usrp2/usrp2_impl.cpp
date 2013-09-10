@@ -49,13 +49,16 @@ static device_addrs_t usrp2_find(const device_addr_t &hint_){
     device_addrs_t hints = separate_device_addr(hint_);
     if (hints.size() > 1){
         device_addrs_t found_devices;
+        std::string error_msg;
         BOOST_FOREACH(const device_addr_t &hint_i, hints){
             device_addrs_t found_devices_i = usrp2_find(hint_i);
-            if (found_devices_i.size() != 1) throw uhd::value_error(str(boost::format(
+            if (found_devices_i.size() != 1) error_msg += str(boost::format(
                 "Could not resolve device hint \"%s\" to a single device."
-            ) % hint_i.to_string()));
-            found_devices.push_back(found_devices_i[0]);
+            ) % hint_i.to_string());
+            else found_devices.push_back(found_devices_i[0]);
         }
+        if (found_devices.empty()) return device_addrs_t();
+        if (not error_msg.empty()) throw uhd::value_error(error_msg);
         return device_addrs_t(1, combine_device_addrs(found_devices));
     }
 

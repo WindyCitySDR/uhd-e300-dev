@@ -34,6 +34,7 @@ LIBUHD_APPEND_SOURCES(
     ${CMAKE_CURRENT_SOURCE_DIR}/nirio_fifo.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/nirio_interface.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/nirio_resource_manager.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/status.cpp
 )
 
 IF(WIN32)

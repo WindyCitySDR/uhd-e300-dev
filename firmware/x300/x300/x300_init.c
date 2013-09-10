@@ -99,14 +99,14 @@ static void init_network(void)
     wb_poke32(SR_ADDR(SET0_BASE, SR_ETHINT0 + 8 + 0), (my_mac0->addr[5] << 0) | (my_mac0->addr[4] << 8) | (my_mac0->addr[3] << 16) | (my_mac0->addr[2] << 24));
     wb_poke32(SR_ADDR(SET0_BASE, SR_ETHINT0 + 8 + 1), (my_mac0->addr[1] << 0) | (my_mac0->addr[0] << 8));
     wb_poke32(SR_ADDR(SET0_BASE, SR_ETHINT0 + 8 + 2), my_ip0->addr);
-    wb_poke32(SR_ADDR(SET0_BASE, SR_ETHINT0 + 8 + 3), FPGA_FORWARDS_BCAST?1:0);
+    wb_poke32(SR_ADDR(SET0_BASE, SR_ETHINT0 + 8 + 4), FPGA_FORWARDS_BCAST?1:0);
 
     //init eth1
     u3_net_stack_init_eth(1, my_mac1, my_ip1, subnet1);
     wb_poke32(SR_ADDR(SET0_BASE, SR_ETHINT1 + 8 + 0), (my_mac1->addr[5] << 0) | (my_mac1->addr[4] << 8) | (my_mac1->addr[3] << 16) | (my_mac1->addr[2] << 24));
     wb_poke32(SR_ADDR(SET0_BASE, SR_ETHINT1 + 8 + 1), (my_mac1->addr[1] << 0) | (my_mac1->addr[0] << 8));
     wb_poke32(SR_ADDR(SET0_BASE, SR_ETHINT1 + 8 + 2), my_ip1->addr);
-    wb_poke32(SR_ADDR(SET0_BASE, SR_ETHINT1 + 8 + 3), FPGA_FORWARDS_BCAST?1:0);
+    wb_poke32(SR_ADDR(SET0_BASE, SR_ETHINT1 + 8 + 4), FPGA_FORWARDS_BCAST?1:0);
 }
 
 static void putc(void *p, char c)

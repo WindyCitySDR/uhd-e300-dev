@@ -205,7 +205,7 @@ b200_impl::b200_impl(const device_addr_t &device_addr)
             product_name = "B210";
             default_file_name = B210_FPGA_FILE_NAME;
             break;
-        default: throw uhd::runtime_error("b200 unknown product code: " + mb_eeprom["product"]);
+        default: UHD_MSG(error) << "B200 unknown product code: " << mb_eeprom["product"] << std::endl;
         }
     }
     if (default_file_name.empty())
