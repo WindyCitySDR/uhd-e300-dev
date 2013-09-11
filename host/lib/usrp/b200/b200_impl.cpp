@@ -218,7 +218,12 @@ b200_impl::b200_impl(const device_addr_t &device_addr)
         device_addr.has_key("fpga")? device_addr["fpga"] : default_file_name
     );
 
-    _iface->load_fpga(b200_fpga_image);
+    boost::uint32_t status = _iface->load_fpga(b200_fpga_image);
+
+    if(status != 0) {
+        throw uhd::runtime_error(str(boost::format("fx3 is in state %1%") % status));
+    }
+
     _iface->reset_gpif();
 
     ////////////////////////////////////////////////////////////////////
