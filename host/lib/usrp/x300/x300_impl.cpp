@@ -105,11 +105,12 @@ static device_addrs_t x300_find_with_addr(const device_addr_t &hint)
     return addrs;
 }
 
-static device_addrs_t x300_find_pcie(const device_addr_t &hint)
+static device_addrs_t x300_find_pcie(const device_addr_t &hint, bool explicit_query)
 {
     device_addrs_t addrs;
     niusrprio_session::device_info_vtr dev_info_vtr;
-    niusrprio_session::enumerate(dev_info_vtr);
+    nirio_status status = niusrprio_session::enumerate(dev_info_vtr);
+    if (explicit_query) nirio_status_to_exception(status, "x300_find_pcie: Error enumerating RIO devices.");
 
     BOOST_FOREACH(niusrprio_session::device_info &dev_info, dev_info_vtr)
     {
@@ -223,7 +224,7 @@ static device_addrs_t x300_find(const device_addr_t &hint_)
         }
     }
 
-    device_addrs_t pcie_addrs = x300_find_pcie(hint);
+    device_addrs_t pcie_addrs = x300_find_pcie(hint, hint.has_key("resource"));
     if (not pcie_addrs.empty()) addrs.insert(addrs.end(), pcie_addrs.begin(), pcie_addrs.end());
 
     return addrs;

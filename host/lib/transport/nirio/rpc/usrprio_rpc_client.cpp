@@ -26,6 +26,7 @@ usrprio_rpc_client::usrprio_rpc_client(
 ) : _rpc_client(server, port, uhd::get_process_id(), uhd::get_host_id()),
     _timeout(boost::posix_time::milliseconds(DEFAULT_TIMEOUT_IN_MS))
 {
+   _ctor_status = _rpc_client.status() ? NiRio_Status_RpcConnectionError : NiRio_Status_Success;
 }
 
 usrprio_rpc_client::~usrprio_rpc_client()
@@ -187,7 +188,17 @@ nirio_status usrprio_rpc_client::niusrprio_download_fpga_to_flash(NIUSRPRIO_DOWN
 
 nirio_status usrprio_rpc_client::_boost_error_to_nirio_status(const boost::system::error_code& err) {
     if (err) {
-        return NiRio_Status_RpcConnectionError;
+        switch (err.value()) {
+            case boost::asio::error::connection_aborted:
+            case boost::asio::error::connection_refused:
+            case boost::asio::error::eof:
+                return NiRio_Status_RpcSessionError;
+            case boost::asio::error::timed_out:
+            case boost::asio::error::operation_aborted:
+                return NiRio_Status_RpcOperationError;
+            default:
+                return NiRio_Status_SoftwareFault;
+        }
     } else {
         return NiRio_Status_Success;
     }

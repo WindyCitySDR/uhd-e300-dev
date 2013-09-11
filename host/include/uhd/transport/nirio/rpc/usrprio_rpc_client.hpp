@@ -36,6 +36,10 @@ public:
         _timeout = timeout_in_ms;
     }
 
+    inline nirio_status get_ctor_status() {
+        return _ctor_status;
+    }
+
     nirio_status niusrprio_enumerate(
             NIUSRPRIO_ENUMERATE_ARGS);
     nirio_status niusrprio_open_session(
@@ -52,10 +56,11 @@ public:
     static const boost::int64_t DEFAULT_TIMEOUT_IN_MS = 5000;
 
 private:
-    nirio_status static _boost_error_to_nirio_status(const boost::system::error_code& err);
+    static nirio_status _boost_error_to_nirio_status(const boost::system::error_code& err);
 
     rpc_client                      _rpc_client;
     boost::posix_time::milliseconds _timeout;
+    nirio_status                    _ctor_status;
 };
 
 }

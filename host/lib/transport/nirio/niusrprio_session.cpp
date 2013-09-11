@@ -43,7 +43,9 @@ niusrprio_session::~niusrprio_session()
 nirio_status niusrprio_session::enumerate(device_info_vtr& device_info_vtr)
 {
     usrprio_rpc::usrprio_rpc_client temp_rpc_client(RPC_CLIENT_ARGS);
-    return temp_rpc_client.niusrprio_enumerate(device_info_vtr);
+    nirio_status status = temp_rpc_client.get_ctor_status();
+    nirio_status_chain(temp_rpc_client.niusrprio_enumerate(device_info_vtr), status);
+    return status;
 }
 
 nirio_status niusrprio_session::open(
@@ -58,6 +60,7 @@ nirio_status niusrprio_session::open(
     std::string bitfile_path(_lvbitx->get_bitfile_path());
 	std::string signature(_lvbitx->get_signature());
 
+    nirio_status_chain(_rpc_client.get_ctor_status(), status);
 	nirio_status_chain(_rpc_client.niusrprio_open_session(
         _resource_name, bitfile_path, signature, attribute, _session), status);
 

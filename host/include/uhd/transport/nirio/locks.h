@@ -27,10 +27,10 @@ public:
 
         nirio_status status = NiRio_Status_Success;
         do {
-            if (_check_lock()) {
+            if (_check_lock(status)) {
                 status = NiRio_Status_Success;
             } else {
-                status = NiRio_Status_DeviceLocked;
+                nirio_status_chain(NiRio_Status_DeviceLocked, status);
                 boost::this_thread::sleep(boost::posix_time::milliseconds(retry_interval_ms));
             }
             elapsed = boost::posix_time::microsec_clock::local_time() - start_time;
@@ -45,9 +45,9 @@ public:
         //NOP
 	}
 
-	bool _check_lock() {
+	bool _check_lock(nirio_status& status) {
 	    boost::uint16_t session_locked = 0;
-	    nirio_status status = _rpc_client_ptr->niusrprio_query_session_lock(_session, session_locked);
+	    status = _rpc_client_ptr->niusrprio_query_session_lock(_session, session_locked);
         return nirio_status_not_fatal(status) && !session_locked;
 	}
 
