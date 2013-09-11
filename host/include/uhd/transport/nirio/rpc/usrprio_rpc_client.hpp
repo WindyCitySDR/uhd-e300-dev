@@ -50,6 +50,8 @@ public:
         NIUSRPRIO_RESET_SESSION_ARGS);
     nirio_status niusrprio_query_session_lock(
         NIUSRPRIO_QUERY_SESSION_LOCK_ARGS);
+    nirio_status niusrprio_get_interface_path(
+         NIUSRPRIO_GET_INTERFACE_PATH_ARGS);
     nirio_status niusrprio_download_fpga_to_flash(
         NIUSRPRIO_DOWNLOAD_FPGA_TO_FLASH_ARGS);
 

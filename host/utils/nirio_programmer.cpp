@@ -68,10 +68,11 @@ int main(int argc, char *argv[])
         return ~0;
     }
 
+    std::string resource_name = boost::str(boost::format("RIO%u") % interface_num);
+
     //Download LVBITX image
     if (fpga_lvbitx_path != "")
     {
-        std::string resource_name = boost::str(boost::format("RIO%u") % interface_num);
         printf("Downloading image %s to FPGA as %s...", fpga_lvbitx_path.c_str(), resource_name.c_str());
         fflush(stdout);
         uint32_t attributes = nifpga_interface::niusrprio_session::OPEN_ATTR_SKIP_SIGNATURE_CHECK |
@@ -97,14 +98,16 @@ int main(int argc, char *argv[])
         printf("DONE\n");
     }
 
-    niriok_proxy dev_proxy;
     fflush(stdout);
-    std::string interface_path = niriok_proxy::get_interface_path(interface_num);
+    usrprio_rpc::usrprio_rpc_client temp_rpc_client("localhost", "50000");
+    std::string interface_path;
+    nirio_status_chain(temp_rpc_client.niusrprio_get_interface_path(resource_name, interface_path), status);
     if (interface_path.empty()) {
         printf("ERROR: Could not open a proxy to interface %u. If it exists, try downloading an LVBITX to the FPGA first.\n", interface_num);
         exit(EXIT_FAILURE);
     }
 
+    niriok_proxy dev_proxy;
     dev_proxy.open(interface_path);
 
     if (poke_tokens_str != ""){

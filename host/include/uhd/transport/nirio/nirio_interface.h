@@ -13,8 +13,6 @@
 #include <uhd/transport/nirio/nirio_driver_iface.h>
 #include <boost/smart_ptr.hpp>
 #include <boost/noncopyable.hpp>
-#include <cstring>
-#include <vector>
 
 namespace nirio_interface
 {
@@ -83,11 +81,6 @@ namespace nirio_interface
 
         nirio_status unmap_fifo_memory(
         	nirio_driver_iface::rio_mmap_t& map);
-
-        //@TODO: Ashish: This function should be removed when enumeration is done
-        //               using niusrprio / helper.
-        static std::string get_interface_path(
-            uint32_t interface_num);
 
     private:	//Members
         nirio_driver_iface::rio_dev_handle_t    _device_handle;

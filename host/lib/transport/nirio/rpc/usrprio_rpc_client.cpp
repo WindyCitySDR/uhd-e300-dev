@@ -162,6 +162,30 @@ nirio_status usrprio_rpc_client::niusrprio_query_session_lock(NIUSRPRIO_QUERY_SE
     return status;
 }
 
+nirio_status usrprio_rpc_client::niusrprio_get_interface_path(NIUSRPRIO_GET_INTERFACE_PATH_ARGS)
+/*
+#define NIUSRPRIO_GET_INTERFACE_PATH_ARGS   \
+    const std::string& resource,            \
+    std::string& interface_path
+*/
+{
+    usrprio_rpc::func_args_writer_t in_args;
+    usrprio_rpc::func_args_reader_t out_args;
+    nirio_status status = NiRio_Status_Success;
+
+    in_args << resource;
+
+    status = _boost_error_to_nirio_status(
+        _rpc_client.call(NIUSRPRIO_GET_INTERFACE_PATH, in_args, out_args, _timeout));
+
+    if (nirio_status_not_fatal(status)) {
+        out_args >> status;
+        out_args >> interface_path;
+    }
+
+    return status;
+}
+
 nirio_status usrprio_rpc_client::niusrprio_download_fpga_to_flash(NIUSRPRIO_DOWNLOAD_FPGA_TO_FLASH_ARGS)
 /*
 #define NIUSRPRIO_DOWNLOAD_FPGA_TO_FLASH_ARGS   \
@@ -173,7 +197,7 @@ nirio_status usrprio_rpc_client::niusrprio_download_fpga_to_flash(NIUSRPRIO_DOWN
     usrprio_rpc::func_args_reader_t out_args;
     nirio_status status = NiRio_Status_Success;
 
-    in_args << interface_num;
+    in_args << resource;
     in_args << bitstream_path;
 
     status = _boost_error_to_nirio_status(

@@ -110,7 +110,7 @@ static device_addrs_t x300_find_pcie(const device_addr_t &hint, bool explicit_qu
     device_addrs_t addrs;
     niusrprio_session::device_info_vtr dev_info_vtr;
     nirio_status status = niusrprio_session::enumerate(dev_info_vtr);
-    if (explicit_query) nirio_status_to_exception(status, "x300_find_pcie: Error enumerating RIO devices.");
+    if (explicit_query) nirio_status_to_exception(status, "x300_find_pcie: Error enumerating NI-RIO devices.");
 
     BOOST_FOREACH(niusrprio_session::device_info &dev_info, dev_info_vtr)
     {

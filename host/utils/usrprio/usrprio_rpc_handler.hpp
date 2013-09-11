@@ -52,6 +52,9 @@ public:
     nirio_status niusrprio_query_session_lock(
         client_id_t client_id,
         NIUSRPRIO_QUERY_SESSION_LOCK_ARGS);
+    nirio_status niusrprio_get_interface_path(
+        client_id_t client_id,
+        NIUSRPRIO_GET_INTERFACE_PATH_ARGS);
     nirio_status niusrprio_download_fpga_to_flash(
         client_id_t client_id,
         NIUSRPRIO_DOWNLOAD_FPGA_TO_FLASH_ARGS);
@@ -64,9 +67,15 @@ private:
        return b;
     }
 
-    uint32_t _read_bitstream_from_file(
+    boost::uint32_t _read_bitstream_from_file(
         const std::string& filename,
         boost::scoped_array<uint8_t>& buffer);
+
+    boost::uint32_t _get_interface_num(
+        const std::string& resource);
+
+    std::string _get_interface_path(
+        boost::uint32_t interface_num);
 
     typedef std::map<boost::uint32_t, client_id_t>  session_map_t;
     typedef std::map<std::string, std::string>      fpga_sig_map_t;

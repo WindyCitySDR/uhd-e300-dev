@@ -8,6 +8,7 @@
 #ifndef STATUS_H_
 #define STATUS_H_
 
+#include <stdio.h>
 #include <stddef.h>
 #include <stdint.h>
 #include <string>

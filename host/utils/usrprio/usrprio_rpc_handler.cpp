@@ -16,15 +16,17 @@
 //
 
 #include "usrprio_rpc_handler.hpp"
-#include <boost/format.hpp>
-#include <boost/lexical_cast.hpp>
-#include "NiFpga.h"
-#include "niusrprio.h"
-#include <uhd/transport/nirio/status.h>
-#include <uhd/transport/nirio/nirio_interface.h>
 #include <iostream>
 #include <fstream>
+#include <boost/format.hpp>
+#include <boost/regex.hpp>
+#include <boost/lexical_cast.hpp>
+#include <uhd/transport/nirio/status.h>
+#include <uhd/transport/nirio/nirio_interface.h>
+#include <uhd/transport/nirio/nirio_driver_iface.h>
 #include "rpc_logger.hpp"
+#include "NiFpga.h"
+#include "niusrprio.h"
 
 #ifdef UNUSED
 #elif defined(__GNUC__)
@@ -131,17 +133,28 @@ void usrprio_rpc_handler::handle_function_call(
             out_args << session_locked;
         } break;
 
+        case NIUSRPRIO_GET_INTERFACE_PATH: {
+            /*
+            #define NIUSRPRIO_GET_INTERFACE_PATH_ARGS   \
+                const std::string& resource,            \
+                std::string& interface_path
+            */
+            std::string resource, interface_path;
+            in_args  >> resource;
+            out_args << niusrprio_get_interface_path(client_id, resource, interface_path);
+            out_args << interface_path;
+        } break;
+
         case NIUSRPRIO_DOWNLOAD_FPGA_TO_FLASH: {
             /*
-            #define NIUSRPRIO_DOWNLOAD_FPGA_TO_FLASH_ARGS    \
-                const boost::uint32_t& interface_num,
+            #define NIUSRPRIO_DOWNLOAD_FPGA_TO_FLASH_ARGS   \
+                const std::string& resource,                \
                 const std::string& bitstream_path
             */
-            std::string bitstream_path;
-            boost::uint32_t interface_num;
-            in_args  >> interface_num;
+            std::string resource, bitstream_path;
+            in_args  >> resource;
             in_args  >> bitstream_path;
-            out_args << niusrprio_download_fpga_to_flash(client_id, interface_num, bitstream_path);
+            out_args << niusrprio_download_fpga_to_flash(client_id, resource, bitstream_path);
         } break;
 
         default: {
@@ -170,9 +183,9 @@ nirio_status usrprio_rpc_handler::niusrprio_enumerate(client_id_t UNUSED(client_
             usrprio_device_info info = usrprio_device_info();
             info.interface_num = nodes[i];
             info.resource_name = "RIO" + boost::lexical_cast<std::string>(nodes[i]);
-            info.serial_num = boost::lexical_cast<std::string>(serials[i]);
-            //@TODO: The interface path should come from niusrprio / helper
-            info.interface_path = nirio_interface::niriok_proxy::get_interface_path(info.interface_num);
+            info.pcie_serial_num = boost::lexical_cast<std::string>(serials[i]);
+            //@TODO: The interface path should come from niusrprio
+            info.interface_path = _get_interface_path(info.interface_num);
 
             if (info.interface_num != ((uint32_t)-1) && !info.interface_path.empty())
                 device_info_vtr.push_back(info);
@@ -192,7 +205,12 @@ nirio_status usrprio_rpc_handler::niusrprio_open_session(client_id_t client_id, 
 */
 {
     static const uint32_t MD5_HASH_STRLEN = 32;
-    std::string lvbitx_signature = signature.substr(MD5_HASH_STRLEN, MD5_HASH_STRLEN);
+
+    if (signature.length() != 0 && signature.length() != MD5_HASH_STRLEN*2)
+        return NiRio_Status_InvalidParameter;
+
+    std::string lvbitx_signature =
+        (signature.length() == MD5_HASH_STRLEN*2) ? signature.substr(MD5_HASH_STRLEN, MD5_HASH_STRLEN) : "";
     boost::uint32_t real_attribute = attribute;
 
     { //Critical section for signature map
@@ -210,7 +228,12 @@ nirio_status usrprio_rpc_handler::niusrprio_open_session(client_id_t client_id, 
         }
     }
 
-    nirio_status status = NiFpga_Open(path.c_str(), lvbitx_signature.c_str(), resource.c_str(), real_attribute, &session);
+    nirio_status status = NiFpga_Open(
+        path.c_str(),
+        lvbitx_signature.empty() ? NULL : lvbitx_signature.c_str(),
+        resource.c_str(),
+        real_attribute,
+        &session);
     if (nirio_status_not_fatal(status)) { //Critical section for session map
         boost::mutex::scoped_lock lock(_session_info_mutex);
 
@@ -257,10 +280,21 @@ nirio_status usrprio_rpc_handler::niusrprio_query_session_lock(client_id_t clien
     return NiRio_Status_Success;
 }
 
+nirio_status usrprio_rpc_handler::niusrprio_get_interface_path(client_id_t UNUSED(client_id), NIUSRPRIO_GET_INTERFACE_PATH_ARGS)
+/*
+#define NIUSRPRIO_GET_INTERFACE_PATH_ARGS   \
+    const std::string& resource,            \
+    std::string& interface_path
+*/
+{
+    interface_path = _get_interface_path(_get_interface_num(resource));
+    return NiRio_Status_Success;
+}
+
 nirio_status usrprio_rpc_handler::niusrprio_download_fpga_to_flash(client_id_t UNUSED(client_id), NIUSRPRIO_DOWNLOAD_FPGA_TO_FLASH_ARGS)
 /*
 #define NIUSRPRIO_DOWNLOAD_FPGA_TO_FLASH_ARGS   \
-    const boost::uint32_t& interface_num,       \
+    const std::string& resource,                \
     const std::string& bitstream_path
 */
 {
@@ -275,7 +309,7 @@ nirio_status usrprio_rpc_handler::niusrprio_download_fpga_to_flash(client_id_t U
     }
 
     uint64_t usrprio_hdl;
-    nirio_status_chain(niusrprio_open(interface_num, &usrprio_hdl), status);
+    nirio_status_chain(niusrprio_open(_get_interface_num(resource), &usrprio_hdl), status);
     nirio_status_chain(niusrprio_downloadToFlash(usrprio_hdl, buffer.get(), bytes_read), status);
     nirio_status_chain(niusrprio_close(usrprio_hdl), status);
     return status;
@@ -304,6 +338,171 @@ uint32_t usrprio_rpc_handler::_read_bitstream_from_file(
 
     return file_size;
 }
+
+boost::uint32_t usrprio_rpc_handler::_get_interface_num(const std::string& resource)
+{
+    //@TODO: This mapping should come from a table.
+    uint32_t interface_num = 0;
+    try {
+        boost::smatch iface_match;
+        if (boost::regex_search(resource, iface_match, boost::regex("RIO([0-9]*)"))) {
+            interface_num = boost::lexical_cast<uint32_t>(std::string(iface_match[1].first, iface_match[1].second));
+        }
+    } catch (boost::exception& e) {
+        interface_num = (uint32_t)-1;
+    }
+    return interface_num;
+}
+
+#if defined(UHD_PLATFORM_LINUX)
+    #include <glob.h>
+
+    std::string usrprio_rpc_handler::_get_interface_path(
+        boost::uint32_t interface_num)
+    {
+        using namespace nirio_interface;
+
+        glob_t glob_instance;
+        nirio_status status = glob("/proc/driver/ni/*/deviceInterfaces/nirio_transport\\\\*", GLOB_ONLYDIR, NULL, &glob_instance);
+
+        if (nirio_status_fatal(status) || status == GLOB_NOMATCH) return "";
+
+        std::string iface_path;
+
+        for (size_t i = 0; i < glob_instance.gl_pathc && iface_path.empty(); i++) {
+            char* current_path = glob_instance.gl_pathv[i];
+
+            char path[PATH_MAX];
+            snprintf(path, sizeof(path), "%s/interfacePath", current_path);
+
+            FILE* prop_file_ptr = fopen(path, "r");
+            if (prop_file_ptr == NULL) return "";
+            char file_buffer[4096];
+            size_t num_read = fread(file_buffer, 1 /* size of element */, sizeof(file_buffer), prop_file_ptr);
+            fclose(prop_file_ptr);
+
+            niriok_proxy temp_proxy;
+            status = temp_proxy.open(file_buffer);
+
+            if (nirio_status_fatal(status) && num_read > 0) return "";
+
+            uint32_t actual_interface_num = -1;
+            status = temp_proxy.get_attribute(kRioInterfaceNumber, actual_interface_num);
+            if (nirio_status_not_fatal(status) && actual_interface_num == interface_num)
+                iface_path = file_buffer;
+
+            temp_proxy.close();
+        }
+        return iface_path;
+    }
+#elif defined(UHD_PLATFORM_WIN32)
+    #include <setupapi.h>
+    #include <guiddef.h>
+
+    LPWSTR MAGICAL_GUID = L"{C7110F75-8354-442E-8EE8-24556DC68714}";
+
+    std::string usrprio_rpc_handler::_get_interface_path(
+        boost::uint32_t interface_num)
+    {
+        using namespace nirio_interface;
+
+        GUID                       interfaceGUID_;
+        HDEVINFO                   devInfoSet_ = INVALID_HANDLE_VALUE;
+        DWORD                      indexIntoSet_ = 0;
+        SP_DEVICE_INTERFACE_DATA   deviceInterfaceData_;
+        BOOL                       isValid = false;
+        deviceInterfaceData_.cbSize = sizeof(SP_DEVICE_INTERFACE_DATA);
+
+        CLSIDFromString(MAGICAL_GUID, (LPCLSID)&interfaceGUID_);
+
+        DWORD flags = DIGCF_PRESENT | DIGCF_DEVICEINTERFACE;
+
+        devInfoSet_ = SetupDiGetClassDevs( &interfaceGUID_,
+                            NULL, // Define no enumerator (global)
+                            NULL, // Define no parent
+                            flags);
+
+        if( devInfoSet_ == INVALID_HANDLE_VALUE )
+        {
+            return "";
+        }
+
+        isValid = SetupDiEnumDeviceInterfaces(  devInfoSet_,
+                                    NULL,
+                                    &interfaceGUID_,
+                                    indexIntoSet_,
+                                    &deviceInterfaceData_ );
+
+        std::string iface_path;
+
+        while (isValid && iface_path.empty())
+        {
+            size_t BUF_SIZE = 1024;
+            char buffer[1024];
+
+            PSP_DEVICE_INTERFACE_DETAIL_DATA_A diDetail =
+                reinterpret_cast<PSP_DEVICE_INTERFACE_DETAIL_DATA_A>(buffer);
+            DWORD diDetailRealSize = static_cast<DWORD>(BUF_SIZE);
+            DWORD diDetailNeededSize;
+            BOOL pass;
+
+            diDetail->cbSize = sizeof(SP_DEVICE_INTERFACE_DETAIL_DATA_A);
+            pass = SetupDiGetDeviceInterfaceDetailA(
+                                                    devInfoSet_,
+                                                    &deviceInterfaceData_,
+                                                    diDetail,
+                                                    diDetailRealSize,
+                                                    &diDetailNeededSize,
+                                                    NULL
+                                                    );
+
+            if (diDetailNeededSize > BUF_SIZE)
+            {
+                return "";
+            }
+
+            if (pass)
+            {
+                std::string temp_str;
+                // if success, shift back the data that's now at an offset inside the diDetail
+                size_t length = strlen(diDetail->DevicePath)+1;
+                memmove(buffer, buffer+offsetof(SP_DEVICE_INTERFACE_DETAIL_DATA_A, DevicePath), length);
+                buffer[length] = '\0';
+
+                nirio_status status = 0;
+                niriok_proxy temp_proxy;
+                status = temp_proxy.open(buffer);
+
+                if (nirio_status_fatal(status)) return "";
+
+                uint32_t actual_interface_num = -1;
+                status = temp_proxy.get_attribute(kRioInterfaceNumber, actual_interface_num);
+                if (nirio_status_not_fatal(status) && actual_interface_num == interface_num)
+                    iface_path = buffer;
+
+                temp_proxy.close();
+            }
+
+            indexIntoSet_++;
+            isValid = SetupDiEnumDeviceInterfaces( devInfoSet_,
+                                                    NULL,
+                                                    &interfaceGUID_,
+                                                    indexIntoSet_,
+                                                    &deviceInterfaceData_ );
+        }
+
+        return iface_path;
+    }
+#elif defined(UHD_PLATFORM_MACOS) || defined(UHD_PLATFORM_BSD)
+    std::string niriok_proxy::get_interface_path(
+        uint32_t interface_num)
+    {
+        return "";
+    }
+#else
+    #error OS not supported by niriok_proxy::get_interface_path.
+#endif
+
 
 }
 

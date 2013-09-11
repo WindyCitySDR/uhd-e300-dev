@@ -31,14 +31,15 @@ static const func_id_t NIUSRPRIO_OPEN_SESSION           = NIUSRPRIO_FUNC_BASE + 
 static const func_id_t NIUSRPRIO_CLOSE_SESSION          = NIUSRPRIO_FUNC_BASE + 2;
 static const func_id_t NIUSRPRIO_RESET_SESSION          = NIUSRPRIO_FUNC_BASE + 3;
 static const func_id_t NIUSRPRIO_QUERY_SESSION_LOCK     = NIUSRPRIO_FUNC_BASE + 4;
-static const func_id_t NIUSRPRIO_DOWNLOAD_FPGA_TO_FLASH = NIUSRPRIO_FUNC_BASE + 5;
+static const func_id_t NIUSRPRIO_GET_INTERFACE_PATH     = NIUSRPRIO_FUNC_BASE + 5;
+static const func_id_t NIUSRPRIO_DOWNLOAD_FPGA_TO_FLASH = NIUSRPRIO_FUNC_BASE + 6;
 
 //Function Args
 
 struct usrprio_device_info {
     boost::uint32_t interface_num;
     std::string     resource_name;
-    std::string     serial_num;
+    std::string     pcie_serial_num;
     std::string     interface_path;
 
     template <typename Archive>
@@ -47,7 +48,7 @@ struct usrprio_device_info {
         if (version || !version) {  //Suppress unused warning
             ar & interface_num;
             ar & resource_name;
-            ar & serial_num;
+            ar & pcie_serial_num;
             ar & interface_path;
         }
     }
@@ -75,8 +76,12 @@ typedef std::vector<usrprio_device_info> usrprio_device_info_vtr;
     const boost::uint32_t& session,         \
     boost::uint16_t& session_locked
 
+#define NIUSRPRIO_GET_INTERFACE_PATH_ARGS   \
+    const std::string& resource,            \
+    std::string& interface_path
+
 #define NIUSRPRIO_DOWNLOAD_FPGA_TO_FLASH_ARGS   \
-    const boost::uint32_t& interface_num,       \
+    const std::string& resource,                \
     const std::string& bitstream_path
 
 }

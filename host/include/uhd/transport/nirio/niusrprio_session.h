@@ -13,13 +13,15 @@
 #include <uhd/transport/nirio/nirio_resource_manager.h>
 #include <uhd/transport/nirio/locks.h>
 #include <uhd/transport/nirio/nifpga_lvbitx.h>
+#include <boost/noncopyable.hpp>
 #include <boost/smart_ptr.hpp>
+#include <boost/thread/recursive_mutex.hpp>
 #include <string>
 
 namespace nifpga_interface
 {
 
-class niusrprio_session
+class niusrprio_session : private boost::noncopyable
 {
 public:
     typedef boost::shared_ptr<niusrprio_session> sptr;
@@ -44,10 +46,10 @@ public:
 		const char* fifo_name,
 		nirio_interface::nirio_fifo<data_t>& fifo)
 	{
-		nirio_status status = _lock.acquire(SESSION_LOCK_TIMEOUT_IN_MS, SESSION_LOCK_RETRY_INT_IN_MS);
+		nirio_status status = _process_lock.acquire(SESSION_LOCK_TIMEOUT_IN_MS, SESSION_LOCK_RETRY_INT_IN_MS);
 		if (nirio_status_not_fatal(status))
 			_resource_manager.create_tx_fifo(fifo_name, fifo);
-		_lock.release();
+		_process_lock.release();
 		return status;
 	}
 
@@ -67,10 +69,10 @@ public:
 		const char* fifo_name,
 		nirio_interface::nirio_fifo<data_t>& fifo)
 	{
-		nirio_status status = _lock.acquire(SESSION_LOCK_TIMEOUT_IN_MS, SESSION_LOCK_RETRY_INT_IN_MS);
+		nirio_status status = _process_lock.acquire(SESSION_LOCK_TIMEOUT_IN_MS, SESSION_LOCK_RETRY_INT_IN_MS);
 		if (nirio_status_not_fatal(status))
 			_resource_manager.create_rx_fifo(fifo_name, fifo);
-		_lock.release();
+		_process_lock.release();
 		return status;
 	}
 
@@ -98,13 +100,13 @@ private:
 	void _init_fifo_info(nirio_interface::nirio_fifo_info_vtr& vtr);
 
 	std::string								_resource_name;
-	uint32_t                                _interface_num;
 	nifpga_lvbitx::sptr                     _lvbitx;
     uint32_t                                _session;
 	nirio_interface::niriok_proxy			_riok_proxy;
 	nirio_interface::nirio_resource_manager	_resource_manager;
-	nifpga_session_lock						_lock;
-	usrprio_rpc::usrprio_rpc_client         _rpc_client;
+    usrprio_rpc::usrprio_rpc_client         _rpc_client;
+	nifpga_session_lock						_process_lock;
+	boost::recursive_mutex                  _session_mutex;
 
 	static const uint32_t SESSION_LOCK_TIMEOUT_IN_MS    = 3000;
     static const uint32_t SESSION_LOCK_RETRY_INT_IN_MS  = 500;
