@@ -26,51 +26,10 @@ usrprio_rpc_client::usrprio_rpc_client(
 ) : _rpc_client(server, port, uhd::get_process_id(), uhd::get_host_id()),
     _timeout(boost::posix_time::milliseconds(DEFAULT_TIMEOUT_IN_MS))
 {
-
 }
 
-usrprio_rpc_client::~usrprio_rpc_client() {
-
-}
-
-nirio_status usrprio_rpc_client::niusrprio_initialize(NIUSRPRIO_INITIALIZE_ARGS)
-/*
-#define NIUSRPRIO_INITIALIZE_ARGS       \
-    void
-*/
+usrprio_rpc_client::~usrprio_rpc_client()
 {
-    usrprio_rpc::func_args_writer_t in_args;
-    usrprio_rpc::func_args_reader_t out_args;
-    nirio_status status = NiRio_Status_Success;
-
-    status = _boost_error_to_nirio_status(
-        _rpc_client.call(NIUSRPRIO_INITIALIZE, in_args, out_args, _timeout));
-
-    if (nirio_status_not_fatal(status)) {
-        out_args >> status;
-    }
-
-    return status;
-}
-
-nirio_status usrprio_rpc_client::niusrprio_finalize(NIUSRPRIO_FINALIZE_ARGS)
-/*
-#define NIUSRPRIO_FINALIZE_ARGS         \
-    void
-*/
-{
-    usrprio_rpc::func_args_writer_t in_args;
-    usrprio_rpc::func_args_reader_t out_args;
-    nirio_status status = NiRio_Status_Success;
-
-    status = _boost_error_to_nirio_status(
-        _rpc_client.call(NIUSRPRIO_FINALIZE, in_args, out_args, _timeout));
-
-    if (nirio_status_not_fatal(status)) {
-        out_args >> status;
-    }
-
-    return status;
 }
 
 nirio_status usrprio_rpc_client::niusrprio_enumerate(NIUSRPRIO_ENUMERATE_ARGS)
@@ -173,6 +132,30 @@ nirio_status usrprio_rpc_client::niusrprio_reset_device(NIUSRPRIO_RESET_SESSION_
 
     if (nirio_status_not_fatal(status)) {
         out_args >> status;
+    }
+
+    return status;
+}
+
+nirio_status usrprio_rpc_client::niusrprio_query_session_lock(NIUSRPRIO_QUERY_SESSION_LOCK_ARGS)
+/*
+#define NIUSRPRIO_QUERY_SESSION_LOCK_ARGS   \
+    const boost::uint32_t& session,         \
+    boost::uint16_t& session_locked
+*/
+{
+    usrprio_rpc::func_args_writer_t in_args;
+    usrprio_rpc::func_args_reader_t out_args;
+    nirio_status status = NiRio_Status_Success;
+
+    in_args << session;
+
+    status = _boost_error_to_nirio_status(
+        _rpc_client.call(NIUSRPRIO_QUERY_SESSION_LOCK, in_args, out_args, _timeout));
+
+    if (nirio_status_not_fatal(status)) {
+        out_args >> status;
+        out_args >> session_locked;
     }
 
     return status;

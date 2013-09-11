@@ -74,6 +74,7 @@ SET(usrprio_server_sources usrprio_server.cpp
     usrprio/rpc_connection.cpp
     usrprio/rpc_logger.cpp
     usrprio/rpc_server.cpp
+    usrprio/usrprio_rpc_handler.cpp
     ../lib/transport/nirio/nirio_interface.cpp
 )
 IF(WIN32)

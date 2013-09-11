@@ -303,7 +303,7 @@ void x300_impl::setup_mb(const size_t mb_i, const uhd::device_addr_t &dev_addr)
         mb.rio_fpga_interface.reset(new niusrprio_session(dev_addr["resource"]));
         nirio_status_chain(mb.rio_fpga_interface->open(lvbitx, niusrprio_session::OPEN_ATTR_FORCE_DOWNLOAD), status);
 
-        nirio_status_to_exception(status, "x300_impl: Could not download LVBITX file to the device.");
+        nirio_status_to_exception(status, "x300_impl: Could not initialize RIO session.");
     }
 
     BOOST_FOREACH(const std::string &key, dev_addr.keys())

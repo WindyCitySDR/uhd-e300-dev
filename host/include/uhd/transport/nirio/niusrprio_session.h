@@ -44,7 +44,7 @@ public:
 		const char* fifo_name,
 		nirio_interface::nirio_fifo<data_t>& fifo)
 	{
-		nirio_status status = _lock.acquire(SESSION_LOCK_TIMEOUT_IN_MS);
+		nirio_status status = _lock.acquire(SESSION_LOCK_TIMEOUT_IN_MS, SESSION_LOCK_RETRY_INT_IN_MS);
 		if (nirio_status_not_fatal(status))
 			_resource_manager.create_tx_fifo(fifo_name, fifo);
 		_lock.release();
@@ -67,7 +67,7 @@ public:
 		const char* fifo_name,
 		nirio_interface::nirio_fifo<data_t>& fifo)
 	{
-		nirio_status status = _lock.acquire(SESSION_LOCK_TIMEOUT_IN_MS);
+		nirio_status status = _lock.acquire(SESSION_LOCK_TIMEOUT_IN_MS, SESSION_LOCK_RETRY_INT_IN_MS);
 		if (nirio_status_not_fatal(status))
 			_resource_manager.create_rx_fifo(fifo_name, fifo);
 		_lock.release();
@@ -106,7 +106,8 @@ private:
 	nifpga_session_lock						_lock;
 	usrprio_rpc::usrprio_rpc_client         _rpc_client;
 
-	static const uint32_t SESSION_LOCK_TIMEOUT_IN_MS = 5000;
+	static const uint32_t SESSION_LOCK_TIMEOUT_IN_MS    = 3000;
+    static const uint32_t SESSION_LOCK_RETRY_INT_IN_MS  = 500;
 };
 
 }

@@ -25,7 +25,7 @@ namespace usrprio_rpc {
 using boost::asio::ip::tcp;
 
 rpc_server::rpc_server(
-    uint32_t port,
+    boost::uint32_t port,
     callback_func_t callback_func,
     boost::uint32_t max_pool_size)
 : _io_service(),

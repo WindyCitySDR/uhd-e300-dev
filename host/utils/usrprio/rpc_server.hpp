@@ -41,7 +41,7 @@ public:
     typedef rpc_connection::callback_func_t callback_func_t;
 
     explicit rpc_server(
-        uint32_t port,
+        boost::uint32_t port,
         callback_func_t callback_func,
         boost::uint32_t max_pool_size = std::numeric_limits<boost::uint32_t>::max());
     ~rpc_server();

@@ -26,13 +26,12 @@ namespace usrprio_rpc {
 
 static const func_id_t NIUSRPRIO_FUNC_BASE              = 0x100;
 
-static const func_id_t NIUSRPRIO_INITIALIZE             = NIUSRPRIO_FUNC_BASE + 0;
-static const func_id_t NIUSRPRIO_FINALIZE               = NIUSRPRIO_FUNC_BASE + 1;
-static const func_id_t NIUSRPRIO_ENUMERATE              = NIUSRPRIO_FUNC_BASE + 2;
-static const func_id_t NIUSRPRIO_OPEN_SESSION           = NIUSRPRIO_FUNC_BASE + 3;
-static const func_id_t NIUSRPRIO_CLOSE_SESSION          = NIUSRPRIO_FUNC_BASE + 4;
-static const func_id_t NIUSRPRIO_RESET_SESSION          = NIUSRPRIO_FUNC_BASE + 5;
-static const func_id_t NIUSRPRIO_DOWNLOAD_FPGA_TO_FLASH = NIUSRPRIO_FUNC_BASE + 6;
+static const func_id_t NIUSRPRIO_ENUMERATE              = NIUSRPRIO_FUNC_BASE + 0;
+static const func_id_t NIUSRPRIO_OPEN_SESSION           = NIUSRPRIO_FUNC_BASE + 1;
+static const func_id_t NIUSRPRIO_CLOSE_SESSION          = NIUSRPRIO_FUNC_BASE + 2;
+static const func_id_t NIUSRPRIO_RESET_SESSION          = NIUSRPRIO_FUNC_BASE + 3;
+static const func_id_t NIUSRPRIO_QUERY_SESSION_LOCK     = NIUSRPRIO_FUNC_BASE + 4;
+static const func_id_t NIUSRPRIO_DOWNLOAD_FPGA_TO_FLASH = NIUSRPRIO_FUNC_BASE + 5;
 
 //Function Args
 
@@ -55,12 +54,6 @@ struct usrprio_device_info {
 };
 typedef std::vector<usrprio_device_info> usrprio_device_info_vtr;
 
-#define NIUSRPRIO_INITIALIZE_ARGS       \
-    void
-
-#define NIUSRPRIO_FINALIZE_ARGS         \
-    void
-
 #define NIUSRPRIO_ENUMERATE_ARGS        \
     usrprio_device_info_vtr& device_info_vtr
 
@@ -77,6 +70,10 @@ typedef std::vector<usrprio_device_info> usrprio_device_info_vtr;
 
 #define NIUSRPRIO_RESET_SESSION_ARGS    \
     const boost::uint32_t& session
+
+#define NIUSRPRIO_QUERY_SESSION_LOCK_ARGS   \
+    const boost::uint32_t& session,         \
+    boost::uint16_t& session_locked
 
 #define NIUSRPRIO_DOWNLOAD_FPGA_TO_FLASH_ARGS   \
     const boost::uint32_t& interface_num,       \

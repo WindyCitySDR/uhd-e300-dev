@@ -43,10 +43,7 @@ niusrprio_session::~niusrprio_session()
 nirio_status niusrprio_session::enumerate(device_info_vtr& device_info_vtr)
 {
     usrprio_rpc::usrprio_rpc_client temp_rpc_client(RPC_CLIENT_ARGS);
-    nirio_status status = NiRio_Status_Success;
-    nirio_status_chain(temp_rpc_client.niusrprio_initialize(), status);
-    nirio_status_chain(temp_rpc_client.niusrprio_enumerate(device_info_vtr), status);
-    return status;
+    return temp_rpc_client.niusrprio_enumerate(device_info_vtr);
 }
 
 nirio_status niusrprio_session::open(
@@ -58,16 +55,14 @@ nirio_status niusrprio_session::open(
 	_lvbitx = lvbitx;
 
 	nirio_status status = NiRio_Status_Success;
-    nirio_status_chain(_rpc_client.niusrprio_initialize(), status);
-
     std::string bitfile_path(_lvbitx->get_bitfile_path());
-	std::string signature_without_checksum(_lvbitx->get_signature() + 32);
+	std::string signature(_lvbitx->get_signature());
 
 	nirio_status_chain(_rpc_client.niusrprio_open_session(
-        _resource_name, bitfile_path, signature_without_checksum, attribute, _session), status);
+        _resource_name, bitfile_path, signature, attribute, _session), status);
 
-	_lock.initialize(_session);
-	nirio_status_chain(_lock.acquire(SESSION_LOCK_TIMEOUT_IN_MS), status);
+	_lock.initialize(_rpc_client, _session);
+	nirio_status_chain(_lock.acquire(SESSION_LOCK_TIMEOUT_IN_MS, SESSION_LOCK_RETRY_INT_IN_MS), status);
 
     std::string interface_path = niriok_proxy::get_interface_path(_interface_num);
     if (interface_path.empty()) nirio_status_chain(NiRio_Status_ResourceNotFound, status);
@@ -90,7 +85,7 @@ void niusrprio_session::close(bool reset_fpga)
 {
     if (_session) {
         nirio_status status = NiRio_Status_Success;
-        nirio_status_chain(_lock.acquire(SESSION_LOCK_TIMEOUT_IN_MS), status);
+        nirio_status_chain(_lock.acquire(SESSION_LOCK_TIMEOUT_IN_MS, SESSION_LOCK_RETRY_INT_IN_MS), status);
         if (reset_fpga) reset();
         nirio_status_chain(_rpc_client.niusrprio_close_session(_session, 0), status);
         _lock.release();
@@ -100,7 +95,7 @@ void niusrprio_session::close(bool reset_fpga)
 nirio_status niusrprio_session::reset()
 {
 	nirio_status status = NiRio_Status_Success;
-	nirio_status_chain(_lock.acquire(SESSION_LOCK_TIMEOUT_IN_MS), status);
+	nirio_status_chain(_lock.acquire(SESSION_LOCK_TIMEOUT_IN_MS, SESSION_LOCK_RETRY_INT_IN_MS), status);
 	nirio_status_chain(_rpc_client.niusrprio_reset_device(_session), status);
 	_lock.release();
 	return status;
@@ -109,7 +104,7 @@ nirio_status niusrprio_session::reset()
 nirio_status niusrprio_session::download_bitstream_to_flash(const std::string& bitstream_path)
 {
     nirio_status status = NiRio_Status_Success;
-    nirio_status_chain(_lock.acquire(SESSION_LOCK_TIMEOUT_IN_MS), status);
+    nirio_status_chain(_lock.acquire(SESSION_LOCK_TIMEOUT_IN_MS, SESSION_LOCK_RETRY_INT_IN_MS), status);
     nirio_status_chain(_rpc_client.niusrprio_download_fpga_to_flash(_interface_num, bitstream_path), status);
     _lock.release();
     return status;

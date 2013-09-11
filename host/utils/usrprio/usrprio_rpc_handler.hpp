@@ -15,49 +15,68 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 //
 
-#ifndef INCLUDED_USRPRIO_RPC_CLIENT_HPP
-#define INCLUDED_USRPRIO_RPC_CLIENT_HPP
+#ifndef INCLUDED_USRPRIO_RPC_HANDLER_HPP
+#define INCLUDED_USRPRIO_RPC_HANDLER_HPP
 
 #include <uhd/transport/nirio/rpc/rpc_common.hpp>
 #include <uhd/transport/nirio/rpc/rpc_client.hpp>
 #include <uhd/transport/nirio/rpc/usrprio_rpc_common.hpp>
 #include <uhd/transport/nirio/status.h>
+#include <boost/noncopyable.hpp>
 
 namespace usrprio_rpc {
 
-class usrprio_rpc_client {
+class usrprio_rpc_handler : private boost::noncopyable{
 public:
-    usrprio_rpc_client(
-        std::string server,
-        std::string port);
-    ~usrprio_rpc_client();
+    explicit usrprio_rpc_handler(nirio_status& status);
+    ~usrprio_rpc_handler();
 
-    inline void set_rpc_timeout(boost::posix_time::milliseconds timeout_in_ms) {
-        _timeout = timeout_in_ms;
-    }
+    void handle_function_call(
+        func_id_t func_id,
+        const func_args_reader_t& in_args,
+        func_args_writer_t& out_args,
+        client_id_t client_id);
 
     nirio_status niusrprio_enumerate(
-            NIUSRPRIO_ENUMERATE_ARGS);
+        client_id_t client_id,
+        NIUSRPRIO_ENUMERATE_ARGS);
     nirio_status niusrprio_open_session(
+        client_id_t client_id,
         NIUSRPRIO_OPEN_SESSION_ARGS);
     nirio_status niusrprio_close_session(
+        client_id_t client_id,
         NIUSRPRIO_CLOSE_SESSION_ARGS);
     nirio_status niusrprio_reset_device(
+        client_id_t client_id,
         NIUSRPRIO_RESET_SESSION_ARGS);
     nirio_status niusrprio_query_session_lock(
+        client_id_t client_id,
         NIUSRPRIO_QUERY_SESSION_LOCK_ARGS);
     nirio_status niusrprio_download_fpga_to_flash(
+        client_id_t client_id,
         NIUSRPRIO_DOWNLOAD_FPGA_TO_FLASH_ARGS);
 
-    static const boost::int64_t DEFAULT_TIMEOUT_IN_MS = 5000;
-
 private:
-    nirio_status static _boost_error_to_nirio_status(const boost::system::error_code& err);
+    static inline uint8_t _reverse_bits(uint8_t b) {
+       b = (b & 0xF0) >> 4 | (b & 0x0F) << 4;
+       b = (b & 0xCC) >> 2 | (b & 0x33) << 2;
+       b = (b & 0xAA) >> 1 | (b & 0x55) << 1;
+       return b;
+    }
 
-    rpc_client                      _rpc_client;
-    boost::posix_time::milliseconds _timeout;
+    uint32_t _read_bitstream_from_file(
+        const std::string& filename,
+        boost::scoped_array<uint8_t>& buffer);
+
+    typedef std::map<boost::uint32_t, client_id_t>  session_map_t;
+    typedef std::map<std::string, std::string>      fpga_sig_map_t;
+
+    session_map_t   _session_map;
+    fpga_sig_map_t  _fpga_sig_map;
+    boost::mutex    _session_info_mutex;
+    boost::mutex    _fpga_sig_mutex;
 };
 
 }
 
-#endif /* INCLUDED_USRPRIO_RPC_CLIENT_HPP */
+#endif /* INCLUDED_USRPRIO_RPC_HANDLER_HPP */

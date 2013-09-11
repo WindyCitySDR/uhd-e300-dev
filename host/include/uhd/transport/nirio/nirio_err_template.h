@@ -43,5 +43,6 @@ NIRIO_ERR_INFO(NiRio_Status_FeatureNotSupported, -63193, "The requested feature 
 NIRIO_ERR_INFO(NiRio_Status_VersionMismatch, -63194, "Software version mismatch.")
 NIRIO_ERR_INFO(NiRio_Status_InvalidSession, -63195, "The session is invalid or has been closed.")
 NIRIO_ERR_INFO(NiRio_Status_OutOfHandles, -63198, "The maximum number of open FPGA sessions has been reached. Close some open sessions.")
+NIRIO_ERR_INFO(NiRio_Status_DeviceLocked, -63031, "The operation is not allowed because another session in a different process is accessing the device. Close all other sessions and retry.")
 
 
