@@ -18,6 +18,7 @@
 #include "usrprio_rpc_handler.hpp"
 #include <iostream>
 #include <fstream>
+#include <boost/algorithm/string.hpp>
 #include <boost/format.hpp>
 #include <boost/regex.hpp>
 #include <boost/lexical_cast.hpp>
@@ -218,13 +219,15 @@ nirio_status usrprio_rpc_handler::niusrprio_open_session(client_id_t client_id, 
 
         static const uint32_t ATTR_FORCE_DOWNLOAD = 1 << 29;
 
-        fpga_sig_map_t::const_iterator it = _fpga_sig_map.find(resource);
+        std::string resource_upper(resource);
+        boost::to_upper(resource_upper);
+        fpga_sig_map_t::const_iterator it = _fpga_sig_map.find(resource_upper);
         if (it == _fpga_sig_map.end() || ((*it).second != signature)) {
             real_attribute |= ATTR_FORCE_DOWNLOAD;
         }
         if (real_attribute & ATTR_FORCE_DOWNLOAD) {
-            if (it != _fpga_sig_map.end()) _fpga_sig_map.erase(resource);
-            _fpga_sig_map.insert(fpga_sig_map_t::value_type(resource, signature));
+            if (it != _fpga_sig_map.end()) _fpga_sig_map.erase(resource_upper);
+            _fpga_sig_map.insert(fpga_sig_map_t::value_type(resource_upper, signature));
         }
     }
 
@@ -341,11 +344,11 @@ uint32_t usrprio_rpc_handler::_read_bitstream_from_file(
 
 boost::uint32_t usrprio_rpc_handler::_get_interface_num(const std::string& resource)
 {
-    //@TODO: This mapping should come from a table.
+    //We currently don't support RIO aliases so device names will always be in the form RIO%d
     uint32_t interface_num = 0;
     try {
         boost::smatch iface_match;
-        if (boost::regex_search(resource, iface_match, boost::regex("RIO([0-9]*)"))) {
+        if (boost::regex_search(resource, iface_match, boost::regex("RIO([0-9]*)", boost::regex::icase))) {
             interface_num = boost::lexical_cast<uint32_t>(std::string(iface_match[1].first, iface_match[1].second));
         }
     } catch (boost::exception&) {
