@@ -348,13 +348,13 @@ boost::uint32_t usrprio_rpc_handler::_get_interface_num(const std::string& resou
         if (boost::regex_search(resource, iface_match, boost::regex("RIO([0-9]*)"))) {
             interface_num = boost::lexical_cast<uint32_t>(std::string(iface_match[1].first, iface_match[1].second));
         }
-    } catch (boost::exception& e) {
+    } catch (boost::exception&) {
         interface_num = (uint32_t)-1;
     }
     return interface_num;
 }
 
-#if defined(UHD_PLATFORM_LINUX)
+#if defined(NiFpga_Linux)
     #include <glob.h>
 
     std::string usrprio_rpc_handler::_get_interface_path(
@@ -395,7 +395,9 @@ boost::uint32_t usrprio_rpc_handler::_get_interface_num(const std::string& resou
         }
         return iface_path;
     }
-#elif defined(UHD_PLATFORM_WIN32)
+#elif defined(NiFpga_Windows)
+    #include <windows.h>
+    #include <Objbase.h>
     #include <setupapi.h>
     #include <guiddef.h>
 
@@ -493,7 +495,7 @@ boost::uint32_t usrprio_rpc_handler::_get_interface_num(const std::string& resou
 
         return iface_path;
     }
-#elif defined(UHD_PLATFORM_MACOS) || defined(UHD_PLATFORM_BSD)
+#elif defined(NiFpga_MacOS)
     std::string niriok_proxy::get_interface_path(
         uint32_t interface_num)
     {

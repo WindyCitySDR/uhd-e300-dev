@@ -2,8 +2,8 @@
 #ifndef NIFPGA_LVBITX_H_
 #define NIFPGA_LVBITX_H_
 
-#include <uhd/transport/nirio/nirio_interface.h>
 #include <uhd/transport/nirio/nirio_resource_manager.h>
+#include <uhd/transport/nirio/nirio_interface.h>
 #include <boost/smart_ptr.hpp>
 
 namespace nifpga_interface {

@@ -8,9 +8,9 @@
 #ifndef NIRIO_FIFO_H_
 #define NIRIO_FIFO_H_
 
+#include <uhd/transport/nirio/locks.h>
 #include <uhd/transport/nirio/nirio_interface.h>
 #include <uhd/transport/nirio/status.h>
-#include <uhd/transport/nirio/locks.h>
 #include <string>
 
 namespace nirio_interface {
