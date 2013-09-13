@@ -40,6 +40,10 @@ void u3_net_stack_init_eth(const uint8_t ethno, const eth_mac_addr_t *mac, const
 
 const struct ip_addr *u3_net_stack_get_ip_addr(const uint8_t ethno);
 
+const struct ip_addr *u3_net_stack_get_subnet(const uint8_t ethno);
+
+const struct ip_addr *u3_net_stack_get_bcast(const uint8_t ethno);
+
 const eth_mac_addr_t *u3_net_stack_get_mac_addr(const uint8_t ethno);
 
 uint32_t u3_net_stack_get_stat_counts(const uint8_t ethno);
@@ -64,6 +68,13 @@ void u3_net_stack_send_udp_pkt(
     const struct ip_addr *dst,
     const uint16_t src_port,
     const uint16_t dst_port,
+    const void *buff,
+    const size_t num_bytes
+);
+
+void u3_net_stack_send_echo_request(
+    const uint8_t ethno,
+    const struct ip_addr *dst,
     const void *buff,
     const size_t num_bytes
 );

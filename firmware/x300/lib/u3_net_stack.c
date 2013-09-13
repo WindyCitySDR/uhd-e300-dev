@@ -102,7 +102,8 @@ void u3_net_stack_init(wb_pkt_iface64_config_t *config)
 
 static struct ip_addr net_conf_ips[MAX_NETHS];
 static eth_mac_addr_t net_conf_macs[MAX_NETHS];
-static eth_mac_addr_t net_conf_subnets[MAX_NETHS];
+static struct ip_addr net_conf_subnets[MAX_NETHS];
+static struct ip_addr net_conf_bcasts[MAX_NETHS];
 static uint32_t net_stat_counts[MAX_NETHS];
 
 void u3_net_stack_init_eth(
@@ -121,6 +122,19 @@ void u3_net_stack_init_eth(
 const struct ip_addr *u3_net_stack_get_ip_addr(const uint8_t ethno)
 {
     return &net_conf_ips[ethno];
+}
+
+const struct ip_addr *u3_net_stack_get_subnet(const uint8_t ethno)
+{
+    return &net_conf_subnets[ethno];
+}
+
+const struct ip_addr *u3_net_stack_get_bcast(const uint8_t ethno)
+{
+    const uint32_t ip = u3_net_stack_get_ip_addr(ethno)->addr;
+    const uint32_t subnet = u3_net_stack_get_subnet(ethno)->addr;
+    net_conf_bcasts[ethno].addr = ip | (~subnet);
+    return &net_conf_bcasts[ethno];
 }
 
 const eth_mac_addr_t *u3_net_stack_get_mac_addr(const uint8_t ethno)
@@ -421,6 +435,57 @@ static void handle_icmp_packet(
             }
         }
     }
+}
+
+void u3_net_stack_send_echo_request(
+    const uint8_t ethno,
+    const struct ip_addr *dst,
+    const void *buff,
+    const size_t num_bytes
+)
+{
+    padded_icmp_t req;
+    req.eth.ethno = ethno;
+
+    //destination mac addr logic
+    const uint32_t is_bcast = memcmp(u3_net_stack_get_bcast(ethno), dst, sizeof(struct ip_addr));
+    const eth_mac_addr_t *dst_mac_addr = u3_net_stack_arp_cache_lookup(dst);
+    if (is_bcast || dst_mac_addr == NULL) memset(&req.eth.dst, 0xff, sizeof(eth_mac_addr_t));
+    else memcpy(&req.eth.dst, dst_mac_addr, sizeof(eth_mac_addr_t));
+
+    memcpy(&req.eth.src, u3_net_stack_get_mac_addr(ethno), sizeof(eth_mac_addr_t));
+    req.eth.ethertype = ETHERTYPE_IPV4;
+
+    IPH_VHLTOS_SET(&req.ip, 4, 5, 0);
+    IPH_LEN_SET(&req.ip, IP_HLEN + sizeof(req.icmp) + num_bytes);
+    IPH_ID_SET(&req.ip, 0);
+    IPH_OFFSET_SET(&req.ip, IP_DF);	/* don't fragment */
+    IPH_TTL_SET(&req.ip, 32);
+    IPH_PROTO_SET(&req.ip, IP_PROTO_ICMP);
+    IPH_CHKSUM_SET(&req.ip, 0);
+    memcpy(&req.ip.src, u3_net_stack_get_ip_addr(ethno), sizeof(struct ip_addr));
+    memcpy(&req.ip.dest, dst, sizeof(struct ip_addr));
+
+    IPH_CHKSUM_SET(&req.ip, ~chksum_buffer(
+        (unsigned short *) &req.ip, sizeof(req.ip)/sizeof(short), 0
+    ));
+
+    req.icmp.type = 0;
+    req.icmp.code = 0;
+    req.icmp.chksum = 0;
+    req.icmp.id = 0xACE0;
+    static int icmp_echo_req_seq = 0;
+    req.icmp.seqno = (icmp_echo_req_seq++) & 0xffff;
+    req.icmp.chksum = ~chksum_buffer( //data checksum
+        (unsigned short *)buff,
+        num_bytes/sizeof(short),
+        chksum_buffer(                  //header checksum
+            (unsigned short *)&req.icmp,
+            sizeof(req.icmp)/sizeof(short),
+        0)
+    );
+
+    send_eth_pkt(&req, sizeof(req), buff, num_bytes, NULL, 0);
 }
 
 /***********************************************************************
