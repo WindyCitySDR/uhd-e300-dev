@@ -27,4 +27,5 @@ add_library(usrpfw STATIC
     ethernet.c
     mdelay.c
     chinch.c
+    link_state_route_proto.c
 )
