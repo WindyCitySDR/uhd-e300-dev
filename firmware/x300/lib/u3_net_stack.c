@@ -51,30 +51,34 @@ static size_t arp_cache_wr_index;
 
 static struct ip_addr arp_cache_ips[ARP_CACHE_NENTRIES];
 static eth_mac_addr_t arp_cache_macs[ARP_CACHE_NENTRIES];
+static uint8_t arp_cache_eths[ARP_CACHE_NENTRIES];
 
-void u3_net_stack_arp_cache_update(const struct ip_addr *ip_addr, const eth_mac_addr_t *mac_addr)
+void u3_net_stack_arp_cache_update(const struct ip_addr *ip_addr, const eth_mac_addr_t *mac_addr, const uint8_t ethno)
 {
     for (size_t i = 0; i < ARP_CACHE_NENTRIES; i++)
     {
         if (memcmp(ip_addr, arp_cache_ips+i, sizeof(struct ip_addr)) == 0)
         {
             memcpy(arp_cache_macs+i, mac_addr, sizeof(eth_mac_addr_t));
+            arp_cache_eths[i] = ethno;
             return;
         }
     }
     if (arp_cache_wr_index >= ARP_CACHE_NENTRIES) arp_cache_wr_index = 0;
     memcpy(arp_cache_ips+arp_cache_wr_index, ip_addr, sizeof(struct ip_addr));
     memcpy(arp_cache_macs+arp_cache_wr_index, mac_addr, sizeof(eth_mac_addr_t));
+    arp_cache_eths[arp_cache_wr_index] = ethno;
     arp_cache_wr_index++;
 }
 
-const eth_mac_addr_t *u3_net_stack_arp_cache_lookup(const struct ip_addr *ip_addr)
+const eth_mac_addr_t *u3_net_stack_arp_cache_lookup(const struct ip_addr *ip_addr, uint8_t *ethno)
 {
     //do a local look up on our own ports
     for (size_t e = 0; e < MAX_NETHS; e++)
     {
         if (memcmp(ip_addr, u3_net_stack_get_ip_addr(e), sizeof(struct ip_addr)) == 0)
         {
+            *ethno = e;
             return u3_net_stack_get_mac_addr(e);
         }
     }
@@ -83,12 +87,32 @@ const eth_mac_addr_t *u3_net_stack_arp_cache_lookup(const struct ip_addr *ip_add
     {
         if (memcmp(ip_addr, arp_cache_ips+i, sizeof(struct ip_addr)) == 0)
         {
+            *ethno = arp_cache_eths[i];
             return &arp_cache_macs[i];
         }
     }
     return NULL;
 }
 
+bool resolve_ip(const struct ip_addr *ip_addr, eth_mac_addr_t *mac_addr, uint8_t *ethno)
+{
+    for (size_t e = 0; e < MAX_NETHS; e++)
+    {
+        if (memcmp(u3_net_stack_get_bcast(e), ip_addr, sizeof(struct ip_addr)) == 0)
+        {
+            *ethno = e;
+            memset(mac_addr, 0xff, sizeof(eth_mac_addr_t));
+            return true;
+        }
+    }
+    const eth_mac_addr_t *r = u3_net_stack_arp_cache_lookup(ip_addr, ethno);
+    if (r != NULL)
+    {
+        memcpy(mac_addr, r, sizeof(eth_mac_addr_t));
+        return true;
+    }
+    return false;
+}
 
 /***********************************************************************
  * Net stack config
@@ -253,7 +277,7 @@ static void handle_arp_packet(const uint8_t ethno, const struct arp_eth_ipv4 *p)
         memcpy(&ip_addr, p->ar_sip, sizeof(ip_addr));
         eth_mac_addr_t mac_addr;
         memcpy(&mac_addr, p->ar_sha, sizeof(mac_addr));
-        u3_net_stack_arp_cache_update(&ip_addr, &mac_addr);
+        u3_net_stack_arp_cache_update(&ip_addr, &mac_addr, ethno);
     }
 
     if (p->ar_op == ARPOP_REQUEST)
@@ -289,8 +313,6 @@ void u3_net_stack_register_udp_handler(
 }
 
 void u3_net_stack_send_udp_pkt(
-    const uint8_t ethno,
-    const struct ip_addr *src,
     const struct ip_addr *dst,
     const uint16_t src_port,
     const uint16_t dst_port,
@@ -298,8 +320,8 @@ void u3_net_stack_send_udp_pkt(
     const size_t num_bytes
 )
 {
-    const eth_mac_addr_t *dst_mac_addr = u3_net_stack_arp_cache_lookup(dst);
-    if (dst_mac_addr == NULL)
+    uint8_t ethno; eth_mac_addr_t dst_mac_addr;
+    if (!resolve_ip(dst, &dst_mac_addr, &ethno))
     {
         printf("u3_net_stack_send_udp_pkt arp_cache_lookup fail\n");
         return;
@@ -308,7 +330,7 @@ void u3_net_stack_send_udp_pkt(
     padded_udp_t reply;
 
     reply.eth.ethno = ethno;
-    memcpy(&reply.eth.dst, dst_mac_addr,                     sizeof(eth_mac_addr_t));
+    memcpy(&reply.eth.dst, &dst_mac_addr,                    sizeof(eth_mac_addr_t));
     memcpy(&reply.eth.src, u3_net_stack_get_mac_addr(ethno), sizeof(eth_mac_addr_t));
     reply.eth.ethertype = ETHERTYPE_IPV4;
 
@@ -319,7 +341,7 @@ void u3_net_stack_send_udp_pkt(
     IPH_TTL_SET(&reply.ip, 32);
     IPH_PROTO_SET(&reply.ip, IP_PROTO_UDP);
     IPH_CHKSUM_SET(&reply.ip, 0);
-    memcpy(&reply.ip.src, src, sizeof(struct ip_addr));
+    memcpy(&reply.ip.src, u3_net_stack_get_ip_addr(ethno), sizeof(struct ip_addr));
     memcpy(&reply.ip.dest, dst, sizeof(struct ip_addr));
 
     IPH_CHKSUM_SET(&reply.ip, ~chksum_buffer(
@@ -361,29 +383,30 @@ static void handle_udp_packet(
  * ICMP handlers
  **********************************************************************/
 static void handle_icmp_packet(
-    const uint8_t ethno,
+    const uint8_t __ethno,
     const struct ip_addr *src,
     const struct ip_addr *dst,
     const struct icmp_echo_hdr *icmp,
     const size_t num_bytes
 ){
+
+    uint8_t ethno; eth_mac_addr_t dst_mac_addr;
+    if (!resolve_ip(src, &dst_mac_addr, &ethno))
+    {
+        printf("handle_icmp_packet arp_cache_lookup fail\n");
+        return;
+    }
+
     //printf("handle_icmp_packet\n");
     if (icmp->type == ICMP_ECHO)
     {
         const void *icmp_data_buff = ((uint8_t*)icmp) + sizeof(struct icmp_echo_hdr);
         const size_t icmp_data_len = num_bytes - sizeof(struct icmp_echo_hdr);
 
-        const eth_mac_addr_t *dst_mac_addr = u3_net_stack_arp_cache_lookup(src);
-        if (dst_mac_addr == NULL)
-        {
-            printf("handle_icmp_packet arp_cache_lookup fail\n");
-            return;
-        }
-
         padded_icmp_t reply;
 
         reply.eth.ethno = ethno;
-        memcpy(&reply.eth.dst, dst_mac_addr,                     sizeof(eth_mac_addr_t));
+        memcpy(&reply.eth.dst, &dst_mac_addr,                    sizeof(eth_mac_addr_t));
         memcpy(&reply.eth.src, u3_net_stack_get_mac_addr(ethno), sizeof(eth_mac_addr_t));
         reply.eth.ethertype = ETHERTYPE_IPV4;
 
@@ -438,21 +461,22 @@ static void handle_icmp_packet(
 }
 
 void u3_net_stack_send_echo_request(
-    const uint8_t ethno,
     const struct ip_addr *dst,
     const void *buff,
     const size_t num_bytes
 )
 {
+    uint8_t ethno; eth_mac_addr_t dst_mac_addr;
+    if (!resolve_ip(dst, &dst_mac_addr, &ethno))
+    {
+        printf("u3_net_stack_send_echo_request arp_cache_lookup fail\n");
+        return;
+    }
+
     padded_icmp_t req;
+
     req.eth.ethno = ethno;
-
-    //destination mac addr logic
-    const uint32_t is_bcast = memcmp(u3_net_stack_get_bcast(ethno), dst, sizeof(struct ip_addr));
-    const eth_mac_addr_t *dst_mac_addr = u3_net_stack_arp_cache_lookup(dst);
-    if (is_bcast || dst_mac_addr == NULL) memset(&req.eth.dst, 0xff, sizeof(eth_mac_addr_t));
-    else memcpy(&req.eth.dst, dst_mac_addr, sizeof(eth_mac_addr_t));
-
+    memcpy(&req.eth.dst, &dst_mac_addr,                    sizeof(eth_mac_addr_t));
     memcpy(&req.eth.src, u3_net_stack_get_mac_addr(ethno), sizeof(eth_mac_addr_t));
     req.eth.ethertype = ETHERTYPE_IPV4;
 
@@ -512,7 +536,7 @@ static void handle_eth_packet(const void *buff, const size_t num_bytes)
         if (IPH_V(ip) != 4 || IPH_HL(ip) != 5) return;// ignore pkts w/ bad version or options
         if (IPH_OFFSET(ip) & (IP_MF | IP_OFFMASK)) return;// ignore fragmented packets
 
-        u3_net_stack_arp_cache_update(&ip->src, &eth_hdr->src);
+        u3_net_stack_arp_cache_update(&ip->src, &eth_hdr->src, eth_hdr->ethno);
 
         if (IPH_PROTO(ip) == IP_PROTO_UDP)
         {
