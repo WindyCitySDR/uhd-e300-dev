@@ -1,5 +1,5 @@
 
-// Copyright 2012 Ettus Research LLC
+// Copyright 2012-2013 Ettus Research LLC
 
 #ifndef INCLUDED_U3_NET_STACK_H
 #define INCLUDED_U3_NET_STACK_H
@@ -70,7 +70,26 @@ void u3_net_stack_send_udp_pkt(
     const size_t num_bytes
 );
 
-void u3_net_stack_send_echo_request(
+//------------------ icmp handling ------------------------------------
+
+typedef void (*u3_net_stack_icmp_handler_t)(
+    const uint8_t,
+    const struct ip_addr *, const struct ip_addr *,
+    const uint16_t, const uint16_t,
+    const void *, const size_t
+);
+
+void u3_net_stack_register_icmp_handler(
+    const uint8_t type,
+    const uint8_t code,
+    const u3_net_stack_icmp_handler_t handler
+);
+
+void u3_net_stack_send_icmp_pkt(
+    const uint8_t type,
+    const uint8_t code,
+    const uint16_t id,
+    const uint16_t seq,
     const struct ip_addr *dst,
     const void *buff,
     const size_t num_bytes
