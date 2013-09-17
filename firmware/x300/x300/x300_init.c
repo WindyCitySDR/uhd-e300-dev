@@ -16,8 +16,8 @@
 
 static wb_pkt_iface64_config_t pkt_config;
 
-static const bool FPGA_FORWARDS_BCAST = true;
-static const bool FPGA_FORWARDS_NDEST = true;
+static const bool FPGA_FORWARDS_BCAST = false;
+static const bool FPGA_FORWARDS_NDEST = false;
 
 struct x300_eeprom_map
 {

@@ -105,7 +105,8 @@ void u3_net_stack_handle_one(void);
 
 void u3_net_stack_send_arp_request(const uint8_t ethno, const struct ip_addr *addr);
 
-void u3_net_stack_arp_cache_update(const struct ip_addr *ip_addr, const eth_mac_addr_t *mac_addr, const uint8_t ethno);
+//commented out to make private - do we need cache update outside this module?
+//void u3_net_stack_arp_cache_update(const struct ip_addr *ip_addr, const eth_mac_addr_t *mac_addr, const uint8_t ethno);
 
 const eth_mac_addr_t *u3_net_stack_arp_cache_lookup(const struct ip_addr *ip_addr);
 

@@ -5,16 +5,34 @@
 #include <u3_net_stack.h>
 #include <string.h>
 
+
+/***********************************************************************
+ * global constants
+ **********************************************************************/
 #define LS_ID_DISCOVER_BCAST 0
 #define LS_ID_DISCOVER_DIRECT 1
 #define LS_ID_INFORM_DIRECT 2
 
+#define LS_MAX_NUM_NBORS 8
+#define LS_MAX_TABLE_SIZE 64
+
+
+/***********************************************************************
+ * shared structures
+ **********************************************************************/
 typedef struct
 {
     bool valid;
     uint16_t seq;
     struct ip_addr node;
 } ls_node_entry_t;
+
+typedef struct
+{
+    struct ip_addr node;
+    struct ip_addr nbors[LS_MAX_NUM_NBORS];
+} ls_data_t;
+
 
 /***********************************************************************
  * sequence monitor
@@ -30,9 +48,7 @@ static bool is_seq_expired(const uint16_t seq)
 /***********************************************************************
  * neighbor table
  **********************************************************************/
-#define NUM_LS_NEIGHBORS 8
-
-static ls_node_entry_t ls_neighbors[NUM_LS_NEIGHBORS];
+static ls_node_entry_t ls_neighbors[LS_MAX_NUM_NBORS];
 
 static void update_neighbor_entry(const size_t i, const uint16_t seq, const struct ip_addr *node)
 {
@@ -43,7 +59,7 @@ static void update_neighbor_entry(const size_t i, const uint16_t seq, const stru
 
 static void register_neighbor(const uint16_t seq, const struct ip_addr *node)
 {
-    for (size_t i = 0; i < NUM_LS_NEIGHBORS; i++)
+    for (size_t i = 0; i < LS_MAX_NUM_NBORS; i++)
     {
         if (!ls_neighbors[i].valid || is_seq_expired(ls_neighbors[i].seq))
         {
@@ -64,13 +80,13 @@ static void register_neighbor(const uint16_t seq, const struct ip_addr *node)
     }
 
     //no space, shift the table down and take entry 0
-    memmove(ls_neighbors+1, ls_neighbors, (NUM_LS_NEIGHBORS-1)*sizeof(ls_node_entry_t));
+    memmove(ls_neighbors+1, ls_neighbors, (LS_MAX_NUM_NBORS-1)*sizeof(ls_node_entry_t));
     update_neighbor_entry(0, seq, node);
 }
 
 static void send_link_state_data_to_all_neighbors(const uint8_t ethno, const uint16_t seq, const void *buff, const size_t num_bytes)
 {
-    for (size_t i = 0; i < NUM_LS_NEIGHBORS; i++)
+    for (size_t i = 0; i < LS_MAX_NUM_NBORS; i++)
     {
         if (ls_neighbors[i].valid && !is_seq_expired(ls_neighbors[i].seq))
         {
@@ -85,59 +101,53 @@ static void send_link_state_data_to_all_neighbors(const uint8_t ethno, const uin
 }
 
 /***********************************************************************
- * global data structures
+ * route table structures
  **********************************************************************/
-#define NUM_LS_ENTRIES 64
-
 typedef struct
 {
     ls_node_entry_t node;
-    struct ip_addr nbors[NUM_LS_NEIGHBORS];
+    struct ip_addr nbors[LS_MAX_NUM_NBORS];
 } ls_table_entry_t;
 
-static ls_table_entry_t ls_entries[NUM_LS_ENTRIES];
+static ls_table_entry_t ls_entries[LS_MAX_TABLE_SIZE];
 
-void update_table_entry(const size_t i, const uint16_t seq, const void *buff, const size_t num_bytes)
+void update_table_entry(const size_t i, const uint16_t seq, const ls_data_t *ls_data)
 {
-    const uint32_t *entries = (const uint32_t *)buff;
     ls_entries[i].node.valid = true;
     ls_entries[i].node.seq = seq;
-    ls_entries[i].node.node.addr = entries[0];
-    memset(ls_entries[i].nbors, 0, NUM_LS_NEIGHBORS*sizeof(struct ip_addr));
-    memcpy(ls_entries[i].nbors, entries+1, num_bytes*sizeof(uint32_t)-4);
+    ls_entries[i].node.node.addr = ls_data->node.addr;
+    memcpy(ls_entries[i].nbors, ls_data->nbors, LS_MAX_NUM_NBORS*sizeof(struct ip_addr));
 }
 
-void update_table(const uint8_t ethno, const uint16_t seq, const void *buff, const size_t num_bytes)
+bool update_table(const uint16_t seq, const void *buff, const size_t num_bytes)
 {
-    const uint32_t node = ((const uint32_t *)buff)[0];
+    const ls_data_t *ls_data = (const ls_data_t *)buff;
 
-    for (size_t i = 0; i < NUM_LS_ENTRIES; i++)
+    for (size_t i = 0; i < LS_MAX_TABLE_SIZE; i++)
     {
         if (!ls_entries[i].node.valid || is_seq_expired(ls_entries[i].node.seq))
         {
-            update_table_entry(i, seq, buff, num_bytes);
-            send_link_state_data_to_all_neighbors(ethno, seq, buff, num_bytes);
-            return;
+            update_table_entry(i, seq, ls_data);
+            return true;
         }
 
         const uint16_t reply_delta = current_seq - seq;
         const uint16_t entry_delta = current_seq - ls_entries[i].node.seq;
-        if (
-            ls_entries[i].node.valid
-            && ls_entries[i].node.node.addr == node
-            && entry_delta > reply_delta //reply more recent
-        )
+        if (ls_entries[i].node.valid && ls_entries[i].node.node.addr == ls_data->node.addr)
         {
-            update_table_entry(i, seq, buff, num_bytes);
-            send_link_state_data_to_all_neighbors(ethno, seq, buff, num_bytes);
-            return;
+            if (entry_delta > reply_delta) //reply more recent
+            {
+                update_table_entry(i, seq, ls_data);
+                return true;
+            }
+            else return false; //old, throw reply out
         }
     }
 
     //no space, shift the table down and take entry 0
-    memmove(ls_entries+1, ls_entries, (NUM_LS_ENTRIES-1)*sizeof(ls_table_entry_t));
-    update_table_entry(0, seq, buff, num_bytes);
-    send_link_state_data_to_all_neighbors(ethno, seq, buff, num_bytes);
+    memmove(ls_entries+1, ls_entries, (LS_MAX_TABLE_SIZE-1)*sizeof(ls_table_entry_t));
+    update_table_entry(0, seq, ls_data);
+    return true;
 }
 
 /***********************************************************************
@@ -186,7 +196,11 @@ static void handle_icmp_irq(
 
     //handle information and forward if new
     case LS_ID_INFORM_DIRECT:
-        update_table(ethno, seq, buff, num_bytes);
+        if (update_table(seq, buff, num_bytes))
+        {
+            //table was updated -- send this info to all neighbors
+            send_link_state_data_to_all_neighbors(ethno, seq, buff, num_bytes);
+        }
         break;
     };
 }
@@ -214,16 +228,17 @@ void link_state_route_proto_update(const uint8_t ethno)
     );
 
     //fill link state data buffer
-    uint32_t ls_data[NUM_LS_NEIGHBORS+1];
-    size_t ls_num_entries = 0;
-    ls_data[ls_num_entries++] = u3_net_stack_get_ip_addr(ethno)->addr;
-    for (size_t i = 0; i < NUM_LS_NEIGHBORS; i++)
+    ls_data_t ls_data = {};
+    ls_data.node.addr = u3_net_stack_get_ip_addr(ethno)->addr;
+    size_t nbor_count = 0;
+    for (size_t i = 0; i < LS_MAX_NUM_NBORS; i++)
     {
         if (ls_neighbors[i].valid && !is_seq_expired(ls_neighbors[i].seq))
         {
-            ls_data[ls_num_entries++] = ls_neighbors[i].node.addr;
+            ls_data.nbors[nbor_count++].addr = ls_neighbors[i].node.addr;
         }
     }
 
-    send_link_state_data_to_all_neighbors(ethno, current_seq++, &ls_data, ls_num_entries*sizeof(uint32_t));
+    //send this data to all neighbors
+    send_link_state_data_to_all_neighbors(ethno, current_seq++, &ls_data, sizeof(ls_data)); //TODO can be less than sizeof lsdata
 }
