@@ -13,8 +13,11 @@
 //! Initialize internals and handler registration
 void link_state_route_proto_init(void);
 
-//! Initiate a periodic update to the table
-void link_state_route_proto_update(const uint8_t ethno);
+//! Initiate a periodic update to the neighbor table
+void link_state_route_proto_neighbor_discovery(const uint8_t ethno);
+
+//! Flood the network with information about routes
+void link_state_route_proto_flood(const uint8_t ethno);
 
 //TODO a way to get the map
 

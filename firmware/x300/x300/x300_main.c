@@ -375,10 +375,14 @@ static void handle_router(void)
     if (count++ < 1000) return; //1 second
     count = 0;
 
+    static size_t which = 0;
+    which++;
+
     for (size_t e = 0; e < ethernet_ninterfaces(); e++)
     {
         if (!ethernet_get_link_up(e)) continue;
-        link_state_route_proto_update(e);
+        if (which % 2) link_state_route_proto_flood(e);
+        else link_state_route_proto_neighbor_discovery(e);
     }
 }
 
