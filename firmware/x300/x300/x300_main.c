@@ -337,6 +337,14 @@ static void garp(void)
  **********************************************************************/
 static void handle_uarts(void)
 {
+    //pool allocations - always update shmem with location
+    #define NUM_POOL_WORDS32 64
+    static uint32_t rxpool[NUM_POOL_WORDS32];
+    static uint32_t txpool[NUM_POOL_WORDS32];
+    shmem[X300_FW_SHMEM_UART_RX_ADDR] = (uint32_t)rxpool;
+    shmem[X300_FW_SHMEM_UART_TX_ADDR] = (uint32_t)txpool;
+    shmem[X300_FW_SHMEM_UART_WORDS32] = NUM_POOL_WORDS32;
+
     ////////////////////////////////////////////////////////////////////
     // RX UART - try to get a character and post it to the shmem buffer
     ////////////////////////////////////////////////////////////////////
@@ -344,12 +352,12 @@ static void handle_uarts(void)
     const int rxch = wb_uart_getc(UART0_BASE);
     if (rxch != -1)
     {
-        rxoffset = (rxoffset+1) % (X300_FW_SHMEM_UART_POOL_WORDS32*4);
+        rxoffset = (rxoffset+1) % (NUM_POOL_WORDS32*4);
         const int shift = ((rxoffset%4) * 8);
         static uint32_t rxword32 = 0;
         if (shift == 0) rxword32 = 0;
         rxword32 |= ((uint32_t) rxch) << ((rxoffset%4) * 8);
-        shmem[X300_FW_SHMEM_UART_RX_POOL+rxoffset/4] = rxword32;
+        rxpool[rxoffset/4] = rxword32;
         shmem[X300_FW_SHMEM_UART_RX_INDEX] = rxoffset;
     }
 
@@ -360,9 +368,9 @@ static void handle_uarts(void)
     if (txoffset != shmem[X300_FW_SHMEM_UART_TX_INDEX])
     {
         const int shift = ((txoffset%4) * 8);
-        const int txch = shmem[X300_FW_SHMEM_UART_TX_POOL+txoffset/4] >> shift;
+        const int txch = txpool[txoffset/4] >> shift;
         wb_uart_putc(UART0_BASE, txch);
-        txoffset = (txoffset+1) % (X300_FW_SHMEM_UART_POOL_WORDS32*4);
+        txoffset = (txoffset+1) % (NUM_POOL_WORDS32*4);
     }
 }
 
