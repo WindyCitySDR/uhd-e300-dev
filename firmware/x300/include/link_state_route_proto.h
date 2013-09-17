@@ -26,6 +26,16 @@ void link_state_route_proto_flood(const uint8_t ethno);
  */
 struct ip_addr *link_state_route_get_neighbor(const struct ip_addr *dst);
 
-//TODO a way to get the map
+typedef struct
+{
+    struct ip_addr node;
+    struct ip_addr nbor;
+} ls_node_mapping_t;
+
+/*!
+ * Get a pointer to the node mapping table.
+ * The table length will be set to *length.
+ */
+const ls_node_mapping_t *link_state_route_get_node_mapping(size_t *length);
 
 #endif /* INCLUDED_LINK_STATE_ROUTE_PROTO_H */
