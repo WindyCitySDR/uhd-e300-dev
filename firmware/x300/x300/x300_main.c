@@ -381,8 +381,8 @@ static void handle_router(void)
     for (size_t e = 0; e < ethernet_ninterfaces(); e++)
     {
         if (!ethernet_get_link_up(e)) continue;
-        if (which % 2) link_state_route_proto_flood(e);
-        else link_state_route_proto_neighbor_discovery(e);
+        if (which % 2) link_state_route_proto_update(e);
+        else link_state_route_proto_flood(e);
     }
 }
 

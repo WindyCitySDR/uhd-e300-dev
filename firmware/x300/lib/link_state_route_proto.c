@@ -46,12 +46,18 @@ static inline bool is_seq_expired(const uint16_t seq)
     return delta > 30; //have not talked in a while, you are deaf to me
 }
 
+static inline bool is_seq_newer(const uint16_t seq, const uint16_t entry_seq)
+{
+    const uint16_t reply_delta = current_seq - seq;
+    const uint16_t entry_delta = current_seq - entry_seq;
+    return entry_delta > reply_delta;
+}
+
 /***********************************************************************
  * neighbor table
  **********************************************************************/
 typedef struct
 {
-    bool valid;
     uint16_t seq;
     uint8_t ethno;
     struct ip_addr node;
@@ -59,14 +65,13 @@ typedef struct
 
 static bool ls_node_entry_valid(const ls_node_entry_t *entry)
 {
-    return entry->valid && !is_seq_expired(entry->seq);
+    return entry->node.addr != 0 && !is_seq_expired(entry->seq);
 }
 
 static ls_node_entry_t ls_neighbors[LS_MAX_NUM_NBORS];
 
 static void update_neighbor_entry(const size_t i, const int8_t ethno, const uint16_t seq, const struct ip_addr *node)
 {
-    ls_neighbors[i].valid = true;
     ls_neighbors[i].seq = seq;
     ls_neighbors[i].ethno = ethno;
     ls_neighbors[i].node.addr = node->addr;
@@ -84,9 +89,7 @@ static bool register_neighbor(const int8_t ethno, const uint16_t seq, const stru
 
         if (ls_neighbors[i].node.addr == node->addr && ls_neighbors[i].ethno == ethno)
         {
-            const uint16_t reply_delta = current_seq - seq;
-            const uint16_t entry_delta = current_seq - ls_neighbors[i].seq;
-            if (entry_delta > reply_delta) //reply more recent
+            if (is_seq_newer(seq, ls_neighbors[i].seq))
             {
                 update_neighbor_entry(i, ethno, seq, node);
                 return true;
@@ -129,7 +132,6 @@ static ls_table_entry_t ls_entries[LS_MAX_TABLE_SIZE];
 
 void update_table_entry(const size_t i, const uint8_t ethno, const uint16_t seq, const ls_data_t *ls_data)
 {
-    ls_entries[i].node.valid = true;
     ls_entries[i].node.seq = seq;
     ls_entries[i].node.ethno = ethno;
     ls_entries[i].node.node.addr = ls_data->node.addr;
@@ -151,9 +153,7 @@ bool update_table(const uint8_t ethno, const uint16_t seq, const ls_data_t *ls_d
 
         if (ls_entries[i].node.node.addr == ls_data->node.addr && ls_entries[i].node.ethno == ethno)
         {
-            const uint16_t reply_delta = current_seq - seq;
-            const uint16_t entry_delta = current_seq - ls_entries[i].node.seq;
-            if (entry_delta > reply_delta) //reply more recent
+            if (is_seq_newer(seq, ls_neighbors[i].seq))
             {
                 update_table_entry(i, ethno, seq, ls_data);
                 return true;
@@ -233,7 +233,7 @@ void link_state_route_proto_init(void)
 /***********************************************************************
  * initiate a periodic update to the table
  **********************************************************************/
-void link_state_route_proto_neighbor_discovery(const uint8_t ethno)
+void link_state_route_proto_update(const uint8_t ethno)
 {
     //send a discovery packet
     u3_net_stack_send_icmp_pkt(
