@@ -136,6 +136,7 @@ void udp_uart_poll(void)
         if (newline || state->cyc++ > num_idle_cyc_b4_flush)
         {
             if (state->host_port != 0) u3_net_stack_send_udp_pkt(
+                state->host_ethno,
                 &state->host_addr,
                 state->local_port,
                 state->host_port,

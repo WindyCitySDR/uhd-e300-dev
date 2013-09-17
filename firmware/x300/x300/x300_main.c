@@ -12,6 +12,7 @@
 #include <wb_uart.h>
 #include <udp_uart.h>
 #include <u3_net_stack.h>
+#include <link_state_route_proto.h>
 #include <printf.h>
 #include <string.h>
 
@@ -21,14 +22,14 @@ static uint32_t *shmem = (uint32_t *) X300_FW_SHMEM_BASE;
  * Setup call for udp framer
  **********************************************************************/
 void program_udp_framer(
+    const uint8_t ethno,
     const uint32_t sid,
     const struct ip_addr *dst_ip,
     const uint16_t dst_port,
     const uint16_t src_port
 )
 {
-    uint8_t ethno;
-    const eth_mac_addr_t *dst_mac = u3_net_stack_arp_cache_lookup(dst_ip, &ethno);
+    const eth_mac_addr_t *dst_mac = u3_net_stack_arp_cache_lookup(dst_ip);
     const size_t ethbase = (ethno == 0)? SR_ETHINT0 : SR_ETHINT1;
     const size_t vdest = (sid >> 16) & 0xff;
     printf("handle_udp_prog_framer sid %u vdest %u\n", sid, vdest);
@@ -65,7 +66,7 @@ void handle_udp_prog_framer(
 )
 {
     const uint32_t sid = ((const uint32_t *)buff)[1];
-    program_udp_framer(sid, src, src_port, dst_port);
+    program_udp_framer(ethno, sid, src, src_port, dst_port);
 }
 
 /***********************************************************************
@@ -112,7 +113,7 @@ void handle_udp_fw_comms(
     //send a reply if ack requested
     if (request->flags & X300_FW_COMMS_FLAGS_ACK)
     {
-        u3_net_stack_send_udp_pkt(src, dst_port, src_port, &reply, sizeof(reply));
+        u3_net_stack_send_udp_pkt(ethno, src, dst_port, src_port, &reply, sizeof(reply));
     }
 }
 
@@ -174,7 +175,7 @@ void handle_udp_fpga_prog(
     //send a reply if ack requested
     if (request->flags & X300_FPGA_PROG_FLAGS_ACK)
     {
-        u3_net_stack_send_udp_pkt(src, dst_port, src_port, &reply, sizeof(reply));
+        u3_net_stack_send_udp_pkt(ethno, src, dst_port, src_port, &reply, sizeof(reply));
     }
 }
 
@@ -366,6 +367,22 @@ static void handle_uarts(void)
 }
 
 /***********************************************************************
+ * update the link state periodic update
+ **********************************************************************/
+static void handle_router(void)
+{
+    static size_t count = 0;
+    if (count++ < 1000) return; //1 second
+    count = 0;
+
+    for (size_t e = 0; e < ethernet_ninterfaces(); e++)
+    {
+        if (!ethernet_get_link_up(e)) continue;
+        link_state_route_proto_update(e);
+    }
+}
+
+/***********************************************************************
  * Main loop runs all the handlers
  **********************************************************************/
 int main(void)
@@ -385,6 +402,7 @@ int main(void)
         static const uint32_t tick_delta = CPU_CLOCK/1000;
         if (ticks_passed > tick_delta)
         {
+            handle_router(); //deal with router table update
             handle_claim(); //deal with the host claim register
             update_leds(); //run the link and activity leds
             garp(); //send periodic garps

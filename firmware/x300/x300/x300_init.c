@@ -10,6 +10,7 @@
 #include <printf.h>
 #include <wb_pkt_iface64.h>
 #include <u3_net_stack.h>
+#include <link_state_route_proto.h>
 #include <udp_uart.h>
 #include "x300_fw_common.h"
 
@@ -76,6 +77,7 @@ static void init_network(void)
     pkt_config = wb_pkt_iface64_init(PKT_RAM0_BASE, 0x1ffc);
     printf("PKT RAM0 BASE %u\n", (&pkt_config)->base);
     u3_net_stack_init(&pkt_config);
+    link_state_route_proto_init();
 
     //read everything from eeprom
     static const uint8_t eeprom_cmd[2] = {0, 0}; //the command is 16 bits of address offset

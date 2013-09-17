@@ -63,6 +63,7 @@ void u3_net_stack_register_udp_handler(
 );
 
 void u3_net_stack_send_udp_pkt(
+    const uint8_t ethno,
     const struct ip_addr *dst,
     const uint16_t src_port,
     const uint16_t dst_port,
@@ -86,6 +87,7 @@ void u3_net_stack_register_icmp_handler(
 );
 
 void u3_net_stack_send_icmp_pkt(
+    const uint8_t ethno,
     const uint8_t type,
     const uint8_t code,
     const uint16_t id,
@@ -105,6 +107,6 @@ void u3_net_stack_send_arp_request(const uint8_t ethno, const struct ip_addr *ad
 
 void u3_net_stack_arp_cache_update(const struct ip_addr *ip_addr, const eth_mac_addr_t *mac_addr, const uint8_t ethno);
 
-const eth_mac_addr_t *u3_net_stack_arp_cache_lookup(const struct ip_addr *ip_addr, uint8_t *ethno);
+const eth_mac_addr_t *u3_net_stack_arp_cache_lookup(const struct ip_addr *ip_addr);
 
 #endif /* INCLUDED_U3_NET_STACK_H */
