@@ -42,7 +42,7 @@ static uint16_t current_seq = 0;
 static bool is_seq_expired(const uint16_t seq)
 {
     const uint16_t delta = current_seq - seq;
-    return delta < 1024; //basically made up metric, TODO look at this closer
+    return delta > 1024; //basically made up metric, TODO look at this closer
 }
 
 /***********************************************************************
@@ -67,14 +67,14 @@ static void register_neighbor(const uint16_t seq, const struct ip_addr *node)
             return;
         }
 
-        const uint16_t reply_delta = current_seq - seq;
-        const uint16_t entry_delta = current_seq - ls_neighbors[i].seq;
-        if (
-            ls_neighbors[i].valid
-            && ls_neighbors[i].node.addr == node->addr
-            && entry_delta > reply_delta //reply more recent
-        ){
-            update_neighbor_entry(i, seq, node);
+        if (ls_neighbors[i].valid && ls_neighbors[i].node.addr == node->addr)
+        {
+            const uint16_t reply_delta = current_seq - seq;
+            const uint16_t entry_delta = current_seq - ls_neighbors[i].seq;
+            if (entry_delta > reply_delta) //reply more recent
+            {
+                update_neighbor_entry(i, seq, node);
+            }
             return;
         }
     }
@@ -94,7 +94,7 @@ static void send_link_state_data_to_all_neighbors(const uint8_t ethno, const uin
                 ethno,
                 ICMP_IRQ, 0,
                 LS_ID_INFORM_DIRECT, seq,
-                &ls_neighbors[i].node, buff, num_bytes
+                &(ls_neighbors[i].node), buff, num_bytes
             );
         }
     }
@@ -131,16 +131,16 @@ bool update_table(const uint16_t seq, const void *buff, const size_t num_bytes)
             return true;
         }
 
-        const uint16_t reply_delta = current_seq - seq;
-        const uint16_t entry_delta = current_seq - ls_entries[i].node.seq;
         if (ls_entries[i].node.valid && ls_entries[i].node.node.addr == ls_data->node.addr)
         {
+            const uint16_t reply_delta = current_seq - seq;
+            const uint16_t entry_delta = current_seq - ls_entries[i].node.seq;
             if (entry_delta > reply_delta) //reply more recent
             {
                 update_table_entry(i, seq, ls_data);
                 return true;
             }
-            else return false; //old, throw reply out
+            return false; //old, throw reply out
         }
     }
 
