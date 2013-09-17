@@ -348,6 +348,26 @@ void x300_impl::setup_mb(const size_t mb_i, const uhd::device_addr_t &dev_addr)
     mb.zpu_i2c->set_clock_rate(X300_BUS_CLOCK_RATE);
 
     ////////////////////////////////////////////////////////////////////
+    // print network routes mapping
+    ////////////////////////////////////////////////////////////////////
+    const uint32_t routes_addr = mb.zpu_ctrl->peek32(SR_ADDR(X300_FW_SHMEM_BASE, X300_FW_SHMEM_ROUTE_MAP_ADDR));
+    const uint32_t routes_len = mb.zpu_ctrl->peek32(SR_ADDR(X300_FW_SHMEM_BASE, X300_FW_SHMEM_ROUTE_MAP_LEN));
+    UHD_VAR(routes_len);
+    for (size_t i = 0; i < routes_len; i+=1)
+    {
+        const uint32_t node_addr = mb.zpu_ctrl->peek32(SR_ADDR(routes_addr, i*2+0));
+        const uint32_t nbor_addr = mb.zpu_ctrl->peek32(SR_ADDR(routes_addr, i*2+1));
+        if (node_addr != 0 and nbor_addr != 0)
+        {
+            UHD_MSG(status) << boost::format("%u: %s -> %s")
+                % i
+                % asio::ip::address_v4(node_addr).to_string()
+                % asio::ip::address_v4(nbor_addr).to_string()
+            << std::endl;
+        }
+    }
+
+    ////////////////////////////////////////////////////////////////////
     // setup the mboard eeprom
     ////////////////////////////////////////////////////////////////////
     UHD_MSG(status) << "Loading values from EEPROM..." << std::endl;

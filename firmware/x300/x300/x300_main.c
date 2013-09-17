@@ -379,6 +379,11 @@ static void handle_uarts(void)
  **********************************************************************/
 static void handle_router(void)
 {
+    //update shmem entries to keep it persistent
+    size_t map_len = 0;
+    shmem[X300_FW_SHMEM_ROUTE_MAP_ADDR] = (uint32_t)link_state_route_get_node_mapping(&map_len);
+    shmem[X300_FW_SHMEM_ROUTE_MAP_LEN] = map_len;
+
     static size_t count = 0;
     if (count++ < 1000) return; //1 second
     count = 0;
