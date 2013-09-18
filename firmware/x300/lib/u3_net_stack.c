@@ -281,6 +281,10 @@ void u3_net_stack_send_arp_request(const uint8_t ethno, const struct ip_addr *ad
 
 static void handle_arp_packet(const uint8_t ethno, const struct arp_eth_ipv4 *p)
 {
+    //TODO
+    //if this for our local ip?, then handle it
+    //if the ip is found in the routing table, also handle it
+
     //printf("handle_arp_packet\n");
     if (p->ar_hrd != ARPHRD_ETHER
       || p->ar_pro != ETHERTYPE_IPV4
@@ -549,6 +553,18 @@ static void handle_eth_packet(const void *buff, const size_t num_bytes)
         if (IPH_OFFSET(ip) & (IP_MF | IP_OFFMASK)) return;// ignore fragmented packets
 
         u3_net_stack_arp_cache_update(&ip->src, &eth_hdr->src, eth_hdr->ethno);
+
+        //TODO
+        //if not bcast mac and not for local addr destination:
+        {
+            //look up the destination in the route table, if not null
+            {
+                //link_state_route_get_neighbor -> call this, then get mac dst from the ip dst
+                //send a new IP packet with change of the source ip
+            }
+        }
+
+        //TODO only call handler if bcast mac or the local ip is dest or local ip bcast
 
         if (IPH_PROTO(ip) == IP_PROTO_UDP)
         {
