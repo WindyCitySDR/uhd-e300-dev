@@ -11,7 +11,7 @@ using namespace uhd;
 struct x300_clock_ctrl_impl : x300_clock_ctrl	{
 
 	x300_clock_ctrl_impl(uhd::spi_iface::sptr spiface, const size_t slaveno, const double clock_rate, const int &revno):
-		_spiface(spiface), _slaveno(slaveno), _clock_rate(clock_rate)
+		_spiface(spiface), _slaveno(slaveno), _clock_rate(clock_rate), _revno(revno)
 	{
 
 		int div = 0;
@@ -88,7 +88,7 @@ struct x300_clock_ctrl_impl : x300_clock_ctrl	{
 	//BEGIN CONDITIONAL DIVIDERS AND CLOCKOUT TYPES FOR REVISION DIFFERENCES
 	/////////////////////////////////////////////////////////////////////////
 
-	if (revno < 3)
+	if (_revno < 3)
 	{
 		_lmk04816_regs.CLKout5_TYPE = lmk04816_regs_t::CLKOUT5_TYPE_LVDS; //REF_CLKOUT
 		_lmk04816_regs.CLKout10_TYPE = lmk04816_regs_t::CLKOUT10_TYPE_LVPECL_700MVPP; //DB_0_TX
@@ -230,9 +230,12 @@ struct x300_clock_ctrl_impl : x300_clock_ctrl	{
 	} 
 
 
-	void set_ref_out(const bool)
+	void set_ref_out(const bool enb)
 	{
-		//TODO -- always on until we rev the HW
+		if (_revno < 3) return; //not supported on this hardware
+		if (enb) _lmk04816_regs.CLKout10_TYPE = lmk04816_regs_t::CLKOUT10_TYPE_LVDS; //REF_CLKOUT
+		else _lmk04816_regs.CLKout10_TYPE = lmk04816_regs_t::CLKOUT10_TYPE_P_DOWN; //REF_CLKOUT
+		this->write_regs(8);
 	}
 
 
@@ -248,6 +251,7 @@ struct x300_clock_ctrl_impl : x300_clock_ctrl	{
 	const spi_iface::sptr _spiface;
 	const size_t _slaveno;
 	const double _clock_rate;
+	const int _revno;
 	lmk04816_regs_t _lmk04816_regs;
 	//uhd::dict<x300_clock_which_t, bool> _enables;
 	//uhd::dict<x300_clock_which_t, double> _rates;
