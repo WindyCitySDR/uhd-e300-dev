@@ -10,7 +10,7 @@
 using namespace uhd;
 struct x300_clock_ctrl_impl : x300_clock_ctrl	{
 
-	x300_clock_ctrl_impl(uhd::spi_iface::sptr spiface, const size_t slaveno, const double clock_rate):
+	x300_clock_ctrl_impl(uhd::spi_iface::sptr spiface, const size_t slaveno, const double clock_rate, const int &revno):
 		_spiface(spiface), _slaveno(slaveno), _clock_rate(clock_rate)
 	{
 
@@ -38,26 +38,21 @@ struct x300_clock_ctrl_impl : x300_clock_ctrl	{
 		
 //register 1
 		_lmk04816_regs.CLKout2_3_PD = lmk04816_regs_t::CLKOUT2_3_PD_POWER_UP;
-		//set divide value for ADC
 		_lmk04816_regs.CLKout2_3_DIV = div;
 		//this->write_regs(1);
 //register 2
 		_lmk04816_regs.CLKout4_5_PD = lmk04816_regs_t::CLKOUT4_5_PD_POWER_UP;
-		//set divide value for ADC
 		_lmk04816_regs.CLKout4_5_DIV = div;
 		//this->write_regs(2);
 //register 3
-		//set divide value for FPGA
 		_lmk04816_regs.CLKout6_7_DIV = div;
 		_lmk04816_regs.CLKout6_7_OSCin_Sel = lmk04816_regs_t::CLKOUT6_7_OSCIN_SEL_VCO;
 		//this->write_regs(3);
 //register 4
-		//set divide value for FPGA
 		_lmk04816_regs.CLKout8_9_DIV = div;
 		//this->write_regs(4);
 //register 5
 		_lmk04816_regs.CLKout10_11_PD = lmk04816_regs_t::CLKOUT10_11_PD_NORMAL;
-		//set divide value for LVDS low frequency system synch clock
 		_lmk04816_regs.CLKout10_11_DIV = div;
 		//this->write_regs(5);
 
@@ -65,29 +60,47 @@ struct x300_clock_ctrl_impl : x300_clock_ctrl	{
 
 //register 6
 		//sets clock type to LVPECL
-		_lmk04816_regs.CLKout0_TYPE = 1; //FPGA
+		_lmk04816_regs.CLKout0_TYPE = lmk04816_regs_t::CLKOUT0_TYPE_LVDS; //FPGA
 		_lmk04816_regs.CLKout2_TYPE = lmk04816_regs_t::CLKOUT2_TYPE_LVPECL_700MVPP; //DB_0_RX
 		_lmk04816_regs.CLKout3_TYPE = lmk04816_regs_t::CLKOUT3_TYPE_LVPECL_700MVPP; //DB_1_RX
 		
 //register 7
 		//sets clock type to LVPECL
-		_lmk04816_regs.CLKout4_TYPE = 2; //DB_1_TX
-		_lmk04816_regs.CLKout5_TYPE = lmk04816_regs_t::CLKOUT5_TYPE_LVDS; //REF_CLKOUT
+		_lmk04816_regs.CLKout4_TYPE = lmk04816_regs_t::CLKOUT4_TYPE_LVPECL_700MVPP; //DB_1_TX
+		_lmk04816_regs.CLKout5_TYPE = lmk04816_regs_t::CLKOUT5_TYPE_LVPECL_700MVPP; //DB_1_TX
 		//sets clock type to LVDS
 		_lmk04816_regs.CLKout6_TYPE = lmk04816_regs_t::CLKOUT6_TYPE_LVPECL_700MVPP; // DB1_DAC
 		_lmk04816_regs.CLKout7_TYPE = lmk04816_regs_t::CLKOUT7_TYPE_LVPECL_700MVPP; // DB1_DAC
-		_lmk04816_regs.CLKout8_TYPE = 2; // DB0_ADC
+		_lmk04816_regs.CLKout8_TYPE = lmk04816_regs_t::CLKOUT8_TYPE_LVPECL_700MVPP; // DB0_ADC
 		//this->write_regs(7);
 //register 8 
 		//sets clock type to LVPECL
 		_lmk04816_regs.CLKout9_TYPE = lmk04816_regs_t::CLKOUT9_TYPE_LVPECL_700MVPP; //DB1_ADC
-		_lmk04816_regs.CLKout10_TYPE = lmk04816_regs_t::CLKOUT10_TYPE_LVPECL_700MVPP; //DB_0_TX
+		_lmk04816_regs.CLKout10_TYPE = lmk04816_regs_t::CLKOUT10_TYPE_LVDS; //REF_CLKOUT
 		//this->write_regs(8);
 /*
 	for (size_t i = 1; i <= 8; ++i)	{ 
 		this->write_regs(i);
 		}
 */
+
+	/////////////////////////////////////////////////////////////////////////
+	//BEGIN CONDITIONAL DIVIDERS AND CLOCKOUT TYPES FOR REVISION DIFFERENCES
+	/////////////////////////////////////////////////////////////////////////
+
+	if (revno < 3)
+	{
+		_lmk04816_regs.CLKout5_TYPE = lmk04816_regs_t::CLKOUT5_TYPE_LVDS; //REF_CLKOUT
+		_lmk04816_regs.CLKout10_TYPE = lmk04816_regs_t::CLKOUT10_TYPE_LVPECL_700MVPP; //DB_0_TX
+	}
+	else
+	{
+		_lmk04816_regs.CLKout10_11_DIV = int(((clock_rate*div)/10e6) + 0.5);
+	}
+
+	/////////////////////////////////////////////////////////////////////////
+	//END CONDITIONAL DIVIDERS AND CLOCKOUT TYPES FOR REVISION DIFFERENCES
+	/////////////////////////////////////////////////////////////////////////
 
 //register 10
 
@@ -252,8 +265,9 @@ struct x300_clock_ctrl_impl : x300_clock_ctrl	{
 
 };
 
-x300_clock_ctrl::sptr x300_clock_ctrl::make(uhd::spi_iface::sptr spiface, const size_t slaveno, const double clock_rate)	{
-	return sptr(new x300_clock_ctrl_impl(spiface,slaveno,clock_rate));
+x300_clock_ctrl::sptr x300_clock_ctrl::make(uhd::spi_iface::sptr spiface, const size_t slaveno, const double clock_rate, const int &revno)
+{
+    return sptr(new x300_clock_ctrl_impl(spiface, slaveno, clock_rate, revno));
 }
 
 
