@@ -292,6 +292,7 @@ static void handle_arp_packet(const uint8_t ethno, const struct arp_eth_ipv4 *p)
       || p->ar_pln != sizeof(struct ip_addr))
     return;
 
+    //got an arp reply -- injest it into the arp cache
     if (p->ar_op == ARPOP_REPLY)
     {
         //printf("ARPOP_REPLY\n");
@@ -302,6 +303,9 @@ static void handle_arp_packet(const uint8_t ethno, const struct arp_eth_ipv4 *p)
         u3_net_stack_arp_cache_update(&ip_addr, &mac_addr, ethno);
     }
 
+    //got an arp request
+    // -- if the request is for a local address, reply normal-like
+    // -- if the request is for a remote address, check the router table
     if (p->ar_op == ARPOP_REQUEST)
     {
         //printf("ARPOP_REQUEST\n");
