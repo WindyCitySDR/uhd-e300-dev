@@ -407,6 +407,8 @@ void x300_impl::setup_mb(const size_t mb_i, const uhd::device_addr_t &dev_addr)
     mb.clock_control_regs__clock_source = 0;
     mb.clock_control_regs__pps_select = 0;
     mb.clock_control_regs__pps_out_enb = 0;
+    mb.clock_control_regs__tcxo_enb = 1;
+    mb.clock_control_regs__gpsdo_pwr = 1;
     this->update_clock_source(mb, "internal");
     this->update_clock_control(mb);
 
@@ -909,6 +911,8 @@ void x300_impl::update_clock_control(mboard_members_t &mb)
     const size_t reg = mb.clock_control_regs__clock_source
         | (mb.clock_control_regs__pps_select << 2)
         | (mb.clock_control_regs__pps_out_enb << 3)
+        | (mb.clock_control_regs__tcxo_enb << 4)
+        | (mb.clock_control_regs__gpsdo_pwr << 5)
     ;
     mb.zpu_ctrl->poke32(SR_ADDR(SET0_BASE, ZPU_SR_CLOCK_CTRL), reg);
 }

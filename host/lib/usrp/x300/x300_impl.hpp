@@ -172,6 +172,8 @@ struct x300_impl : public uhd::device
         int clock_control_regs__clock_source;
         int clock_control_regs__pps_select;
         int clock_control_regs__pps_out_enb;
+        int clock_control_regs__tcxo_enb;
+        int clock_control_regs__gpsdo_pwr;
     };
     std::vector<mboard_members_t> _mb;
 
