@@ -181,6 +181,13 @@ static void update_node_mappings(const ls_data_t *ls_data)
 static void send_link_state_data_to_all_neighbors(
     const uint8_t ethno, const uint16_t seq, const ls_data_t *ls_data
 ){
+    //exit and dotn forward if the information is stale
+    if (!ls_node_entries_update(ls_nodes, lengthof(ls_nodes), ethno, seq, &ls_data->node)) return;
+
+    //update the mappings with new info
+    update_node_mappings(ls_data);
+
+    //forward to all neighbors
     for (size_t i = 0; i < lengthof(ls_nbors); i++)
     {
         if (ls_node_entry_valid(&ls_nbors[i]) && ls_nbors[i].ethno == ethno)
@@ -236,15 +243,9 @@ static void handle_icmp_irq(
         u3_net_stack_send_icmp_pkt(ethno, ICMP_IR, 0, id, seq, src, buff, num_bytes);
         break;
 
-    //handle information and forward if new
+    //handle and forward information
     case LS_ID_INFORM:
-        if (ls_node_entries_update(ls_nodes, lengthof(ls_nodes), ethno, seq, &ls_data->node))
-        {
-            //update the mappings with new info
-            update_node_mappings(ls_data);
-            //send this info to all neighbors
-            send_link_state_data_to_all_neighbors(ethno, seq, ls_data);
-        }
+        send_link_state_data_to_all_neighbors(ethno, seq, ls_data);
         break;
     };
 }
@@ -273,20 +274,24 @@ void link_state_route_proto_update(const uint8_t ethno)
 
 void link_state_route_proto_flood(const uint8_t ethno)
 {
-    //fill link state data buffer
-    uint8_t buff[LS_PAYLOAD_MTU] = {};
-    ls_data_t *ls_data = (ls_data_t *)buff;
-    ls_data->node.addr = u3_net_stack_get_ip_addr(ethno)->addr;
-    ls_data->num_nbors = 0;
-    for (size_t i = 0; i < lengthof(ls_nbors); i++)
+    for (size_t e = 0; e < ethernet_ninterfaces(); e++)
     {
-        if ((sizeof_ls_data(ls_data) + 4) >= LS_PAYLOAD_MTU) break;
-        if (ls_node_entry_valid(&ls_nbors[i])/* && ls_nbors[i].ethno == ethno*/)
-        {
-            ls_data->nbors[ls_data->num_nbors++].addr = ls_nbors[i].ip_addr.addr;
-        }
-    }
+        //fill link state data buffer
+        uint8_t buff[LS_PAYLOAD_MTU] = {};
+        ls_data_t *ls_data = (ls_data_t *)buff;
+        ls_data->node.addr = u3_net_stack_get_ip_addr(e)->addr;
+        ls_data->num_nbors = 0;
 
-    //send this data to all neighbors
-    send_link_state_data_to_all_neighbors(ethno, current_seq++, ls_data);
+        for (size_t i = 0; i < lengthof(ls_nbors); i++)
+        {
+            if ((sizeof_ls_data(ls_data) + 4) >= LS_PAYLOAD_MTU) break;
+            if (ls_node_entry_valid(&ls_nbors[i]) && ls_nbors[i].ethno == e)
+            {
+                ls_data->nbors[ls_data->num_nbors++].addr = ls_nbors[i].ip_addr.addr;
+            }
+        }
+
+        //send this data to all neighbors
+        send_link_state_data_to_all_neighbors(ethno, current_seq++, ls_data);
+    }
 }
