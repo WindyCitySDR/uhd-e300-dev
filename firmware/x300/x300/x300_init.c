@@ -16,9 +16,6 @@
 
 static wb_pkt_iface64_config_t pkt_config;
 
-static const bool FPGA_FORWARDS_BCAST = false;
-static const bool FPGA_FORWARDS_NDEST = false;
-
 struct x300_eeprom_map
 {
     //indentifying numbers
@@ -97,24 +94,21 @@ static void init_network(void)
     const struct ip_addr *my_ip1 = (const struct ip_addr *)pick_inited_field(&eeprom_map.ip_addr[eth1no], &default_map.ip_addr[eth1no], 4);
     const struct ip_addr *subnet1 = (const struct ip_addr *)pick_inited_field(&eeprom_map.subnet[eth1no], &default_map.subnet[eth1no], 4);
 
-    //forward value
-    uint32_t forward = 0;
-    if (FPGA_FORWARDS_BCAST) forward |= (1 << 0);
-    if (FPGA_FORWARDS_NDEST) forward |= (1 << 1);
-
     //init eth0
     u3_net_stack_init_eth(0, my_mac0, my_ip0, subnet0);
     wb_poke32(SR_ADDR(SET0_BASE, SR_ETHINT0 + 8 + 0), (my_mac0->addr[5] << 0) | (my_mac0->addr[4] << 8) | (my_mac0->addr[3] << 16) | (my_mac0->addr[2] << 24));
     wb_poke32(SR_ADDR(SET0_BASE, SR_ETHINT0 + 8 + 1), (my_mac0->addr[1] << 0) | (my_mac0->addr[0] << 8));
     wb_poke32(SR_ADDR(SET0_BASE, SR_ETHINT0 + 8 + 2), my_ip0->addr);
-    wb_poke32(SR_ADDR(SET0_BASE, SR_ETHINT0 + 8 + 4), forward);
+    wb_poke32(SR_ADDR(SET0_BASE, SR_ETHINT0 + 8 + 4), 0/*nofwd*/);
+    wb_poke32(SR_ADDR(SET0_BASE, SR_ETHINT0 + 8 + 5), (ICMP_IRQ << 8) | 0); //no fwd: type, code
 
     //init eth1
     u3_net_stack_init_eth(1, my_mac1, my_ip1, subnet1);
     wb_poke32(SR_ADDR(SET0_BASE, SR_ETHINT1 + 8 + 0), (my_mac1->addr[5] << 0) | (my_mac1->addr[4] << 8) | (my_mac1->addr[3] << 16) | (my_mac1->addr[2] << 24));
     wb_poke32(SR_ADDR(SET0_BASE, SR_ETHINT1 + 8 + 1), (my_mac1->addr[1] << 0) | (my_mac1->addr[0] << 8));
     wb_poke32(SR_ADDR(SET0_BASE, SR_ETHINT1 + 8 + 2), my_ip1->addr);
-    wb_poke32(SR_ADDR(SET0_BASE, SR_ETHINT1 + 8 + 4), forward);
+    wb_poke32(SR_ADDR(SET0_BASE, SR_ETHINT1 + 8 + 4), 0/*nofwd*/);
+    wb_poke32(SR_ADDR(SET0_BASE, SR_ETHINT1 + 8 + 5), (ICMP_IRQ << 8) | 0); //no fwd: type, code
 }
 
 static void putc(void *p, char c)

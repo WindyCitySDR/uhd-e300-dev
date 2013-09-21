@@ -377,7 +377,7 @@ static void handle_uarts(void)
 /***********************************************************************
  * update the link state periodic update
  **********************************************************************/
-static void handle_router(void)
+static void handle_link_state(void)
 {
     //update shmem entries to keep it persistent
     size_t map_len = 0;
@@ -396,6 +396,16 @@ static void handle_router(void)
         if (!ethernet_get_link_up(e)) continue;
         if (which % 2) link_state_route_proto_update(e);
         else link_state_route_proto_flood(e);
+
+        //update forwarding rules
+        uint32_t forward = 0;
+        if (!link_state_route_proto_causes_cycle(u3_net_stack_get_ip_addr(e), u3_net_stack_get_ip_addr((e+1)%2)))
+        {
+            forward |= (1 << 0); //forward bcast
+            forward |= (1 << 1); //forward not mac dest
+        }
+        const uint32_t eth_base = (e == 0)? SR_ETHINT0 : SR_ETHINT1;
+        wb_poke32(SR_ADDR(SET0_BASE, eth_base + 8 + 4), forward);
     }
 }
 
@@ -419,7 +429,7 @@ int main(void)
         static const uint32_t tick_delta = CPU_CLOCK/1000;
         if (ticks_passed > tick_delta)
         {
-            handle_router(); //deal with router table update
+            handle_link_state(); //deal with router table update
             handle_claim(); //deal with the host claim register
             update_leds(); //run the link and activity leds
             garp(); //send periodic garps

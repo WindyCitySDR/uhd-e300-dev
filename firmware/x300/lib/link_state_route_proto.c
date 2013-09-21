@@ -11,7 +11,7 @@
 /***********************************************************************
  * global constants
  **********************************************************************/
-#define LS_PROTO_VERSION 5
+#define LS_PROTO_VERSION 6
 
 //shift the proto version into the ID so only matching fw responds
 #define LS_ID_DISCOVER  (0 | (8 << LS_PROTO_VERSION))
@@ -27,7 +27,8 @@
  **********************************************************************/
 typedef struct
 {
-    uint32_t num_nbors;
+    uint32_t num_nbors; //number of entries in neighbors list
+    uint32_t num_ports; //first few neighbors are local ports
     struct ip_addr node;
     struct ip_addr nbors[];
 } ls_data_t;
@@ -168,9 +169,17 @@ static void update_node_mappings(const ls_data_t *ls_data)
     //remove any matches for the current node
     remove_node_matches(&ls_data->node);
 
+    //is this a local packet?
+    bool is_local = false;
+    for (size_t e = 0; e < ethernet_ninterfaces(); e++)
+    {
+        if (ls_data->node.addr == u3_net_stack_get_ip_addr(e)->addr) is_local = true;
+    }
+
     //load entries from ls data into array
     for (size_t i = 0; i < ls_data->num_nbors; i++)
     {
+        if (is_local && i < ls_data->num_ports) continue; //ignore local ports
         add_node_mapping(&ls_data->node, &ls_data->nbors[i]);
     }
 }
@@ -181,7 +190,7 @@ static void update_node_mappings(const ls_data_t *ls_data)
 static void send_link_state_data_to_all_neighbors(
     const uint8_t ethno, const uint16_t seq, const ls_data_t *ls_data
 ){
-    //exit and dotn forward if the information is stale
+    //exit and dont forward if the information is stale
     if (!ls_node_entries_update(ls_nodes, lengthof(ls_nodes), ethno, seq, &ls_data->node)) return;
 
     //update the mappings with new info
@@ -190,6 +199,7 @@ static void send_link_state_data_to_all_neighbors(
     //forward to all neighbors
     for (size_t i = 0; i < lengthof(ls_nbors); i++)
     {
+        if (ls_nbors[i].ip_addr.addr == ls_data->node.addr) continue; //dont forward to sender
         if (ls_node_entry_valid(&ls_nbors[i]) && ls_nbors[i].ethno == ethno)
         {
             u3_net_stack_send_icmp_pkt(
@@ -228,14 +238,6 @@ static void handle_icmp_irq(
     const uint16_t id, const uint16_t seq,
     const void *buff, const size_t num_bytes
 ){
-    const ls_data_t *ls_data = (const ls_data_t *)buff;
-
-    //ignore packets that originated from this unit
-    for (size_t e = 0; e < ethernet_ninterfaces(); e++)
-    {
-        if (ls_data->node.addr == u3_net_stack_get_ip_addr(e)->addr) return;
-    }
-
     switch (id)
     {
     //replies to discovery packets
@@ -245,7 +247,7 @@ static void handle_icmp_irq(
 
     //handle and forward information
     case LS_ID_INFORM:
-        send_link_state_data_to_all_neighbors(ethno, seq, ls_data);
+        send_link_state_data_to_all_neighbors(ethno, seq, (const ls_data_t *)buff);
         break;
     };
 }
@@ -281,7 +283,17 @@ void link_state_route_proto_flood(const uint8_t ethno)
         ls_data_t *ls_data = (ls_data_t *)buff;
         ls_data->node.addr = u3_net_stack_get_ip_addr(e)->addr;
         ls_data->num_nbors = 0;
+        ls_data->num_ports = 0;
 
+        //first the local port links
+        for (size_t ej = 0; ej < ethernet_ninterfaces(); ej++)
+        {
+            if (e == ej) continue; //dont include our own port
+            ls_data->nbors[ls_data->num_nbors++].addr = u3_net_stack_get_ip_addr(ej)->addr;
+            ls_data->num_ports++;
+        }
+
+        //now list the neighbors
         for (size_t i = 0; i < lengthof(ls_nbors); i++)
         {
             if ((sizeof_ls_data(ls_data) + 4) >= LS_PAYLOAD_MTU) break;
@@ -294,4 +306,12 @@ void link_state_route_proto_flood(const uint8_t ethno)
         //send this data to all neighbors
         send_link_state_data_to_all_neighbors(ethno, current_seq++, ls_data);
     }
+}
+
+/***********************************************************************
+ * cycle detection logic
+ **********************************************************************/
+bool link_state_route_proto_causes_cycle(const struct ip_addr *src, const struct ip_addr *dst)
+{
+    return true;
 }

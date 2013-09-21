@@ -20,11 +20,8 @@ void link_state_route_proto_update(const uint8_t ethno);
 //! Flood the network with information about routes
 void link_state_route_proto_flood(const uint8_t ethno);
 
-/*!
- * Given a destination, tell us which neighbor to send to.
- * If the route cannot be determined, return NULL.
- */
-struct ip_addr *link_state_route_get_neighbor(const struct ip_addr *dst);
+//! Determine if the given link is the cause of a cycle (aka routing loop)
+bool link_state_route_proto_causes_cycle(const struct ip_addr *src, const struct ip_addr *dst);
 
 typedef struct
 {
