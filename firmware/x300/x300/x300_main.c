@@ -377,6 +377,18 @@ static void handle_uarts(void)
 /***********************************************************************
  * update the link state periodic update
  **********************************************************************/
+static void update_forwarding(const uint8_t e)
+{
+    //update forwarding rules
+    uint32_t forward = 0;
+    if (!link_state_route_proto_causes_cycle(u3_net_stack_get_ip_addr(e), u3_net_stack_get_ip_addr((e+1)%2)))
+    {
+        forward |= (1 << 0); //forward bcast
+        forward |= (1 << 1); //forward not mac dest
+    }
+    const uint32_t eth_base = (e == 0)? SR_ETHINT0 : SR_ETHINT1;
+    wb_poke32(SR_ADDR(SET0_BASE, eth_base + 8 + 4), forward);
+}
 static void handle_link_state(void)
 {
     //update shmem entries to keep it persistent
@@ -385,27 +397,22 @@ static void handle_link_state(void)
     shmem[X300_FW_SHMEM_ROUTE_MAP_LEN] = map_len;
 
     static size_t count = 0;
-    if (count++ < 1000) return; //1 second
+    if (count++ < 500) return; //1/2 second
     count = 0;
 
     static size_t which = 0;
     which++;
 
-    for (size_t e = 0; e < ethernet_ninterfaces(); e++)
-    {
-        if (!ethernet_get_link_up(e)) continue;
-        if (which % 2) link_state_route_proto_update(e);
-        else link_state_route_proto_flood(e);
+    static uint8_t ethno = 0;
+    if (ethno >= ethernet_ninterfaces()) ethno = 0;
+    if (!ethernet_get_link_up(ethno)) return;
 
-        //update forwarding rules
-        uint32_t forward = 0;
-        if (!link_state_route_proto_causes_cycle(u3_net_stack_get_ip_addr(e), u3_net_stack_get_ip_addr((e+1)%2)))
-        {
-            forward |= (1 << 0); //forward bcast
-            forward |= (1 << 1); //forward not mac dest
-        }
-        const uint32_t eth_base = (e == 0)? SR_ETHINT0 : SR_ETHINT1;
-        wb_poke32(SR_ADDR(SET0_BASE, eth_base + 8 + 4), forward);
+    switch(which % 4)
+    {
+    case 0: link_state_route_proto_update(ethno); break;
+    case 1: link_state_route_proto_flood(ethno); break;
+    case 2: update_forwarding(ethno); break;
+    case 3: ethno++; break;
     }
 }
 

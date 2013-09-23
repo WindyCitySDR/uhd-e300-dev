@@ -311,7 +311,60 @@ void link_state_route_proto_flood(const uint8_t ethno)
 /***********************************************************************
  * cycle detection logic
  **********************************************************************/
+static void follow_links(const size_t current, struct ip_addr *nodes, bool *visited, const size_t num_nodes)
+{
+    if (visited[current]) return; //end the recursion
+    visited[current] = true;
+
+    //follow all links where current node is the source
+    for (size_t i = 0; i < lengthof(ls_node_maps); i++)
+    {
+        if (ls_node_maps[i].node.addr != nodes[current].addr) continue;
+
+        //find the index of the neighbor in the node list to recurse
+        for (size_t j = 0; j < num_nodes; j++)
+        {
+            if (nodes[j].addr != ls_node_maps[i].nbor.addr) continue;
+            follow_links(j, nodes, visited, num_nodes);
+        }
+    }
+}
+
 bool link_state_route_proto_causes_cycle(const struct ip_addr *src, const struct ip_addr *dst)
 {
-    return true;
+    //make a set of all nodes
+    size_t num_nodes = 0;
+    struct ip_addr nodes[LS_NUM_MAP_ENTRIES];
+    for (size_t i = 0; i < lengthof(ls_node_maps); i++)
+    {
+        if (ls_node_maps[i].node.addr == 0 || ls_node_maps[i].nbor.addr) continue;
+        const struct ip_addr *node = &ls_node_maps[i].node;
+
+        //check if we have an entry
+        for (size_t j = 0; j < num_nodes; j++)
+        {
+            if (nodes[j].addr == node->addr) continue;
+        }
+
+        //otherwise, we add the node
+        nodes[num_nodes++].addr = node->addr;
+    }
+
+    //and stateful tracking info for each node
+    bool visited[LS_NUM_MAP_ENTRIES];
+    for (size_t i = 0; i < lengthof(visited); i++) visited[i] = false;
+
+    //find our src node in the set and follow
+    for (size_t i = 0; i < lengthof(nodes); i++)
+    {
+        if (nodes[i].addr == src->addr) follow_links(i, nodes, visited, num_nodes);
+    }
+
+    //did we visit the destination? if so, there is a cycle
+    for (size_t i = 0; i < lengthof(nodes); i++)
+    {
+        if (nodes[i].addr == dst->addr && visited[i]) return true;
+    }
+
+    return false;
 }
