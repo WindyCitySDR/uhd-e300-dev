@@ -24,7 +24,7 @@
 #define LS_NUM_NODE_ENTRIES 64
 #define LS_NUM_MAP_ENTRIES 128
 
-#define LS_SEQ_EXPIRED_MAX 10
+#define LS_SEQ_EXPIRED_MAX 30
 
 /***********************************************************************
  * wire format for table communication
@@ -357,6 +357,7 @@ bool link_state_route_proto_causes_cycle(const struct ip_addr *src, const struct
     for (size_t i = 0; i < lengthof(ls_node_maps); i++)
     {
         if (ls_node_maps[i].node.addr == 0 || ls_node_maps[i].nbor.addr == 0) continue;
+        printf("  Link %s -> %s\n", ip_addr_to_str(&ls_node_maps[i].node), ip_addr_to_str(&ls_node_maps[i].nbor));
         const struct ip_addr *node = &ls_node_maps[i].node;
 
         //check if we have an entry
@@ -367,7 +368,7 @@ bool link_state_route_proto_causes_cycle(const struct ip_addr *src, const struct
 
         //otherwise, we add the node
         nodes[num_nodes++].addr = node->addr;
-        printf("  Add to node set: %s\n", ip_addr_to_str(node));
+        //printf("  Add to node set: %s\n", ip_addr_to_str(node));
         skip_add: continue;
     }
 
