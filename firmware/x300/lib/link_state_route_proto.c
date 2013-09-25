@@ -108,7 +108,7 @@ static bool ls_node_entries_update(
             return true;
         }
 
-        if (entries[i].ip_addr.addr == ip_addr->addr/* && entries[i].ethno == ethno*/)
+        if (entries[i].ip_addr.addr == ip_addr->addr && entries[i].ethno == ethno)
         {
             if (is_seq_newer(seq, entries[i].seq))
             {
@@ -225,10 +225,10 @@ static void send_link_state_data_to_all_neighbors(
     for (size_t i = 0; i < lengthof(ls_nbors); i++)
     {
         if (ls_nbors[i].ip_addr.addr == ls_data->node.addr) continue; //dont forward to sender
-        if (ls_node_entry_valid(&ls_nbors[i]) && ls_nbors[i].ethno == ethno)
+        if (ls_node_entry_valid(&ls_nbors[i]))
         {
-            u3_net_stack_send_icmp_pkt(
-                ethno, ICMP_IRQ, 0,
+            if (ethernet_get_link_up(ls_nbors[i].ethno)) u3_net_stack_send_icmp_pkt(
+                ls_nbors[i].ethno, ICMP_IRQ, 0,
                 LS_ID_INFORM, seq,
                 &(ls_nbors[i].ip_addr), ls_data, sizeof_ls_data(ls_data)
             );
