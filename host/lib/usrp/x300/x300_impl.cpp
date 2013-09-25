@@ -946,6 +946,7 @@ void x300_impl::update_clock_source(mboard_members_t &mb, const std::string &sou
     else if (source == "external") mb.clock_control_regs__clock_source = 0x0;
     else if (source == "gpsdo") mb.clock_control_regs__clock_source = 0x3;
     else throw uhd::key_error("update_clock_source: unknown source: " + source);
+    mb.clock_control_regs__tcxo_enb = (source == "internal")? 1 : 0;
     this->update_clock_control(mb);
 }
 
