@@ -382,7 +382,7 @@ static void update_forwarding(const uint8_t e)
 {
     //update forwarding rules
     uint32_t forward = 0;
-    if (!link_state_route_proto_causes_cycle(u3_net_stack_get_ip_addr(e), u3_net_stack_get_ip_addr((e+1)%2)))
+    if (!link_state_route_proto_causes_cycle_cached(e, (e+1)%2))
     {
         forward |= (1 << 0); //forward bcast
         forward |= (1 << 1); //forward not mac dest
@@ -398,23 +398,27 @@ static void handle_link_state(void)
     shmem[X300_FW_SHMEM_ROUTE_MAP_ADDR] = (uint32_t)link_state_route_get_node_mapping(&map_len);
     shmem[X300_FW_SHMEM_ROUTE_MAP_LEN] = map_len;
 
+    //update forwarding for all eths
+    //low overhead: this does not run the algorithm
+    for (uint8_t e = 0; e < ethernet_ninterfaces(); e++) update_forwarding(e);
+
     static size_t count = 0;
-    if (count++ < 500) return; //1/2 second
+    if (count++ < 1000) return; //1 seconds
     count = 0;
 
-    static size_t which = 0;
-    which++;
-
-    static uint8_t ethno = 0;
-    if (ethno >= ethernet_ninterfaces()) ethno = 0;
-    if (!ethernet_get_link_up(ethno)) return;
-
-    switch(which % 4)
+    link_state_route_proto_tick();
+    for (size_t e = 0; e < ethernet_ninterfaces(); e++)
     {
-    case 0: link_state_route_proto_update(ethno); break;
-    case 1: link_state_route_proto_flood(ethno); break;
-    case 2: update_forwarding(ethno); break;
-    case 3: ethno++; break;
+        if (ethernet_get_link_up(e))
+        {
+            link_state_route_proto_update(e);
+            link_state_route_proto_flood(e);
+        }
+        link_state_route_proto_update_cycle_cache(e);
+        printf("is there a cycle %s -> %s? %s\n",
+            ip_addr_to_str(u3_net_stack_get_ip_addr(e)),
+            ip_addr_to_str(u3_net_stack_get_ip_addr((e+1)%2)),
+            link_state_route_proto_causes_cycle_cached(e, (e+1)%2)? "YES" : "no");
     }
 }
 

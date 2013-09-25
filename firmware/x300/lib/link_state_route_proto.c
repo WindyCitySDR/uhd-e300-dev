@@ -24,7 +24,7 @@
 #define LS_NUM_NODE_ENTRIES 64
 #define LS_NUM_MAP_ENTRIES 128
 
-#define LS_SEQ_EXPIRED_MAX 10
+#define NETHS 4 //max eths supported in this file
 
 /***********************************************************************
  * wire format for table communication
@@ -47,21 +47,27 @@ static inline size_t sizeof_ls_data(const ls_data_t *ls_data)
 }
 
 /***********************************************************************
- * sequence monitor
+ * sequence and tick counter monitor
  **********************************************************************/
-static uint16_t current_seq = 0;
+static uint16_t ticker = 0;
 
-static inline bool is_seq_expired(const uint16_t seq)
+void link_state_route_proto_tick(void)
 {
-    const uint16_t delta = current_seq - seq;
-    return delta > LS_SEQ_EXPIRED_MAX; //have not talked in a while, you are deaf to me
+    ticker++;
 }
+
+static inline bool is_tick_expired(const uint16_t tick)
+{
+    const uint16_t delta = ticker - tick;
+    return delta > 3; //have not talked in a while, you are deaf to me
+}
+
+static uint16_t current_seq = 0;
 
 static inline bool is_seq_newer(const uint16_t seq, const uint16_t entry_seq)
 {
-    const uint16_t reply_delta = current_seq - seq;
-    const uint16_t entry_delta = current_seq - entry_seq;
-    return entry_delta > reply_delta;
+    const uint16_t delta = seq - entry_seq;
+    return (delta & (1 << 15)) == 0;
 }
 
 /***********************************************************************
@@ -69,21 +75,21 @@ static inline bool is_seq_newer(const uint16_t seq, const uint16_t entry_seq)
  **********************************************************************/
 typedef struct
 {
-    uint16_t src_seq;
-    uint16_t dst_seq;
+    uint16_t seq;
+    uint16_t tick;
     uint8_t ethno;
     struct ip_addr ip_addr;
 } ls_node_entry_t;
 
 static bool ls_node_entry_valid(const ls_node_entry_t *entry)
 {
-    return entry->ip_addr.addr != 0 && !is_seq_expired(entry->dst_seq);
+    return entry->ip_addr.addr != 0 && !is_tick_expired(entry->tick);
 }
 
 static void ls_node_entry_update(ls_node_entry_t *entry, const int8_t ethno, const uint16_t seq, const struct ip_addr *ip_addr)
 {
-    entry->src_seq = seq;
-    entry->dst_seq = current_seq;
+    entry->seq = seq;
+    entry->tick = ticker;
     entry->ethno = ethno;
     entry->ip_addr.addr = ip_addr->addr;
 }
@@ -103,7 +109,7 @@ static bool ls_node_entries_update(
 
         if (entries[i].ip_addr.addr == ip_addr->addr/* && entries[i].ethno == ethno*/)
         {
-            if (is_seq_newer(seq, entries[i].src_seq))
+            if (is_seq_newer(seq, entries[i].seq))
             {
                 ls_node_entry_update(entries+i, ethno, seq, ip_addr);
                 return true;
@@ -178,7 +184,7 @@ static void update_node_mappings(const ls_data_t *ls_data)
     //remove any expired entries
     for (size_t i = 0; i < lengthof(ls_nodes); i++)
     {
-        if (ls_nodes[i].ip_addr.addr != 0 && is_seq_expired(ls_nodes[i].dst_seq))
+        if (ls_nodes[i].ip_addr.addr != 0 && is_tick_expired(ls_nodes[i].tick))
         {
             remove_node_matches(&ls_nodes[i].ip_addr);
         }
@@ -227,6 +233,9 @@ static void send_link_state_data_to_all_neighbors(
             );
         }
     }
+
+    //a change may have occured, update the cache
+    link_state_route_proto_update_cycle_cache(ethno);
 }
 
 /***********************************************************************
@@ -243,7 +252,7 @@ static void handle_icmp_ir(
     //received a reply directly from the neighbor, add to neighbor list
     case LS_ID_DISCOVER:
         //printf("GOT LS_ID_DISCOVER REPLY - ID 0x%x - IP%u: %s\n", id, (int)ethno, ip_addr_to_str(u3_net_stack_get_ip_addr(ethno)));
-        ls_node_entries_update(ls_nbors, lengthof(ls_nbors), ethno, seq, src);
+        if (ls_node_entries_update(ls_nbors, lengthof(ls_nbors), ethno, seq, src)) link_state_route_proto_flood(ethno);
         break;
     }
 }
@@ -272,15 +281,6 @@ static void handle_icmp_irq(
         send_link_state_data_to_all_neighbors(ethno, seq, (const ls_data_t *)buff);
         break;
     };
-}
-
-/***********************************************************************
- * init and registration code
- **********************************************************************/
-void link_state_route_proto_init(void)
-{
-    u3_net_stack_register_icmp_handler(ICMP_IRQ, 0, &handle_icmp_irq);
-    u3_net_stack_register_icmp_handler(ICMP_IR, 0, &handle_icmp_ir);
 }
 
 /***********************************************************************
@@ -355,7 +355,7 @@ static void follow_links(const size_t current, struct ip_addr *nodes, bool *visi
 
 bool link_state_route_proto_causes_cycle(const struct ip_addr *src, const struct ip_addr *dst)
 {
-    printf("is there a cycle? %s -> %s: \n", ip_addr_to_str(src), ip_addr_to_str(dst));
+    //printf("is there a cycle? %s -> %s: \n", ip_addr_to_str(src), ip_addr_to_str(dst));
 
     //make a set of all nodes
     size_t num_nodes = 0;
@@ -363,7 +363,7 @@ bool link_state_route_proto_causes_cycle(const struct ip_addr *src, const struct
     for (size_t i = 0; i < lengthof(ls_node_maps); i++)
     {
         if (ls_node_maps[i].node.addr == 0 || ls_node_maps[i].nbor.addr == 0) continue;
-        printf("  Link %s -> %s\n", ip_addr_to_str(&ls_node_maps[i].node), ip_addr_to_str(&ls_node_maps[i].nbor));
+        //printf("  Link %s -> %s\n", ip_addr_to_str(&ls_node_maps[i].node), ip_addr_to_str(&ls_node_maps[i].nbor));
         const struct ip_addr *node = &ls_node_maps[i].node;
 
         //check if we have an entry
@@ -393,11 +393,48 @@ bool link_state_route_proto_causes_cycle(const struct ip_addr *src, const struct
     {
         if (nodes[i].addr == dst->addr && visited[i])
         {
-            printf("CAUSES CYCLE!\n");
+            //printf("CAUSES CYCLE!\n");
             return true;
         }
     }
 
-    printf("no cycle found.\n");
+    //printf("no cycle found.\n");
     return false;
+}
+
+static bool ls_causes_cycle[NETHS][NETHS];
+
+void link_state_route_proto_update_cycle_cache(const uint8_t eth_src)
+{
+    for (size_t eth_dst = 0; eth_dst < ethernet_ninterfaces(); eth_dst++)
+    {
+        if (eth_src == eth_dst) continue;
+        ls_causes_cycle[eth_src][eth_dst] = link_state_route_proto_causes_cycle(
+            u3_net_stack_get_ip_addr(eth_src),
+            u3_net_stack_get_ip_addr(eth_dst)
+        );
+    }
+}
+
+bool link_state_route_proto_causes_cycle_cached(const uint8_t eth_src, const uint8_t eth_dst)
+{
+    return ls_causes_cycle[eth_src][eth_dst];
+}
+
+/***********************************************************************
+ * init and registration code
+ **********************************************************************/
+void link_state_route_proto_init(void)
+{
+    u3_net_stack_register_icmp_handler(ICMP_IRQ, 0, &handle_icmp_irq);
+    u3_net_stack_register_icmp_handler(ICMP_IR, 0, &handle_icmp_ir);
+
+    //default to causing a cycle, let the algorithm set this correctly
+    for (size_t i = 0; i < NETHS; i++)
+    {
+        for (size_t j = 0; j < NETHS; j++)
+        {
+            ls_causes_cycle[i][j] = true;
+        }
+    }
 }
