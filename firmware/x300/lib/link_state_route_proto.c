@@ -373,16 +373,16 @@ bool link_state_route_proto_causes_cycle(const struct ip_addr *src, const struct
 
     //and stateful tracking info for each node
     bool visited[LS_NUM_MAP_ENTRIES];
-    for (size_t i = 0; i < lengthof(visited); i++) visited[i] = false;
+    for (size_t i = 0; i < num_nodes; i++) visited[i] = false;
 
     //find our src node in the set and follow
-    for (size_t i = 0; i < lengthof(nodes); i++)
+    for (size_t i = 0; i < num_nodes; i++)
     {
         if (nodes[i].addr == src->addr) follow_links(i, nodes, visited, num_nodes);
     }
 
     //did we visit the destination? if so, there is a cycle
-    for (size_t i = 0; i < lengthof(nodes); i++)
+    for (size_t i = 0; i < num_nodes; i++)
     {
         if (nodes[i].addr == dst->addr && visited[i])
         {
