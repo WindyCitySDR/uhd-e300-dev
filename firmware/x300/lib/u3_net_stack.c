@@ -1,5 +1,5 @@
 
-// Copyright 2012 Ettus Research LLC
+// Copyright 2012-2013 Ettus Research LLC
 
 #include <u3_net_stack.h>
 #include <string.h> //memcmp
@@ -28,6 +28,25 @@ typedef struct
 } padded_udp_t;
 
 /***********************************************************************
+ * declares for internal handlers
+ **********************************************************************/
+static void handle_icmp_echo_packet(
+    const uint8_t ethno,
+    const struct ip_addr *src, const struct ip_addr *dst,
+    const uint16_t id, const uint16_t seq,
+    const void *buff, const size_t num_bytes
+){
+    u3_net_stack_send_icmp_pkt(ethno, ICMP_ER, 0, id, seq, src, buff, num_bytes);
+}
+
+static void handle_icmp_dur_packet(
+    const uint8_t ethno,
+    const struct ip_addr *src, const struct ip_addr *dst,
+    const uint16_t id, const uint16_t seq,
+    const void *buff, const size_t num_bytes
+);
+
+/***********************************************************************
  * 16-bit one's complement sum
  **********************************************************************/
 static uint32_t chksum_buffer(
@@ -51,20 +70,23 @@ static size_t arp_cache_wr_index;
 
 static struct ip_addr arp_cache_ips[ARP_CACHE_NENTRIES];
 static eth_mac_addr_t arp_cache_macs[ARP_CACHE_NENTRIES];
+static uint8_t arp_cache_eths[ARP_CACHE_NENTRIES];
 
-void u3_net_stack_arp_cache_update(const struct ip_addr *ip_addr, const eth_mac_addr_t *mac_addr)
+void u3_net_stack_arp_cache_update(const struct ip_addr *ip_addr, const eth_mac_addr_t *mac_addr, const uint8_t ethno)
 {
     for (size_t i = 0; i < ARP_CACHE_NENTRIES; i++)
     {
         if (memcmp(ip_addr, arp_cache_ips+i, sizeof(struct ip_addr)) == 0)
         {
             memcpy(arp_cache_macs+i, mac_addr, sizeof(eth_mac_addr_t));
+            arp_cache_eths[i] = ethno;
             return;
         }
     }
     if (arp_cache_wr_index >= ARP_CACHE_NENTRIES) arp_cache_wr_index = 0;
     memcpy(arp_cache_ips+arp_cache_wr_index, ip_addr, sizeof(struct ip_addr));
     memcpy(arp_cache_macs+arp_cache_wr_index, mac_addr, sizeof(eth_mac_addr_t));
+    arp_cache_eths[arp_cache_wr_index] = ethno;
     arp_cache_wr_index++;
 }
 
@@ -89,6 +111,24 @@ const eth_mac_addr_t *u3_net_stack_arp_cache_lookup(const struct ip_addr *ip_add
     return NULL;
 }
 
+bool resolve_ip(const struct ip_addr *ip_addr, eth_mac_addr_t *mac_addr)
+{
+    for (size_t e = 0; e < MAX_NETHS; e++)
+    {
+        if (memcmp(u3_net_stack_get_bcast(e), ip_addr, sizeof(struct ip_addr)) == 0)
+        {
+            memset(mac_addr, 0xff, sizeof(eth_mac_addr_t));
+            return true;
+        }
+    }
+    const eth_mac_addr_t *r = u3_net_stack_arp_cache_lookup(ip_addr);
+    if (r != NULL)
+    {
+        memcpy(mac_addr, r, sizeof(eth_mac_addr_t));
+        return true;
+    }
+    return false;
+}
 
 /***********************************************************************
  * Net stack config
@@ -98,11 +138,14 @@ static wb_pkt_iface64_config_t *pkt_iface_config = NULL;
 void u3_net_stack_init(wb_pkt_iface64_config_t *config)
 {
     pkt_iface_config = config;
+    u3_net_stack_register_icmp_handler(ICMP_ECHO, 0, &handle_icmp_echo_packet);
+    u3_net_stack_register_icmp_handler(ICMP_DUR, ICMP_DUR_PORT, &handle_icmp_dur_packet);
 }
 
 static struct ip_addr net_conf_ips[MAX_NETHS];
 static eth_mac_addr_t net_conf_macs[MAX_NETHS];
-static eth_mac_addr_t net_conf_subnets[MAX_NETHS];
+static struct ip_addr net_conf_subnets[MAX_NETHS];
+static struct ip_addr net_conf_bcasts[MAX_NETHS];
 static uint32_t net_stat_counts[MAX_NETHS];
 
 void u3_net_stack_init_eth(
@@ -121,6 +164,19 @@ void u3_net_stack_init_eth(
 const struct ip_addr *u3_net_stack_get_ip_addr(const uint8_t ethno)
 {
     return &net_conf_ips[ethno];
+}
+
+const struct ip_addr *u3_net_stack_get_subnet(const uint8_t ethno)
+{
+    return &net_conf_subnets[ethno];
+}
+
+const struct ip_addr *u3_net_stack_get_bcast(const uint8_t ethno)
+{
+    const uint32_t ip = u3_net_stack_get_ip_addr(ethno)->addr;
+    const uint32_t subnet = u3_net_stack_get_subnet(ethno)->addr;
+    net_conf_bcasts[ethno].addr = ip | (~subnet);
+    return &net_conf_bcasts[ethno];
 }
 
 const eth_mac_addr_t *u3_net_stack_get_mac_addr(const uint8_t ethno)
@@ -232,6 +288,7 @@ static void handle_arp_packet(const uint8_t ethno, const struct arp_eth_ipv4 *p)
       || p->ar_pln != sizeof(struct ip_addr))
     return;
 
+    //got an arp reply -- injest it into the arp cache
     if (p->ar_op == ARPOP_REPLY)
     {
         //printf("ARPOP_REPLY\n");
@@ -239,9 +296,10 @@ static void handle_arp_packet(const uint8_t ethno, const struct arp_eth_ipv4 *p)
         memcpy(&ip_addr, p->ar_sip, sizeof(ip_addr));
         eth_mac_addr_t mac_addr;
         memcpy(&mac_addr, p->ar_sha, sizeof(mac_addr));
-        u3_net_stack_arp_cache_update(&ip_addr, &mac_addr);
+        u3_net_stack_arp_cache_update(&ip_addr, &mac_addr, ethno);
     }
 
+    //got an arp request -- reply if its for our address
     if (p->ar_op == ARPOP_REQUEST)
     {
         //printf("ARPOP_REQUEST\n");
@@ -276,7 +334,6 @@ void u3_net_stack_register_udp_handler(
 
 void u3_net_stack_send_udp_pkt(
     const uint8_t ethno,
-    const struct ip_addr *src,
     const struct ip_addr *dst,
     const uint16_t src_port,
     const uint16_t dst_port,
@@ -284,40 +341,40 @@ void u3_net_stack_send_udp_pkt(
     const size_t num_bytes
 )
 {
-    const eth_mac_addr_t *dst_mac_addr = u3_net_stack_arp_cache_lookup(dst);
-    if (dst_mac_addr == NULL)
+    eth_mac_addr_t dst_mac_addr;
+    if (!resolve_ip(dst, &dst_mac_addr))
     {
         printf("u3_net_stack_send_udp_pkt arp_cache_lookup fail\n");
         return;
     }
 
-    padded_udp_t reply;
+    padded_udp_t pkt;
 
-    reply.eth.ethno = ethno;
-    memcpy(&reply.eth.dst, dst_mac_addr,                     sizeof(eth_mac_addr_t));
-    memcpy(&reply.eth.src, u3_net_stack_get_mac_addr(ethno), sizeof(eth_mac_addr_t));
-    reply.eth.ethertype = ETHERTYPE_IPV4;
+    pkt.eth.ethno = ethno;
+    memcpy(&pkt.eth.dst, &dst_mac_addr,                    sizeof(eth_mac_addr_t));
+    memcpy(&pkt.eth.src, u3_net_stack_get_mac_addr(ethno), sizeof(eth_mac_addr_t));
+    pkt.eth.ethertype = ETHERTYPE_IPV4;
 
-    IPH_VHLTOS_SET(&reply.ip, 4, 5, 0);
-    IPH_LEN_SET(&reply.ip, IP_HLEN + UDP_HLEN + num_bytes);
-    IPH_ID_SET(&reply.ip, 0);
-    IPH_OFFSET_SET(&reply.ip, IP_DF);	/* don't fragment */
-    IPH_TTL_SET(&reply.ip, 32);
-    IPH_PROTO_SET(&reply.ip, IP_PROTO_UDP);
-    IPH_CHKSUM_SET(&reply.ip, 0);
-    memcpy(&reply.ip.src, src, sizeof(struct ip_addr));
-    memcpy(&reply.ip.dest, dst, sizeof(struct ip_addr));
+    IPH_VHLTOS_SET(&pkt.ip, 4, 5, 0);
+    IPH_LEN_SET(&pkt.ip, IP_HLEN + UDP_HLEN + num_bytes);
+    IPH_ID_SET(&pkt.ip, 0);
+    IPH_OFFSET_SET(&pkt.ip, IP_DF);	/* don't fragment */
+    IPH_TTL_SET(&pkt.ip, 32);
+    IPH_PROTO_SET(&pkt.ip, IP_PROTO_UDP);
+    IPH_CHKSUM_SET(&pkt.ip, 0);
+    memcpy(&pkt.ip.src, u3_net_stack_get_ip_addr(ethno), sizeof(struct ip_addr));
+    memcpy(&pkt.ip.dest, dst, sizeof(struct ip_addr));
 
-    IPH_CHKSUM_SET(&reply.ip, ~chksum_buffer(
-        (unsigned short *) &reply.ip, sizeof(reply.ip)/sizeof(short), 0
+    IPH_CHKSUM_SET(&pkt.ip, ~chksum_buffer(
+        (unsigned short *) &pkt.ip, sizeof(pkt.ip)/sizeof(short), 0
     ));
 
-    reply.udp.src = src_port;
-    reply.udp.dest = dst_port;
-    reply.udp.len = UDP_HLEN + num_bytes;
-    reply.udp.chksum = 0;
+    pkt.udp.src = src_port;
+    pkt.udp.dest = dst_port;
+    pkt.udp.len = UDP_HLEN + num_bytes;
+    pkt.udp.chksum = 0;
 
-    send_eth_pkt(&reply, sizeof(reply), buff, num_bytes, NULL, 0);
+    send_eth_pkt(&pkt, sizeof(pkt), buff, num_bytes, NULL, 0);
 }
 
 static void handle_udp_packet(
@@ -346,6 +403,28 @@ static void handle_udp_packet(
 /***********************************************************************
  * ICMP handlers
  **********************************************************************/
+#define ICMP_NHANDLERS 8
+
+static uint8_t icmp_handler_types[ICMP_NHANDLERS];
+static uint8_t icmp_handler_codes[ICMP_NHANDLERS];
+static u3_net_stack_icmp_handler_t icmp_handlers[ICMP_NHANDLERS];
+static size_t icmp_handlers_index = 0;
+
+void u3_net_stack_register_icmp_handler(
+    const uint8_t type,
+    const uint8_t code,
+    const u3_net_stack_icmp_handler_t handler
+)
+{
+    if (icmp_handlers_index < ICMP_NHANDLERS)
+    {
+        icmp_handler_types[icmp_handlers_index] = type;
+        icmp_handler_codes[icmp_handlers_index] = code;
+        icmp_handlers[icmp_handlers_index] = handler;
+        icmp_handlers_index++;
+    }
+}
+
 static void handle_icmp_packet(
     const uint8_t ethno,
     const struct ip_addr *src,
@@ -353,74 +432,98 @@ static void handle_icmp_packet(
     const struct icmp_echo_hdr *icmp,
     const size_t num_bytes
 ){
-    //printf("handle_icmp_packet\n");
-    if (icmp->type == ICMP_ECHO)
-    {
-        const void *icmp_data_buff = ((uint8_t*)icmp) + sizeof(struct icmp_echo_hdr);
-        const size_t icmp_data_len = num_bytes - sizeof(struct icmp_echo_hdr);
 
-        const eth_mac_addr_t *dst_mac_addr = u3_net_stack_arp_cache_lookup(src);
-        if (dst_mac_addr == NULL)
+    for (size_t i = 0; i < icmp_handlers_index; i++)
+    {
+        if (icmp_handler_types[i] == icmp->type && icmp_handler_codes[i] == icmp->code)
         {
-            printf("handle_icmp_packet arp_cache_lookup fail\n");
+            icmp_handlers[i](
+                ethno, src, u3_net_stack_get_ip_addr(ethno), icmp->id, icmp->seqno,
+                ((const uint8_t *)icmp) + sizeof(struct icmp_echo_hdr),
+                num_bytes - sizeof(struct icmp_echo_hdr)
+            );
             return;
         }
-
-        padded_icmp_t reply;
-
-        reply.eth.ethno = ethno;
-        memcpy(&reply.eth.dst, dst_mac_addr,                     sizeof(eth_mac_addr_t));
-        memcpy(&reply.eth.src, u3_net_stack_get_mac_addr(ethno), sizeof(eth_mac_addr_t));
-        reply.eth.ethertype = ETHERTYPE_IPV4;
-
-        IPH_VHLTOS_SET(&reply.ip, 4, 5, 0);
-        IPH_LEN_SET(&reply.ip, IP_HLEN + sizeof(reply.icmp) + icmp_data_len);
-        IPH_ID_SET(&reply.ip, 0);
-        IPH_OFFSET_SET(&reply.ip, IP_DF);	/* don't fragment */
-        IPH_TTL_SET(&reply.ip, 32);
-        IPH_PROTO_SET(&reply.ip, IP_PROTO_ICMP);
-        IPH_CHKSUM_SET(&reply.ip, 0);
-        memcpy(&reply.ip.src, u3_net_stack_get_ip_addr(ethno), sizeof(struct ip_addr));
-        memcpy(&reply.ip.dest, src, sizeof(struct ip_addr));
-
-        IPH_CHKSUM_SET(&reply.ip, ~chksum_buffer(
-            (unsigned short *) &reply.ip, sizeof(reply.ip)/sizeof(short), 0
-        ));
-
-        reply.icmp.type = 0;
-        reply.icmp.code = 0;
-        reply.icmp.chksum = 0;
-        reply.icmp.id = icmp->id;
-        reply.icmp.seqno = icmp->seqno;
-        reply.icmp.chksum = ~chksum_buffer( //data checksum
-            (unsigned short *)icmp_data_buff,
-            icmp_data_len/sizeof(short),
-            chksum_buffer(                  //header checksum
-                (unsigned short *)&reply.icmp,
-                sizeof(reply.icmp)/sizeof(short),
-            0)
-        );
-
-        send_eth_pkt(&reply, sizeof(reply), icmp_data_buff, icmp_data_len, NULL, 0);
     }
+    printf("Unhandled ICMP packet type=%u\n", icmp->type);
+}
 
-    if (icmp->type == ICMP_DUR && icmp->code == ICMP_DUR_PORT)
+static void handle_icmp_dur_packet(
+    const uint8_t ethno,
+    const struct ip_addr *src, const struct ip_addr *dst,
+    const uint16_t id, const uint16_t seq,
+    const void *buff, const size_t num_bytes
+){
+    struct ip_hdr *ip = (struct ip_hdr *)buff;
+    struct udp_hdr *udp = (struct udp_hdr *)(((char *)ip) + IP_HLEN);
+    if (IPH_PROTO(ip) != IP_PROTO_UDP) return;
+    for (size_t i = 0; i < udp_handlers_index; i++)
     {
-        struct ip_hdr *ip = (struct ip_hdr *)(((uint8_t*)icmp) + sizeof(struct icmp_echo_hdr));
-        struct udp_hdr *udp = (struct udp_hdr *)(((char *)ip) + IP_HLEN);
-        if (IPH_PROTO(ip) != IP_PROTO_UDP) return;
-        for (size_t i = 0; i < udp_handlers_index; i++)
+        if (udp_handler_ports[i] == udp->src)
         {
-            if (udp_handler_ports[i] == udp->src)
-            {
-                udp_handlers[i](ethno,
-                    src, u3_net_stack_get_ip_addr(ethno),
-                    udp->src, udp->dest, NULL, 0
-                );
-                return;
-            }
+            udp_handlers[i](ethno,
+                src, u3_net_stack_get_ip_addr(ethno),
+                udp->src, udp->dest, NULL, 0
+            );
+            return;
         }
     }
+}
+
+void u3_net_stack_send_icmp_pkt(
+    const uint8_t ethno,
+    const uint8_t type,
+    const uint8_t code,
+    const uint16_t id,
+    const uint16_t seq,
+    const struct ip_addr *dst,
+    const void *buff,
+    const size_t num_bytes
+)
+{
+    eth_mac_addr_t dst_mac_addr;
+    if (!resolve_ip(dst, &dst_mac_addr))
+    {
+        printf("u3_net_stack_send_echo_request arp_cache_lookup fail\n");
+        return;
+    }
+
+    padded_icmp_t pkt;
+
+    pkt.eth.ethno = ethno;
+    memcpy(&pkt.eth.dst, &dst_mac_addr,                    sizeof(eth_mac_addr_t));
+    memcpy(&pkt.eth.src, u3_net_stack_get_mac_addr(ethno), sizeof(eth_mac_addr_t));
+    pkt.eth.ethertype = ETHERTYPE_IPV4;
+
+    IPH_VHLTOS_SET(&pkt.ip, 4, 5, 0);
+    IPH_LEN_SET(&pkt.ip, IP_HLEN + sizeof(pkt.icmp) + num_bytes);
+    IPH_ID_SET(&pkt.ip, 0);
+    IPH_OFFSET_SET(&pkt.ip, IP_DF);	/* don't fragment */
+    IPH_TTL_SET(&pkt.ip, 32);
+    IPH_PROTO_SET(&pkt.ip, IP_PROTO_ICMP);
+    IPH_CHKSUM_SET(&pkt.ip, 0);
+    memcpy(&pkt.ip.src, u3_net_stack_get_ip_addr(ethno), sizeof(struct ip_addr));
+    memcpy(&pkt.ip.dest, dst, sizeof(struct ip_addr));
+
+    IPH_CHKSUM_SET(&pkt.ip, ~chksum_buffer(
+        (unsigned short *) &pkt.ip, sizeof(pkt.ip)/sizeof(short), 0
+    ));
+
+    pkt.icmp.type = type;
+    pkt.icmp.code = code;
+    pkt.icmp.chksum = 0;
+    pkt.icmp.id = id;
+    pkt.icmp.seqno = seq;
+    pkt.icmp.chksum = ~chksum_buffer( //data checksum
+        (unsigned short *)buff,
+        num_bytes/sizeof(short),
+        chksum_buffer(                  //header checksum
+            (unsigned short *)&pkt.icmp,
+            sizeof(pkt.icmp)/sizeof(short),
+        0)
+    );
+
+    send_eth_pkt(&pkt, sizeof(pkt), buff, num_bytes, NULL, 0);
 }
 
 /***********************************************************************
@@ -447,7 +550,9 @@ static void handle_eth_packet(const void *buff, const size_t num_bytes)
         if (IPH_V(ip) != 4 || IPH_HL(ip) != 5) return;// ignore pkts w/ bad version or options
         if (IPH_OFFSET(ip) & (IP_MF | IP_OFFMASK)) return;// ignore fragmented packets
 
-        u3_net_stack_arp_cache_update(&ip->src, &eth_hdr->src);
+        //TODO -- only handle when the mac is bcast or IP is for us
+
+        u3_net_stack_arp_cache_update(&ip->src, &eth_hdr->src, eth_hdr->ethno);
 
         if (IPH_PROTO(ip) == IP_PROTO_UDP)
         {

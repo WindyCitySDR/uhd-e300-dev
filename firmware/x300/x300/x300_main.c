@@ -12,8 +12,10 @@
 #include <wb_uart.h>
 #include <udp_uart.h>
 #include <u3_net_stack.h>
+#include <link_state_route_proto.h>
 #include <printf.h>
 #include <string.h>
+#include <print_addrs.h>
 
 static uint32_t *shmem = (uint32_t *) X300_FW_SHMEM_BASE;
 
@@ -28,6 +30,7 @@ void program_udp_framer(
     const uint16_t src_port
 )
 {
+    const eth_mac_addr_t *dst_mac = u3_net_stack_arp_cache_lookup(dst_ip);
     const size_t ethbase = (ethno == 0)? SR_ETHINT0 : SR_ETHINT1;
     const size_t vdest = (sid >> 16) & 0xff;
     printf("handle_udp_prog_framer sid %u vdest %u\n", sid, vdest);
@@ -43,7 +46,6 @@ void program_udp_framer(
     wb_poke32(SR_ADDR(SET0_BASE, ethbase + ETH_FRAMER_SRC_UDP_PORT), src_port);
 
     //setup destination framer
-    const eth_mac_addr_t *dst_mac = u3_net_stack_arp_cache_lookup(dst_ip);
     wb_poke32(SR_ADDR(SET0_BASE, ethbase + ETH_FRAMER_DST_RAM_ADDR), vdest);
     wb_poke32(SR_ADDR(SET0_BASE, ethbase + ETH_FRAMER_DST_IP_ADDR), dst_ip->addr);
     wb_poke32(SR_ADDR(SET0_BASE, ethbase + ETH_FRAMER_DST_UDP_MAC),
@@ -112,7 +114,7 @@ void handle_udp_fw_comms(
     //send a reply if ack requested
     if (request->flags & X300_FW_COMMS_FLAGS_ACK)
     {
-        u3_net_stack_send_udp_pkt(ethno, dst, src, dst_port, src_port, &reply, sizeof(reply));
+        u3_net_stack_send_udp_pkt(ethno, src, dst_port, src_port, &reply, sizeof(reply));
     }
 }
 
@@ -174,7 +176,7 @@ void handle_udp_fpga_prog(
     //send a reply if ack requested
     if (request->flags & X300_FPGA_PROG_FLAGS_ACK)
     {
-        u3_net_stack_send_udp_pkt(ethno, dst, src, dst_port, src_port, &reply, sizeof(reply));
+        u3_net_stack_send_udp_pkt(ethno, src, dst_port, src_port, &reply, sizeof(reply));
     }
 }
 
@@ -336,6 +338,14 @@ static void garp(void)
  **********************************************************************/
 static void handle_uarts(void)
 {
+    //pool allocations - always update shmem with location
+    #define NUM_POOL_WORDS32 64
+    static uint32_t rxpool[NUM_POOL_WORDS32];
+    static uint32_t txpool[NUM_POOL_WORDS32];
+    shmem[X300_FW_SHMEM_UART_RX_ADDR] = (uint32_t)rxpool;
+    shmem[X300_FW_SHMEM_UART_TX_ADDR] = (uint32_t)txpool;
+    shmem[X300_FW_SHMEM_UART_WORDS32] = NUM_POOL_WORDS32;
+
     ////////////////////////////////////////////////////////////////////
     // RX UART - try to get a character and post it to the shmem buffer
     ////////////////////////////////////////////////////////////////////
@@ -343,12 +353,12 @@ static void handle_uarts(void)
     const int rxch = wb_uart_getc(UART0_BASE);
     if (rxch != -1)
     {
-        rxoffset = (rxoffset+1) % (X300_FW_SHMEM_UART_POOL_WORDS32*4);
+        rxoffset = (rxoffset+1) % (NUM_POOL_WORDS32*4);
         const int shift = ((rxoffset%4) * 8);
         static uint32_t rxword32 = 0;
         if (shift == 0) rxword32 = 0;
         rxword32 |= ((uint32_t) rxch) << ((rxoffset%4) * 8);
-        shmem[X300_FW_SHMEM_UART_RX_POOL+rxoffset/4] = rxword32;
+        rxpool[rxoffset/4] = rxword32;
         shmem[X300_FW_SHMEM_UART_RX_INDEX] = rxoffset;
     }
 
@@ -359,9 +369,58 @@ static void handle_uarts(void)
     if (txoffset != shmem[X300_FW_SHMEM_UART_TX_INDEX])
     {
         const int shift = ((txoffset%4) * 8);
-        const int txch = shmem[X300_FW_SHMEM_UART_TX_POOL+txoffset/4] >> shift;
+        const int txch = txpool[txoffset/4] >> shift;
         wb_uart_putc(UART0_BASE, txch);
-        txoffset = (txoffset+1) % (X300_FW_SHMEM_UART_POOL_WORDS32*4);
+        txoffset = (txoffset+1) % (NUM_POOL_WORDS32*4);
+    }
+}
+
+/***********************************************************************
+ * update the link state periodic update
+ **********************************************************************/
+static void update_forwarding(const uint8_t e)
+{
+    //update forwarding rules
+    uint32_t forward = 0;
+    if (!link_state_route_proto_causes_cycle_cached(e, (e+1)%2))
+    {
+        forward |= (1 << 0); //forward bcast
+        forward |= (1 << 1); //forward not mac dest
+    }
+    const uint32_t eth_base = (e == 0)? SR_ETHINT0 : SR_ETHINT1;
+    wb_poke32(SR_ADDR(SET0_BASE, eth_base + 8 + 4), forward);
+}
+
+static void handle_link_state(void)
+{
+    //update shmem entries to keep it persistent
+    size_t map_len = 0;
+    shmem[X300_FW_SHMEM_ROUTE_MAP_ADDR] = (uint32_t)link_state_route_get_node_mapping(&map_len);
+    shmem[X300_FW_SHMEM_ROUTE_MAP_LEN] = map_len;
+
+    //update forwarding for all eths
+    //low overhead: this does not run the algorithm
+    for (uint8_t e = 0; e < ethernet_ninterfaces(); e++) update_forwarding(e);
+
+    static size_t count = 0;
+    if (count++ < 2000) return; //2 seconds
+    count = 0;
+
+    link_state_route_proto_tick();
+    for (size_t e = 0; e < ethernet_ninterfaces(); e++)
+    {
+        if (ethernet_get_link_up(e))
+        {
+            link_state_route_proto_update(e);
+            link_state_route_proto_flood(e);
+        }
+        link_state_route_proto_update_cycle_cache(e);
+        /*
+        printf("is there a cycle %s -> %s? %s\n",
+            ip_addr_to_str(u3_net_stack_get_ip_addr(e)),
+            ip_addr_to_str(u3_net_stack_get_ip_addr((e+1)%2)),
+            link_state_route_proto_causes_cycle_cached(e, (e+1)%2)? "YES" : "no");
+        //*/
     }
 }
 
@@ -385,6 +444,7 @@ int main(void)
         static const uint32_t tick_delta = CPU_CLOCK/1000;
         if (ticks_passed > tick_delta)
         {
+            handle_link_state(); //deal with router table update
             handle_claim(); //deal with the host claim register
             update_leds(); //run the link and activity leds
             garp(); //send periodic garps

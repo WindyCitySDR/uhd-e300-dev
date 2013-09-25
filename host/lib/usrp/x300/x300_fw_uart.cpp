@@ -30,22 +30,25 @@ using namespace uhd;
 struct x300_uart_iface : uart_iface
 {
     x300_uart_iface(wb_iface::sptr iface):
-        rxoffset(0), txoffset(0), txword32(0)
+        rxoffset(0), txoffset(0), txword32(0), rxpool(0), txpool(0), poolsize(0)
     {
         _iface = iface;
         rxoffset = _iface->peek32(SR_ADDR(X300_FW_SHMEM_BASE, X300_FW_SHMEM_UART_RX_INDEX));
         txoffset = _iface->peek32(SR_ADDR(X300_FW_SHMEM_BASE, X300_FW_SHMEM_UART_TX_INDEX));
+        rxpool = _iface->peek32(SR_ADDR(X300_FW_SHMEM_BASE, X300_FW_SHMEM_UART_RX_ADDR));
+        txpool = _iface->peek32(SR_ADDR(X300_FW_SHMEM_BASE, X300_FW_SHMEM_UART_TX_ADDR));
+        poolsize = _iface->peek32(SR_ADDR(X300_FW_SHMEM_BASE, X300_FW_SHMEM_UART_WORDS32));
         //this->write_uart("HELLO UART\n");
         //this->read_uart(0.1);
     }
 
     void putchar(const char ch)
     {
-        txoffset = (txoffset + 1) % (X300_FW_SHMEM_UART_POOL_WORDS32*4);
+        txoffset = (txoffset + 1) % (poolsize*4);
         const int shift = ((txoffset%4) * 8);
         if (shift == 0) txword32 = 0;
         txword32 |= boost::uint32_t(ch) << shift;
-        _iface->poke32(SR_ADDR(X300_FW_SHMEM_BASE, X300_FW_SHMEM_UART_TX_POOL+txoffset/4), txword32);
+        _iface->poke32(SR_ADDR(txpool, txoffset/4), txword32);
         _iface->poke32(SR_ADDR(X300_FW_SHMEM_BASE, X300_FW_SHMEM_UART_TX_INDEX), txoffset);
     }
 
@@ -63,8 +66,8 @@ struct x300_uart_iface : uart_iface
         if (_iface->peek32(SR_ADDR(X300_FW_SHMEM_BASE, X300_FW_SHMEM_UART_RX_INDEX)) != rxoffset)
         {
             const int shift = ((rxoffset%4) * 8);
-            const char ch = _iface->peek32(SR_ADDR(X300_FW_SHMEM_BASE, X300_FW_SHMEM_UART_RX_POOL+rxoffset/4)) >> shift;
-            rxoffset = (rxoffset + 1) % (X300_FW_SHMEM_UART_POOL_WORDS32*4);
+            const char ch = _iface->peek32(SR_ADDR(rxpool, rxoffset/4)) >> shift;
+            rxoffset = (rxoffset + 1) % (poolsize*4);
             return ch;
         }
         return -1;
@@ -92,7 +95,7 @@ struct x300_uart_iface : uart_iface
     }
 
     wb_iface::sptr _iface;
-    boost::uint32_t rxoffset, txoffset, txword32;
+    boost::uint32_t rxoffset, txoffset, txword32, rxpool, txpool, poolsize;
 };
 
 uart_iface::sptr x300_make_uart_iface(wb_iface::sptr iface)
