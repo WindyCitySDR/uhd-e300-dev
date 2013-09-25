@@ -362,12 +362,13 @@ bool link_state_route_proto_causes_cycle(const struct ip_addr *src, const struct
         //check if we have an entry
         for (size_t j = 0; j < num_nodes; j++)
         {
-            if (nodes[j].addr == node->addr) continue;
+            if (nodes[j].addr == node->addr) goto skip_add;
         }
 
         //otherwise, we add the node
         nodes[num_nodes++].addr = node->addr;
         printf("  Add to node set: %s\n", ip_addr_to_str(node));
+        skip_add: continue;
     }
 
     //and stateful tracking info for each node
