@@ -39,7 +39,11 @@ typedef struct
 
 static inline size_t sizeof_ls_data(const ls_data_t *ls_data)
 {
-    return 4/*num neighbors*/ + 4/*source node*/ + 4*ls_data->num_nbors;
+    return 0
+        + sizeof(uint32_t)/*num neighbors*/
+        + sizeof(uint32_t)/*num ports*/
+        + sizeof(struct ip_addr)/*source node*/
+        + sizeof(struct ip_addr)*ls_data->num_nbors;
 }
 
 /***********************************************************************
@@ -131,7 +135,7 @@ const ls_node_mapping_t *link_state_route_get_node_mapping(size_t *length)
 
 static void add_node_mapping(const struct ip_addr *node, const struct ip_addr *nbor)
 {
-    printf("add_node_mapping: %s -> %s\n", ip_addr_to_str(node), ip_addr_to_str(nbor));
+    //printf("add_node_mapping: %s -> %s\n", ip_addr_to_str(node), ip_addr_to_str(nbor));
 
     //write into the first available slot
     for (size_t i = 0; i < lengthof(ls_node_maps); i++)
@@ -165,7 +169,7 @@ static void remove_node_matches(const struct ip_addr *node)
 
 static void update_node_mappings(const ls_data_t *ls_data)
 {
-    printf("update_node_mappings: %s\n", ip_addr_to_str(&ls_data->node));
+    //printf("update_node_mappings: %s\n", ip_addr_to_str(&ls_data->node));
 
     //remove any expired entries
     for (size_t i = 0; i < lengthof(ls_nodes); i++)
@@ -379,8 +383,13 @@ bool link_state_route_proto_causes_cycle(const struct ip_addr *src, const struct
     //did we visit the destination? if so, there is a cycle
     for (size_t i = 0; i < lengthof(nodes); i++)
     {
-        if (nodes[i].addr == dst->addr && visited[i]) return true;
+        if (nodes[i].addr == dst->addr && visited[i])
+        {
+            printf("CAUSES CYCLE!\n");
+            return true;
+        }
     }
 
+    printf("no cycle found.\n");
     return false;
 }
