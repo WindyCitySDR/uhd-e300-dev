@@ -298,8 +298,6 @@ void x300_impl::setup_mb(const size_t mb_i, const uhd::device_addr_t &dev_addr)
 
     if (mb.xport_path == "nirio")
     {
-        //@TODO: Remove this when we have the helper process
-        UHD_MSG(status) << "Loading NI shared libs...\n";
         nirio_status status = 0;
         //@TODO: When we can tell the X300 and X310 apart, instantiate the correct LVBITX
         //       objest here. Both of them are codegen'ed currently.
@@ -577,12 +575,6 @@ x300_impl::~x300_impl(void)
             mb.claimer_task.reset();
             mb.zpu_ctrl->poke32(SR_ADDR(X300_FW_SHMEM_BASE, X300_FW_SHMEM_CLAIM_TIME), 0);
             mb.zpu_ctrl->poke32(SR_ADDR(X300_FW_SHMEM_BASE, X300_FW_SHMEM_CLAIM_SRC), 0);
-
-            //@TODO: Handle lifetime issus for these objects. Can be fixed when the shared lib loading/unloading is removed.
-            //        if (_xport_path == "nirio") {
-            //            _rio_fpga_interface->close(true);
-            //            nifpga_session::unload_lib();
-            //        }
         }
     }
     catch(...)

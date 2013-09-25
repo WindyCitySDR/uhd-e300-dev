@@ -39,8 +39,6 @@ LIBUHD_APPEND_SOURCES(
 
 IF(WIN32)
     LIBUHD_APPEND_SOURCES(${CMAKE_CURRENT_SOURCE_DIR}/nirio_driver_iface_win.cpp)
-    #@TODO: Ashish: Setupapi should be removed when enumeration is done using niusrprio / helper.
-    LIBUHD_APPEND_LIBS(Setupapi)
 ELSE(WIN32)
     IF(APPLE)
         LIBUHD_APPEND_SOURCES(${CMAKE_CURRENT_SOURCE_DIR}/nirio_driver_iface_macos.cpp)
