@@ -403,7 +403,7 @@ static void handle_link_state(void)
     for (uint8_t e = 0; e < ethernet_ninterfaces(); e++) update_forwarding(e);
 
     static size_t count = 0;
-    if (count++ < 1000) return; //1 seconds
+    if (count++ < 2000) return; //2 seconds
     count = 0;
 
     link_state_route_proto_tick();
@@ -415,10 +415,12 @@ static void handle_link_state(void)
             link_state_route_proto_flood(e);
         }
         link_state_route_proto_update_cycle_cache(e);
+        /*
         printf("is there a cycle %s -> %s? %s\n",
             ip_addr_to_str(u3_net_stack_get_ip_addr(e)),
             ip_addr_to_str(u3_net_stack_get_ip_addr((e+1)%2)),
             link_state_route_proto_causes_cycle_cached(e, (e+1)%2)? "YES" : "no");
+        //*/
     }
 }
 

@@ -59,7 +59,7 @@ void link_state_route_proto_tick(void)
 static inline bool is_tick_expired(const uint16_t tick)
 {
     const uint16_t delta = ticker - tick;
-    return delta > 3; //have not talked in a while, you are deaf to me
+    return delta > 2; //have not talked in a while, you are deaf to me
 }
 
 static uint16_t current_seq = 0;
