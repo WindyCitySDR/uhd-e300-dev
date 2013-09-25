@@ -350,6 +350,7 @@ void x300_impl::setup_mb(const size_t mb_i, const uhd::device_addr_t &dev_addr)
     ////////////////////////////////////////////////////////////////////
     // print network routes mapping
     ////////////////////////////////////////////////////////////////////
+    /*
     const uint32_t routes_addr = mb.zpu_ctrl->peek32(SR_ADDR(X300_FW_SHMEM_BASE, X300_FW_SHMEM_ROUTE_MAP_ADDR));
     const uint32_t routes_len = mb.zpu_ctrl->peek32(SR_ADDR(X300_FW_SHMEM_BASE, X300_FW_SHMEM_ROUTE_MAP_LEN));
     UHD_VAR(routes_len);
@@ -366,6 +367,7 @@ void x300_impl::setup_mb(const size_t mb_i, const uhd::device_addr_t &dev_addr)
             << std::endl;
         }
     }
+    //*/
 
     ////////////////////////////////////////////////////////////////////
     // setup the mboard eeprom
