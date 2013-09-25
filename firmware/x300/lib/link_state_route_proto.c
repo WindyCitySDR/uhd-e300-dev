@@ -24,7 +24,7 @@
 #define LS_NUM_NODE_ENTRIES 64
 #define LS_NUM_MAP_ENTRIES 128
 
-#define LS_SEQ_EXPIRED_MAX 30
+#define LS_SEQ_EXPIRED_MAX 10
 
 /***********************************************************************
  * wire format for table communication
@@ -69,19 +69,21 @@ static inline bool is_seq_newer(const uint16_t seq, const uint16_t entry_seq)
  **********************************************************************/
 typedef struct
 {
-    uint16_t seq;
+    uint16_t src_seq;
+    uint16_t dst_seq;
     uint8_t ethno;
     struct ip_addr ip_addr;
 } ls_node_entry_t;
 
 static bool ls_node_entry_valid(const ls_node_entry_t *entry)
 {
-    return entry->ip_addr.addr != 0 && !is_seq_expired(entry->seq);
+    return entry->ip_addr.addr != 0 && !is_seq_expired(entry->dst_seq);
 }
 
 static void ls_node_entry_update(ls_node_entry_t *entry, const int8_t ethno, const uint16_t seq, const struct ip_addr *ip_addr)
 {
-    entry->seq = seq;
+    entry->src_seq = seq;
+    entry->dst_seq = current_seq;
     entry->ethno = ethno;
     entry->ip_addr.addr = ip_addr->addr;
 }
@@ -101,7 +103,7 @@ static bool ls_node_entries_update(
 
         if (entries[i].ip_addr.addr == ip_addr->addr/* && entries[i].ethno == ethno*/)
         {
-            if (is_seq_newer(seq, entries[i].seq))
+            if (is_seq_newer(seq, entries[i].src_seq))
             {
                 ls_node_entry_update(entries+i, ethno, seq, ip_addr);
                 return true;
@@ -156,6 +158,8 @@ static void add_node_mapping(const struct ip_addr *node, const struct ip_addr *n
 
 static void remove_node_matches(const struct ip_addr *node)
 {
+    //printf("remove_node_matches: %s\n", ip_addr_to_str(node));
+
     for (size_t j = 0; j < lengthof(ls_node_maps); j++)
     {
         //if the address is a match, clear the entry
@@ -174,8 +178,10 @@ static void update_node_mappings(const ls_data_t *ls_data)
     //remove any expired entries
     for (size_t i = 0; i < lengthof(ls_nodes); i++)
     {
-        if (ls_node_entry_valid(ls_nodes+i)) continue;
-        remove_node_matches(&ls_nodes[i].ip_addr);
+        if (ls_nodes[i].ip_addr.addr != 0 && is_seq_expired(ls_nodes[i].dst_seq))
+        {
+            remove_node_matches(&ls_nodes[i].ip_addr);
+        }
     }
 
     //remove any matches for the current node
