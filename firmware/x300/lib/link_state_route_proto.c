@@ -66,8 +66,9 @@ static uint16_t current_seq = 0;
 
 static inline bool is_seq_newer(const uint16_t seq, const uint16_t entry_seq)
 {
+    if (seq == entry_seq) return false; //not newer if equal
     const uint16_t delta = seq - entry_seq;
-    return (delta & (1 << 15)) == 0;
+    return (delta & (1 << 15)) == 0; //newer when subtraction did not overflow
 }
 
 /***********************************************************************
