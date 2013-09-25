@@ -15,6 +15,7 @@
 #include <link_state_route_proto.h>
 #include <printf.h>
 #include <string.h>
+#include <print_addrs.h>
 
 static uint32_t *shmem = (uint32_t *) X300_FW_SHMEM_BASE;
 
@@ -388,6 +389,12 @@ static void update_forwarding(const uint8_t e)
     }
     const uint32_t eth_base = (e == 0)? SR_ETHINT0 : SR_ETHINT1;
     wb_poke32(SR_ADDR(SET0_BASE, eth_base + 8 + 4), forward);
+
+    //print summary:
+    printf("\n\nupdate_forwarding:\n");
+    printf("IP%u: %s\n", (int)e, ip_addr_to_str(u3_net_stack_get_ip_addr(e)));
+    if (forward) printf("No cycle found.\n");
+    else printf("CAUSES CYCLE!\n");
 }
 static void handle_link_state(void)
 {

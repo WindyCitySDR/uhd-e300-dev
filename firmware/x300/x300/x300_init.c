@@ -13,6 +13,7 @@
 #include <link_state_route_proto.h>
 #include <udp_uart.h>
 #include "x300_fw_common.h"
+#include <print_addrs.h>
 
 static wb_pkt_iface64_config_t pkt_config;
 
@@ -113,7 +114,7 @@ static void init_network(void)
 
 static void putc(void *p, char c)
 {
-  //wb_uart_putc(UART1_BASE, c);
+  wb_uart_putc(UART1_BASE, c);
 }
 
 void x300_init(void)
@@ -125,7 +126,7 @@ void x300_init(void)
     //udp_uart_init(UART0_BASE, X300_GPSDO_UDP_PORT);
 
     //now we can init the rest with prints
-    printf("B250 ZPU Init Begin -- CPU CLOCK is %d MHz\n", CPU_CLOCK/1000000);
+    printf("X300 ZPU Init Begin -- CPU CLOCK is %d MHz\n", CPU_CLOCK/1000000);
 
     //i2c rate init
     wb_i2c_init(I2C0_BASE, CPU_CLOCK);
@@ -148,4 +149,13 @@ void x300_init(void)
     mdelay(100);
     xge_ethernet_init(0);
     xge_ethernet_init(1);
+
+    //print network summary
+    for (uint8_t e = 0; e < ethernet_ninterfaces(); e++)
+    {
+        printf("  MAC%u:     %s\n", (int)e, mac_addr_to_str(u3_net_stack_get_mac_addr(e)));
+        printf("    IP%u:      %s\n", (int)e, ip_addr_to_str(u3_net_stack_get_ip_addr(e)));
+        printf("    SUBNET%u:  %s\n", (int)e, ip_addr_to_str(u3_net_stack_get_subnet(e)));
+        printf("    BCAST%u:   %s\n", (int)e, ip_addr_to_str(u3_net_stack_get_bcast(e)));
+    }
 }

@@ -5,6 +5,8 @@
 #include <u3_net_stack.h>
 #include <ethernet.h>
 #include <string.h>
+#include <printf.h>
+#include <print_addrs.h>
 
 #define lengthof(a) (sizeof(a)/sizeof(*(a)))
 
@@ -21,6 +23,8 @@
 #define LS_NUM_NBOR_ENTRIES 16
 #define LS_NUM_NODE_ENTRIES 64
 #define LS_NUM_MAP_ENTRIES 128
+
+#define LS_SEQ_EXPIRED_MAX 10
 
 /***********************************************************************
  * wire format for table communication
@@ -46,7 +50,7 @@ static uint16_t current_seq = 0;
 static inline bool is_seq_expired(const uint16_t seq)
 {
     const uint16_t delta = current_seq - seq;
-    return delta > 30; //have not talked in a while, you are deaf to me
+    return delta > LS_SEQ_EXPIRED_MAX; //have not talked in a while, you are deaf to me
 }
 
 static inline bool is_seq_newer(const uint16_t seq, const uint16_t entry_seq)
@@ -127,6 +131,8 @@ const ls_node_mapping_t *link_state_route_get_node_mapping(size_t *length)
 
 static void add_node_mapping(const struct ip_addr *node, const struct ip_addr *nbor)
 {
+    printf("add_node_mapping: %s -> %s\n", ip_addr_to_str(node), ip_addr_to_str(nbor));
+
     //write into the first available slot
     for (size_t i = 0; i < lengthof(ls_node_maps); i++)
     {
@@ -159,6 +165,8 @@ static void remove_node_matches(const struct ip_addr *node)
 
 static void update_node_mappings(const ls_data_t *ls_data)
 {
+    printf("update_node_mappings: %s\n", ip_addr_to_str(&ls_data->node));
+
     //remove any expired entries
     for (size_t i = 0; i < lengthof(ls_nodes); i++)
     {
@@ -224,6 +232,7 @@ static void handle_icmp_ir(
     {
     //received a reply directly from the neighbor, add to neighbor list
     case LS_ID_DISCOVER:
+        //printf("GOT LS_ID_DISCOVER REPLY - ID 0x%x - IP%u: %s\n", id, (int)ethno, ip_addr_to_str(u3_net_stack_get_ip_addr(ethno)));
         ls_node_entries_update(ls_nbors, lengthof(ls_nbors), ethno, seq, src);
         break;
     }
@@ -242,11 +251,14 @@ static void handle_icmp_irq(
     {
     //replies to discovery packets
     case LS_ID_DISCOVER:
+        //printf("GOT LS_ID_DISCOVER REQ - IP%u: %s\n", (int)ethno, ip_addr_to_str(u3_net_stack_get_ip_addr(ethno)));
+        //printf("SEND LS_ID_DISCOVER REPLY - IP%u: %s\n", (int)ethno, ip_addr_to_str(u3_net_stack_get_ip_addr(ethno)));
         u3_net_stack_send_icmp_pkt(ethno, ICMP_IR, 0, id, seq, src, buff, num_bytes);
         break;
 
     //handle and forward information
     case LS_ID_INFORM:
+        //printf("GOT LS_ID_INFORM REQ - IP%u: %s\n", (int)ethno, ip_addr_to_str(u3_net_stack_get_ip_addr(ethno)));
         send_link_state_data_to_all_neighbors(ethno, seq, (const ls_data_t *)buff);
         break;
     };
@@ -267,6 +279,7 @@ void link_state_route_proto_init(void)
 void link_state_route_proto_update(const uint8_t ethno)
 {
     //send a discovery packet
+    //printf("SEND LS_ID_DISCOVER REQ - IP%u: %s\n", (int)ethno, ip_addr_to_str(u3_net_stack_get_ip_addr(ethno)));
     u3_net_stack_send_icmp_pkt(
         ethno, ICMP_IRQ, 0,
         LS_ID_DISCOVER, current_seq++,
@@ -332,12 +345,14 @@ static void follow_links(const size_t current, struct ip_addr *nodes, bool *visi
 
 bool link_state_route_proto_causes_cycle(const struct ip_addr *src, const struct ip_addr *dst)
 {
+    printf("is there a cycle? %s -> %s: \n", ip_addr_to_str(src), ip_addr_to_str(dst));
+
     //make a set of all nodes
     size_t num_nodes = 0;
     struct ip_addr nodes[LS_NUM_MAP_ENTRIES];
     for (size_t i = 0; i < lengthof(ls_node_maps); i++)
     {
-        if (ls_node_maps[i].node.addr == 0 || ls_node_maps[i].nbor.addr) continue;
+        if (ls_node_maps[i].node.addr == 0 || ls_node_maps[i].nbor.addr == 0) continue;
         const struct ip_addr *node = &ls_node_maps[i].node;
 
         //check if we have an entry
@@ -348,6 +363,7 @@ bool link_state_route_proto_causes_cycle(const struct ip_addr *src, const struct
 
         //otherwise, we add the node
         nodes[num_nodes++].addr = node->addr;
+        printf("  Add to node set: %s\n", ip_addr_to_str(node));
     }
 
     //and stateful tracking info for each node
