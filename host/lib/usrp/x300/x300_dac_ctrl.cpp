@@ -83,7 +83,7 @@ public:
         this->set_iq_swap(false);
         write_ad9146_reg(0x10, 0x48); // Choose data rate mode
         write_ad9146_reg(0x17, 0x04); // Issue software FIFO reset
-        write_ad9146_reg(0x18, 0x01); //
+        write_ad9146_reg(0x18, 0x02); //
         write_ad9146_reg(0x18, 0x00); //
         write_ad9146_reg(0x1B, 0xA4); // Enable inverse SINC
 
