@@ -18,6 +18,8 @@
 #ifndef INCLUDED_X300_IMPL_HPP
 #define INCLUDED_X300_IMPL_HPP
 
+#include <stdio.h>
+
 #include <uhd/property_tree.hpp>
 #include <uhd/device.hpp>
 #include <uhd/usrp/mboard_eeprom.hpp>
