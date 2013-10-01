@@ -137,6 +137,9 @@ struct x300_impl : public uhd::device
         gpio_core_200_32wo::sptr leds;
     };
 
+    //overflow recovery impl
+    void handle_overflow(radio_perifs_t &perif, boost::weak_ptr<uhd::rx_streamer> streamer);
+
     //vector of member objects per motherboard
     struct mboard_members_t
     {

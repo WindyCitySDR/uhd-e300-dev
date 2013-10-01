@@ -432,7 +432,7 @@ rx_streamer::sptr x300_impl::get_rx_stream(const uhd::stream_args_t &args_)
             &zero_copy_if::get_recv_buff, data_xport, _1
         ), true /*flush*/);
         my_streamer->set_overflow_handler(stream_i, boost::bind(
-            &rx_vita_core_3000::handle_overflow, perif.framer
+            &x300_impl::handle_overflow, this, boost::ref(perif), my_streamer
         ));
         my_streamer->set_xport_handle_flowctrl(stream_i, boost::bind(
             &handle_rx_flowctrl, data_sid, data_xport, mb.if_pkt_is_big_endian, seq32, _1
@@ -449,6 +449,35 @@ rx_streamer::sptr x300_impl::get_rx_stream(const uhd::stream_args_t &args_)
     }
 
     return my_streamer;
+}
+
+void x300_impl::handle_overflow(x300_impl::radio_perifs_t &perif, boost::weak_ptr<uhd::rx_streamer> streamer)
+{
+    boost::shared_ptr<sph::recv_packet_streamer> my_streamer =
+            boost::dynamic_pointer_cast<sph::recv_packet_streamer>(streamer.lock());
+    if (my_streamer->get_num_channels() == 1)
+    {
+        perif.framer->handle_overflow();
+        return;
+    }
+
+    /////////////////////////////////////////////////////////////
+    // MIMO overflow recovery time
+    /////////////////////////////////////////////////////////////
+    //find out if we were in continuous mode before stopping
+    const bool in_continuous_streaming_mode = perif.framer->in_continuous_streaming_mode();
+    //stop streaming
+    my_streamer->issue_stream_cmd(stream_cmd_t::STREAM_MODE_STOP_CONTINUOUS);
+    //flush transports
+    my_streamer->flush_all(0.001);
+    //restart streaming
+    if (in_continuous_streaming_mode)
+    {
+        stream_cmd_t stream_cmd(stream_cmd_t::STREAM_MODE_START_CONTINUOUS);
+        stream_cmd.stream_now = false;
+        stream_cmd.time_spec = perif.time64->get_time_now() + time_spec_t(0.01);
+        my_streamer->issue_stream_cmd(stream_cmd);
+    }
 }
 
 /***********************************************************************

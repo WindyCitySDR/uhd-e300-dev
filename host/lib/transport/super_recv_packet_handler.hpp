@@ -141,6 +141,15 @@ public:
         _props.at(xport_chan).get_buff = get_buff;
     }
 
+    //! Flush all transports in the streamer
+    void flush_all(const double timeout = 0.0)
+    {
+        for (size_t i = 0; i < _props.size(); i++)
+        {
+            while (_props.at(i).get_buff(timeout));
+        }
+    }
+
     /*!
      * Set the function to handle flow control
      * \param xport_chan which transport channel
