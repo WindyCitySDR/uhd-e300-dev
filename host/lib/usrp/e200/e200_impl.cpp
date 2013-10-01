@@ -358,7 +358,9 @@ e200_impl::e200_impl(const uhd::device_addr_t &device_addr)
     ////////////////////////////////////////////////////////////////////
 
     //init the clock rate to something, but only when we have active chains
-    _tree->access<double>(mb_path / "tick_rate").set(61.44e6/2);
+    //init the clock rate to something reasonable
+    _tree->access<double>(mb_path / "tick_rate").set(
+        device_addr.cast<double>("master_clock_rate", E200_DEFAULT_TICK_RATE));
     //_codec_ctrl->set_active_chains(false, false, false, false);
 
     _tree->access<subdev_spec_t>(mb_path / "rx_subdev_spec").set(subdev_spec_t("A:RX2"));
