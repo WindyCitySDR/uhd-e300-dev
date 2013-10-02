@@ -374,6 +374,11 @@ void x300_impl::setup_mb(const size_t mb_i, const uhd::device_addr_t &dev_addr)
     ////////////////////////////////////////////////////////////////////
     UHD_MSG(status) << "Loading values from EEPROM..." << std::endl;
     i2c_iface::sptr eeprom16 = mb.zpu_i2c->eeprom16();
+    if (dev_addr.has_key("blank_eeprom"))
+    {
+        UHD_MSG(warning) << "Obliterating the motherboard EEPROM..." << std::endl;
+        eeprom16->write_eeprom(0x50, 0, byte_vector_t(256, 0xff));
+    }
     const mboard_eeprom_t mb_eeprom(*eeprom16, "X300");
     _tree->create<mboard_eeprom_t>(mb_path / "eeprom")
         .set(mb_eeprom)
