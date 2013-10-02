@@ -685,6 +685,21 @@ void x300_impl::setup_radio(const size_t mb_i, const size_t i, const std::string
         .subscribe(boost::bind(&x300_adc_ctrl::set_gain, perif.adc, _1)).set(0);
 
     ////////////////////////////////////////////////////////////////////
+    // front end corrections
+    ////////////////////////////////////////////////////////////////////
+    perif.rx_fe = rx_frontend_core_200::make(perif.ctrl, TOREG(SR_RX_FRONT));
+    const fs_path rx_fe_path = mb_path / "rx_frontends" / db_name;
+    _tree->create<std::complex<double> >(rx_fe_path / "dc_offset" / "value")
+        .coerce(boost::bind(&rx_frontend_core_200::set_dc_offset, perif.rx_fe, _1))
+        .set(std::complex<double>(0.0, 0.0));
+    _tree->create<bool>(rx_fe_path / "dc_offset" / "enable")
+        .subscribe(boost::bind(&rx_frontend_core_200::set_dc_offset_auto, perif.rx_fe, _1))
+        .set(true);
+    _tree->create<std::complex<double> >(rx_fe_path / "iq_balance" / "value")
+        .subscribe(boost::bind(&rx_frontend_core_200::set_iq_balance, perif.rx_fe, _1))
+        .set(std::complex<double>(0.0, 0.0));
+
+    ////////////////////////////////////////////////////////////////////
     // create rx dsp control objects
     ////////////////////////////////////////////////////////////////////
     perif.framer = rx_vita_core_3000::make(perif.ctrl, TOREG(SR_RX_CTRL));

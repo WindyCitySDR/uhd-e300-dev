@@ -104,7 +104,10 @@ void x300_impl::update_rx_subdev_spec(const size_t mb_i, const subdev_spec_t &sp
         const std::string conn = _tree->access<std::string>(root / db_name / "rx_frontends" / fe_name / "connection").get();
 
         //swap condition
-        _mb[mb_i].radio_perifs[i].ddc->set_mux(conn, false);
+        const bool fe_swapped = (conn == "QI" or conn == "Q");
+        _mb[mb_i].radio_perifs[i].ddc->set_mux(conn, fe_swapped);
+        //see usrp/io_impl.cpp if multiple DSPs share the frontend:
+        _mb[mb_i].radio_perifs[i].rx_fe->set_mux(fe_swapped);
     }
 
     _mb[mb_i].rx_fe_map = spec;

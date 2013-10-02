@@ -42,6 +42,7 @@
 #include "tx_dsp_core_3000.hpp"
 #include "i2c_core_100_wb32.hpp"
 #include "radio_ctrl_core_3000.hpp"
+#include "rx_frontend_core_200.hpp"
 #include "gpio_core_200.hpp"
 #include <boost/weak_ptr.hpp>
 #include <uhd/usrp/gps_ctrl.hpp>
@@ -135,6 +136,7 @@ struct x300_impl : public uhd::device
         tx_vita_core_3000::sptr deframer;
         tx_dsp_core_3000::sptr duc;
         gpio_core_200_32wo::sptr leds;
+        rx_frontend_core_200::sptr rx_fe;
     };
 
     //overflow recovery impl
