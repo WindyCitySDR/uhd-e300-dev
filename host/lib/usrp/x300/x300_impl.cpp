@@ -19,6 +19,7 @@
 #include "x300_regs.hpp"
 #include "x300_lvbitx.hpp"
 #include "x310_lvbitx.hpp"
+#include "apply_corrections.hpp"
 #include <uhd/utils/static.hpp>
 #include <uhd/utils/msg.hpp>
 #include <uhd/utils/images.hpp>
@@ -794,6 +795,19 @@ void x300_impl::setup_radio(const size_t mb_i, const size_t i, const std::string
     _tree->access<std::string>(mb_path / "dboards" / db_name / "rx_frontends" / fe_name / "antenna" / "value")
         .subscribe(boost::bind(&x300_impl::update_atr_leds, this, mb.radio_perifs[i].leds, _1));
     this->update_atr_leds(mb.radio_perifs[i].leds, ""); //init anyway, even if never called
+
+    //bind frontend corrections to the dboard freq props
+    const fs_path db_rx_fe_path = mb_path / "dboards" / db_name / "rx_frontends";
+    BOOST_FOREACH(const std::string &name, _tree->list(db_rx_fe_path))
+    {
+        _tree->access<double>(db_rx_fe_path / name / "freq" / "value")
+            .subscribe(boost::bind(&x300_impl::set_rx_fe_corrections, this, mb_path, db_name, _1));
+    }
+}
+
+void x300_impl::set_rx_fe_corrections(const uhd::fs_path &mb_path, const std::string &fe_name, const double lo_freq)
+{
+    apply_rx_fe_corrections(this->get_tree()->subtree(mb_path), fe_name, lo_freq);
 }
 
 boost::uint32_t get_pcie_dma_channel(boost::uint8_t destination, boost::uint8_t prefix)
