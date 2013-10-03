@@ -108,7 +108,7 @@ struct b200_impl : public uhd::device
     //transports
     uhd::transport::zero_copy_if::sptr _data_transport;
     uhd::transport::zero_copy_if::sptr _ctrl_transport;
-    boost::shared_ptr<uhd::usrp::recv_packet_demuxer_3000> _demux;
+    uhd::usrp::recv_packet_demuxer_3000::sptr _demux;
 
     //device properties interface
     uhd::property_tree::sptr get_tree(void) const

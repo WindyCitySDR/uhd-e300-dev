@@ -329,7 +329,7 @@ b200_impl::b200_impl(const device_addr_t &device_addr)
         data_xport_args    // param hints
     );
     while (_data_transport->get_recv_buff(0.0)){} //flush ctrl xport
-    _demux.reset(new recv_packet_demuxer_3000(_data_transport));
+    _demux = recv_packet_demuxer_3000::make(_data_transport);
 
     ////////////////////////////////////////////////////////////////////
     // Init codec - turns on clocks
