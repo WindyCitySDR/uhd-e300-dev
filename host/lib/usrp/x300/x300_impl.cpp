@@ -642,8 +642,8 @@ void x300_impl::setup_radio(const size_t mb_i, const size_t i, const std::string
     ////////////////////////////////////////////////////////////////////
     uint8_t dest = (i == 0)? X300_XB_DST_R0 : X300_XB_DST_R1;
     boost::uint32_t ctrl_sid;
-    zero_copy_if::sptr ctrl_xport = this->make_transport(mb, dest, X300_RADIO_DEST_PREFIX_CTRL, device_addr_t(), ctrl_sid);
-    perif.ctrl = radio_ctrl_core_3000::make(mb.if_pkt_is_big_endian, ctrl_xport, ctrl_xport, ctrl_sid, db_name);
+    both_xports_t xport = this->make_transport(mb, dest, X300_RADIO_DEST_PREFIX_CTRL, device_addr_t(), ctrl_sid);
+    perif.ctrl = radio_ctrl_core_3000::make(mb.if_pkt_is_big_endian, xport.recv, xport.send, ctrl_sid, db_name);
     perif.ctrl->poke32(TOREG(SR_MISC_OUTS), (1 << 2)); //reset adc + dac
     perif.ctrl->poke32(TOREG(SR_MISC_OUTS),  (1 << 1) | (1 << 0)); //out of reset + dac enable
 
@@ -820,7 +820,7 @@ boost::uint32_t get_pcie_dma_channel(boost::uint8_t destination, boost::uint8_t 
     return ((radio_grp * RADIO_GRP_SIZE) + prefix);
 }
 
-uhd::transport::zero_copy_if::sptr x300_impl::make_transport(
+x300_impl::both_xports_t x300_impl::make_transport(
     mboard_members_t &mb,
     const uint8_t& destination,
     const uint8_t& prefix,
@@ -874,7 +874,10 @@ uhd::transport::zero_copy_if::sptr x300_impl::make_transport(
         //ethernet framer has been programmed before we return.
         mb.zpu_ctrl->peek32(0);
     }
-    return xport;
+    both_xports_t both;
+    both.recv = xport;
+    both.send = xport;
+    return both;
 }
 
 

@@ -382,7 +382,7 @@ rx_streamer::sptr x300_impl::get_rx_stream(const uhd::stream_args_t &args_)
         uint8_t dest = (mb_chan == 0)? X300_XB_DST_R0 : X300_XB_DST_R1;
         boost::uint32_t data_sid;
         UHD_LOG << "creating rx stream " << device_addr.to_string() << std::endl;
-        zero_copy_if::sptr data_xport = this->make_transport(mb, dest, X300_RADIO_DEST_PREFIX_RX, device_addr, data_sid);
+        both_xports_t xport = this->make_transport(mb, dest, X300_RADIO_DEST_PREFIX_RX, device_addr, data_sid);
         UHD_LOG << boost::format("data_sid = 0x%08x\n") % data_sid << std::endl;
 
         //calculate packet size
@@ -393,7 +393,7 @@ rx_streamer::sptr x300_impl::get_rx_stream(const uhd::stream_args_t &args_)
             - sizeof(vrt::if_packet_info_t().cid) //no class id ever used
             - sizeof(vrt::if_packet_info_t().tsi) //no int time ever used
         ;
-        const size_t bpp = data_xport->get_recv_frame_size() - hdr_size;
+        const size_t bpp = xport.recv->get_recv_frame_size() - hdr_size;
         const size_t bpi = convert::get_bytes_per_item(args.otw_format);
         const size_t spp = unsigned(args.args.cast<double>("spp", bpp/bpi));
 
@@ -427,18 +427,18 @@ rx_streamer::sptr x300_impl::get_rx_stream(const uhd::stream_args_t &args_)
 
         //flow control setup
         const size_t max_buffering = size_t(device_addr.cast<double>("recv_buff_size", 1e6));
-        const size_t fc_window = max_buffering/data_xport->get_recv_frame_size();
+        const size_t fc_window = max_buffering/xport.recv->get_recv_frame_size();
         perif.framer->configure_flow_control(fc_window);
 
         boost::shared_ptr<boost::uint32_t> seq32(new boost::uint32_t(0));
         my_streamer->set_xport_chan_get_buff(stream_i, boost::bind(
-            &zero_copy_if::get_recv_buff, data_xport, _1
+            &zero_copy_if::get_recv_buff, xport.recv, _1
         ), true /*flush*/);
         my_streamer->set_overflow_handler(stream_i, boost::bind(
             &x300_impl::handle_overflow, this, boost::ref(perif), my_streamer
         ));
         my_streamer->set_xport_handle_flowctrl(stream_i, boost::bind(
-            &handle_rx_flowctrl, data_sid, data_xport, mb.if_pkt_is_big_endian, seq32, _1
+            &handle_rx_flowctrl, data_sid, xport.send, mb.if_pkt_is_big_endian, seq32, _1
         ), fc_window, true/*init*/);
         my_streamer->set_issue_stream_cmd(stream_i, boost::bind(
             &rx_vita_core_3000::issue_stream_command, perif.framer, _1
@@ -520,7 +520,7 @@ tx_streamer::sptr x300_impl::get_tx_stream(const uhd::stream_args_t &args_)
         uint8_t dest = (mb_chan == 0)? X300_XB_DST_R0 : X300_XB_DST_R1;
         boost::uint32_t data_sid;
         UHD_LOG << "creating tx stream " << mb.send_args.to_string() << std::endl;
-        zero_copy_if::sptr data_xport = this->make_transport(mb, dest, X300_RADIO_DEST_PREFIX_TX, mb.send_args, data_sid);
+        both_xports_t xport = this->make_transport(mb, dest, X300_RADIO_DEST_PREFIX_TX, mb.send_args, data_sid);
         UHD_LOG << boost::format("data_sid = 0x%08x\n") % data_sid << std::endl;
 
         //calculate packet size
@@ -531,7 +531,7 @@ tx_streamer::sptr x300_impl::get_tx_stream(const uhd::stream_args_t &args_)
             - sizeof(vrt::if_packet_info_t().cid) //no class id ever used
             - sizeof(vrt::if_packet_info_t().tsi) //no int time ever used
         ;
-        const size_t bpp = data_xport->get_send_frame_size() - hdr_size;
+        const size_t bpp = xport.send->get_send_frame_size() - hdr_size;
         const size_t bpi = convert::get_bytes_per_item(args.otw_format);
         const size_t spp = unsigned(args.args.cast<double>("spp", bpp/bpi));
 
@@ -567,10 +567,10 @@ tx_streamer::sptr x300_impl::get_tx_stream(const uhd::stream_args_t &args_)
         guts->device_channel = chan;
         guts->async_queue = async_md;
         guts->old_async_queue = _async_md;
-        task::sptr task = task::make(boost::bind(&handle_tx_async_msgs, guts, data_xport, mb.if_pkt_is_big_endian, mb.clock));
+        task::sptr task = task::make(boost::bind(&handle_tx_async_msgs, guts, xport.recv, mb.if_pkt_is_big_endian, mb.clock));
 
         my_streamer->set_xport_chan_get_buff(stream_i, boost::bind(
-            &get_tx_buff_with_flowctrl, task, guts, data_xport, _1
+            &get_tx_buff_with_flowctrl, task, guts, xport.send, _1
         ));
         my_streamer->set_async_receiver(boost::bind(
             &async_md_type::pop_with_timed_wait, async_md, _1, _2

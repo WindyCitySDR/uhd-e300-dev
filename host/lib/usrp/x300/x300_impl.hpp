@@ -203,7 +203,13 @@ struct x300_impl : public uhd::device
         boost::uint8_t router_dst_here;
     };
     boost::uint32_t allocate_sid(mboard_members_t &mb, const sid_config_t &config);
-    uhd::transport::zero_copy_if::sptr make_transport(
+
+    struct both_xports_t
+    {
+        uhd::transport::zero_copy_if::sptr recv;
+        uhd::transport::zero_copy_if::sptr send;
+    };
+    both_xports_t make_transport(
         mboard_members_t &mb,
         const uint8_t& destination,
         const uint8_t& prefix,
