@@ -49,7 +49,7 @@
 #include <uhd/transport/bounded_buffer.hpp>
 #include <uhd/transport/nirio/nifpga_interface.h>
 #include <uhd/transport/vrt_if_packet.hpp>
-
+#include "recv_packet_demuxer_3000.hpp"
 
 static const size_t X300_TX_FC_PKT_WINDOW = 2048; //16MB/8Kpkts
 static const std::string X300_FW_FILE_NAME = "usrp_x300_fw.bin";
@@ -210,12 +210,32 @@ struct x300_impl : public uhd::device
         uhd::transport::zero_copy_if::sptr send;
     };
     both_xports_t make_transport(
-        mboard_members_t &mb,
+        const size_t mb_index,
         const uint8_t& destination,
         const uint8_t& prefix,
         const uhd::device_addr_t& args,
         boost::uint32_t& sid);
 
+    ////////////////////////////////////////////////////////////////////
+    //
+    //Caching for transport interface re-use -- like sharing a DMA.
+    //The cache is optionally used by make_transport by use-case.
+    //The cache maps an ID string to a transport-ish object.
+    //The ID string identifies a purpose for the transport.
+    //
+    //For recv, there is a demux cache, which maps a ID string
+    //to a recv demux object. When a demux is used, the underlying transport
+    //must never be used outside of the demux. Use demux->make_proxy(sid).
+    //
+    uhd::dict<std::string, uhd::usrp::recv_packet_demuxer_3000::sptr> _demux_cache;
+    //
+    //For send, there is a shared send xport, which maps an ID string
+    //to a transport capable of sending buffers. Send transports
+    //can be shared amongst multiple callers, unlike recv.
+    //
+    uhd::dict<std::string, uhd::transport::zero_copy_if::sptr> _send_cache;
+    //
+    ////////////////////////////////////////////////////////////////////
 
     uhd::dict<std::string, uhd::usrp::dboard_manager::sptr> _dboard_managers;
     uhd::dict<std::string, uhd::usrp::dboard_iface::sptr> _dboard_ifaces;

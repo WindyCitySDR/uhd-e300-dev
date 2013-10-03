@@ -642,7 +642,7 @@ void x300_impl::setup_radio(const size_t mb_i, const size_t i, const std::string
     ////////////////////////////////////////////////////////////////////
     uint8_t dest = (i == 0)? X300_XB_DST_R0 : X300_XB_DST_R1;
     boost::uint32_t ctrl_sid;
-    both_xports_t xport = this->make_transport(mb, dest, X300_RADIO_DEST_PREFIX_CTRL, device_addr_t(), ctrl_sid);
+    both_xports_t xport = this->make_transport(mb_i, dest, X300_RADIO_DEST_PREFIX_CTRL, device_addr_t(), ctrl_sid);
     perif.ctrl = radio_ctrl_core_3000::make(mb.if_pkt_is_big_endian, xport.recv, xport.send, ctrl_sid, db_name);
     perif.ctrl->poke32(TOREG(SR_MISC_OUTS), (1 << 2)); //reset adc + dac
     perif.ctrl->poke32(TOREG(SR_MISC_OUTS),  (1 << 1) | (1 << 0)); //out of reset + dac enable
@@ -821,16 +821,17 @@ boost::uint32_t get_pcie_dma_channel(boost::uint8_t destination, boost::uint8_t 
 }
 
 x300_impl::both_xports_t x300_impl::make_transport(
-    mboard_members_t &mb,
+    const size_t mb_index,
     const uint8_t& destination,
     const uint8_t& prefix,
     const uhd::device_addr_t& args,
     boost::uint32_t& sid
 )
 {
+    mboard_members_t &mb = _mb[mb_index];
     const std::string& addr = mb.addr;
     const std::string& xport_path = mb.xport_path;
-    zero_copy_if::sptr xport;
+    both_xports_t xports;
 
     sid_config_t config;
     config.router_addr_there    = X300_DEVICE_THERE;
@@ -846,11 +847,17 @@ x300_impl::both_xports_t x300_impl::make_transport(
         xport_args["recv_frame_size"] = boost::lexical_cast<std::string>(
             (prefix == X300_RADIO_DEST_PREFIX_RX) ? X300_PCIE_DATA_FRAME_SIZE : X300_PCIE_MSG_FRAME_SIZE);
 
-        xport = nirio_zero_copy::make(mb.rio_fpga_interface, get_pcie_dma_channel(destination, prefix), xport_args);
+        xports.recv = nirio_zero_copy::make(mb.rio_fpga_interface, get_pcie_dma_channel(destination, prefix), xport_args);
+        xports.send = xports.recv;
     } else {
         //make a new transport - fpga has no idea how to talk to use on this yet
-        xport = udp_zero_copy::make(addr, BOOST_STRINGIZE(X300_VITA_UDP_PORT), args);
+        xports.recv = udp_zero_copy::make(addr, BOOST_STRINGIZE(X300_VITA_UDP_PORT), args);
+        xports.send = xports.recv;
+    }
 
+    //always program the framer if this is a socket, even its caching was used
+    if (xport_path != "nirio")
+    {
         //clear the ethernet dispatcher's udp port
         //NOT clearing this, the dispatcher is now intelligent
         //_zpu_ctrl->poke32(SR_ADDR(SET0_BASE, (ZPU_SR_ETHINT0+8+3)), 0);
@@ -859,7 +866,9 @@ x300_impl::both_xports_t x300_impl::make_transport(
         //ZPU will reprogram the ethernet framer
         UHD_LOG << "programming packet for new xport on "
             << addr << std::hex << "sid 0x" << sid << std::dec << std::endl;
-        managed_send_buffer::sptr buff = xport->get_send_buff();
+        //YES, get a __send__ buffer from the __recv__ socket
+        //-- this is the only way to program the framer for recv:
+        managed_send_buffer::sptr buff = xports.recv->get_send_buff();
         buff->cast<boost::uint32_t *>()[0] = 0; //eth dispatch looks for != 0
         buff->cast<boost::uint32_t *>()[1] = uhd::htonx(sid);
         buff->commit(8);
@@ -874,10 +883,7 @@ x300_impl::both_xports_t x300_impl::make_transport(
         //ethernet framer has been programmed before we return.
         mb.zpu_ctrl->peek32(0);
     }
-    both_xports_t both;
-    both.recv = xport;
-    both.send = xport;
-    return both;
+    return xports;
 }
 
 
