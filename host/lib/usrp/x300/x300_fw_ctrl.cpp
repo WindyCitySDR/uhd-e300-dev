@@ -15,7 +15,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 //
 
-#include "wb_iface.hpp"
+#include <uhd/types/wb_iface.hpp>
 #include "x300_fw_common.h"
 #include <uhd/transport/udp_simple.hpp>
 #include <uhd/utils/byteswap.hpp>
@@ -28,6 +28,8 @@
 #include "x300_regs.hpp"
 #include <boost/date_time/posix_time/posix_time.hpp>
 #include <boost/thread/thread.hpp>
+
+using namespace uhd;
 
 class x300_ctrl_iface : public wb_iface
 {

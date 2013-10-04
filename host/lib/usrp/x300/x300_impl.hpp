@@ -25,7 +25,6 @@
 #include <uhd/usrp/dboard_eeprom.hpp>
 #include <uhd/usrp/subdev_spec.hpp>
 #include <uhd/types/sensors.hpp>
-#include "wb_iface.hpp"
 #include "x300_clock_ctrl.hpp"
 #include "x300_fw_common.h"
 #include <uhd/transport/udp_simple.hpp>
@@ -97,10 +96,10 @@ struct x300_dboard_iface_config_t
 };
 
 uhd::usrp::dboard_iface::sptr x300_make_dboard_iface(const x300_dboard_iface_config_t &);
-uhd::uart_iface::sptr x300_make_uart_iface(wb_iface::sptr iface);
+uhd::uart_iface::sptr x300_make_uart_iface(uhd::wb_iface::sptr iface);
 
-wb_iface::sptr x300_make_ctrl_iface_enet(uhd::transport::udp_simple::sptr udp);
-wb_iface::sptr x300_make_ctrl_iface_pcie(nirio_interface::niriok_proxy& drv_proxy);
+uhd::wb_iface::sptr x300_make_ctrl_iface_enet(uhd::transport::udp_simple::sptr udp);
+uhd::wb_iface::sptr x300_make_ctrl_iface_pcie(nirio_interface::niriok_proxy& drv_proxy);
 
 struct x300_impl : public uhd::device
 {
@@ -159,7 +158,7 @@ struct x300_impl : public uhd::device
         nifpga_interface::nifpga_session::sptr  rio_fpga_interface;
 
         //perifs in the zpu
-        wb_iface::sptr zpu_ctrl;
+        uhd::wb_iface::sptr zpu_ctrl;
         spi_core_3000::sptr zpu_spi;
         i2c_core_100_wb32::sptr zpu_i2c;
 
@@ -186,12 +185,12 @@ struct x300_impl : public uhd::device
     std::vector<mboard_members_t> _mb;
 
     //task for periodically reclaiming the device from others
-    void claimer_loop(wb_iface::sptr);
-    static bool is_claimed(wb_iface::sptr);
+    void claimer_loop(uhd::wb_iface::sptr);
+    static bool is_claimed(uhd::wb_iface::sptr);
 
     boost::mutex _transport_setup_mutex;
 
-    void register_loopback_self_test(wb_iface::sptr iface);
+    void register_loopback_self_test(uhd::wb_iface::sptr iface);
 
     void setup_radio(const size_t, const size_t which_radio, const std::string &db_name);
 
@@ -256,13 +255,13 @@ struct x300_impl : public uhd::device
     void update_clock_source(mboard_members_t&, const std::string &);
     void update_time_source(mboard_members_t&, const std::string &);
 
-    uhd::sensor_value_t get_ref_locked(wb_iface::sptr);
+    uhd::sensor_value_t get_ref_locked(uhd::wb_iface::sptr);
 
     void set_db_eeprom(uhd::i2c_iface::sptr i2c, const size_t, const uhd::usrp::dboard_eeprom_t &);
     void set_mb_eeprom(uhd::i2c_iface::sptr i2c, const uhd::usrp::mboard_eeprom_t &);
 
-    void check_fw_compat(const uhd::fs_path &mb_path, wb_iface::sptr iface);
-    void check_fpga_compat(const uhd::fs_path &mb_path, wb_iface::sptr iface);
+    void check_fw_compat(const uhd::fs_path &mb_path, uhd::wb_iface::sptr iface);
+    void check_fpga_compat(const uhd::fs_path &mb_path, uhd::wb_iface::sptr iface);
 
     void update_atr_leds(gpio_core_200_32wo::sptr, const std::string &ant);
     boost::uint64_t get_fp_gpio(gpio_core_200::sptr, const std::string &);

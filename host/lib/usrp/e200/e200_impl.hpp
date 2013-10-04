@@ -75,7 +75,7 @@ struct e200_impl : public uhd::device
 
     e200_fifo_interface::sptr _fifo_iface;
 
-    void register_loopback_self_test(wb_iface::sptr iface);
+    void register_loopback_self_test(uhd::wb_iface::sptr iface);
 
     //perifs in the radio core
     struct radio_perifs_t
@@ -116,7 +116,7 @@ struct e200_impl : public uhd::device
     void update_tx_subdev_spec(const uhd::usrp::subdev_spec_t &spec);
 
     ad9361_ctrl::sptr _codec_ctrl;
-    void codec_loopback_self_test(wb_iface::sptr iface);
+    void codec_loopback_self_test(uhd::wb_iface::sptr iface);
 
     //server stuff for network access
     void run_server(const std::string &port, const std::string &what);
