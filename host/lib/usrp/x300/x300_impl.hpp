@@ -28,7 +28,7 @@
 #include "wb_iface.hpp"
 #include "x300_clock_ctrl.hpp"
 #include "x300_fw_common.h"
-#include "x300_fw_ctrl.hpp"
+#include <uhd/transport/udp_simple.hpp>
 #include <uhd/utils/tasks.hpp>
 #include "spi_core_3000.hpp"
 #include "x300_adc_ctrl.hpp"
@@ -98,6 +98,9 @@ struct x300_dboard_iface_config_t
 
 uhd::usrp::dboard_iface::sptr x300_make_dboard_iface(const x300_dboard_iface_config_t &);
 uhd::uart_iface::sptr x300_make_uart_iface(wb_iface::sptr iface);
+
+wb_iface::sptr x300_make_ctrl_iface_enet(uhd::transport::udp_simple::sptr udp);
+wb_iface::sptr x300_make_ctrl_iface_pcie(nirio_interface::niriok_proxy& drv_proxy);
 
 struct x300_impl : public uhd::device
 {

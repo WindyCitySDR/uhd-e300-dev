@@ -15,10 +15,8 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 //
 
-#ifndef INCLUDED_X300_FW_CTRL_HPP
-#define INCLUDED_X300_FW_CTRL_HPP
-
 #include "wb_iface.hpp"
+#include "x300_fw_common.h"
 #include <uhd/transport/udp_simple.hpp>
 #include <uhd/utils/byteswap.hpp>
 #include <uhd/utils/msg.hpp>
@@ -269,4 +267,12 @@ private:
     static const uint32_t READ_TIMEOUT_IN_MS = 10;
 };
 
-#endif /* INCLUDED_X300_FW_CTRL_HPP */
+wb_iface::sptr x300_make_ctrl_iface_enet(uhd::transport::udp_simple::sptr udp)
+{
+    return wb_iface::sptr(new x300_ctrl_iface_enet(udp));
+}
+
+wb_iface::sptr x300_make_ctrl_iface_pcie(nirio_interface::niriok_proxy& drv_proxy)
+{
+    return wb_iface::sptr(new x300_ctrl_iface_pcie(drv_proxy));
+}
