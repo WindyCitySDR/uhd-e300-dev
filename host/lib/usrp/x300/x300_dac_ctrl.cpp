@@ -62,7 +62,7 @@ public:
         write_ad9146_reg(0x0A, 0xA0); // See above.
 
         /* Verify PLL is Locked */
-        const time_spec_t exit_time = time_spec_t::get_system_time() + time_spec_t(0.5);
+        const time_spec_t exit_time = time_spec_t::get_system_time() + time_spec_t(1.0);
         while (true)
         {
             const size_t reg_e = read_ad9146_reg(0x0E); /* Expect bit 7 = 0, bit 6 = 1 */
