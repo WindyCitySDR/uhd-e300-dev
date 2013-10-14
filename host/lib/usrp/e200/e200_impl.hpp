@@ -43,6 +43,8 @@ static std::string E200_SERVER_TX_PORT = "321757";
 static std::string E200_SERVER_CTRL_PORT = "321758";
 static std::string E200_SERVER_CODEC_PORT = "321759";
 
+static const double E200_DEFAULT_TICK_RATE = 32e6;
+
 /*!
  * USRP-E200 implementation guts:
  * The implementation details are encapsulated here.
@@ -73,7 +75,7 @@ struct e200_impl : public uhd::device
 
     e200_fifo_interface::sptr _fifo_iface;
 
-    void register_loopback_self_test(wb_iface::sptr iface);
+    void register_loopback_self_test(uhd::wb_iface::sptr iface);
 
     //perifs in the radio core
     struct radio_perifs_t
@@ -114,7 +116,7 @@ struct e200_impl : public uhd::device
     void update_tx_subdev_spec(const uhd::usrp::subdev_spec_t &spec);
 
     ad9361_ctrl::sptr _codec_ctrl;
-    void codec_loopback_self_test(wb_iface::sptr iface);
+    void codec_loopback_self_test(uhd::wb_iface::sptr iface);
 
     //server stuff for network access
     void run_server(const std::string &port, const std::string &what);

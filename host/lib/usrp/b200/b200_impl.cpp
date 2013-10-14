@@ -88,8 +88,8 @@ static device_addrs_t b200_find(const device_addr_t &hint)
         catch(...){
             UHD_MSG(warning) << boost::format(
                 "Could not locate B200 firmware.\n"
-                "Please install the images package.\n"
-            );
+                "Please install the images package. %s\n"
+            ) % print_images_error();
             return b200_addrs;
         }
         UHD_LOG << "the firmware image: " << b200_fw_image << std::endl;
@@ -218,7 +218,12 @@ b200_impl::b200_impl(const device_addr_t &device_addr)
         device_addr.has_key("fpga")? device_addr["fpga"] : default_file_name
     );
 
-    _iface->load_fpga(b200_fpga_image);
+    boost::uint32_t status = _iface->load_fpga(b200_fpga_image);
+
+    if(status != 0) {
+        throw uhd::runtime_error(str(boost::format("fx3 is in state %1%") % status));
+    }
+
     _iface->reset_gpif();
 
     ////////////////////////////////////////////////////////////////////
@@ -324,7 +329,7 @@ b200_impl::b200_impl(const device_addr_t &device_addr)
         data_xport_args    // param hints
     );
     while (_data_transport->get_recv_buff(0.0)){} //flush ctrl xport
-    _demux.reset(new recv_packet_demuxer_3000(_data_transport));
+    _demux = recv_packet_demuxer_3000::make(_data_transport);
 
     ////////////////////////////////////////////////////////////////////
     // Init codec - turns on clocks

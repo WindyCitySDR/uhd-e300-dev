@@ -48,7 +48,7 @@
 static const std::string     B200_FW_FILE_NAME = "usrp_b200_fw.hex";
 static const std::string     B200_FPGA_FILE_NAME = "usrp_b200_fpga.bin";
 static const std::string     B210_FPGA_FILE_NAME = "usrp_b210_fpga.bin";
-static const boost::uint8_t  B200_FW_COMPAT_NUM_MAJOR = 0x02;
+static const boost::uint8_t  B200_FW_COMPAT_NUM_MAJOR = 0x03;
 static const boost::uint8_t  B200_FW_COMPAT_NUM_MINOR = 0x00;
 static const boost::uint16_t B200_FPGA_COMPAT_NUM = 0x02;
 static const double          B200_LINK_RATE_BPS = (5e9)/8; //practical link rate (5 Gbps)
@@ -108,7 +108,7 @@ struct b200_impl : public uhd::device
     //transports
     uhd::transport::zero_copy_if::sptr _data_transport;
     uhd::transport::zero_copy_if::sptr _ctrl_transport;
-    boost::shared_ptr<uhd::usrp::recv_packet_demuxer_3000> _demux;
+    uhd::usrp::recv_packet_demuxer_3000::sptr _demux;
 
     //device properties interface
     uhd::property_tree::sptr get_tree(void) const
@@ -132,8 +132,8 @@ struct b200_impl : public uhd::device
     boost::shared_ptr<AsyncTaskData> _async_task_data;
     void handle_async_task(uhd::transport::zero_copy_if::sptr, boost::shared_ptr<AsyncTaskData>);
 
-    void register_loopback_self_test(wb_iface::sptr iface);
-    void codec_loopback_self_test(wb_iface::sptr iface);
+    void register_loopback_self_test(uhd::wb_iface::sptr iface);
+    void codec_loopback_self_test(uhd::wb_iface::sptr iface);
     void set_mb_eeprom(const uhd::usrp::mboard_eeprom_t &);
     void check_fw_compat(void);
     void check_fpga_compat(void);

@@ -25,10 +25,9 @@
 #include <uhd/usrp/dboard_eeprom.hpp>
 #include <uhd/usrp/subdev_spec.hpp>
 #include <uhd/types/sensors.hpp>
-#include "wb_iface.hpp"
 #include "x300_clock_ctrl.hpp"
 #include "x300_fw_common.h"
-#include "x300_fw_ctrl.hpp"
+#include <uhd/transport/udp_simple.hpp>
 #include <uhd/utils/tasks.hpp>
 #include "spi_core_3000.hpp"
 #include "x300_adc_ctrl.hpp"
@@ -40,17 +39,18 @@
 #include "tx_dsp_core_3000.hpp"
 #include "i2c_core_100_wb32.hpp"
 #include "radio_ctrl_core_3000.hpp"
+#include "rx_frontend_core_200.hpp"
 #include "gpio_core_200.hpp"
 #include <boost/weak_ptr.hpp>
 #include <uhd/usrp/gps_ctrl.hpp>
 #include <uhd/transport/bounded_buffer.hpp>
 #include <uhd/transport/nirio/niusrprio_session.h>
 #include <uhd/transport/vrt_if_packet.hpp>
-
+#include "recv_packet_demuxer_3000.hpp"
 
 static const size_t X300_TX_FC_PKT_WINDOW = 2048; //16MB/8Kpkts
 static const std::string X300_FW_FILE_NAME = "usrp_x300_fw.bin";
-static const double X300_DEFAULT_TICK_RATE = 120e6;
+static const double X300_DEFAULT_TICK_RATE = 200e6;
 static const double X300_BUS_CLOCK_RATE = 175000000;
 static const bool X300_ENABLE_RX_FC = false;
 static const size_t X300_PCIE_DATA_FRAME_SIZE = 8192;   //bytes
@@ -96,7 +96,10 @@ struct x300_dboard_iface_config_t
 };
 
 uhd::usrp::dboard_iface::sptr x300_make_dboard_iface(const x300_dboard_iface_config_t &);
-uhd::uart_iface::sptr x300_make_uart_iface(wb_iface::sptr iface);
+uhd::uart_iface::sptr x300_make_uart_iface(uhd::wb_iface::sptr iface);
+
+uhd::wb_iface::sptr x300_make_ctrl_iface_enet(uhd::transport::udp_simple::sptr udp);
+uhd::wb_iface::sptr x300_make_ctrl_iface_pcie(nirio_interface::niriok_proxy& drv_proxy);
 
 struct x300_impl : public uhd::device
 {
@@ -133,7 +136,11 @@ struct x300_impl : public uhd::device
         tx_vita_core_3000::sptr deframer;
         tx_dsp_core_3000::sptr duc;
         gpio_core_200_32wo::sptr leds;
+        rx_frontend_core_200::sptr rx_fe;
     };
+
+    //overflow recovery impl
+    void handle_overflow(radio_perifs_t &perif, boost::weak_ptr<uhd::rx_streamer> streamer);
 
     //vector of member objects per motherboard
     struct mboard_members_t
@@ -151,7 +158,7 @@ struct x300_impl : public uhd::device
         nifpga_interface::niusrprio_session::sptr  rio_fpga_interface;
 
         //perifs in the zpu
-        wb_iface::sptr zpu_ctrl;
+        uhd::wb_iface::sptr zpu_ctrl;
         spi_core_3000::sptr zpu_spi;
         i2c_core_100_wb32::sptr zpu_i2c;
 
@@ -172,16 +179,18 @@ struct x300_impl : public uhd::device
         int clock_control_regs__clock_source;
         int clock_control_regs__pps_select;
         int clock_control_regs__pps_out_enb;
+        int clock_control_regs__tcxo_enb;
+        int clock_control_regs__gpsdo_pwr;
     };
     std::vector<mboard_members_t> _mb;
 
     //task for periodically reclaiming the device from others
-    void claimer_loop(wb_iface::sptr);
-    static bool is_claimed(wb_iface::sptr);
+    void claimer_loop(uhd::wb_iface::sptr);
+    static bool is_claimed(uhd::wb_iface::sptr);
 
     boost::mutex _transport_setup_mutex;
 
-    void register_loopback_self_test(wb_iface::sptr iface);
+    void register_loopback_self_test(uhd::wb_iface::sptr iface);
 
     void setup_radio(const size_t, const size_t which_radio, const std::string &db_name);
 
@@ -194,16 +203,44 @@ struct x300_impl : public uhd::device
         boost::uint8_t router_dst_here;
     };
     boost::uint32_t allocate_sid(mboard_members_t &mb, const sid_config_t &config);
-    uhd::transport::zero_copy_if::sptr make_transport(
-        mboard_members_t &mb,
+
+    struct both_xports_t
+    {
+        uhd::transport::zero_copy_if::sptr recv;
+        uhd::transport::zero_copy_if::sptr send;
+    };
+    both_xports_t make_transport(
+        const size_t mb_index,
         const uint8_t& destination,
         const uint8_t& prefix,
         const uhd::device_addr_t& args,
         boost::uint32_t& sid);
 
+    ////////////////////////////////////////////////////////////////////
+    //
+    //Caching for transport interface re-use -- like sharing a DMA.
+    //The cache is optionally used by make_transport by use-case.
+    //The cache maps an ID string to a transport-ish object.
+    //The ID string identifies a purpose for the transport.
+    //
+    //For recv, there is a demux cache, which maps a ID string
+    //to a recv demux object. When a demux is used, the underlying transport
+    //must never be used outside of the demux. Use demux->make_proxy(sid).
+    //
+    uhd::dict<std::string, uhd::usrp::recv_packet_demuxer_3000::sptr> _demux_cache;
+    //
+    //For send, there is a shared send xport, which maps an ID string
+    //to a transport capable of sending buffers. Send transports
+    //can be shared amongst multiple callers, unlike recv.
+    //
+    uhd::dict<std::string, uhd::transport::zero_copy_if::sptr> _send_cache;
+    //
+    ////////////////////////////////////////////////////////////////////
 
     uhd::dict<std::string, uhd::usrp::dboard_manager::sptr> _dboard_managers;
     uhd::dict<std::string, uhd::usrp::dboard_iface::sptr> _dboard_ifaces;
+
+    void set_rx_fe_corrections(const uhd::fs_path &mb_path, const std::string &fe_name, const double lo_freq);
 
     void update_rx_subdev_spec(const size_t, const uhd::usrp::subdev_spec_t &spec);
     void update_tx_subdev_spec(const size_t, const uhd::usrp::subdev_spec_t &spec);
@@ -218,17 +255,17 @@ struct x300_impl : public uhd::device
     void update_clock_source(mboard_members_t&, const std::string &);
     void update_time_source(mboard_members_t&, const std::string &);
 
-    uhd::sensor_value_t get_ref_locked(wb_iface::sptr);
+    uhd::sensor_value_t get_ref_locked(uhd::wb_iface::sptr);
 
     void set_db_eeprom(uhd::i2c_iface::sptr i2c, const size_t, const uhd::usrp::dboard_eeprom_t &);
     void set_mb_eeprom(uhd::i2c_iface::sptr i2c, const uhd::usrp::mboard_eeprom_t &);
 
-    void check_fw_compat(const uhd::fs_path &mb_path, wb_iface::sptr iface);
-    void check_fpga_compat(const uhd::fs_path &mb_path, wb_iface::sptr iface);
+    void check_fw_compat(const uhd::fs_path &mb_path, uhd::wb_iface::sptr iface);
+    void check_fpga_compat(const uhd::fs_path &mb_path, uhd::wb_iface::sptr iface);
 
     void update_atr_leds(gpio_core_200_32wo::sptr, const std::string &ant);
     boost::uint64_t get_fp_gpio(gpio_core_200::sptr, const std::string &);
-    void set_fp_gpio(gpio_core_200::sptr, const std::string &, const boost::uint64_t);
+    void set_fp_gpio(const uhd::fs_path &mb_path, gpio_core_200::sptr, const std::string &, const boost::uint64_t);
 };
 
 #endif /* INCLUDED_X300_IMPL_HPP */

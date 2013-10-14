@@ -62,7 +62,7 @@ public:
         write_ad9146_reg(0x0A, 0xA0); // See above.
 
         /* Verify PLL is Locked */
-        const time_spec_t exit_time = time_spec_t::get_system_time() + time_spec_t(0.5);
+        const time_spec_t exit_time = time_spec_t::get_system_time() + time_spec_t(1.0);
         while (true)
         {
             const size_t reg_e = read_ad9146_reg(0x0E); /* Expect bit 7 = 0, bit 6 = 1 */
@@ -83,7 +83,7 @@ public:
         this->set_iq_swap(false);
         write_ad9146_reg(0x10, 0x48); // Choose data rate mode
         write_ad9146_reg(0x17, 0x04); // Issue software FIFO reset
-        write_ad9146_reg(0x18, 0x01); //
+        write_ad9146_reg(0x18, 0x02); //
         write_ad9146_reg(0x18, 0x00); //
         write_ad9146_reg(0x1B, 0xA4); // Enable inverse SINC
 

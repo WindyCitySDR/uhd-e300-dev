@@ -142,6 +142,32 @@ public:
     }
 
     /*!
+     * Flush all transports in the streamer:
+     * This calls into get_and_process_single_packet(),
+     * so the sequence and flow control are handled.
+     * However, the packet payload is discarded.
+     */
+    void flush_all(const double timeout = 0.0)
+    {
+        increment_buffer_info(); //increment to next buffer
+
+        for (size_t i = 0; i < _props.size(); i++)
+        {
+            while (true) //while (_props.at(i).get_buff(timeout));
+            {
+                //receive a single packet from the transport
+                try
+                {
+                    if (get_and_process_single_packet(i,
+                        get_prev_buffer_info(),
+                        get_curr_buffer_info(),
+                    timeout) == PACKET_TIMEOUT_ERROR) break;
+                }catch(...){}
+            }
+        }
+    }
+
+    /*!
      * Set the function to handle flow control
      * \param xport_chan which transport channel
      * \param handle_flowctrl the callback function

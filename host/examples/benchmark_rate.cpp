@@ -80,7 +80,7 @@ void benchmark_rx_rate(uhd::usrp::multi_usrp::sptr usrp, const std::string &rx_c
 
         case uhd::rx_metadata_t::ERROR_CODE_OVERFLOW:
             had_an_overflow = true;
-            last_time = md.time_spec;
+	    last_time = md.time_spec;
             num_overflows++;
             break;
 
@@ -226,7 +226,7 @@ int UHD_SAFE_MAIN(int argc, char *argv[]){
     boost::split(channel_strings, channel_list, boost::is_any_of("\"',"));
     for(size_t ch = 0; ch < channel_strings.size(); ch++){
         size_t chan = boost::lexical_cast<int>(channel_strings[ch]);
-        if(chan >= usrp->get_tx_num_channels() or chan >= usrp->get_tx_num_channels()){
+        if(chan >= usrp->get_tx_num_channels() or chan >= usrp->get_rx_num_channels()){
             throw std::runtime_error("Invalid channel(s) specified.");
         }
         else channel_nums.push_back(boost::lexical_cast<int>(channel_strings[ch]));
