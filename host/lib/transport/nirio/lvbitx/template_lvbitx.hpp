@@ -9,6 +9,8 @@ namespace nifpga_interface {{
 
 class {lvbitx_classname}_lvbitx : public nifpga_lvbitx {{
 public:
+    explicit {lvbitx_classname}_lvbitx(const char* option);
+
     virtual const char* get_bitfile_path();
     virtual const char* get_signature();
 
@@ -31,6 +33,9 @@ public:
     static const char* INDICATORS[];
     static const char* OUTPUT_FIFOS[];
     static const char* INPUT_FIFOS[];
+
+private:
+    std::string fpga_file_name;
 }};
 
 }}

@@ -1,6 +1,7 @@
 {autogen_msg}
 
 #include "{lvbitx_classname}_lvbitx.hpp"
+#include <string>
 
 namespace nifpga_interface {{
 
@@ -18,8 +19,13 @@ const char* {lvbitx_classname}_lvbitx::OUTPUT_FIFOS[] = {{{out_fifo_list}
 const char* {lvbitx_classname}_lvbitx::INPUT_FIFOS[] = {{{in_fifo_list}
 }};
 
+{lvbitx_classname}_lvbitx::{lvbitx_classname}_lvbitx(const char* option) :
+    fpga_file_name("{lvbitx_path}" + std::string(option) + ".lvbitx")
+{{
+}}
+
 const char* {lvbitx_classname}_lvbitx::get_bitfile_path() {{
-    return "{lvbitx_path}";
+    return fpga_file_name.c_str();
 }}
 
 const char* {lvbitx_classname}_lvbitx::get_signature() {{

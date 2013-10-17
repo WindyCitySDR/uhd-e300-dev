@@ -123,12 +123,20 @@ static device_addrs_t x300_find_pcie(const device_addr_t &hint)
 
         niriok_proxy kernel_proxy;
         kernel_proxy.open(dev_info.interface_path);
+        boost::uint32_t pid;
+        kernel_proxy.get_attribute(kRioProductNumber, pid);
+        new_addr["subtype"] = (pid == X310_PCIE_SSID) ? "x310" : "x300";
+
         //Attempt to read the name from the EEPROM and perform filtering.
         //This operation can throw due to compatibility mismatch.
         try
         {
             wb_iface::sptr zpu_ctrl = x300_make_ctrl_iface_pcie(kernel_proxy);
             if (x300_impl::is_claimed(zpu_ctrl)) continue; //claimed by another process
+
+            //If only support two options: HG: eth0 is 1G, XG: eth0 is 10G. Both options have eth1 as 10G.
+            bool eth0XG = (zpu_ctrl->peek32(SR_ADDR(SET0_BASE, ZPU_RB_ETH_TYPE0)) == 0x1);
+            new_addr["fpga-option"] = eth0XG ? "XG" : "HG";
 
             i2c_core_100_wb32::sptr zpu_i2c = i2c_core_100_wb32::make(zpu_ctrl, I2C1_BASE);
             i2c_iface::sptr eeprom16 = zpu_i2c->eeprom16();
@@ -301,9 +309,12 @@ void x300_impl::setup_mb(const size_t mb_i, const uhd::device_addr_t &dev_addr)
         nirio_status status = 0;
         nirio_status_chain(nifpga_session::load_lib(), status);
 
-        //@TODO: When we can tell the X300 and X310 apart, instantiate the correct LVBITX
-        //       objest here. Both of them are codegen'ed currently.
-        nifpga_lvbitx::sptr lvbitx(new x310_lvbitx());
+        nifpga_lvbitx::sptr lvbitx;
+        if (dev_addr["subtype"] == "x310") {
+            new x310_lvbitx(dev_addr["fpga-option"].c_str());
+        } else {
+            new x300_lvbitx(dev_addr["fpga-option"].c_str());
+        }
 
         UHD_MSG(status) << boost::format("Loading bitfile %s...\n") % lvbitx->get_signature();
         mb.rio_fpga_interface.reset(new nifpga_session(dev_addr["resource"]));
@@ -393,10 +404,10 @@ void x300_impl::setup_mb(const size_t mb_i, const uhd::device_addr_t &dev_addr)
     {
         switch (boost::lexical_cast<boost::uint16_t>(mb_eeprom["product"]))
         {
-        case 0x7736:
+        case X300_PCIE_SSID:
             product_name = "X300";
             break;
-        case 0x76CA:
+        case X310_PCIE_SSID:
             product_name = "X310";
             break;
         default: UHD_MSG(error) << "X300 unknown product code: " << mb_eeprom["product"] << std::endl;
