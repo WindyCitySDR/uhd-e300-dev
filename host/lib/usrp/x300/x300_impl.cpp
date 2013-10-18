@@ -340,12 +340,10 @@ void x300_impl::setup_mb(const size_t mb_i, const uhd::device_addr_t &dev_addr)
         }
 
         //Load the lvbitx onto the device
-        UHD_MSG(status) << boost::format("Loading bitfile %s...\n") % lvbitx->get_bitfile_path();
+        UHD_MSG(status) << boost::format("Loading LVBITX bitfile %s...\n") % lvbitx->get_bitfile_path();
         mb.rio_fpga_interface.reset(new niusrprio_session(dev_addr["resource"]));
-        nirio_status_chain(mb.rio_fpga_interface->open(lvbitx, niusrprio_session::OPEN_ATTR_FORCE_DOWNLOAD), status);
+        nirio_status_chain(mb.rio_fpga_interface->open(lvbitx), status);
         nirio_status_to_exception(status, "x300_impl: Could not initialize RIO session.");
-
-        UHD_MSG(status) << boost::format("LVBITX signature is %s...\n") % lvbitx->get_signature();
     }
 
     BOOST_FOREACH(const std::string &key, dev_addr.keys())

@@ -140,7 +140,7 @@ if (options.merge_bin is not None):
 		root.find('Bitstream').text = bitstream_b64_lb
 		root.find('BitstreamMD5').text = bitstream_md5
 
-codegen_transform['lvbitx_signature'] = str.upper(root.find('BitstreamMD5').text + root.find('SignatureRegister').text)
+codegen_transform['lvbitx_signature'] = str.upper(root.find('SignatureRegister').text)
 
 # Write BIN file
 bitstream = base64.b64decode(root.find('Bitstream').text)
