@@ -40,6 +40,7 @@ namespace nirio_interface
 
 	niriok_proxy::~niriok_proxy()
 	{
+	    close();
 	}
 
 	nirio_status niriok_proxy::open(const std::string& interface_path)

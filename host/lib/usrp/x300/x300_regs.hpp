@@ -68,6 +68,8 @@ localparam ZPU_SR_ETHINT1    = 56;
 localparam ZPU_RB_SPI = 2;
 localparam ZPU_RB_CLK_STATUS = 3;
 localparam ZPU_RB_COMPAT_NUM = 6;
+localparam ZPU_RB_ETH_TYPE0  = 4;
+localparam ZPU_RB_ETH_TYPE1  = 5;
 
 //spi slaves on radio
 #define DB_DAC_SEN (1 << 7)
@@ -85,7 +87,8 @@ localparam ZPU_RB_COMPAT_NUM = 6;
 
 static const uint32_t X300_PCIE_VID         = 0x1093;
 static const uint32_t X300_PCIE_PID         = 0xC4C4;
-static const uint32_t X300_PCIE_SSID        = 0x76CA;
+static const uint32_t X300_PCIE_SSID        = 0x7736;
+static const uint32_t X310_PCIE_SSID        = 0x76CA;
 
 static const uint32_t PCIE_FPGA_ADDR_BASE   = 0x80000;
 #define PCIE_FPGA_REG(X)                    (PCIE_FPGA_ADDR_BASE + X)

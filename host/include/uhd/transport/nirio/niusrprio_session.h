@@ -93,6 +93,9 @@ public:
 
     nirio_status download_bitstream_to_flash(const std::string& bitstream_path);
 
+    //Static
+    static nirio_interface::niriok_proxy::sptr create_kernel_proxy(const std::string& resource_name);
+
 	static const uint32_t OPEN_ATTR_SKIP_SIGNATURE_CHECK	= 1 << 31;
 	static const uint32_t OPEN_ATTR_FORCE_DOWNLOAD 			= 1 << 29;
 

@@ -46,8 +46,16 @@ using namespace nirio_interface;
 namespace asio = boost::asio;
 
 /***********************************************************************
- * Discovery over the udp transport
+ * Discovery over the udp and pcie transport
  **********************************************************************/
+static std::string get_fpga_option(wb_iface::sptr zpu_ctrl) {
+    //1G = {0:1G, 1:1G}, HG = {0:1G, 1:10G}, XG = {0:10G, 1:10G}
+    bool eth0XG = (zpu_ctrl->peek32(SR_ADDR(SET0_BASE, ZPU_RB_ETH_TYPE0)) == 0x1);
+    bool eth1XG = (zpu_ctrl->peek32(SR_ADDR(SET0_BASE, ZPU_RB_ETH_TYPE1)) == 0x1);
+    return (eth0XG && eth1XG) ? "XG" : (eth1XG ? "HG" : "1G");
+}
+
+//@TODO: Refactor the find functions to collapse common code for ethernet and PCIe
 static device_addrs_t x300_find_with_addr(const device_addr_t &hint)
 {
     udp_simple::sptr comm = udp_simple::make_broadcast(
@@ -81,6 +89,11 @@ static device_addrs_t x300_find_with_addr(const device_addr_t &hint)
         {
             wb_iface::sptr zpu_ctrl = x300_make_ctrl_iface_enet(udp_simple::make_connected(new_addr["addr"], BOOST_STRINGIZE(X300_FW_COMMS_UDP_PORT)));
             if (x300_impl::is_claimed(zpu_ctrl)) continue; //claimed by another process
+
+            //Attempt to autodetect the FPGA type
+            if (not hint.has_key("fpga")) {
+                new_addr["fpga"] = get_fpga_option(zpu_ctrl);
+            }
 
             i2c_core_100_wb32::sptr zpu_i2c = i2c_core_100_wb32::make(zpu_ctrl, I2C1_BASE);
             i2c_iface::sptr eeprom16 = zpu_i2c->eeprom16();
@@ -124,12 +137,18 @@ static device_addrs_t x300_find_pcie(const device_addr_t &hint, bool explicit_qu
 
         niriok_proxy kernel_proxy;
         kernel_proxy.open(dev_info.interface_path);
+
         //Attempt to read the name from the EEPROM and perform filtering.
         //This operation can throw due to compatibility mismatch.
         try
         {
             wb_iface::sptr zpu_ctrl = x300_make_ctrl_iface_pcie(kernel_proxy);
             if (x300_impl::is_claimed(zpu_ctrl)) continue; //claimed by another process
+
+            //Attempt to autodetect the FPGA type
+            if (not hint.has_key("fpga")) {
+                new_addr["fpga"] = get_fpga_option(zpu_ctrl);
+            }
 
             i2c_core_100_wb32::sptr zpu_i2c = i2c_core_100_wb32::make(zpu_ctrl, I2C1_BASE);
             i2c_iface::sptr eeprom16 = zpu_i2c->eeprom16();
@@ -301,15 +320,32 @@ void x300_impl::setup_mb(const size_t mb_i, const uhd::device_addr_t &dev_addr)
     if (mb.xport_path == "nirio")
     {
         nirio_status status = 0;
-        //@TODO: When we can tell the X300 and X310 apart, instantiate the correct LVBITX
-        //       objest here. Both of them are codegen'ed currently.
-        nifpga_lvbitx::sptr lvbitx(new x310_lvbitx());
 
-        UHD_MSG(status) << boost::format("Loading bitfile %s...\n") % lvbitx->get_signature();
+        //Detect the PCIe product ID to distinguish between X300 and X310
+        boost::uint32_t pid;
+        nirio_interface::niriok_proxy::sptr discovery_proxy =
+            niusrprio_session::create_kernel_proxy(dev_addr["resource"]);
+        if (discovery_proxy) {
+            nirio_status_chain(discovery_proxy->get_attribute(kRioProductNumber, pid), status);
+            discovery_proxy->close();
+        }
+        nirio_status_to_exception(status, "x300_impl: Could not detect device type. Please ensure that that x300 device drivers are loaded and the device has a valid FPGA bitstream.");
+
+        //Instantiate the correct lvbitx object
+        nifpga_lvbitx::sptr lvbitx;
+        if (pid == X310_PCIE_SSID) {
+            lvbitx.reset(new x310_lvbitx(dev_addr["fpga"].c_str()));
+        } else {
+            lvbitx.reset(new x300_lvbitx(dev_addr["fpga"].c_str()));
+        }
+
+        //Load the lvbitx onto the device
+        UHD_MSG(status) << boost::format("Loading bitfile %s...\n") % lvbitx->get_bitfile_path();
         mb.rio_fpga_interface.reset(new niusrprio_session(dev_addr["resource"]));
         nirio_status_chain(mb.rio_fpga_interface->open(lvbitx, niusrprio_session::OPEN_ATTR_FORCE_DOWNLOAD), status);
-
         nirio_status_to_exception(status, "x300_impl: Could not initialize RIO session.");
+
+        UHD_MSG(status) << boost::format("LVBITX signature is %s...\n") % lvbitx->get_signature();
     }
 
     BOOST_FOREACH(const std::string &key, dev_addr.keys())
@@ -393,10 +429,10 @@ void x300_impl::setup_mb(const size_t mb_i, const uhd::device_addr_t &dev_addr)
     {
         switch (boost::lexical_cast<boost::uint16_t>(mb_eeprom["product"]))
         {
-        case 0x7736:
+        case X300_PCIE_SSID:
             product_name = "X300";
             break;
-        case 0x76CA:
+        case X310_PCIE_SSID:
             product_name = "X310";
             break;
         default: UHD_MSG(error) << "X300 unknown product code: " << mb_eeprom["product"] << std::endl;

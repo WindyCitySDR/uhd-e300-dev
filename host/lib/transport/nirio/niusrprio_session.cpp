@@ -111,4 +111,22 @@ nirio_status niusrprio_session::download_bitstream_to_flash(const std::string& b
     return status;
 }
 
+nirio_interface::niriok_proxy::sptr niusrprio_session::create_kernel_proxy(const std::string& resource_name)
+{
+    usrprio_rpc::usrprio_rpc_client temp_rpc_client(RPC_CLIENT_ARGS);
+    nirio_status status = temp_rpc_client.get_ctor_status();
+
+    std::string interface_path;
+    nirio_status_chain(temp_rpc_client.niusrprio_get_interface_path(resource_name, interface_path), status);
+
+    nirio_interface::niriok_proxy::sptr proxy;
+    if (nirio_status_not_fatal(status)) {
+        proxy.reset(new nirio_interface::niriok_proxy());
+        if (proxy) nirio_status_chain(proxy->open(interface_path), status);
+    }
+
+    return proxy;
+}
+
+
 }

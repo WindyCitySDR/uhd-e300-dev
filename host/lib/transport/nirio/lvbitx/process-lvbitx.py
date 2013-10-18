@@ -47,7 +47,7 @@ codegen_transform = {}
 
 # General info
 codegen_transform['autogen_msg'] = '// Auto-generated file: DO NOT EDIT!\n// Generated from a LabVIEW FPGA LVBITX image using "process-lvbitx.py"'
-codegen_transform['lvbitx_path'] = os.path.join(options.uhd_images_path, class_name + '_fpga.lvbitx').replace('\\', '\\\\')
+codegen_transform['lvbitx_path'] = os.path.join(options.uhd_images_path, 'usrp_' + class_name + '_fpga_').replace('\\', '\\\\')
 codegen_transform['lvbitx_classname'] = class_name
 codegen_transform['lvbitx_classname_u'] = class_name.upper()
 bitstream_version = root.find('BitstreamVersion').text
