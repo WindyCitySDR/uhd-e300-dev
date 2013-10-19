@@ -12,7 +12,7 @@
 
 void usage()
 {
-  fprintf(stderr,"Usage: vrlp_dump [-h host_ip] filename.pcap\n");
+  fprintf(stderr,"Usage: chdr_dump [-h host_ip] filename.pcap\n");
   exit(2);
 }
 
@@ -36,15 +36,18 @@ int main(int argc, char *argv[])
   // const struct eth_header *eth_header;
   const struct ip_header *ip_header;
   const struct udp_header *udp_header;
-  const struct vrlp_header *vrlp_header;
-  const struct vrt_header *vrt_header;
+  //const struct vrlp_header *vrlp_header;
+  //const struct vrt_header *vrt_header;
+  const struct chdr_header *chdr_header;
   const struct chdr_sid *chdr_sid;
 
+  u32 *dump_header;
 
 
   host_addr.s_addr = 0x0;
-
-  while ((c = getopt(argc, argv, "h:")) != -1) {
+  //usrp_addr.s_addr = 0x0;
+ 
+  while ((c = getopt(argc, argv, "h:u:")) != -1) {
     switch(c) {
     case 'h':
       // Explicit IP address for host on command line
@@ -63,6 +66,24 @@ int main(int argc, char *argv[])
       if  (**conversion_error != '\0') 
 	usage();
       break;
+    case 'u':
+      // Explicit IP address for USRP on command line
+      if (*optarg == '\0')
+	usage();
+      usrp_addr.s_addr = strtol(strtok(optarg,"."),conversion_error,10) ;
+      if  (**conversion_error != '\0')
+      	usage();
+      usrp_addr.s_addr = usrp_addr.s_addr | strtol(strtok(NULL,"."),conversion_error,10) << 8;
+      if  (**conversion_error != '\0')
+       	usage();
+      usrp_addr.s_addr = usrp_addr.s_addr | strtol(strtok(NULL,"."),conversion_error,10) << 16;
+      if  (**conversion_error != '\0')
+       	usage();
+      usrp_addr.s_addr = usrp_addr.s_addr | strtol(strtok(NULL,"\0"),conversion_error,10) << 24;
+      if  (**conversion_error != '\0')
+	usage();
+      break;
+
     case'?':
     default:
       usage();
@@ -75,8 +96,7 @@ int main(int argc, char *argv[])
 
   // Just a mandatory pcap filename for now, better parser and options later.
   if (argc != 2) {
-    fprintf(stderr,"Usage: vrlp_dump  <PCAPFILENAME>\n");
-    return(2);
+    usage();
   }
 
 
@@ -87,7 +107,7 @@ int main(int argc, char *argv[])
   origin_ts = malloc(sizeof(struct timeval));
 
   // Go read matching packets from capture file into memory
-  get_udp_port_from_file(VRLP_PORT,argv[1],packet_buffer,origin_ts);
+  get_udp_port_from_file(CHDR_PORT,argv[1],packet_buffer,origin_ts);
 
   // Extract origin tome of first packet and convert to uS.
   origin_ts_in_us = origin_ts->tv_sec * 1000000 + origin_ts->tv_usec;                                                                                                                                                                       
@@ -106,7 +126,7 @@ int main(int argc, char *argv[])
   fprintf(stdout,"\n Total matching packet count in capture file: %d\n",x);
   fprintf(stdout,"\n===================================================================\n\n");
   
-  // If no packets were VRLP then just exit now
+  // If no packets were CHDR then just exit now
   if (x == 0) {
     exit(0);
   }
@@ -163,40 +183,31 @@ int main(int argc, char *argv[])
   while (packet_buffer->current != NULL) {
     x++;
 
-    // Overlay IP header on packet payload	
-    ip_header = (struct ip_header *)(packet_buffer->current->payload+ETH_SIZE);
-
-    // Overlay VRLP header on packet payload
-    vrlp_header = (struct vrlp_header *)(packet_buffer->current->payload+ETH_SIZE+IP_SIZE+UDP_SIZE);
-
-    // Overlay VRT header on packet payload
-    vrt_header = (struct vrt_header *)(packet_buffer->current->payload+ETH_SIZE+IP_SIZE+UDP_SIZE+VRLP_SIZE);
-
-    // Overlay CHDR SID definition on VRT SID.
-    chdr_sid = (struct chdr_sid *)&(vrt_header->vrt_sid);
-
     // Calculate time offset of this packet from start
     time_since_start = ((double) packet_buffer->current->ts.tv_sec * 1000000 + packet_buffer->current->ts.tv_usec - origin_ts_in_us)/1000000;
 
-    // Is it VRT inside VRLP?
-    if ((vrlp_header->vrlp_start) != 0x504C5256) // VRLP start code
-      {
-	fprintf(stdout,"%8d %f NOT VRLP. %x\n",x,time_since_start,vrlp_header->vrlp_start);
-      }
-    else
-      {
-	// Implicitly VRT encapuslauted in VRLP.
-	// Extract the device portion of the SID to see which packet flow this belongs in
-	y = (int) &chdr_sid->src_endpoint;
-	fprintf(stdout,"%8d %f \t",x,time_since_start);
-	print_direction(packet_buffer,&host_addr,&usrp_addr);
-	fprintf(stdout,"\t");
-	print_sid(packet_buffer);
-	fprintf(stdout,"\t");
-	print_vita_header(packet_buffer,&host_addr);
-	fprintf(stdout,"\n");
-	
-      }
+
+     dump_header = (u32 *) (packet_buffer->current->payload+ETH_SIZE+IP_SIZE+UDP_SIZE); 
+
+  fprintf(stdout,"DUMP: %08x %08x %08x %08x %08x %08x\n", 
+ 	  swapint((int) *(dump_header)), 
+ 	  swapint((int) *(dump_header+1)), 
+ 	  swapint((int) *(dump_header+2)), 
+ 	  swapint((int) *(dump_header+3)), 
+ 	  swapint((int) *(dump_header+4)), 
+	  swapint((int) *(dump_header+5))); 
+
+    // Extract the device portion of the SID to see which packet flow this belongs in 
+
+    y = (int) &chdr_sid->src_endpoint;
+    fprintf(stdout,"%8d %f \t",x,time_since_start);
+    print_direction(packet_buffer,&host_addr,&usrp_addr);
+    fprintf(stdout,"\t");
+    print_sid(packet_buffer);
+    fprintf(stdout,"\t");
+    print_vita_header(packet_buffer,&host_addr);
+    fprintf(stdout,"\n");
+
     packet_buffer->current = packet_buffer->current->next;
 
   }

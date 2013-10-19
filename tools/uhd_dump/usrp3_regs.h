@@ -22,7 +22,7 @@ const struct radio_ctrl_names reg_list[] =
     {100, "SR_RX_CTRL_MAXLEN"},
     {101, "SR_RX_CTRL_SID"},
     {102, "SR_RX_CTRL_WINDOW_SIZE"},
-    {103, "SR_RX_CTRL_WINODW_ENABLE"},
+    {103, "SR_RX_CTRL_WINDOW_ENABLE"},
     {128, "SR_TIME_HI"},
     {129, "SR_TIME_LO"},
     {130, "SR_TIME_CTRL"},
@@ -38,6 +38,11 @@ const struct radio_ctrl_names reg_list[] =
     {198, "SR_LEDS_TX"},
     {199, "SR_LEDS_FDX"},
     {200, "SR_LEDS_DDR"},
+    {208, "SR_SWAP_IQ"},
+    {209, "SR_MAG_CORR"},
+    {210, "SR_PHASE_CORR"},
+    {211, "SR_RX_DC_OFFSET_I"},
+    {212, "SR_RX_DC_OFFSET_Q"},
     {999, "NOT FOUND"}
   }
 ;
