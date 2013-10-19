@@ -13,50 +13,50 @@
 // Swap endianness of 64bits
 unsigned long swaplong (unsigned long nLongNumber)
 {
-   union u {unsigned long vi; unsigned char c[sizeof(unsigned long)];}; 
+   union u {unsigned long vi; unsigned char c[sizeof(unsigned long)];};
    union v {unsigned long ni; unsigned char d[sizeof(unsigned long)];};
-   union u un; 
-   union v vn; 
-   un.vi = nLongNumber; 
-   vn.d[0]=un.c[7]; 
-   vn.d[1]=un.c[6]; 
-   vn.d[2]=un.c[5]; 
-   vn.d[3]=un.c[4]; 
-   vn.d[4]=un.c[3]; 
-   vn.d[5]=un.c[2]; 
-   vn.d[6]=un.c[1]; 
-   vn.d[7]=un.c[0]; 
+   union u un;
+   union v vn;
+   un.vi = nLongNumber;
+   vn.d[0]=un.c[7];
+   vn.d[1]=un.c[6];
+   vn.d[2]=un.c[5];
+   vn.d[3]=un.c[4];
+   vn.d[4]=un.c[3];
+   vn.d[5]=un.c[2];
+   vn.d[6]=un.c[1];
+   vn.d[7]=un.c[0];
 
-   return (vn.ni); 
+   return (vn.ni);
 }
 
 // Swap endianness of 32bits
 unsigned int swapint (unsigned int nIntNumber)
 {
-   union u {unsigned int vi; unsigned char c[sizeof(unsigned long)];}; 
+   union u {unsigned int vi; unsigned char c[sizeof(unsigned long)];};
    union v {unsigned int ni; unsigned char d[sizeof(unsigned long)];};
-   union u un; 
-   union v vn; 
-   un.vi = nIntNumber; 
-   vn.d[0]=un.c[3]; 
-   vn.d[1]=un.c[2]; 
-   vn.d[2]=un.c[1]; 
-   vn.d[3]=un.c[0]; 
-   return (vn.ni); 
+   union u un;
+   union v vn;
+   un.vi = nIntNumber;
+   vn.d[0]=un.c[3];
+   vn.d[1]=un.c[2];
+   vn.d[2]=un.c[1];
+   vn.d[3]=un.c[0];
+   return (vn.ni);
 }
 
 // Swap Endianness of 16bits
 unsigned short swapshort (unsigned short nShortNumber)
 {
-   union u {unsigned short vi; unsigned char c[sizeof(unsigned short)];}; 
+   union u {unsigned short vi; unsigned char c[sizeof(unsigned short)];};
    union v {unsigned short ni; unsigned char d[sizeof(unsigned short)];};
-   union u un; 
-   union v vn; 
-   un.vi = nShortNumber; 
-   vn.d[0]=un.c[1]; 
-   vn.d[1]=un.c[0]; 
+   union u un;
+   union v vn;
+   un.vi = nShortNumber;
+   vn.d[0]=un.c[1];
+   vn.d[1]=un.c[0];
 
-   return (vn.ni); 
+   return (vn.ni);
 }
 
 // Format time from pcap as ascii style.
@@ -100,11 +100,11 @@ void get_packet(struct pbuf_info *packet_buffer , const struct pcap_pkthdr *head
   // Get size of new packet
   packet_buffer->current->size = header->caplen;
   packet_buffer->current->orig_size = header->len;
-  
+
   // Allocate memory for packet
   packet_buffer->current->payload = (char *)malloc((size_t)packet_buffer->current->size);
 
-  // Copy Packet into buffer 
+  // Copy Packet into buffer
   memcpy(packet_buffer->current->payload,packet,packet_buffer->current->size);
   packet_buffer->current->ts = header->ts;
 
@@ -114,7 +114,7 @@ void get_packet(struct pbuf_info *packet_buffer , const struct pcap_pkthdr *head
   packet_buffer->current = packet_buffer->current->next;
 }
 
-// This grabs the (absolute) time stamp of the first packet in the cature file, which can be used to 
+// This grabs the (absolute) time stamp of the first packet in the cature file, which can be used to
 // derive times relative to the start of the capture file for cross correlation with interactive work
 // in Wireshark
 void get_start_time(struct timeval *ts , const struct pcap_pkthdr *header, const u_char *packet)
@@ -124,10 +124,10 @@ void get_start_time(struct timeval *ts , const struct pcap_pkthdr *header, const
 
 void get_udp_port_from_file(const u16 udp_port, const char *filename, struct pbuf_info *packet_buffer, struct timeval *ts)
 {
-  pcap_t *handle;			// Session handle 
-  char errbuf[PCAP_ERRBUF_SIZE];	// Error string 
-  char filter_exp[256];	                // The ascii filter expression 
-  struct bpf_program filter;     	// The compiled filter 
+  pcap_t *handle;			// Session handle
+  char errbuf[PCAP_ERRBUF_SIZE];	// Error string
+  char filter_exp[256];	                // The ascii filter expression
+  struct bpf_program filter;     	// The compiled filter
 
   // Open PCAP file for read capture time stamp of first packet
   if ((handle = pcap_open_offline(filename,errbuf)) == NULL) {
@@ -144,7 +144,7 @@ void get_udp_port_from_file(const u16 udp_port, const char *filename, struct pbu
 
   // Close file again because no way to rewind file descriptor.
   pcap_close(handle);
-  
+
   // Open PCAP file for read.
   if ((handle = pcap_open_offline(filename,errbuf)) == NULL) {
     fprintf(stderr,"Can't open pcap file for reading: %s\n",errbuf);
@@ -181,7 +181,7 @@ void get_udp_port_from_file(const u16 udp_port, const char *filename, struct pbu
   if ( packet_buffer->start == packet_buffer->current) {
     free(packet_buffer->current);
     packet_buffer->start = packet_buffer->current = NULL;
-  } else {	
+  } else {
     // Note the last used buffer in the list. Removed allocated but unused buffer from list and free
     packet_buffer->end = packet_buffer->current->last;
     packet_buffer->end->next = NULL;
@@ -194,9 +194,9 @@ void get_udp_port_from_file(const u16 udp_port, const char *filename, struct pbu
 //
 void get_everything_from_file(const char *filename, struct pbuf_info *packet_buffer, struct timeval *ts)
 {
-  pcap_t *handle;			// Session handle 
-  char errbuf[PCAP_ERRBUF_SIZE];	// Error string 
-  
+  pcap_t *handle;			// Session handle
+  char errbuf[PCAP_ERRBUF_SIZE];	// Error string
+
   // Open PCAP file for read capture time stamp of first packet
   if ((handle = pcap_open_offline(filename,errbuf)) == NULL) {
     fprintf(stderr,"Can't open pcap file for reading: %s\n",errbuf);
@@ -213,7 +213,7 @@ void get_everything_from_file(const char *filename, struct pbuf_info *packet_buf
   // Close file again because no way to rewind file descriptor.
   pcap_close(handle);
 
-  // Open PCAP file for read 
+  // Open PCAP file for read
   if ((handle = pcap_open_offline(filename,errbuf)) == NULL) {
     fprintf(stderr,"Can't open pcap file for reading: %s\n",errbuf);
     exit(2);
@@ -233,7 +233,7 @@ void get_everything_from_file(const char *filename, struct pbuf_info *packet_buf
   if ( packet_buffer->start == packet_buffer->current) {
     free(packet_buffer->current);
     packet_buffer->start = packet_buffer->current = NULL;
-  } else {	
+  } else {
     // Note the last used buffer in the list. Removed allocated but unused buffer from list and free
     packet_buffer->end = packet_buffer->current->last;
     packet_buffer->end->next = NULL;
@@ -243,7 +243,7 @@ void get_everything_from_file(const char *filename, struct pbuf_info *packet_buf
 
 
 // Debug
-void print_raw( struct pbuf_info *packet_buffer, int count)
+void print_raw(const struct pbuf_info *packet_buffer, const int count)
 {
   const u8 *raw;
   int x;
@@ -254,7 +254,7 @@ void print_raw( struct pbuf_info *packet_buffer, int count)
 }
 
 // Print to STDOUT the direction of this packet flow
-void print_direction( struct pbuf_info *packet_buffer, struct in_addr *host_addr, struct in_addr *usrp_addr)
+void print_direction(const struct pbuf_info *packet_buffer, const struct in_addr *host_addr, const struct in_addr *usrp_addr)
 {
  const struct ip_header *ip_header;
 
@@ -270,7 +270,7 @@ void print_direction( struct pbuf_info *packet_buffer, struct in_addr *host_addr
 }
 
 // Print to STDOUT the CHDR SID decode
-void print_sid( struct pbuf_info *packet_buffer)
+void print_sid(const struct pbuf_info *packet_buffer)
 {
   const struct chdr_header *chdr_header;
   const struct chdr_sid *chdr_sid;
@@ -282,12 +282,12 @@ void print_sid( struct pbuf_info *packet_buffer)
   chdr_sid = (struct chdr_sid *)&(chdr_header->chdr_sid);
 
   fprintf(stdout,"%02x.%02x->%02x.%02x",chdr_sid->src_device,chdr_sid->src_endpoint,chdr_sid->dst_device,chdr_sid->dst_endpoint);
-}	  
+}
 
 // Print to STDOUT a decoded tx response packet payload.
-void print_tx_response(struct tx_response *tx_response)
+void print_tx_response(const struct tx_response *tx_response)
 {
-  switch(swapint(tx_response->error_code)) 
+  switch(swapint(tx_response->error_code))
     {
     case TX_ACK: fprintf(stdout,"ACK "); break;
     case TX_EOB: fprintf(stdout,"EOB "); break;
@@ -299,11 +299,11 @@ void print_tx_response(struct tx_response *tx_response)
     }
   fprintf(stdout,"for SeqID = %03x ",swapint(tx_response->seq_id)&0xFFF);
 }
-      
+
 
 
 // Returns Name of a register from it's address
-char *reg_addr_to_name(u32 addr)
+char *reg_addr_to_name(const u32 addr)
 {
   int x;
   x = 0;
@@ -313,7 +313,7 @@ char *reg_addr_to_name(u32 addr)
 }
 
 // Print to STDOUT decode of CHDR header including time if present.
-void print_vita_header( struct pbuf_info *packet_buffer, struct in_addr *host_addr)
+void print_vita_header(const struct pbuf_info *packet_buffer, const struct in_addr *host_addr)
 {
   const struct ip_header *ip_header;
   const struct chdr_header *chdr_header;
@@ -327,7 +327,7 @@ void print_vita_header( struct pbuf_info *packet_buffer, struct in_addr *host_ad
   u8 endpoint;
   int has_time;
 
-  // Overlay IP header on packet payload	
+  // Overlay IP header on packet payload
   ip_header = (struct ip_header *)(packet_buffer->current->payload+ETH_SIZE);
 
   // Overlay CHDR header on packet payload
@@ -347,19 +347,19 @@ void print_vita_header( struct pbuf_info *packet_buffer, struct in_addr *host_ad
 
   if ((swapint(chdr_header->chdr_type) & EXT_CONTEXT) == EXT_CONTEXT)  fprintf(stdout,"Context Ext ");
   else  fprintf(stdout,"IF Data     ");
-      
+
   // Determine USRP Sink/Src Endpoint
   if (direction==H2U)
-    endpoint = (chdr_sid->dst_endpoint) & 0x3; 
+    endpoint = (chdr_sid->dst_endpoint) & 0x3;
   else if (direction==U2H)
     endpoint = (chdr_sid->src_endpoint) & 0x3;
-    
+
   // Look for CHDR EOB flags.
   if ((swapint(chdr_header->chdr_type) & EOB) == EOB)  fprintf(stdout,"EOB ");
   else fprintf(stdout,"    ");
 
   // Is there embeded VITA time?
-  if ((swapint(chdr_header->chdr_type) & HAS_TIME) == HAS_TIME) {  
+  if ((swapint(chdr_header->chdr_type) & HAS_TIME) == HAS_TIME) {
     vita_time = (struct vita_time *)(packet_buffer->current->payload+ETH_SIZE+IP_SIZE+UDP_SIZE+CHDR_SIZE);
     fprintf(stdout,"Time=%016lx ",swaplong(vita_time->time));
     has_time = 1;
@@ -369,11 +369,11 @@ void print_vita_header( struct pbuf_info *packet_buffer, struct in_addr *host_ad
   }
 
   fprintf(stdout,"SeqID=%03x  ",(swapint(chdr_header->chdr_type)>>16)&0xFFF);
-  
+
   // Print Payload
   if (endpoint == RADIO)
-    { 
-      if ((swapint(chdr_header->chdr_type) & EXT_CONTEXT) != EXT_CONTEXT) 
+    {
+      if ((swapint(chdr_header->chdr_type) & EXT_CONTEXT) != EXT_CONTEXT)
 	{
 	  if (direction == H2U)
 	    {
@@ -385,7 +385,7 @@ void print_vita_header( struct pbuf_info *packet_buffer, struct in_addr *host_ad
 	      fprintf(stdout,"RX IF Data ");
 	    }
 	}
-      else if ((swapint(chdr_header->chdr_type) & EXT_CONTEXT) == EXT_CONTEXT) 
+      else if ((swapint(chdr_header->chdr_type) & EXT_CONTEXT) == EXT_CONTEXT)
 	{
 	  if (direction == H2U)
 	    {
@@ -396,8 +396,6 @@ void print_vita_header( struct pbuf_info *packet_buffer, struct in_addr *host_ad
 	    {
 	      // TX Response packet.
 	      tx_response = (struct tx_response *) (packet_buffer->current->payload+ETH_SIZE+IP_SIZE+UDP_SIZE+CHDR_SIZE+(has_time?VITA_TIME_SIZE:0));
-	      //	      print_tx_response((struct tx_response *)(packet_buffer->current->payload+ETH_SIZE+IP_SIZE+UDP_SIZE+CHDR_SIZE+(VITA_TIME_SIZE*has_time)));   
-	      fprintf(stdout,"pntr: %x %x ",(int) packet_buffer->current->payload,(int)tx_response);
 	      print_tx_response(tx_response);
 	    }
 	}
@@ -405,36 +403,36 @@ void print_vita_header( struct pbuf_info *packet_buffer, struct in_addr *host_ad
   else if (endpoint == RADIO_CTRL)
     {
       fprintf(stdout,"\t\t\t");
-      if ((swapint(chdr_header->chdr_type) & EXT_CONTEXT) != EXT_CONTEXT) 
+      if ((swapint(chdr_header->chdr_type) & EXT_CONTEXT) != EXT_CONTEXT)
 	{
 	  // BAD PACKET
 	}
-      else if ((swapint(chdr_header->chdr_type) & EXT_CONTEXT) == EXT_CONTEXT) 
+      else if ((swapint(chdr_header->chdr_type) & EXT_CONTEXT) == EXT_CONTEXT)
 	{
-	if (direction == H2U) 
+	if (direction == H2U)
 	    {
-	      radio_ctrl_payload = (struct radio_ctrl_payload *)(packet_buffer->current->payload+ETH_SIZE+IP_SIZE+UDP_SIZE+CHDR_SIZE+(VITA_TIME_SIZE*has_time));   
+	      radio_ctrl_payload = (struct radio_ctrl_payload *)(packet_buffer->current->payload+ETH_SIZE+IP_SIZE+UDP_SIZE+CHDR_SIZE+(VITA_TIME_SIZE*has_time));
 	      fprintf(stdout,"Radio Ctrl (%s)=0x%08x",reg_addr_to_name(swapint(radio_ctrl_payload->addr)),swapint(radio_ctrl_payload->data));
 	    }
 	  else
 	    // U2H
-	    {	    
-	      radio_response = (struct radio_response *)(packet_buffer->current->payload+ETH_SIZE+IP_SIZE+UDP_SIZE+CHDR_SIZE+(VITA_TIME_SIZE*has_time));   
+	    {
+	      radio_response = (struct radio_response *)(packet_buffer->current->payload+ETH_SIZE+IP_SIZE+UDP_SIZE+CHDR_SIZE+(VITA_TIME_SIZE*has_time));
 	      fprintf(stdout,"Radio Response = 0x%016lx",swaplong(radio_response->data));
 	    }
-	}  
+	}
     }
   else if (endpoint == SRC_FLOW_CTRL)
     {
-      if  ((swapint(chdr_header->chdr_type) & EXT_CONTEXT) != EXT_CONTEXT) 
+      if  ((swapint(chdr_header->chdr_type) & EXT_CONTEXT) != EXT_CONTEXT)
 	{
 	  // BAD PACKET
 	}
-      else if  ((swapint(chdr_header->chdr_type) & EXT_CONTEXT) == EXT_CONTEXT) 
+      else if  ((swapint(chdr_header->chdr_type) & EXT_CONTEXT) == EXT_CONTEXT)
 	{
-	  if (direction == H2U) 
+	  if (direction == H2U)
 	    {
-	      src_flow_ctrl = (struct src_flow_ctrl *)(packet_buffer->current->payload+ETH_SIZE+IP_SIZE+UDP_SIZE+CHDR_SIZE+(VITA_TIME_SIZE*has_time));   
+	      src_flow_ctrl = (struct src_flow_ctrl *)(packet_buffer->current->payload+ETH_SIZE+IP_SIZE+UDP_SIZE+CHDR_SIZE+(VITA_TIME_SIZE*has_time));
 	      fprintf(stdout,"Src Flow Ctrl = 0x%04x",swapint(src_flow_ctrl->seq_id));
 	    }
 	  else
@@ -448,11 +446,10 @@ void print_vita_header( struct pbuf_info *packet_buffer, struct in_addr *host_ad
 }
 
 
-// Find IP addresses for Host and USRP in this Session 
+// Find IP addresses for Host and USRP in this Session
 
-void get_connection_endpoints( struct pbuf_info *packet_buffer, struct in_addr *host_addr, struct in_addr *usrp_addr)
+void get_connection_endpoints( struct pbuf_info *packet_buffer,  struct in_addr *host_addr, struct in_addr *usrp_addr)
 {
-  int x;                                // Local scratch variables
   const struct ip_header *ip_header;
   const struct chdr_header *chdr_header;
   const struct chdr_sid *chdr_sid;
@@ -475,7 +472,7 @@ void get_connection_endpoints( struct pbuf_info *packet_buffer, struct in_addr *
 
     // Overlay CHDR SID definition on CHDR SID.
     chdr_sid = (struct chdr_sid *)&(chdr_header->chdr_sid);
-    
+
 
     // Catagorise stream
     // CHDR is actually quite hard to conclusively detect, the following deductions help...
@@ -508,12 +505,12 @@ void get_connection_endpoints( struct pbuf_info *packet_buffer, struct in_addr *
 	    host_addr->s_addr = ip_header->ip_dst.s_addr;
 	    break;
 	  }
-	else 
+	else
 	  {
 	    fprintf(stderr,"Malformed CHDR packet, SID is unexpected value: 0x%x",swapint(chdr_header->chdr_sid));
 	  }
       }
-    packet_buffer->current = packet_buffer->current->next;		  
+    packet_buffer->current = packet_buffer->current->next;
   }
 
   if (host_addr->s_addr == 0) {

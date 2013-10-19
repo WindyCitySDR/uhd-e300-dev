@@ -9,7 +9,7 @@
 #define UNKNOWN 2
 
 // Define directions for Host->USRP & USRP->Host
-#define H2U 0 
+#define H2U 0
 #define U2H 1
 
 // Endpoint encodings for USRP3 from SID LSB's
@@ -52,7 +52,7 @@ Ethernet header structure
 
 struct ethernet_header {
   u8 eth_dst[6]; // MAC addr of destination
-  u8 eth_src[6]; // MAC addr of source 
+  u8 eth_src[6]; // MAC addr of source
   u16 eth_typ;   // Payload protocol type
 };
 
@@ -133,14 +133,12 @@ struct udp_header {
 
 
 /*
-Ettus Research CHDR header 
-NOTE: Network byte order (Big Endian)
+Ettus Research CHDR header
+NOTE: Little endian byte order (must be unswizzled)
 */
 
 struct chdr_header {
-  //u16 chdr_type; // [15] Ext Context, [14] RSVD, [13] Has_time, [12] EOB], [11:0] SEQ_ID
-  //u16 chdr_size; // Number of bytes in CHDR packet including headers and payload.
-  u32 chdr_type;
+  u32 chdr_type;// [31] Ext Context, [30] RSVD, [29] Has_time, [28] EOB], [27:16] SEQ_ID, [15:0] Size
   u32 chdr_sid; // Stream ID
 };
 
@@ -154,10 +152,6 @@ struct chdr_sid {
   u8 src_endpoint;
   u8 dst_device;
   u8 dst_endpoint;
- /*  u8 dst_endpoint; */
-/*   u8 dst_device; */
-/*   u8 src_endpoint; */
-/*   u8 src_device; */
 };
 
 struct radio_ctrl_payload {
@@ -202,7 +196,7 @@ struct vita_time {
 struct pbuf {
   struct pbuf *next;
   struct pbuf *last;
-  struct timeval ts;  
+  struct timeval ts;
   int size;                 // Size stored in pcap file
   int orig_size;            // Original capture size on the wire
   char *payload;
@@ -223,7 +217,7 @@ struct radio_ctrl_names {
 //
 // Prototypes
 //
-  
+
 unsigned long swaplong (unsigned long);
 unsigned int swapint (unsigned int);
 unsigned short swapshort (unsigned short);
@@ -235,8 +229,8 @@ void get_start_time(struct timeval * , const struct pcap_pkthdr *, const u_char 
 void get_udp_port_from_file(u16, const char *, struct pbuf_info *, struct timeval *);
 void get_everything_from_file(const char *, struct pbuf_info *, struct timeval *);
 void get_connection_endpoints( struct pbuf_info *, struct in_addr *, struct in_addr *);
-void print_direction( struct pbuf_info *, struct in_addr *, struct in_addr *);
-void print_sid( struct pbuf_info *);
-void print_vita_header( struct pbuf_info *, struct in_addr *);
+void print_direction(const struct pbuf_info *, const struct in_addr *, const struct in_addr *);
+void print_sid( const struct pbuf_info *);
+void print_vita_header( const struct pbuf_info *, const struct in_addr *);
 
-#endif 
+#endif
