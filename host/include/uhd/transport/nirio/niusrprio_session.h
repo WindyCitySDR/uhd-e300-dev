@@ -100,7 +100,7 @@ public:
 	static const uint32_t OPEN_ATTR_FORCE_DOWNLOAD 			= 1 << 29;
 
 private:
-	void _init_fifo_info(nirio_interface::nirio_fifo_info_vtr& vtr);
+	nirio_status _verify_posc_and_signature();
 
 	std::string								_resource_name;
 	nifpga_lvbitx::sptr                     _lvbitx;

@@ -9,6 +9,8 @@
 #include <uhd/transport/nirio/nirio_fifo.h>
 #include <uhd/transport/nirio/status.h>
 #include <boost/thread/locks.hpp>
+#include <boost/format.hpp>
+#include <boost/algorithm/string.hpp>
 #include <stdio.h>
 #include <fstream>
 
@@ -70,6 +72,8 @@ nirio_status niusrprio_session::open(
 		_lvbitx->init_register_info(reg_vtr);
 		_lvbitx->init_fifo_info(fifo_vtr);
 		_resource_manager.initialize(reg_vtr, fifo_vtr);
+
+		nirio_status_chain(_verify_posc_and_signature(), status);
 	}
 
 	_process_lock.release();
@@ -126,6 +130,50 @@ nirio_interface::niriok_proxy::sptr niusrprio_session::create_kernel_proxy(const
     }
 
     return proxy;
+}
+
+nirio_status niusrprio_session::_verify_posc_and_signature() {
+    nirio_status status = 0;
+    boost::uint32_t reg_data = 0xffffffff;
+    boost::posix_time::ptime start_time = boost::posix_time::microsec_clock::local_time();
+    boost::posix_time::time_duration elapsed;
+
+    static const boost::uint32_t READ_TIMEOUT_IN_MS = 100;
+    static const boost::uint32_t POSC_STATUS_REG = 0x58;
+    nirio_status_chain(_riok_proxy.set_attribute(kRioAddressSpace, kRioAddressSpaceBusInterface), status);
+    if (nirio_status_not_fatal(status)) {
+        do {
+            boost::this_thread::sleep(boost::posix_time::microsec(5000)); //Avoid flooding the bus
+            elapsed = boost::posix_time::microsec_clock::local_time() - start_time;
+            nirio_status_chain(_riok_proxy.peek(POSC_STATUS_REG, reg_data), status);
+        } while (
+            nirio_status_not_fatal(status) &&
+            (reg_data == 1) &&
+            elapsed.total_milliseconds() < READ_TIMEOUT_IN_MS);
+    }
+
+    if (elapsed.total_milliseconds() > READ_TIMEOUT_IN_MS) nirio_status_chain(NiRio_Status_CommunicationTimeout, status);
+
+    if (nirio_status_not_fatal(status)) {
+        boost::uint32_t sig_offset = 0;
+        nirio_status_chain(_riok_proxy.get_attribute(kRioFpgaDefaultSignatureOffset, sig_offset), status);
+        nirio_status_chain(_riok_proxy.set_attribute(kRioAddressSpace, kRioAddressSpaceFpga), status);
+        std::string signature;
+        for (int i = 0; i < 8; i++) {
+            boost::uint32_t quarter_sig;
+            nirio_status_chain(_riok_proxy.peek(sig_offset, quarter_sig), status);
+            signature += boost::str(boost::format("%08x") % quarter_sig);
+        }
+
+        std::string expected_signature(_lvbitx->get_signature());
+        boost::to_upper(signature);
+        boost::to_upper(expected_signature);
+        if (signature.find(expected_signature) == std::string::npos) {
+            nirio_status_chain(NiRio_Status_SignatureMismatch, status);
+        }
+    }
+
+    return status;
 }
 
 

@@ -31,7 +31,7 @@
         </Datatype>
         <FlattenedType/>
         <Grouping/>
-        <Offset>65524</Offset>
+        <Offset>262132</Offset>
         <SizeInBits>128</SizeInBits>
         <Class>0</Class>
         <Internal>true</Internal>
@@ -56,7 +56,7 @@
         </Datatype>
         <FlattenedType/>
         <Grouping/>
-        <Offset>65532</Offset>
+        <Offset>262140</Offset>
         <SizeInBits>32</SizeInBits>
         <Class>0</Class>
         <Internal>true</Internal>
@@ -81,7 +81,7 @@
         </Datatype>
         <FlattenedType/>
         <Grouping/>
-        <Offset>65528</Offset>
+        <Offset>262136</Offset>
         <SizeInBits>32</SizeInBits>
         <Class>0</Class>
         <Internal>true</Internal>
@@ -106,7 +106,7 @@
         </Datatype>
         <FlattenedType/>
         <Grouping/>
-        <Offset>65508</Offset>
+        <Offset>262116</Offset>
         <SizeInBits>32</SizeInBits>
         <Class>0</Class>
         <Internal>true</Internal>
@@ -131,7 +131,7 @@
         </Datatype>
         <FlattenedType/>
         <Grouping/>
-        <Offset>65516</Offset>
+        <Offset>262124</Offset>
         <SizeInBits>32</SizeInBits>
         <Class>0</Class>
         <Internal>true</Internal>
@@ -156,7 +156,7 @@
         </Datatype>
         <FlattenedType/>
         <Grouping/>
-        <Offset>65520</Offset>
+        <Offset>262128</Offset>
         <SizeInBits>32</SizeInBits>
         <Class>0</Class>
         <Internal>true</Internal>
@@ -186,7 +186,7 @@
     </Icon>
   </VI>
   <Project>
-    <TargetClass>USRP X300; USRP X310; USRP-294XR; USRP-295XR</TargetClass>
+    <TargetClass>294XR; 295XR</TargetClass>
     <AutoRunWhenDownloaded>false</AutoRunWhenDownloaded>
     <CompilationResultsTree>
       <CompilationResults>
