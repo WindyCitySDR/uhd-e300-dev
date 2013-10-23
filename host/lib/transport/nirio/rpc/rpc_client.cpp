@@ -44,6 +44,7 @@ rpc_client::rpc_client (
         tcp::resolver::query query(tcp::v4(), server, port);
         tcp::resolver::iterator iterator = resolver.resolve(query);
         boost::asio::connect(_socket, iterator);
+        UHD_LOG << "rpc_client connected to server." << std::endl;
 
         try {
             //Perform handshake
@@ -61,17 +62,21 @@ rpc_client::rpc_client (
                 _hshake_args_client.version >= _hshake_args_server.oldest_comp_version &&
                 status)
             {
+                UHD_LOG << "rpc_client bound to server." << std::endl;
                 _wait_for_next_response_header();
 
                 //Spawn a thread for the io_service callback handler. This thread will run until rpc_client is destroyed.
                 _io_service_thread.reset(new boost::thread(boost::bind(&boost::asio::io_service::run, &_io_service)));
             } else {
+                UHD_LOG << "rpc_client handshake failed." << std::endl;
                 _exec_err.assign(boost::asio::error::connection_refused, boost::system::system_category());
             }
         } catch (boost::exception&) {
+            UHD_LOG << "rpc_client handshake aborted." << std::endl;
             _exec_err.assign(boost::asio::error::connection_refused, boost::system::system_category());
         }
     } catch (boost::exception&) {
+        UHD_LOG << "rpc_client connection request cancelled/aborted." << std::endl;
         _exec_err.assign(boost::asio::error::connection_aborted, boost::system::system_category());
     }
 }
@@ -112,15 +117,18 @@ const boost::system::error_code& rpc_client::call(
         //Wait for response using condition variable
         if (status) {
             if (!_exec_gate.timed_wait(lock, timeout)) {
+                UHD_LOG << "rpc_client function timed out." << std::endl;
                 _exec_err.assign(boost::asio::error::timed_out, boost::system::system_category());
             }
         } else {
+            UHD_LOG << "rpc_client connection dropped." << std::endl;
             _exec_err.assign(boost::asio::error::connection_aborted, boost::system::system_category());
             _stop_io_service();
         }
 
         //Verify that we are talking to the correct endpoint
         if ((_request.header.client_id != _response.header.client_id) && !_exec_err) {
+            UHD_LOG << "rpc_client confused about who its talking to." << std::endl;
             _exec_err.assign(boost::asio::error::operation_aborted, boost::system::system_category());
         }
 
@@ -148,6 +156,7 @@ void rpc_client::_handle_response_hdr(const boost::system::error_code& err, size
                     _response.data.size()));
         } else {
             //Unexpected response. Ignore it.
+            UHD_LOG << "rpc_client received garbage responses." << std::endl;
             _exec_err.assign(boost::asio::error::operation_aborted, boost::system::system_category());
 
             _wait_for_next_response_header();

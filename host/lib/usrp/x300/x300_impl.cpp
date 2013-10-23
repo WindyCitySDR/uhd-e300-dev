@@ -132,8 +132,8 @@ static device_addrs_t x300_find_pcie(const device_addr_t &hint, bool explicit_qu
         device_addr_t new_addr;
         new_addr["type"] = "x300";
         new_addr["resource"] = dev_info.resource_name;
-        std::string d_resource(dev_info.resource_name);
-        boost::to_upper(d_resource);
+        std::string resource_d(dev_info.resource_name);
+        boost::to_upper(resource_d);
 
         niriok_proxy kernel_proxy;
         kernel_proxy.open(dev_info.interface_path);
@@ -166,11 +166,11 @@ static device_addrs_t x300_find_pcie(const device_addr_t &hint, bool explicit_qu
         kernel_proxy.close();
 
         //filter the discovered device below by matching optional keys
-        std::string i_resource = hint.has_key("resource") ? hint["resource"] : "";
-        boost::to_upper(i_resource);
+        std::string resource_i = hint.has_key("resource") ? hint["resource"] : "";
+        boost::to_upper(resource_i);
 
         if (
-            (not hint.has_key("resource") or i_resource     == d_resource) and
+            (not hint.has_key("resource") or resource_i     == resource_d) and
             (not hint.has_key("name")     or hint["name"]   == new_addr["name"]) and
             (not hint.has_key("serial")   or hint["serial"] == new_addr["serial"])
         ){

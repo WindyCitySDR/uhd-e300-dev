@@ -23,6 +23,7 @@
 #include <boost/thread/thread.hpp>
 #include <boost/thread/condition_variable.hpp>
 #include "rpc_common.hpp"
+#include <uhd/utils/log.hpp>
 
 namespace usrprio_rpc {
 
@@ -64,9 +65,11 @@ private:
 
     inline void _stop_io_service() {
         if (_io_service_thread.get()) {
+            UHD_LOG << "rpc_client stopping..." << std::endl;
             _io_service.stop();
             _io_service_thread->join();
             _io_service_thread.reset();
+            UHD_LOG << "rpc_client stopped." << std::endl;
         }
     }
 
