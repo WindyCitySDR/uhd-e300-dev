@@ -90,7 +90,7 @@ static const uint32_t X300_PCIE_PID         = 0xC4C4;
 static const uint32_t X300_PCIE_SSID        = 0x7736;
 static const uint32_t X310_PCIE_SSID        = 0x76CA;
 
-static const uint32_t PCIE_FPGA_ADDR_BASE   = 0x80000;
+static const uint32_t PCIE_FPGA_ADDR_BASE   = 0xC0000;
 #define PCIE_FPGA_REG(X)                    (PCIE_FPGA_ADDR_BASE + X)
 
 static const uint32_t FPGA_X300_SIG_REG     = PCIE_FPGA_REG(0x0000);
@@ -120,9 +120,9 @@ static const uint32_t DMA_STATUS_ERROR      = 1;
 static const uint32_t PCIE_ROUTER_REG_BASE  = PCIE_FPGA_REG(0x0500);
 #define PCIE_ROUTER_REG(X)                  (PCIE_ROUTER_REG_BASE + X)
 
-static const uint32_t PCIE_ZPU_DATA_BASE    = 0x70000;
-static const uint32_t PCIE_ZPU_READ_BASE    = 0x60000;  //Trig and Status share the same base
-static const uint32_t PCIE_ZPU_STATUS_BASE  = 0x60000;
+static const uint32_t PCIE_ZPU_DATA_BASE    = 0x30000;
+static const uint32_t PCIE_ZPU_READ_BASE    = 0x20000;  //Trig and Status share the same base
+static const uint32_t PCIE_ZPU_STATUS_BASE  = 0x20000;
 
 #define PCIE_ZPU_DATA_REG(X)                (PCIE_FPGA_REG(PCIE_ZPU_DATA_BASE) + X)
 #define PCIE_ZPU_READ_REG(X)                (PCIE_FPGA_REG(PCIE_ZPU_READ_BASE) + X)

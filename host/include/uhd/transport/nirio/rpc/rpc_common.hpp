@@ -73,7 +73,7 @@ public:
 //[Internal] Serializer for RPC input parameters
 class func_args_writer_t {
 public:
-    explicit func_args_writer_t() : _stream(), _archive(_stream) {}
+    func_args_writer_t() : _stream(), _archive(_stream) {}
 
     template<typename data_t>
     void push(const data_t& d) {
@@ -104,16 +104,16 @@ private:
 //[Internal] Deserializer for RPC output parameters
 class func_args_reader_t {
 public:
-    explicit func_args_reader_t() : _stream(), _archive() {}
+    func_args_reader_t() : _stream(), _archive() {}
 
     template<typename data_t>
-    void pop(data_t& d) const {
+    void pull(data_t& d) const {
         if (_archive) (*_archive) >> d;
     }
 
     template<typename data_t>
     friend const func_args_reader_t& operator>> (const func_args_reader_t& in, data_t& data) {
-        in.pop(data);
+        in.pull(data);
         return in;
     }
 

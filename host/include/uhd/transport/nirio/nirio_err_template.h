@@ -15,7 +15,7 @@ NIRIO_ERR_INFO(NiRio_Status_FpgaAlreadyRunning, -61003, "The FPGA is already run
 NIRIO_ERR_INFO(NiRio_Status_DeviceTypeMismatch, -61024, "The bitfile was not compiled for the specified resource's device type.")
 NIRIO_ERR_INFO(NiRio_Status_CommunicationTimeout, -61046, "An error was detected in the communication between the host computer and the FPGA target.")
 NIRIO_ERR_INFO(NiRio_Status_IrqTimeout, -61060, "The timeout expired before any of the IRQs were asserted.")
-NIRIO_ERR_INFO(NiRio_Status_CorruptBitfile, -61070, "The timeout expired before any of the IRQs were asserted.")
+NIRIO_ERR_INFO(NiRio_Status_CorruptBitfile, -61070, "The LVBITX configuration bitstream seems to be corrupt.")
 NIRIO_ERR_INFO(NiRio_Status_BadDepth, -61072, "The requested FIFO depth is invalid. It is either 0 or an amount not supported by the hardware.")
 NIRIO_ERR_INFO(NiRio_Status_BadReadWriteCount, -61073, "The number of FIFO elements is invalid. Either the number is greater than the depth of the host memory DMA FIFO, or more elements were requested for release than had been acquired.")
 NIRIO_ERR_INFO(NiRio_Status_ClockLostLock, -61083, "A hardware clocking error occurred.")

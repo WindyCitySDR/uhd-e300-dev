@@ -59,15 +59,7 @@ OPTION( FPGA_IMAGES_DIR "Path to installed FPGA image files." "" )
 MESSAGE( STATUS "  LVBITX install directory: ${FPGA_IMAGES_DIR}" )
 
 # X300 Stuff
-# Uncomment this to enable LVBITX generation on-the-fly
-# SET( X300_FPGA_BIN "OFF" CACHE STRING "X300 FPGA config bitstream to generate LVBITX" )
-# OPTION( X300_FPGA_BIN "FPGA config bitstream to generate LVBITX" "" )
-# LIBUHD_LVBITX_GEN_SOURCE_AND_BITSTREAM(x300.lvbitx_base ${X300_FPGA_BIN})
 LIBUHD_LVBITX_GEN_SOURCE_AND_BITSTREAM(x300.lvbitx_base OFF)
 
 # X310 Stuff
-# Uncomment this to enable LVBITX generation on-the-fly
-# SET( X310_FPGA_BIN "OFF" CACHE STRING "X310 FPGA config bitstream to generate LVBITX" )
-# OPTION( X310_FPGA_BIN "FPGA config bitstream to generate LVBITX" "" )
-# LIBUHD_LVBITX_GEN_SOURCE_AND_BITSTREAM(x310.lvbitx_base ${X310_FPGA_BIN})
 LIBUHD_LVBITX_GEN_SOURCE_AND_BITSTREAM(x310.lvbitx_base OFF)
