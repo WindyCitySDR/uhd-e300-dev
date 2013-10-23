@@ -81,13 +81,18 @@ nirio_status usrprio_rpc_client::niusrprio_open_session(NIUSRPRIO_OPEN_SESSION_A
     in_args << signature;
     in_args << attribute;
 
+    //Open needs a longer timeout because the FPGA download can take upto 6 secs and the NiFpga libload can take 4.
+    static const boost::uint32_t OPEN_TIMEOUT = 15000;
     status = _boost_error_to_nirio_status(
-        _rpc_client.call(NIUSRPRIO_OPEN_SESSION, in_args, out_args, _timeout));
+        _rpc_client.call(NIUSRPRIO_OPEN_SESSION, in_args, out_args, boost::posix_time::milliseconds(OPEN_TIMEOUT)));
 
     if (nirio_status_not_fatal(status)) {
         out_args >> status;
         out_args >> session;
     }
+
+    //@TODO: Remove this when we have a fix for https://github.com/EttusResearch/uhddev/issues/177
+    boost::this_thread::sleep(boost::posix_time::milliseconds(1000));
 
     return status;
 }
