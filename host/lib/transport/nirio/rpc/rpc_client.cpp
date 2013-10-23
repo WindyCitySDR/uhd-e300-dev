@@ -19,7 +19,11 @@
 #include <boost/bind.hpp>
 
 #define CHAIN_BLOCKING_XFER(func, exp, status) \
-    if (status) status = (static_cast<size_t>((func)) == exp);
+    if (status) { \
+        status = (static_cast<size_t>((func)) == exp); \
+    } else { \
+        UHD_LOG << "rpc_client operation skipped: " #func "\n"; \
+    } \
 
 namespace usrprio_rpc {
 

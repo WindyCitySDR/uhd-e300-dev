@@ -81,9 +81,9 @@ public:
     }
 
     template<typename data_t>
-    friend func_args_writer_t& operator<< (func_args_writer_t& out, const data_t& data) {
-        out.push(data);
-        return out;
+    func_args_writer_t& operator<< (const data_t& data) {
+        push(data);
+        return *this;
     }
 
     void store(std::vector<char>& data) const {
@@ -112,9 +112,9 @@ public:
     }
 
     template<typename data_t>
-    friend const func_args_reader_t& operator>> (const func_args_reader_t& in, data_t& data) {
-        in.pull(data);
-        return in;
+    const func_args_reader_t& operator>> (data_t& data) const {
+        pull(data);
+        return *this;
     }
 
     void load(const std::vector<char>& data) {
