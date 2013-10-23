@@ -9,7 +9,7 @@
 #define UNKNOWN 2
 
 // Define directions for Host->USRP & USRP->Host
-#define H2U 0 
+#define H2U 0
 #define U2H 1
 
 // Endpoint encodings for USRP3 from SID LSB's
@@ -18,17 +18,22 @@
 #define SRC_FLOW_CTRL 2
 #define RESERVED 3
 
-// VRT Type definitions
-#define IF_DATA_NO_SID 0
-#define IF_DATA_WITH_SID 1
-#define EXT_DATA_NO_SID 2
-#define EXT_DATA_WITH_SID 3
-#define IF_CONTEXT 4
-#define EXT_CONTEXT 5
+/* // VRT Type definitions */
+/* #define IF_DATA_NO_SID 0 */
+/* #define IF_DATA_WITH_SID 1 */
+/* #define EXT_DATA_NO_SID 2 */
+/* #define EXT_DATA_WITH_SID 3 */
+/* #define IF_CONTEXT 4 */
+/* #define EXT_CONTEXT 5 */
+
+// CHDR bit masks
+#define EXT_CONTEXT 1<<31
+#define HAS_TIME 1<<29
+#define EOB 1<<28
 
 
-// UDP used as source for all VRLP comms.
-#define VRLP_PORT 49153
+// UDP used as source for all CHDR comms.
+#define CHDR_PORT 49153
 
 typedef unsigned char bool;
 typedef unsigned char u8;
@@ -47,7 +52,7 @@ Ethernet header structure
 
 struct ethernet_header {
   u8 eth_dst[6]; // MAC addr of destination
-  u8 eth_src[6]; // MAC addr of source 
+  u8 eth_src[6]; // MAC addr of source
   u16 eth_typ;   // Payload protocol type
 };
 
@@ -87,44 +92,57 @@ struct udp_header {
 
 #define UDP_SIZE 8
 
+/* /\* */
+/* VITA49 VRLP Header */
+/* NOTE: Network byte order (Big Endian) */
+/* *\/ */
+
+/* struct vrlp_header { */
+/*   u32 vrlp_start; // Hardcoded to ASCII "VRLP" */
+/*   u32 vrlp_size;  // [31:20] Frame Count, [19:0] Frame Size */
+/* }; */
+
+/* #define VRLP_SIZE 8 */
+
+/* #define VRLP_SEQID(x)  (((x & 0xff)<<4) | ((x & 0xf000) >> 12)) */
+
+/* /\* */
+/* VITA49 VRLP Trailer */
+/* NOTE: Network byte order (Big Endian) */
+/* *\/ */
+
+/* struct vrlp_trailer { */
+/*   u32 vrlp_end; // Hardcoded to ASCII "VEND" */
+/* }; */
+
+/* #define VRLP_TRAILER_SIZE 4 */
+
+/* /\* */
+/* VITA49 VRT Header  */
+/* NOTE: Network byte order (Big Endian) */
+/* *\/ */
+
+/* struct vrt_header { */
+/*   u8 vrt_type; // [7:4] type, [3] Class ID flag, [2] Trailer flag, [1] SOB, [0] EOB  */
+/*   u8 vrt_count; // [7:6] TSI, [5:4] TSF, [3:0] Packet Count modulo 16 */
+/*   u16 vrt_size; // Number of 32bit words in VRT packet including headers and payload. */
+/*   u32 vrt_sid; // Stream ID */
+/* }; */
+
+/* #define VRT_SIZE 8 */
+
+
 /*
-VITA49 VRLP Header
-NOTE: Network byte order (Big Endian)
+Ettus Research CHDR header
+NOTE: Little endian byte order (must be unswizzled)
 */
 
-struct vrlp_header {
-  u32 vrlp_start; // Hardcoded to ASCII "VRLP"
-  u32 vrlp_size;  // [31:20] Frame Count, [19:0] Frame Size
+struct chdr_header {
+  u32 chdr_type;// [31] Ext Context, [30] RSVD, [29] Has_time, [28] EOB], [27:16] SEQ_ID, [15:0] Size
+  u32 chdr_sid; // Stream ID
 };
 
-#define VRLP_SIZE 8
-
-#define VRLP_SEQID(x)  (((x & 0xff)<<4) | ((x & 0xf000) >> 12))
-
-/*
-VITA49 VRLP Trailer
-NOTE: Network byte order (Big Endian)
-*/
-
-struct vrlp_trailer {
-  u32 vrlp_end; // Hardcoded to ASCII "VEND"
-};
-
-#define VRLP_TRAILER_SIZE 4
-
-/*
-VITA49 VRT Header 
-NOTE: Network byte order (Big Endian)
-*/
-
-struct vrt_header {
-  u8 vrt_type; // [7:4] type, [3] Class ID flag, [2] Trailer flag, [1] SOB, [0] EOB 
-  u8 vrt_count; // [7:6] TSI, [5:4] TSF, [3:0] Packet Count modulo 16
-  u16 vrt_size; // Number of 32bit words in VRT packet including headers and payload.
-  u32 vrt_sid; // Stream ID
-};
-
-#define VRT_SIZE 8
+#define CHDR_SIZE 8
 
 /*
 Break down SID into CHDR defined fields
@@ -157,8 +175,6 @@ struct tx_response {
 #define TX_TIME_ERROR 0x08
 #define TX_MIDBURST_SEQ_ERROR 0x20
 
-
-
 struct src_flow_ctrl {
   u32 unused;
   u32 seq_id;
@@ -173,9 +189,6 @@ struct vita_time {
 #define RADIO_RESPONSE_SIZE 4
 
 
-
-
-
 /*
   Packet storage
 */
@@ -183,7 +196,7 @@ struct vita_time {
 struct pbuf {
   struct pbuf *next;
   struct pbuf *last;
-  struct timeval ts;  
+  struct timeval ts;
   int size;                 // Size stored in pcap file
   int orig_size;            // Original capture size on the wire
   char *payload;
@@ -204,7 +217,7 @@ struct radio_ctrl_names {
 //
 // Prototypes
 //
-  
+
 unsigned long swaplong (unsigned long);
 unsigned int swapint (unsigned int);
 unsigned short swapshort (unsigned short);
@@ -216,8 +229,8 @@ void get_start_time(struct timeval * , const struct pcap_pkthdr *, const u_char 
 void get_udp_port_from_file(u16, const char *, struct pbuf_info *, struct timeval *);
 void get_everything_from_file(const char *, struct pbuf_info *, struct timeval *);
 void get_connection_endpoints( struct pbuf_info *, struct in_addr *, struct in_addr *);
-void print_direction( struct pbuf_info *, struct in_addr *, struct in_addr *);
-void print_sid( struct pbuf_info *);
-void print_vita_header( struct pbuf_info *, struct in_addr *);
+void print_direction(const struct pbuf_info *, const struct in_addr *, const struct in_addr *);
+void print_sid( const struct pbuf_info *);
+void print_vita_header( const struct pbuf_info *, const struct in_addr *);
 
-#endif 
+#endif
