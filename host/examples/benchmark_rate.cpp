@@ -67,7 +67,16 @@ void benchmark_rx_rate(uhd::usrp::multi_usrp::sptr usrp, const std::string &rx_c
     cmd.stream_now = (buffs.size() == 1);
     rx_stream->issue_stream_cmd(cmd);
     while (not boost::this_thread::interruption_requested()){
-        num_rx_samps += rx_stream->recv(buffs, max_samps_per_packet, md)*rx_stream->get_num_channels();
+        try {
+          num_rx_samps += rx_stream->recv(buffs, max_samps_per_packet, md)*rx_stream->get_num_channels();
+        }
+        catch (...) {
+          /* apparently, the boost thread interruption can sometimes result in
+             throwing exceptions not of type boost::exception, this catch allows 
+             this thread to still attempt to issue the STREAM_MODE_STOP_CONTINUOUS 
+          */
+          break;
+        }
 
         //handle the error codes
         switch(md.error_code){
