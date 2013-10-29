@@ -91,9 +91,6 @@ nirio_status usrprio_rpc_client::niusrprio_open_session(NIUSRPRIO_OPEN_SESSION_A
         out_args >> session;
     }
 
-    //@TODO: Remove this when we have a fix for https://github.com/EttusResearch/uhddev/issues/177
-    boost::this_thread::sleep(boost::posix_time::milliseconds(1000));
-
     return status;
 }
 

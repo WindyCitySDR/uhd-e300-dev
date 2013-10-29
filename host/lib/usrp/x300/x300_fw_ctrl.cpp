@@ -190,9 +190,23 @@ public:
     x300_ctrl_iface_pcie(nirio_interface::niriok_proxy& drv_proxy):
         _drv_proxy(drv_proxy)
     {
-        nirio_interface::nirio_status_to_exception(
-            _drv_proxy.set_attribute(kRioAddressSpace, kRioAddressSpaceBusInterface),
-            "Could not initialize x300_ctrl_iface_pcie.");
+        nirio_status status = 0;
+        nirio_status_chain(_drv_proxy.set_attribute(kRioAddressSpace, kRioAddressSpaceBusInterface), status);
+
+        boost::uint32_t reg_data = 0xffffffff;
+        boost::posix_time::ptime start_time = boost::posix_time::microsec_clock::local_time();
+        boost::posix_time::time_duration elapsed;
+
+        do {
+            boost::this_thread::sleep(boost::posix_time::microsec(500)); //Avoid flooding the bus
+            elapsed = boost::posix_time::microsec_clock::local_time() - start_time;
+            nirio_status_chain(_drv_proxy.peek(PCIE_ZPU_STATUS_REG(0), reg_data), status);
+        } while (
+            nirio_status_not_fatal(status) &&
+            (reg_data & PCIE_ZPU_STATUS_SUSPENDED) &&
+            elapsed.total_milliseconds() < INIT_TIMEOUT_IN_MS);
+
+        nirio_interface::nirio_status_to_exception(status, "Could not initialize x300_ctrl_iface_pcie.");
 
         try
         {
@@ -219,7 +233,7 @@ protected:
                 nirio_status_chain(_drv_proxy.peek(PCIE_ZPU_STATUS_REG(addr), reg_data), status);
             } while (
                 nirio_status_not_fatal(status) &&
-                (reg_data & PCIE_ZPU_STATUS_BUSY) &&
+                ((reg_data & (PCIE_ZPU_STATUS_BUSY | PCIE_ZPU_STATUS_SUSPENDED)) != 0) &&
                 elapsed.total_milliseconds() < READ_TIMEOUT_IN_MS);
         }
 
@@ -246,7 +260,7 @@ protected:
                 nirio_status_chain(_drv_proxy.peek(PCIE_ZPU_STATUS_REG(addr), reg_data), status);
             } while (
                 nirio_status_not_fatal(status) &&
-                (reg_data & PCIE_ZPU_STATUS_BUSY) &&
+                ((reg_data & (PCIE_ZPU_STATUS_BUSY | PCIE_ZPU_STATUS_SUSPENDED)) != 0) &&
                 elapsed.total_milliseconds() < READ_TIMEOUT_IN_MS);
         }
         nirio_status_chain(_drv_proxy.peek(PCIE_ZPU_DATA_REG(addr), reg_data), status);
@@ -267,6 +281,7 @@ protected:
 private:
     nirio_interface::niriok_proxy& _drv_proxy;
     static const uint32_t READ_TIMEOUT_IN_MS = 10;
+    static const uint32_t INIT_TIMEOUT_IN_MS = 5000;
 };
 
 wb_iface::sptr x300_make_ctrl_iface_enet(uhd::transport::udp_simple::sptr udp)
