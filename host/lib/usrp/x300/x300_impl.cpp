@@ -477,7 +477,8 @@ void x300_impl::setup_mb(const size_t mb_i, const uhd::device_addr_t &dev_addr)
     const std::string rev = mb_eeprom["revision"];
     mb.clock = x300_clock_ctrl::make(mb.zpu_spi, 1/*slaveno*/,
         dev_addr.cast<double>("master_clock_rate", X300_DEFAULT_TICK_RATE),
-        (rev.empty()? 0 : boost::lexical_cast<int>(rev)));
+        (rev.empty()? 0 : boost::lexical_cast<int>(rev)), 
+	dev_addr.cast<double>("lmk_pll_ref", X300_DEFAULT_PLL2REF_FREQ));
     _tree->create<double>(mb_path / "tick_rate")
         .publish(boost::bind(&x300_clock_ctrl::get_master_clock_rate, mb.clock));
 
