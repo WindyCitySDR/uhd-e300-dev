@@ -128,9 +128,10 @@ static const uint32_t PCIE_ZPU_STATUS_BASE  = 0x20000;
 #define PCIE_ZPU_READ_REG(X)                (PCIE_FPGA_REG(PCIE_ZPU_READ_BASE) + X)
 #define PCIE_ZPU_STATUS_REG(X)              (PCIE_FPGA_REG(PCIE_ZPU_STATUS_BASE) + X)
 
-static const uint32_t PCIE_ZPU_READ_START   = 0x0;
-static const uint32_t PCIE_ZPU_READ_CLOBBER = 0x80000000;
-static const uint32_t PCIE_ZPU_STATUS_BUSY  = 0x1;
+static const uint32_t PCIE_ZPU_READ_START       = 0x0;
+static const uint32_t PCIE_ZPU_READ_CLOBBER     = 0x80000000;
+static const uint32_t PCIE_ZPU_STATUS_BUSY      = 0x1;
+static const uint32_t PCIE_ZPU_STATUS_SUSPENDED = 0x80000000;
 
 
 #endif /* INCLUDED_X300_REGS_HPP */
