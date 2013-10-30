@@ -35,7 +35,7 @@ public:
 
 	nirio_status open(
         nifpga_lvbitx::sptr lvbitx,
-		uint32_t attribute = 0);
+        bool force_download = false);
 
 	void close(bool reset_fpga = false);
 
@@ -46,11 +46,8 @@ public:
 		const char* fifo_name,
 		nirio_interface::nirio_fifo<data_t>& fifo)
 	{
-		nirio_status status = _process_lock.acquire(SESSION_LOCK_TIMEOUT_IN_MS, SESSION_LOCK_RETRY_INT_IN_MS);
-		if (nirio_status_not_fatal(status))
-			_resource_manager.create_tx_fifo(fifo_name, fifo);
-		_process_lock.release();
-		return status;
+        if (!_session) return NiRio_Status_ResourceNotInitialized;
+        return _resource_manager.create_tx_fifo(fifo_name, fifo);
 	}
 
     template<typename data_t>
@@ -58,9 +55,7 @@ public:
         uint32_t fifo_instance,
         nirio_interface::nirio_fifo<data_t>& fifo)
     {
-        if (_lvbitx.get() == NULL) return NiRio_Status_ResourceNotInitialized;
         if ((size_t)fifo_instance >= _lvbitx->get_output_fifo_count()) return NiRio_Status_InvalidParameter;
-
         return create_tx_fifo(_lvbitx->get_output_fifo_names()[fifo_instance], fifo);
     }
 
@@ -69,11 +64,8 @@ public:
 		const char* fifo_name,
 		nirio_interface::nirio_fifo<data_t>& fifo)
 	{
-		nirio_status status = _process_lock.acquire(SESSION_LOCK_TIMEOUT_IN_MS, SESSION_LOCK_RETRY_INT_IN_MS);
-		if (nirio_status_not_fatal(status))
-			_resource_manager.create_rx_fifo(fifo_name, fifo);
-		_process_lock.release();
-		return status;
+        if (!_session) return NiRio_Status_ResourceNotInitialized;
+        return _resource_manager.create_rx_fifo(fifo_name, fifo);
 	}
 
     template<typename data_t>
@@ -81,9 +73,7 @@ public:
         uint32_t fifo_instance,
         nirio_interface::nirio_fifo<data_t>& fifo)
     {
-        if (_lvbitx.get() == NULL) return NiRio_Status_ResourceNotInitialized;
         if ((size_t)fifo_instance >= _lvbitx->get_input_fifo_count()) return NiRio_Status_InvalidParameter;
-
         return create_rx_fifo(_lvbitx->get_input_fifo_names()[fifo_instance], fifo);
     }
 
@@ -96,19 +86,19 @@ public:
     //Static
     static nirio_interface::niriok_proxy::sptr create_kernel_proxy(const std::string& resource_name);
 
-	static const uint32_t OPEN_ATTR_SKIP_SIGNATURE_CHECK	= 1 << 31;
-	static const uint32_t OPEN_ATTR_FORCE_DOWNLOAD 			= 1 << 29;
-
 private:
-	nirio_status _verify_posc_and_signature();
+	nirio_status _verify_signature();
+	std::string _read_bitstream_checksum();
+	nirio_status _write_bitstream_checksum(const std::string& checksum);
+	nirio_status _wait_for_device_available();
 
 	std::string								_resource_name;
 	nifpga_lvbitx::sptr                     _lvbitx;
+    std::string                             _interface_path;
     uint32_t                                _session;
 	nirio_interface::niriok_proxy			_riok_proxy;
 	nirio_interface::nirio_resource_manager	_resource_manager;
     usrprio_rpc::usrprio_rpc_client         _rpc_client;
-	nifpga_session_lock						_process_lock;
 	boost::recursive_mutex                  _session_mutex;
 
 	static const uint32_t SESSION_LOCK_TIMEOUT_IN_MS    = 3000;

@@ -14,6 +14,7 @@ public:
 
     virtual const char* get_bitfile_path() = 0;
     virtual const char* get_signature() = 0;
+    virtual const char* get_bitstream_checksum() = 0;
 
     virtual size_t get_input_fifo_count() = 0;
     virtual const char** get_input_fifo_names() = 0;

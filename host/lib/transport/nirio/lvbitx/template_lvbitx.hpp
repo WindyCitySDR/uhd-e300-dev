@@ -13,6 +13,7 @@ public:
 
     virtual const char* get_bitfile_path();
     virtual const char* get_signature();
+    virtual const char* get_bitstream_checksum();
 
     virtual size_t get_input_fifo_count();
     virtual const char** get_input_fifo_names();
@@ -35,7 +36,8 @@ public:
     static const char* INPUT_FIFOS[];
 
 private:
-    std::string fpga_file_name;
+    std::string _fpga_file_name;
+    std::string _bitstream_checksum;
 }};
 
 }}

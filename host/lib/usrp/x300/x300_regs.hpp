@@ -97,6 +97,8 @@ static const uint32_t FPGA_X300_SIG_REG     = PCIE_FPGA_REG(0x0000);
 static const uint32_t FPGA_CNTR_LO_REG      = PCIE_FPGA_REG(0x0004);
 static const uint32_t FPGA_CNTR_HI_REG      = PCIE_FPGA_REG(0x0008);
 static const uint32_t FPGA_CNTR_FREQ_REG    = PCIE_FPGA_REG(0x000C);
+static const uint32_t FPGA_USR_SIG_REG_BASE = PCIE_FPGA_REG(0x0030);
+static const uint32_t FPGA_USR_SIG_REG_SIZE = 16;
 
 static const uint32_t PCIE_TX_DMA_REG_BASE  = PCIE_FPGA_REG(0x0200);
 static const uint32_t PCIE_RX_DMA_REG_BASE  = PCIE_FPGA_REG(0x0400);

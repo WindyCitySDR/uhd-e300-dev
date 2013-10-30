@@ -6,18 +6,49 @@
 #include <stdlib.h>
 #include <fcntl.h>
 #include <iostream>
+#include <fstream>
+#include <streambuf>
 #include <boost/program_options.hpp>
 #include <boost/format.hpp>
 #include <boost/thread/thread.hpp>
 #include <boost/algorithm/string.hpp>
+#include <boost/regex.hpp>
 
 class dummy_lvbitx : public nifpga_interface::nifpga_lvbitx {
 public:
-    dummy_lvbitx(const std::string& fpga_lvbitx_path) : _fpga_lvbitx_path(fpga_lvbitx_path) {}
+    dummy_lvbitx(const std::string& fpga_lvbitx_path) : _fpga_lvbitx_path(fpga_lvbitx_path) {
+        std::ifstream lvbitx_stream(_fpga_lvbitx_path.c_str());
+        if (lvbitx_stream.is_open()) {
+            std::string lvbitx_contents;
+            lvbitx_stream.seekg(0, std::ios::end);
+            lvbitx_contents.reserve(static_cast<size_t>(lvbitx_stream.tellg()));
+            lvbitx_stream.seekg(0, std::ios::beg);
+            lvbitx_contents.assign((std::istreambuf_iterator<char>(lvbitx_stream)), std::istreambuf_iterator<char>());
+            try {
+                boost::smatch md5_match;
+                if (boost::regex_search(lvbitx_contents, md5_match, boost::regex("<BitstreamMD5>([a-zA-Z0-9]{32})<\\/BitstreamMD5>", boost::regex::icase))) {
+                    _bitstream_checksum = std::string(md5_match[1].first, md5_match[1].second);
+                }
+                boost::to_upper(_bitstream_checksum);
+            } catch (boost::exception&) {
+                _bitstream_checksum = "";
+            }
+            try {
+                boost::smatch sig_match;
+                if (boost::regex_search(lvbitx_contents, sig_match, boost::regex("<SignatureRegister>([a-zA-Z0-9]{32})<\\/SignatureRegister>", boost::regex::icase))) {
+                    _signature = std::string(sig_match[1].first, sig_match[1].second);
+                }
+                boost::to_upper(_signature);
+            } catch (boost::exception&) {
+                _signature = "";
+            }
+        }
+    }
     ~dummy_lvbitx() {}
 
     virtual const char* get_bitfile_path() { return _fpga_lvbitx_path.c_str(); }
-    virtual const char* get_signature() { return ""; }
+    virtual const char* get_signature() { return _signature.c_str(); }
+    virtual const char* get_bitstream_checksum() { return _bitstream_checksum.c_str(); }
 
     virtual size_t get_input_fifo_count() { return 0; }
     virtual const char** get_input_fifo_names() { return NULL; }
@@ -36,6 +67,8 @@ public:
 
 private:
     std::string _fpga_lvbitx_path;
+    std::string _bitstream_checksum;
+    std::string _signature;
 };
 
 int main(int argc, char *argv[])
@@ -52,7 +85,7 @@ int main(int argc, char *argv[])
     desc.add_options()
         ("help", "help message")
         ("interface", po::value<uint32_t>(&interface_num)->default_value(0), "The interface number to communicate with.")
-        ("fpga", po::value<std::string>(&fpga_lvbitx_path)->default_value(""), "The path to the LVBITX file to download to the FPGA.")
+        ("fpga", po::value<std::string>(&fpga_lvbitx_path)->default_value(""), "The absolute path to the LVBITX file to download to the FPGA.")
         ("flash", po::value<std::string>(&flash_path)->default_value(""), "The path to the image to download to the flash OR 'erase' to erase the FPGA image from flash.")
         ("peek", po::value<std::string>(&peek_tokens_str)->default_value(""), "Peek32.")
         ("poke", po::value<std::string>(&poke_tokens_str)->default_value(""), "Poke32.")
@@ -75,11 +108,9 @@ int main(int argc, char *argv[])
     {
         printf("Downloading image %s to FPGA as %s...", fpga_lvbitx_path.c_str(), resource_name.c_str());
         fflush(stdout);
-        uint32_t attributes = nifpga_interface::niusrprio_session::OPEN_ATTR_SKIP_SIGNATURE_CHECK |
-                nifpga_interface::niusrprio_session::OPEN_ATTR_FORCE_DOWNLOAD;
         nifpga_interface::niusrprio_session fpga_session(resource_name);
         nifpga_interface::nifpga_lvbitx::sptr lvbitx(new dummy_lvbitx(fpga_lvbitx_path));
-        nirio_status_chain(fpga_session.open(lvbitx, attributes), status);
+        nirio_status_chain(fpga_session.open(lvbitx, true), status);
         //Download BIN to flash or erase
         if (flash_path != "erase") {
             if (flash_path != "") {

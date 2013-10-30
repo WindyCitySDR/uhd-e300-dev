@@ -48,12 +48,14 @@ public:
         NIUSRPRIO_CLOSE_SESSION_ARGS);
     nirio_status niusrprio_reset_device(
         NIUSRPRIO_RESET_SESSION_ARGS);
-    nirio_status niusrprio_query_session_lock(
-        NIUSRPRIO_QUERY_SESSION_LOCK_ARGS);
+    nirio_status niusrprio_query_device_lock(
+            NIUSRPRIO_QUERY_DEVICE_LOCK_ARGS);
     nirio_status niusrprio_get_interface_path(
          NIUSRPRIO_GET_INTERFACE_PATH_ARGS);
     nirio_status niusrprio_download_fpga_to_flash(
         NIUSRPRIO_DOWNLOAD_FPGA_TO_FLASH_ARGS);
+    nirio_status niusrprio_download_bitstream_to_fpga(
+        NIUSRPRIO_DOWNLOAD_BITSTREAM_TO_FPGA_ARGS);
 
     static const boost::int64_t DEFAULT_TIMEOUT_IN_MS = 5000;
 
