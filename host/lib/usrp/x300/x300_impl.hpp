@@ -51,6 +51,7 @@
 static const size_t X300_TX_FC_PKT_WINDOW = 2048; //16MB/8Kpkts
 static const std::string X300_FW_FILE_NAME = "usrp_x300_fw.bin";
 static const double X300_DEFAULT_TICK_RATE = 200e6;
+static const double X300_DEFAULT_PLL2REF_FREQ = 96e6;
 static const double X300_BUS_CLOCK_RATE = 175000000;
 static const bool X300_ENABLE_RX_FC = false;
 static const size_t X300_PCIE_DATA_FRAME_SIZE = 8192;   //bytes

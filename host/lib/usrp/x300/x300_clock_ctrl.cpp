@@ -10,15 +10,18 @@
 using namespace uhd;
 struct x300_clock_ctrl_impl : x300_clock_ctrl	{
 
-	x300_clock_ctrl_impl(uhd::spi_iface::sptr spiface, const size_t slaveno, const double clock_rate, const int &revno):
-		_spiface(spiface), _slaveno(slaveno), _clock_rate(clock_rate), _revno(revno)
+	x300_clock_ctrl_impl(uhd::spi_iface::sptr spiface, const size_t slaveno, const double clock_rate, const int &revno, const double pll2ref):
+		_spiface(spiface), _slaveno(slaveno), _clock_rate(clock_rate), _revno(revno), _lmkpll2_ref(pll2ref)
 	{
+		bool pll2ref96M = (pll2ref == 96e6);
+                if (!pll2ref96M && pll2ref != 120e6) 
+		   throw uhd::runtime_error(str(boost::format("x300_clock_ctrl: unsupported pll2 reference %f") % pll2ref));
 
 		int div = 0;
 		if (clock_rate == 120e6) div = 20;
 		else if (clock_rate == 150e6) div = 16;
 		else if (clock_rate == 200e6) div = 12;
-		else throw uhd::runtime_error(str(boost::format("x300_clock_ctrl: cant handle rate %f") % clock_rate));
+		else throw uhd::runtime_error(str(boost::format("x300_clock_ctrl: can't handle rate %f") % clock_rate));
 
 		//calculate N div -- ok as long as integer multiple of 10e6
 		const int pll_1_n_div = int(clock_rate/10e6);
@@ -157,7 +160,7 @@ struct x300_clock_ctrl_impl : x300_clock_ctrl	{
 
 //Register 26
 
-		_lmk04816_regs.PLL2_CP_GAIN_26 = lmk04816_regs_t::PLL2_CP_GAIN_26_1600UA;
+		_lmk04816_regs.PLL2_CP_GAIN_26 = pll2ref96M ? lmk04816_regs_t::PLL2_CP_GAIN_26_400UA : lmk04816_regs_t::PLL2_CP_GAIN_26_1600UA;
 		_lmk04816_regs.PLL2_CP_POL_26 = lmk04816_regs_t::PLL2_CP_POL_26_NEG_SLOPE;
 
 //register 27
@@ -173,17 +176,18 @@ struct x300_clock_ctrl_impl : x300_clock_ctrl	{
 		//set PLL_1_N value
 		_lmk04816_regs.PLL1_N_28 = pll_1_n_div*_lmk04816_regs.PLL1_R_27;
 		//set PLL_2_R value
-		_lmk04816_regs.PLL2_R_28 = 1;
+		_lmk04816_regs.PLL2_R_28 = pll2ref96M ? 2 : 1;
 		//this->write_regs(28);
 //register 29
 		//set the PLL_2_N value (calibration divider)
-		_lmk04816_regs.PLL2_N_CAL_29 = 10;
+		_lmk04816_regs.PLL2_N_CAL_29 = pll2ref96M ? 25 : 10;
+                if (pll2ref96M) _lmk04816_regs.OSCin_FREQ_29 = lmk04816_regs_t::OSCIN_FREQ_29_63_TO_127MHZ;
 		//this->write_regs(29);
 //register 30
 		//sets PLL_2_N divider prescaler
 		_lmk04816_regs.PLL2_P_30 = lmk04816_regs_t::PLL2_P_30_DIV_2A;
 		//sets PLL2_N_divider
-		_lmk04816_regs.PLL2_N_30 = 10;
+		_lmk04816_regs.PLL2_N_30 = pll2ref96M ? 25 : 10;
 		//this->write_regs(30);
 		
 		for (size_t i = 1; i <= 16; ++i) { 
@@ -252,6 +256,7 @@ struct x300_clock_ctrl_impl : x300_clock_ctrl	{
 	const size_t _slaveno;
 	const double _clock_rate;
 	const int _revno;
+	const double _lmkpll2_ref; 
 	lmk04816_regs_t _lmk04816_regs;
 	//uhd::dict<x300_clock_which_t, bool> _enables;
 	//uhd::dict<x300_clock_which_t, double> _rates;
@@ -269,9 +274,9 @@ struct x300_clock_ctrl_impl : x300_clock_ctrl	{
 
 };
 
-x300_clock_ctrl::sptr x300_clock_ctrl::make(uhd::spi_iface::sptr spiface, const size_t slaveno, const double clock_rate, const int &revno)
+x300_clock_ctrl::sptr x300_clock_ctrl::make(uhd::spi_iface::sptr spiface, const size_t slaveno, const double clock_rate, const int &revno, const double pll2ref)
 {
-    return sptr(new x300_clock_ctrl_impl(spiface, slaveno, clock_rate, revno));
+    return sptr(new x300_clock_ctrl_impl(spiface, slaveno, clock_rate, revno, pll2ref));
 }
 
 
