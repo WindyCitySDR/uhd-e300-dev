@@ -11,14 +11,6 @@
 #endif
 
 template <typename data_t>
-nirio_fifo<data_t>::nirio_fifo() :
-	_datatype_info(_get_datatype_info()),
-	_lock(0, 0),
-    _riok_proxy_ptr(NULL)
-{
-}
-
-template <typename data_t>
 nirio_fifo<data_t>::nirio_fifo(
     niriok_proxy& riok_proxy,
     fifo_direction_t direction,
@@ -30,7 +22,6 @@ nirio_fifo<data_t>::nirio_fifo(
     _datatype_info(_get_datatype_info()),
     _acquired_pending(0),
     _mem_map(),
-	_lock(riok_proxy.get_interface_num(), fifo_instance),
     _riok_proxy_ptr(&riok_proxy)
 {
 }
@@ -49,9 +40,7 @@ nirio_status nirio_fifo<data_t>::initialize(
 {
 	nirio_status status = NiRio_Status_Success;
 	if (!_riok_proxy_ptr) return NiRio_Status_ResourceNotInitialized;
-
-	status = _lock.acquire(FIFO_LOCK_TIMEOUT_IN_MS);
-	if (nirio_status_fatal(status)) return status;
+    boost::unique_lock<boost::recursive_mutex> lock(_mutex);
 
 	nNIRIOSRV200::tRioDeviceSocketInputParameters in = {};
 	nNIRIOSRV200::tRioDeviceSocketOutputParameters out = {};
@@ -75,21 +64,17 @@ nirio_status nirio_fifo<data_t>::initialize(
 	actual_size = out.params.fifo.op.config.actualSize;
 
 	status = _riok_proxy_ptr->map_fifo_memory(_fifo_channel, actual_size, _mem_map);
-	_lock.release();
 	return status;
 }
 
 template <typename data_t>
 void nirio_fifo<data_t>::finalize()
 {
-	nirio_status status = _lock.acquire(FIFO_LOCK_TIMEOUT_IN_MS);
-    if (nirio_status_fatal(status)) return;
-
+    boost::unique_lock<boost::recursive_mutex> lock(_mutex);
     if (!_mem_map.is_null()) {
         stop();
         _riok_proxy_ptr->unmap_fifo_memory(_mem_map);
     }
-	_lock.release();
 }
 
 template <typename data_t>
@@ -98,8 +83,7 @@ nirio_status nirio_fifo<data_t>::start()
 	nirio_status status = NiRio_Status_Success;
 	if (!_riok_proxy_ptr) return NiRio_Status_ResourceNotInitialized;
 
-	status = _lock.acquire(FIFO_LOCK_TIMEOUT_IN_MS);
-	if (nirio_status_fatal(status)) return status;
+    boost::unique_lock<boost::recursive_mutex> lock(_mutex);
 
 	nNIRIOSRV200::tRioDeviceSocketInputParameters in = {};
     nNIRIOSRV200::tRioDeviceSocketOutputParameters out = {};
@@ -109,7 +93,6 @@ nirio_status nirio_fifo<data_t>::start()
 
     status = _riok_proxy_ptr->sync_operation(&in, sizeof(in), &out, sizeof(out));
     _acquired_pending = 0;
-	_lock.release();
 
 	return status;
 }
@@ -120,9 +103,7 @@ nirio_status nirio_fifo<data_t>::stop()
 	nirio_status status = NiRio_Status_Success;
 	if (!_riok_proxy_ptr) return NiRio_Status_ResourceNotInitialized;
 
-	status = _lock.acquire(FIFO_LOCK_TIMEOUT_IN_MS);
-	if (nirio_status_fatal(status)) return status;
-
+    boost::unique_lock<boost::recursive_mutex> lock(_mutex);
     if (_acquired_pending > 0) release(_acquired_pending);
 
     nNIRIOSRV200::tRioDeviceSocketInputParameters in = {};
@@ -133,7 +114,6 @@ nirio_status nirio_fifo<data_t>::stop()
 
     status = _riok_proxy_ptr->sync_operation(&in, sizeof(in), &out, sizeof(out));
 
-	_lock.release();
 	return status;
 }
 
@@ -148,8 +128,7 @@ nirio_status nirio_fifo<data_t>::acquire(
 	nirio_status status = NiRio_Status_Success;
 	if (!_riok_proxy_ptr || _mem_map.is_null()) return NiRio_Status_ResourceNotInitialized;
 
-	status = _lock.acquire(FIFO_LOCK_TIMEOUT_IN_MS);
-	if (nirio_status_fatal(status)) return status;
+    boost::unique_lock<boost::recursive_mutex> lock(_mutex);
 
 	nNIRIOSRV200::tRioDeviceSocketInputParameters in = {};
 	uint32_t stuffed[2];
@@ -175,7 +154,6 @@ nirio_status nirio_fifo<data_t>::acquire(
 		_acquired_pending = elements_acquired;
     }
 
-    _lock.release();
 	return status;
 }
 
@@ -185,8 +163,7 @@ nirio_status nirio_fifo<data_t>::release(const size_t elements)
 	nirio_status status = NiRio_Status_Success;
 	if (!_riok_proxy_ptr) return NiRio_Status_ResourceNotInitialized;
 
-	status = _lock.acquire(FIFO_LOCK_TIMEOUT_IN_MS);
-	if (nirio_status_fatal(status)) return status;
+    boost::unique_lock<boost::recursive_mutex> lock(_mutex);
 
 	nNIRIOSRV200::tRioDeviceSocketInputParameters in = {};
 	nNIRIOSRV200::tRioDeviceSocketOutputParameters out = {};
@@ -200,7 +177,6 @@ nirio_status nirio_fifo<data_t>::release(const size_t elements)
     status = _riok_proxy_ptr->sync_operation(&in, sizeof(in), &out, sizeof(out));
     _acquired_pending = 0;
 
-    _lock.release();
 	return status;
 }
 
@@ -215,8 +191,7 @@ nirio_status nirio_fifo<data_t>::read(
 	nirio_status status = NiRio_Status_Success;
 	if (!_riok_proxy_ptr) return NiRio_Status_ResourceNotInitialized;
 
-	status = _lock.acquire(FIFO_LOCK_TIMEOUT_IN_MS);
-	if (nirio_status_fatal(status)) return status;
+    boost::unique_lock<boost::recursive_mutex> lock(_mutex);
 
 	nNIRIOSRV200::tRioDeviceSocketInputParameters in = {};
 	nNIRIOSRV200::tRioDeviceSocketOutputParameters out = {};
@@ -237,7 +212,6 @@ nirio_status nirio_fifo<data_t>::read(
 		num_remaining = out.params.fifo.op.read.numberRemaining;
 	}
 
-    _lock.release();
 	return status;
 }
 
@@ -251,8 +225,7 @@ nirio_status nirio_fifo<data_t>::write(
 	nirio_status status = NiRio_Status_Success;
 	if (!_riok_proxy_ptr) return NiRio_Status_ResourceNotInitialized;
 
-	status = _lock.acquire(FIFO_LOCK_TIMEOUT_IN_MS);
-	if (nirio_status_fatal(status)) return status;
+    boost::unique_lock<boost::recursive_mutex> lock(_mutex);
 
 	nNIRIOSRV200::tRioDeviceSocketInputParameters in = {};
 	initRioDeviceSocketInputParameters(in, buf, num_elements * _datatype_info.width);
@@ -272,7 +245,6 @@ nirio_status nirio_fifo<data_t>::write(
 		num_remaining = out.params.fifo.op.write.numberRemaining;
 	}
 
-    _lock.release();
 	return status;
 }
 

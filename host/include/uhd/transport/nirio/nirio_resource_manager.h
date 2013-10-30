@@ -83,33 +83,33 @@ public:
 	nirio_status get_register_offset(const char* register_name, uint32_t& offset);
 
 	template<typename data_t>
-	nirio_status create_tx_fifo(const char* fifo_name, nirio_fifo<data_t>& fifo)
+	nirio_status create_tx_fifo(const char* fifo_name, boost::shared_ptr< nirio_fifo<data_t> >& fifo)
 	{
 		nirio_fifo_info_t* fifo_info_ptr = _lookup_fifo_info(fifo_name);
 		if (fifo_info_ptr) {
-			fifo = nirio_fifo<data_t>(_kernel_proxy, OUTPUT_FIFO, fifo_info_ptr->name, fifo_info_ptr->channel);
+			fifo.reset(new nirio_fifo<data_t>(_kernel_proxy, OUTPUT_FIFO, fifo_info_ptr->name, fifo_info_ptr->channel));
 		} else {
 			return NiRio_Status_ResourceNotFound;
 		}
 
-		if (fifo.get_channel() != fifo_info_ptr->channel) return NiRio_Status_InvalidParameter;
-		if (fifo.get_scalar_type() != fifo_info_ptr->scalar_type) return NiRio_Status_InvalidParameter;
+		if (fifo->get_channel() != fifo_info_ptr->channel) return NiRio_Status_InvalidParameter;
+		if (fifo->get_scalar_type() != fifo_info_ptr->scalar_type) return NiRio_Status_InvalidParameter;
 
 		return NiRio_Status_Success;
 	}
 
 	template<typename data_t>
-	nirio_status create_rx_fifo(const char* fifo_name, nirio_fifo<data_t>& fifo)
+	nirio_status create_rx_fifo(const char* fifo_name, boost::shared_ptr< nirio_fifo<data_t> >& fifo)
 	{
 		nirio_fifo_info_t* fifo_info_ptr = _lookup_fifo_info(fifo_name);
 		if (fifo_info_ptr) {
-			fifo = nirio_fifo<data_t>(_kernel_proxy, INPUT_FIFO, fifo_info_ptr->name, fifo_info_ptr->channel);
+		    fifo.reset(new nirio_fifo<data_t>(_kernel_proxy, INPUT_FIFO, fifo_info_ptr->name, fifo_info_ptr->channel));
 		} else {
 			return NiRio_Status_ResourceNotFound;
 		}
 
-		if (fifo.get_channel() != fifo_info_ptr->channel) return NiRio_Status_InvalidParameter;
-		if (fifo.get_scalar_type() != fifo_info_ptr->scalar_type) return NiRio_Status_InvalidParameter;
+		if (fifo->get_channel() != fifo_info_ptr->channel) return NiRio_Status_InvalidParameter;
+		if (fifo->get_scalar_type() != fifo_info_ptr->scalar_type) return NiRio_Status_InvalidParameter;
 
 		return NiRio_Status_Success;
 	}

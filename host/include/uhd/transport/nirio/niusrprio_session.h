@@ -11,7 +11,6 @@
 #include <uhd/transport/nirio/rpc/usrprio_rpc_client.hpp>
 #include <uhd/transport/nirio/nirio_interface.h>
 #include <uhd/transport/nirio/nirio_resource_manager.h>
-#include <uhd/transport/nirio/locks.h>
 #include <uhd/transport/nirio/nifpga_lvbitx.h>
 #include <boost/noncopyable.hpp>
 #include <boost/smart_ptr.hpp>
@@ -44,7 +43,7 @@ public:
 	template<typename data_t>
 	nirio_status create_tx_fifo(
 		const char* fifo_name,
-		nirio_interface::nirio_fifo<data_t>& fifo)
+		boost::shared_ptr< nirio_interface::nirio_fifo<data_t> >& fifo)
 	{
         if (!_session) return NiRio_Status_ResourceNotInitialized;
         return _resource_manager.create_tx_fifo(fifo_name, fifo);
@@ -53,7 +52,7 @@ public:
     template<typename data_t>
     nirio_status create_tx_fifo(
         uint32_t fifo_instance,
-        nirio_interface::nirio_fifo<data_t>& fifo)
+        boost::shared_ptr< nirio_interface::nirio_fifo<data_t> >& fifo)
     {
         if ((size_t)fifo_instance >= _lvbitx->get_output_fifo_count()) return NiRio_Status_InvalidParameter;
         return create_tx_fifo(_lvbitx->get_output_fifo_names()[fifo_instance], fifo);
@@ -62,7 +61,7 @@ public:
     template<typename data_t>
 	nirio_status create_rx_fifo(
 		const char* fifo_name,
-		nirio_interface::nirio_fifo<data_t>& fifo)
+		boost::shared_ptr< nirio_interface::nirio_fifo<data_t> >& fifo)
 	{
         if (!_session) return NiRio_Status_ResourceNotInitialized;
         return _resource_manager.create_rx_fifo(fifo_name, fifo);
@@ -71,7 +70,7 @@ public:
     template<typename data_t>
     nirio_status create_rx_fifo(
         uint32_t fifo_instance,
-        nirio_interface::nirio_fifo<data_t>& fifo)
+        boost::shared_ptr< nirio_interface::nirio_fifo<data_t> >& fifo)
     {
         if ((size_t)fifo_instance >= _lvbitx->get_input_fifo_count()) return NiRio_Status_InvalidParameter;
         return create_rx_fifo(_lvbitx->get_input_fifo_names()[fifo_instance], fifo);

@@ -164,27 +164,32 @@ public:
         nirio_status_chain(
             fpga_session->create_tx_fifo(_fifo_instance, _send_fifo),
             status);
-        //Initialize FIFOs
-        nirio_status_chain(
-            _recv_fifo.initialize((_recv_frame_size*_num_recv_frames)/sizeof(fifo_data_t), actual_depth, actual_size),
-            status);
-        nirio_status_chain(
-            _send_fifo.initialize((_send_frame_size*_num_send_frames)/sizeof(fifo_data_t), actual_depth, actual_size),
-            status);
 
-        nirio_status_chain(_recv_fifo.start(), status);
-        nirio_status_chain(_send_fifo.start(), status);
+        if ((_recv_fifo.get() != NULL) && (_send_fifo.get() != NULL)) {
+            //Initialize FIFOs
+            nirio_status_chain(
+                _recv_fifo->initialize((_recv_frame_size*_num_recv_frames)/sizeof(fifo_data_t), actual_depth, actual_size),
+                status);
+            nirio_status_chain(
+                _send_fifo->initialize((_send_frame_size*_num_send_frames)/sizeof(fifo_data_t), actual_depth, actual_size),
+                status);
 
-        //allocate re-usable managed receive buffers
-        for (size_t i = 0; i < get_num_recv_frames(); i++){
-            _mrb_pool.push_back(boost::shared_ptr<nirio_zero_copy_mrb>(new nirio_zero_copy_mrb(
-                _recv_fifo, get_recv_frame_size())));
-        }
+            nirio_status_chain(_recv_fifo->start(), status);
+            nirio_status_chain(_send_fifo->start(), status);
 
-        //allocate re-usable managed send buffers
-        for (size_t i = 0; i < get_num_send_frames(); i++){
-            _msb_pool.push_back(boost::shared_ptr<nirio_zero_copy_msb>(new nirio_zero_copy_msb(
-                _send_fifo, get_send_frame_size())));
+            //allocate re-usable managed receive buffers
+            for (size_t i = 0; i < get_num_recv_frames(); i++){
+                _mrb_pool.push_back(boost::shared_ptr<nirio_zero_copy_mrb>(new nirio_zero_copy_mrb(
+                    *_recv_fifo, get_recv_frame_size())));
+            }
+
+            //allocate re-usable managed send buffers
+            for (size_t i = 0; i < get_num_send_frames(); i++){
+                _msb_pool.push_back(boost::shared_ptr<nirio_zero_copy_msb>(new nirio_zero_copy_msb(
+                    *_send_fifo, get_send_frame_size())));
+            }
+        } else {
+            nirio_status_chain(NiRio_Status_ResourceNotInitialized, status);
         }
 
         nirio_interface::nirio_status_to_exception(status, "Could not create nirio_zero_copy transport.");
@@ -229,7 +234,7 @@ private:
     //memory management -> buffers and fifos
     nirio_interface::niriok_proxy& _reg_int;
     uint32_t _fifo_instance;
-    nirio_interface::nirio_fifo<fifo_data_t> _recv_fifo, _send_fifo;
+    nirio_interface::nirio_fifo<fifo_data_t>::sptr _recv_fifo, _send_fifo;
     const size_t _recv_frame_size, _num_recv_frames;
     const size_t _send_frame_size, _num_send_frames;
     buffer_pool::sptr _recv_buffer_pool, _send_buffer_pool;

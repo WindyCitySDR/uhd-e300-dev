@@ -8,10 +8,12 @@
 #ifndef NIRIO_FIFO_H_
 #define NIRIO_FIFO_H_
 
-#include <uhd/transport/nirio/locks.h>
 #include <uhd/transport/nirio/nirio_interface.h>
 #include <uhd/transport/nirio/status.h>
+#include <boost/noncopyable.hpp>
+#include <boost/smart_ptr.hpp>
 #include <string>
+#include <boost/thread/recursive_mutex.hpp>
 
 namespace nirio_interface {
 
@@ -38,11 +40,12 @@ struct datatype_info_t {
 };
 
 template <typename data_t>
-class nirio_fifo
+class nirio_fifo : private boost::noncopyable
 {
 public:
-	nirio_fifo();
-	nirio_fifo(
+    typedef boost::shared_ptr< nirio_fifo<data_t> > sptr;
+
+    nirio_fifo(
 		niriok_proxy& riok_proxy,
 		fifo_direction_t direction,
 		const std::string& name,
@@ -98,7 +101,7 @@ private:	//Members
 	datatype_info_t						_datatype_info;
     size_t                              _acquired_pending;
 	nirio_driver_iface::rio_mmap_t		_mem_map;
-	nirio_fifo_lock						_lock;
+	boost::recursive_mutex              _mutex;
 
 	niriok_proxy* 						_riok_proxy_ptr;
 
