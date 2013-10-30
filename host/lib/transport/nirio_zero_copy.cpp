@@ -15,9 +15,9 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 //
 
+#include <uhd/transport/nirio_zero_copy.hpp>
 #include <stdio.h>
 #include <uhd/transport/nirio/nirio_fifo.h>
-#include <uhd/transport/nirio_zero_copy.hpp>
 #include <uhd/transport/nirio/nirio_fifo.h>
 #include <uhd/transport/buffer_pool.hpp>
 #include <uhd/utils/msg.hpp>
