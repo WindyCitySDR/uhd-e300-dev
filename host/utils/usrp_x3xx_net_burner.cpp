@@ -103,56 +103,34 @@ bool initialize_connection(udp_simple::sptr udp_transport){
     else return false;
 }
 
-int UHD_SAFE_MAIN(int argc, char *argv[]){
-    memset(intermediary_packet_data, 0, X300_PACKET_SIZE_BYTES);
-    std::string ip_addr, fpga_path;
+void list_usrps(){
+    const x300_fpga_update_data_t *update_data_in = reinterpret_cast<const x300_fpga_update_data_t *>(x300_data_in_mem);
 
-    po::options_description desc("Allowed options");
-    desc.add_options()
-        ("help", "Display this help message.")
-        ("addr", po::value<std::string>(&ip_addr)->default_value("192.168.10.2"), "Specify an IP address.")
-        ("fpga-path", po::value<std::string>(&fpga_path)->default_value(""), "Specify an FPGA path.")
-        ("list", "List all available X3x0 devices.")
-    ;
-    po::variables_map vm;
-    po::store(po::parse_command_line(argc, argv, desc), vm);
-    po::notify(vm);
-
-    if(vm.count("help")){
-        std::cout << "USRP X3x0 Net Burner - " << desc << std::endl;
-        return EXIT_FAILURE;
-    }
+    udp_simple::sptr udp_bc_transport;
+    x300_fpga_update_data_t config_status_packet;
+    config_status_packet.flags = htonx<boost::uint32_t>(X300_FPGA_PROG_CONFIG_STATUS | X300_FPGA_PROG_FLAGS_ACK);
+    config_status_packet.sector = 0;
+    config_status_packet.size = 0;
+    config_status_packet.index = 0;
+    memset(config_status_packet.data, 0, sizeof(config_status_packet.data));
     
-    //List connected X3x0 devices
-    if(vm.count("list")){
-        const x300_fpga_update_data_t *update_data_in = reinterpret_cast<const x300_fpga_update_data_t *>(x300_data_in_mem);
+    std::cout << "Available X3x0 devices:" << std::endl;
     
-        udp_simple::sptr udp_bc_transport;
-        x300_fpga_update_data_t config_status_packet;
-        config_status_packet.flags = htonx<boost::uint32_t>(X300_FPGA_PROG_CONFIG_STATUS | X300_FPGA_PROG_FLAGS_ACK);
-        config_status_packet.sector = 0;
-        config_status_packet.size = 0;
-        config_status_packet.index = 0;
-        memset(config_status_packet.data, 0, sizeof(config_status_packet.data));
+    BOOST_FOREACH(const if_addrs_t &if_addrs, get_if_addrs()){
+        //Avoid the loopback device
+        if(if_addrs.inet == boost::asio::ip::address_v4::loopback().to_string()) continue;
+        udp_bc_transport = udp_simple::make_broadcast(if_addrs.bcast, BOOST_STRINGIZE(X300_FPGA_PROG_UDP_PORT));
+        udp_bc_transport->send(boost::asio::buffer(&config_status_packet, sizeof(config_status_packet)));
         
-        std::cout << "Available X3x0 devices:" << std::endl;
-        
-        BOOST_FOREACH(const if_addrs_t &if_addrs, get_if_addrs()){
-            //Avoid the loopback device
-            if(if_addrs.inet == boost::asio::ip::address_v4::loopback().to_string()) continue;
-            udp_bc_transport = udp_simple::make_broadcast(if_addrs.bcast, BOOST_STRINGIZE(X300_FPGA_PROG_UDP_PORT));
-            udp_bc_transport->send(boost::asio::buffer(&config_status_packet, sizeof(config_status_packet)));
-            
-            udp_bc_transport->recv(boost::asio::buffer(x300_data_in_mem), 1);
-            if((ntohl(update_data_in->flags) & X300_FPGA_PROG_FLAGS_ERROR) != X300_FPGA_PROG_FLAGS_ERROR
-            and udp_bc_transport->get_recv_addr() != "0.0.0.0"){
-                std::cout << " * " << udp_bc_transport->get_recv_addr() << std::endl;
-            }
+        udp_bc_transport->recv(boost::asio::buffer(x300_data_in_mem), 1);
+        if((ntohl(update_data_in->flags) & X300_FPGA_PROG_FLAGS_ERROR) != X300_FPGA_PROG_FLAGS_ERROR
+        and udp_bc_transport->get_recv_addr() != "0.0.0.0"){
+            std::cout << " * " << udp_bc_transport->get_recv_addr() << std::endl;
         }
-    
-        return EXIT_FAILURE;
     }
+}
 
+void burn_fpga_image(udp_simple::sptr udp_transport, std::string fpga_path){
     size_t fpga_image_size;
     FILE* file;
     if((file = fopen(fpga_path.c_str(), "rb"))){
@@ -165,15 +143,8 @@ int UHD_SAFE_MAIN(int argc, char *argv[]){
         }
         rewind(file);
     }
-    else
-    {
+    else{
         throw std::runtime_error("Could not find specified FPGA image!");
-    }
-    
-    std::cout << "Attempting to connect to: " << ip_addr << std::endl;
-    udp_simple::sptr udp_transport = udp_simple::make_connected(ip_addr, BOOST_STRINGIZE(X300_FPGA_PROG_UDP_PORT));
-    if(not initialize_connection(udp_transport)){
-        throw std::runtime_error("Flash initialization failed!");
     }
 
     std::cout << "Burning image: " << fpga_path << std::endl << std::endl;
@@ -239,7 +210,10 @@ int UHD_SAFE_MAIN(int argc, char *argv[]){
     }
     fclose(file);
 
-    std::cout << "100%" << std::endl << std::endl;
+    std::cout << "100%" << std::endl;
+}
+
+bool configure_fpga(udp_simple::sptr udp_transport, std::string ip_addr){
     x300_fpga_update_data_t configure_packet;
     configure_packet.flags = htonx<boost::uint32_t>(X300_FPGA_PROG_CONFIGURE | X300_FPGA_PROG_FLAGS_ACK);
     configure_packet.sector = 0;
@@ -256,8 +230,8 @@ int UHD_SAFE_MAIN(int argc, char *argv[]){
         throw std::runtime_error("Transfer or data verification failed!");
     }
     else{
-        std::cout << "Waiting for X3x0 to set new FPGA image and reload." << std::endl;
-        boost::this_thread::sleep(boost::posix_time::milliseconds(10000));
+        std::cout << std::endl << "Waiting for X3x0 to configure FPGA image and reload." << std::endl;
+        boost::this_thread::sleep(boost::posix_time::milliseconds(5000));
 
         x300_fpga_update_data_t config_status_packet;
         configure_packet.flags = htonx<boost::uint32_t>(X300_FPGA_PROG_CONFIG_STATUS);
@@ -278,9 +252,58 @@ int UHD_SAFE_MAIN(int argc, char *argv[]){
             successful = false; //If it worked, the break would skip this
         }
     }
-    if(successful) std::cout << "Successfully burned FPGA image!" << std::endl;
-    else{
-        throw std::runtime_error("FPGA image burning failed!");
+    return successful;
+}
+
+int UHD_SAFE_MAIN(int argc, char *argv[]){
+    memset(intermediary_packet_data, 0, X300_PACKET_SIZE_BYTES);
+    std::string ip_addr, fpga_path;
+
+    po::options_description desc("Allowed options");
+    desc.add_options()
+        ("help", "Display this help message.")
+        ("addr", po::value<std::string>(&ip_addr)->default_value("192.168.10.2"), "Specify an IP address.")
+        ("fpga-path", po::value<std::string>(&fpga_path)->default_value(""), "Specify an FPGA path.")
+        ("configure", "")
+        ("list", "List all available X3x0 devices.")
+    ;
+    po::variables_map vm;
+    po::store(po::parse_command_line(argc, argv, desc), vm);
+    po::notify(vm);
+
+    //Print help message
+    if(vm.count("help")){
+        std::cout << "USRP X3x0 Net Burner - " << desc << std::endl;
+        return EXIT_FAILURE;
+    }
+    
+    //List all available devices
+    if(vm.count("list")){
+        list_usrps();
+        return EXIT_FAILURE;
+    }
+
+    if(fpga_path == "" and !vm.count("configure")){
+        throw std::runtime_error("You must specify an FPGA image or select the option to configure the current image.");
+    }
+
+    //Establish UDP connection before doing anything
+    std::cout << "Attempting to connect to: " << ip_addr << std::endl;
+    udp_simple::sptr udp_transport = udp_simple::make_connected(ip_addr, BOOST_STRINGIZE(X300_FPGA_PROG_UDP_PORT));
+    if(not initialize_connection(udp_transport)){
+        throw std::runtime_error("Flash initialization failed!");
+    }
+
+    //If user specifies FPGA path, burn the image
+    if(fpga_path != "") burn_fpga_image(udp_transport, fpga_path);
+
+    //If new image is burned, automatically configure
+    //If not, user needs to specify
+    if(fpga_path != "" or vm.count("configure")){
+        if(configure_fpga(udp_transport, ip_addr)) std::cout << "Successfully configured FPGA!" << std::endl;
+        else{
+            throw std::runtime_error("FPGA configuring failed!");
+        }
     }
 
     return EXIT_SUCCESS;
