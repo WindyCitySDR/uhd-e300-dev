@@ -28,13 +28,13 @@
 #include <boost/asio.hpp>
 #include <boost/program_options.hpp>
 #include <boost/assign.hpp>
+#include <boost/cstdint.hpp>
 #include <boost/assign/list_of.hpp>
 #include <boost/format.hpp>
 #include <boost/algorithm/string/erase.hpp>
 #include <boost/filesystem.hpp>
 #include <boost/thread/thread.hpp>
 
-#include "usrp_x3xx_burner_utils.hpp"
 #include <uhd/exception.hpp>
 #include <uhd/transport/if_addrs.hpp>
 #include <uhd/transport/udp_simple.hpp>
@@ -42,10 +42,36 @@
 #include <uhd/utils/safe_main.hpp>
 #include <uhd/utils/safe_call.hpp>
 
+#define X300_FPGA_IMAGE_SIZE_BYTES 15877916
+#define X300_FPGA_PROG_UDP_PORT 49157
+#define X300_FLASH_SECTOR_SIZE 131072
+#define X300_PACKET_SIZE_BYTES 256
+#define X300_FPGA_SECTOR_START 32
+#define X300_MAX_RESPONSE_BYTES 128
+#define UDP_TIMEOUT 3
+#define FPGA_LOAD_TIMEOUT 15
+
+#define X300_FPGA_PROG_FLAGS_ACK     1
+#define X300_FPGA_PROG_FLAGS_ERROR   2
+#define X300_FPGA_PROG_FLAGS_INIT    4
+#define X300_FPGA_PROG_FLAGS_CLEANUP 8
+#define X300_FPGA_PROG_FLAGS_ERASE   16
+#define X300_FPGA_PROG_FLAGS_VERIFY  32
+#define X300_FPGA_PROG_CONFIGURE     64
+#define X300_FPGA_PROG_CONFIG_STATUS 128
+
 namespace po = boost::program_options;
 
 using namespace uhd;
 using namespace uhd::transport;
+
+typedef struct {
+    boost::uint32_t flags;
+    boost::uint32_t sector;
+    boost::uint32_t index;
+    boost::uint32_t size;
+    boost::uint16_t data[128];
+} x300_fpga_update_data_t;
 
 boost::uint8_t x300_data_in_mem[udp_simple::mtu];
 boost::uint8_t intermediary_packet_data[X300_PACKET_SIZE_BYTES];
