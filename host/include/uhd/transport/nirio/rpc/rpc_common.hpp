@@ -42,6 +42,7 @@ typedef boost::uint64_t client_id_t;
 struct hshake_args_t {
     boost::uint32_t version;
     boost::uint32_t oldest_comp_version;
+    boost::int32_t  boost_archive_version;
     union {
         client_id_t         client_id;
         struct {
@@ -73,7 +74,7 @@ public:
 //[Internal] Serializer for RPC input parameters
 class func_args_writer_t {
 public:
-    func_args_writer_t() : _stream(), _archive(_stream) {}
+    func_args_writer_t() : _stream(), _archive(_stream, boost::archive::no_header) {}
 
     template<typename data_t>
     void push(const data_t& d) {
@@ -120,9 +121,9 @@ public:
     void load(const std::vector<char>& data) {
         _stream.str(std::string(data.begin(), data.end()));
 #if (USE_BINARY_ARCHIVE)
-        _archive.reset(new boost::archive::binary_iarchive(_stream));
+        _archive.reset(new boost::archive::binary_iarchive(_stream, boost::archive::no_header));
 #else
-        _archive.reset(new boost::archive::text_iarchive(_stream));
+        _archive.reset(new boost::archive::text_iarchive(_stream, boost::archive::no_header));
 #endif
     }
 
@@ -133,6 +134,20 @@ private:
 #else
     boost::scoped_ptr<boost::archive::text_iarchive>    _archive;
 #endif
+};
+
+class boost_serialization_archive_utils {
+public:
+    static boost::int32_t get_version() {
+    #if (USE_BINARY_ARCHIVE)
+        typedef boost::archive::binary_oarchive archive_t;
+    #else
+        typedef boost::archive::text_oarchive   archive_t;
+    #endif
+        std::ostringstream stream;
+        archive_t dummy_archive(stream, boost::archive::no_header);
+        return static_cast<boost::int32_t>(dummy_archive.get_library_version());
+    }
 };
 
 }
