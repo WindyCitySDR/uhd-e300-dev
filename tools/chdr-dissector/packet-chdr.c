@@ -25,6 +25,8 @@
  *
  */
 
+#define CHDR_PORT 49153
+
 #include "config.h"
 
 #include <glib.h>
@@ -126,11 +128,33 @@ static void dissect_chdr(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
     proto_tree *chdr_tree;
     proto_tree *stream_tree;
     gint len;
+    
+    gint flag_offset;
 	guint8 *bytes;
 	gboolean flag_has_time;
 	guint64 timestamp;
+	gboolean is_network;
+	gint endianness;
+	gint id_pos_usb[4] = {7, 6, 5, 4};
+	gint id_pos_net[4] = {4, 5, 6, 7};
+	gint id_pos[4] = {7, 6, 5, 4};
+	
+	if(pinfo->match_uint == CHDR_PORT){
+		is_network = TRUE;
+		flag_offset = 0;
+		endianness = ENC_BIG_ENDIAN;
+		memcpy(id_pos, id_pos_net, 4 * sizeof(gint));
+	}
+	else{
+		is_network = FALSE;
+		flag_offset = 3;
+		endianness = ENC_LITTLE_ENDIAN;
+		memcpy(id_pos, id_pos_usb, 4 * sizeof(gint));
+	}
 
 	len = tvb_reported_length(tvb);
+	printf("%s\t%i\t", pinfo->current_proto, pinfo->ethertype);
+	printf("matched string %s\tmatched_uint %i\n", pinfo->match_string, pinfo->match_uint);
 
     col_append_str(pinfo->cinfo, COL_PROTOCOL, "/CHDR");
     col_append_sep_fstr(pinfo->cinfo, COL_INFO, NULL, "CHDR",
@@ -142,33 +166,35 @@ static void dissect_chdr(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
         chdr_tree = proto_item_add_subtree(item, ett_chdr);
 
 		bytes = tvb_get_string(tvb, 0, 4);
-		flag_has_time = bytes[3] & 0x20;
+		flag_has_time = bytes[flag_offset] & 0x20;
 
 		/* These lines add flag info to tree */
-		proto_tree_add_item(chdr_tree, hf_chdr_is_extension, tvb, 3, 1, ENC_BIG_ENDIAN);
-		proto_tree_add_item(chdr_tree, hf_chdr_reserved, tvb, 3, 1, ENC_BIG_ENDIAN);
-		proto_tree_add_item(chdr_tree, hf_chdr_has_time, tvb, 3, 1, ENC_BIG_ENDIAN);
-		proto_tree_add_item(chdr_tree, hf_chdr_eob, tvb, 3, 1, ENC_BIG_ENDIAN);
+		proto_tree_add_item(chdr_tree, hf_chdr_is_extension, tvb, flag_offset, 1, ENC_NA);
+		proto_tree_add_item(chdr_tree, hf_chdr_reserved, tvb, flag_offset, 1, ENC_NA);
+		proto_tree_add_item(chdr_tree, hf_chdr_has_time, tvb, flag_offset, 1, ENC_NA);
+		proto_tree_add_item(chdr_tree, hf_chdr_eob, tvb, flag_offset, 1, ENC_NA);
 
 		/* These lines add sequence, packet_size and stream ID */
-		proto_tree_add_item(chdr_tree, hf_chdr_sequence, tvb, 2, 2, ENC_LITTLE_ENDIAN);
-		proto_tree_add_item(chdr_tree, hf_chdr_packet_size, tvb, 0, 2, ENC_LITTLE_ENDIAN);
+		proto_tree_add_item(chdr_tree, hf_chdr_sequence, tvb, is_network ? 0:2, 2, endianness);
+		proto_tree_add_item(chdr_tree, hf_chdr_packet_size, tvb, is_network ? 2:0, 2, endianness);
 		
 		/* stream id can be broken down to 4 sections. these are collapsed in a subtree */
-		stream_item = proto_tree_add_item(chdr_tree, hf_chdr_stream_id, tvb, 4, 4, ENC_LITTLE_ENDIAN);
+		stream_item = proto_tree_add_item(chdr_tree, hf_chdr_stream_id, tvb, 4, 4, endianness);
 		stream_tree = proto_item_add_subtree(stream_item, ett_chdr_id);
-		proto_tree_add_item(stream_tree, hf_chdr_src_dev, tvb, 7, 1, ENC_NA);
-		proto_tree_add_item(stream_tree, hf_chdr_src_ep, tvb, 6, 1, ENC_NA);
-		proto_tree_add_item(stream_tree, hf_chdr_dst_dev, tvb, 5, 1, ENC_NA);
-		proto_tree_add_item(stream_tree, hf_chdr_dst_ep, tvb, 4, 1, ENC_NA);
+		proto_tree_add_item(stream_tree, hf_chdr_src_dev, tvb, id_pos[0], 1, ENC_NA);
+		proto_tree_add_item(stream_tree, hf_chdr_src_ep, tvb, id_pos[1], 1, ENC_NA);
+		proto_tree_add_item(stream_tree, hf_chdr_dst_dev, tvb, id_pos[2], 1, ENC_NA);
+		proto_tree_add_item(stream_tree, hf_chdr_dst_ep, tvb, id_pos[3], 1, ENC_NA);
 		
 		/* if has_time flag is present interpret timestamp */
 		if(flag_has_time){
-			item = proto_tree_add_item(chdr_tree, hf_chdr_timestamp, tvb, 8, 8, ENC_LITTLE_ENDIAN);
+			item = proto_tree_add_item(chdr_tree, hf_chdr_timestamp, tvb, 8, 8, endianness);
 			
-			bytes = (guint8*) tvb_get_string(tvb, 8, 8);
-			timestamp = get_timestamp(bytes);
-			proto_item_set_text(item, "CHDR timestamp: %ld", timestamp);
+			if(!is_network){
+				bytes = (guint8*) tvb_get_string(tvb, 8, 8);
+				timestamp = get_timestamp(bytes);
+				proto_item_set_text(item, "CHDR timestamp: %ld", timestamp);
+			}
 		}
     }
 }
@@ -277,7 +303,7 @@ proto_register_chdr(void)
             { "CHDR timestamp", //name
 				"chdr.timestamp", //abbr
             	FT_UINT64, //type
-				BASE_HEX, //display
+				BASE_DEC, //display
             	NULL, //strings
 				0x0, //bitmask
             	NULL, //brief description
@@ -302,6 +328,10 @@ void
 proto_reg_handoff_chdr(void)
 {
     heur_dissector_add("usb.bulk", heur_dissect_chdr, proto_chdr);
-    //heur_dissector_add("usb.control", heur_dissect_chdr, proto_chdr);
+
+    static dissector_handle_t chdr_handle;
+
+    chdr_handle = create_dissector_handle(dissect_chdr, proto_chdr);
+    dissector_add_uint("udp.port", CHDR_PORT, chdr_handle);
 }
 
