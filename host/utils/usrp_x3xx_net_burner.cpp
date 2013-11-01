@@ -77,9 +77,9 @@ boost::uint8_t x300_data_in_mem[udp_simple::mtu];
 boost::uint8_t intermediary_packet_data[X300_PACKET_SIZE_BYTES];
 
 boost::uint8_t bitswap(uint8_t b){
-    b = (b & 0xF0) >> 4 | (b & 0x0F) << 4;
-    b = (b & 0xCC) >> 2 | (b & 0x33) << 2;
-    b = (b & 0xAA) >> 1 | (b & 0x55) << 1;
+    b = ((b & 0xF0) >> 4) | ((b & 0x0F) << 4);
+    b = ((b & 0xCC) >> 2) | ((b & 0x33) << 2);
+    b = ((b & 0xAA) >> 1) | ((b & 0x55) << 1);
 
     return b;
 }
@@ -123,14 +123,14 @@ void list_usrps(){
         udp_bc_transport->send(boost::asio::buffer(&config_status_packet, sizeof(config_status_packet)));
         
         udp_bc_transport->recv(boost::asio::buffer(x300_data_in_mem), 1);
-        if((ntohl(update_data_in->flags) & X300_FPGA_PROG_FLAGS_ERROR) != X300_FPGA_PROG_FLAGS_ERROR
-        and udp_bc_transport->get_recv_addr() != "0.0.0.0"){
+        if(((ntohl(update_data_in->flags) & X300_FPGA_PROG_FLAGS_ERROR) != X300_FPGA_PROG_FLAGS_ERROR)
+           and (udp_bc_transport->get_recv_addr() != "0.0.0.0")){
             std::cout << " * " << udp_bc_transport->get_recv_addr() << std::endl;
         }
     }
 }
 
-void burn_fpga_image(udp_simple::sptr udp_transport, std::string fpga_path){
+void burn_fpga_image(udp_simple::sptr udp_transport, std::string fpga_path, bool verify){
     size_t fpga_image_size;
     FILE* file;
     if((file = fopen(fpga_path.c_str(), "rb"))){
@@ -144,7 +144,8 @@ void burn_fpga_image(udp_simple::sptr udp_transport, std::string fpga_path){
         rewind(file);
     }
     else{
-        throw std::runtime_error("Could not find specified FPGA image!");
+        throw std::runtime_error(str(boost::format("Could not find FPGA image at location: %s")
+                                     % fpga_path.c_str()));
     }
 
     std::cout << "Burning image: " << fpga_path << std::endl << std::endl;
@@ -158,7 +159,7 @@ void burn_fpga_image(udp_simple::sptr udp_transport, std::string fpga_path){
 
         //Print percentage at beginning of first sector after each 10%
         int percentage = int(double(i)/double(fpga_image_size)*100);
-        if(percentage != last_percentage and (percentage % 10 == 0)){ //Don't print same percentage twice
+        if((percentage != last_percentage) and (percentage % 10 == 0)){ //Don't print same percentage twice
             std::cout << int(double(i)/double(fpga_image_size)*100) << "%..." << std::flush;
         }
         last_percentage = percentage;
@@ -168,6 +169,7 @@ void burn_fpga_image(udp_simple::sptr udp_transport, std::string fpga_path){
             x300_fpga_update_data_t send_packet;
 
             send_packet.flags = X300_FPGA_PROG_FLAGS_ACK;
+            if(verify) send_packet.flags |= X300_FPGA_PROG_FLAGS_VERIFY;
             if(j == i) send_packet.flags |= X300_FPGA_PROG_FLAGS_ERASE; //Erase the sector before writing
             send_packet.flags = htonx<boost::uint32_t>(send_packet.flags);
             
@@ -179,13 +181,13 @@ void burn_fpga_image(udp_simple::sptr udp_transport, std::string fpga_path){
             size_t current_pos = ftell(file);
             size_t send_size = 0;
 
-            if(current_pos + 256 > fpga_image_size){
+            if(current_pos + X300_PACKET_SIZE_BYTES > fpga_image_size){
                 fread(intermediary_packet_data, sizeof(boost::uint8_t), (fpga_image_size-current_pos), file);
                 send_size = (fpga_image_size-current_pos);
             }
             else{
                 fread(intermediary_packet_data, sizeof(boost::uint8_t), X300_PACKET_SIZE_BYTES, file);
-                send_size = 256;
+                send_size = X300_PACKET_SIZE_BYTES;
             }
 
             for(size_t k = 0; k < X300_PACKET_SIZE_BYTES; k++){
@@ -209,6 +211,22 @@ void burn_fpga_image(udp_simple::sptr udp_transport, std::string fpga_path){
         }
     }
     fclose(file);
+
+    //Send clean-up signal
+    x300_fpga_update_data_t cleanup_packet;
+    cleanup_packet.flags = htonx<boost::uint32_t>(X300_FPGA_PROG_FLAGS_ACK | X300_FPGA_PROG_FLAGS_CLEANUP);
+    cleanup_packet.sector = 0;
+    cleanup_packet.size = 0;
+    cleanup_packet.index = 0;
+    memset(cleanup_packet.data, 0, sizeof(cleanup_packet.data));
+    udp_transport->send(boost::asio::buffer(&cleanup_packet, sizeof(cleanup_packet)));
+
+    udp_transport->recv(boost::asio::buffer(x300_data_in_mem), UDP_TIMEOUT);
+    const x300_fpga_update_data_t *update_data_in = reinterpret_cast<const x300_fpga_update_data_t *>(x300_data_in_mem);
+
+    if((ntohl(update_data_in->flags) & X300_FPGA_PROG_FLAGS_ERROR) == X300_FPGA_PROG_FLAGS_ERROR){
+        throw std::runtime_error("Transfer or data verification failed!");
+    }
 
     std::cout << "100%" << std::endl;
 }
@@ -264,7 +282,8 @@ int UHD_SAFE_MAIN(int argc, char *argv[]){
         ("help", "Display this help message.")
         ("addr", po::value<std::string>(&ip_addr)->default_value("192.168.10.2"), "Specify an IP address.")
         ("fpga-path", po::value<std::string>(&fpga_path)->default_value(""), "Specify an FPGA path.")
-        ("configure", "")
+        ("configure", "Set FPGA image currently in flash (automatically done after downloading)")
+        ("verify", "Verify data downloaded to flash (download will take much longer)")
         ("list", "List all available X3x0 devices.")
     ;
     po::variables_map vm;
@@ -274,13 +293,13 @@ int UHD_SAFE_MAIN(int argc, char *argv[]){
     //Print help message
     if(vm.count("help")){
         std::cout << "USRP X3x0 Net Burner - " << desc << std::endl;
-        return EXIT_FAILURE;
+        return EXIT_SUCCESS;
     }
     
     //List all available devices
     if(vm.count("list")){
         list_usrps();
-        return EXIT_FAILURE;
+        return EXIT_SUCCESS;
     }
 
     if(fpga_path == "" and !vm.count("configure")){
@@ -291,19 +310,17 @@ int UHD_SAFE_MAIN(int argc, char *argv[]){
     std::cout << "Attempting to connect to: " << ip_addr << std::endl;
     udp_simple::sptr udp_transport = udp_simple::make_connected(ip_addr, BOOST_STRINGIZE(X300_FPGA_PROG_UDP_PORT));
     if(not initialize_connection(udp_transport)){
-        throw std::runtime_error("Flash initialization failed!");
+        throw std::runtime_error("Flash initialization failed! Did you specify the correct IP address? If so, power-cycle the device and try again.");
     }
 
     //If user specifies FPGA path, burn the image
-    if(fpga_path != "") burn_fpga_image(udp_transport, fpga_path);
+    if(fpga_path != "") burn_fpga_image(udp_transport, fpga_path, vm.count("verify"));
 
     //If new image is burned, automatically configure
     //If not, user needs to specify
-    if(fpga_path != "" or vm.count("configure")){
+    if((fpga_path != "") or vm.count("configure")){
         if(configure_fpga(udp_transport, ip_addr)) std::cout << "Successfully configured FPGA!" << std::endl;
-        else{
-            throw std::runtime_error("FPGA configuring failed!");
-        }
+        else throw std::runtime_error("FPGA configuring failed!");
     }
 
     return EXIT_SUCCESS;
