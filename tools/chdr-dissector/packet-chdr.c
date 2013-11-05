@@ -1,18 +1,13 @@
-/* packet-at.c
- * Dissector for AT Commands
+/* packet-chdr.c
+ * Dissector for UHD CHDR packets
  *
- * Copyright 2011, Tyson Key <tyson.key@gmail.com>
  *
- * $Id$
+ * Copyright 2010-2013 Ettus Research LLC
  *
- * Wireshark - Network traffic analyzer
- * By Gerald Combs <gerald@wireshark.org>
- * Copyright 1998 Gerald Combs
- *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -20,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -61,61 +55,51 @@ static void dissect_chdr(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree);
 static gint ett_chdr = -1;
 static gint ett_chdr_id = -1;
 
-static gboolean allowed_chars(tvbuff_t *tvb)
-{
-    gint offset, len;
-    guint8 val;
 
-    len = tvb_length(tvb);
-    for (offset = 0; offset < len; offset++) {
-        val = tvb_get_guint8(tvb, offset);
-        if (!(isprint(val) || (val == 0x0a) || (val == 0x0d)))
-            return (FALSE);
-    }
-    return (TRUE);
-}
-
-/* Experimental approach based upon the one used for PPP */
+/* heuristic dissector call. Will always return. */
 static gboolean heur_dissect_chdr(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
 {
+	printf("heuristic dissector for UHD CHDR always returns true!\n");
 	dissect_chdr(tvb, pinfo, tree); 
     return (TRUE);
 }
 
-static void byte_swap(guint8 *bytes)
+static void byte_swap(guint8 *bytes, gint len)
 {
 	guint8 tmp[4];
+	
+	if(len != 4){
+		printf("FATAL! number of bytes don't match 32 bit!\n");
+		return;
+	}
+	
 	memcpy(tmp, bytes, 4);
-	//~ printf("\tunswapped = %x\n", *(guint32*)tmp);
 	bytes[0] = tmp[3];
 	bytes[1] = tmp[2];
 	bytes[2] = tmp[1];
 	bytes[3] = tmp[0];
-	//~ printf("\tswapped = %x\n", *(guint32*)bytes);
 }
 
-static guint64 get_timestamp(guint8 *bytes)
+static guint64 get_timestamp(guint8 *bytes, gint len)
 {
 	guint64 ts;
 	guint64 trans;
 	int it;
 	
-	byte_swap(bytes);
-	byte_swap(bytes+4);
+	if(len != 8){
+		printf("FATAL! timestamps always consist of 64 bits!\n");
+	}
 	
-	//~ for(it = 0 ; it < 8 ; it++){
-		//~ printf("0x%2x ", bytes[it]);
-	//~ }
-	//~ printf("\n");
+	byte_swap(bytes, 4);
+	byte_swap(bytes+4, 4);
 
 	ts = 0;
 	for(it = 0 ; it < 8 ; it++){
 		ts = ts << 8;
 		trans = (guint64) bytes[it];
 		ts = ts | trans;
-		//~ printf("0x%16lx\n", ts);
 	}
-	//~ printf("\ntimestamp = %ld\n", ts);
+
 	return (ts);
 }
 
@@ -153,8 +137,6 @@ static void dissect_chdr(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
 	}
 
 	len = tvb_reported_length(tvb);
-	printf("%s\t%i\t", pinfo->current_proto, pinfo->ethertype);
-	printf("matched string %s\tmatched_uint %i\n", pinfo->match_string, pinfo->match_uint);
 
     col_append_str(pinfo->cinfo, COL_PROTOCOL, "/CHDR");
     col_append_sep_fstr(pinfo->cinfo, COL_INFO, NULL, "CHDR",
@@ -192,8 +174,7 @@ static void dissect_chdr(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
 			
 			if(!is_network){
 				bytes = (guint8*) tvb_get_string(tvb, 8, 8);
-				timestamp = get_timestamp(bytes);
-				proto_item_set_text(item, "CHDR timestamp: %ld", timestamp);
+				timestamp = get_timestamp(bytes, 8);
 			}
 		}
     }
@@ -327,10 +308,11 @@ proto_register_chdr(void)
 void
 proto_reg_handoff_chdr(void)
 {
+    /* register heuristic dissector for use with USB */
     heur_dissector_add("usb.bulk", heur_dissect_chdr, proto_chdr);
 
+	/* register dissector for UDP packets */
     static dissector_handle_t chdr_handle;
-
     chdr_handle = create_dissector_handle(dissect_chdr, proto_chdr);
     dissector_add_uint("udp.port", CHDR_PORT, chdr_handle);
 }
