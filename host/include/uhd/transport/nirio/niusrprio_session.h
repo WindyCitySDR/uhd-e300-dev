@@ -56,7 +56,7 @@ public:
 		const char* fifo_name,
 		boost::shared_ptr< nirio_interface::nirio_fifo<data_t> >& fifo)
 	{
-        if (!_session) return NiRio_Status_ResourceNotInitialized;
+        if (!_session_open) return NiRio_Status_ResourceNotInitialized;
         return _resource_manager.create_tx_fifo(fifo_name, fifo);
 	}
 
@@ -74,7 +74,7 @@ public:
 		const char* fifo_name,
 		boost::shared_ptr< nirio_interface::nirio_fifo<data_t> >& fifo)
 	{
-        if (!_session) return NiRio_Status_ResourceNotInitialized;
+        if (!_session_open) return NiRio_Status_ResourceNotInitialized;
         return _resource_manager.create_rx_fifo(fifo_name, fifo);
 	}
 
@@ -105,7 +105,7 @@ private:
 	std::string								_resource_name;
 	nifpga_lvbitx::sptr                     _lvbitx;
     std::string                             _interface_path;
-    uint32_t                                _session;
+    bool                                    _session_open;
 	nirio_interface::niriok_proxy			_riok_proxy;
 	nirio_interface::nirio_resource_manager	_resource_manager;
     usrprio_rpc::usrprio_rpc_client         _rpc_client;

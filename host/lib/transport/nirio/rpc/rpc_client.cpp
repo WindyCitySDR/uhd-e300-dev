@@ -40,8 +40,7 @@ rpc_client::rpc_client (
     //Fill in handshake info
     _hshake_args_client.version = CURRENT_VERSION;
     _hshake_args_client.oldest_comp_version = OLDEST_COMPATIBLE_VERSION;
-    _hshake_args_client.id.pid = process_id;
-    _hshake_args_client.id.hid = host_id;
+    _hshake_args_client.client_id = build_client_id(host_id, process_id);
     _hshake_args_client.boost_archive_version = boost_serialization_archive_utils::get_version();
 
     try {
