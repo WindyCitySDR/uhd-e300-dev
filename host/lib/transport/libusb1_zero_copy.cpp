@@ -31,6 +31,12 @@
 #include <boost/thread/condition_variable.hpp>
 #include <list>
 
+#ifdef UHD_TXRX_DEBUG_PRINTS
+#include <vector>
+#include <fstream>
+#include <boost/format.hpp>
+#endif
+
 using namespace uhd;
 using namespace uhd::transport;
 
@@ -69,11 +75,30 @@ struct lut_result_t
         completed = 0;
         status = LIBUSB_TRANSFER_COMPLETED;
         actual_length = 0;
+#ifdef UHD_TXRX_DEBUG_PRINTS
+        start_time = 0;
+        buff_num = -1;
+#endif
     }
     int completed;
     libusb_transfer_status status;
     int actual_length;
+
+#ifdef UHD_TXRX_DEBUG_PRINTS
+    // These are fore debugging
+    long start_time;
+    int buff_num;
+    bool is_recv;
+#endif
 };
+
+#ifdef UHD_TXRX_DEBUG_PRINTS
+static std::string dbg_prefix("libusb1_zero_copy,");
+static void libusb1_zerocopy_dbg_print_err(std::string msg){
+	msg = dbg_prefix + msg;
+	fprintf(stderr, "%s\n", msg.c_str());
+}
+#endif
 
 /*!
  * All libusb callback functions should be marked with the LIBUSB_CALL macro
@@ -87,6 +112,10 @@ static void LIBUSB_CALL libusb_async_cb(libusb_transfer *lut)
     r->completed = 1;
     r->status = lut->status;
     r->actual_length = lut->actual_length;
+#ifdef UHD_TXRX_DEBUG_PRINTS
+    long end_time = boost::get_system_time().time_of_day().total_microseconds();
+    libusb1_zerocopy_dbg_print_err( (boost::format("libusb_async_cb,%s,%i,%i,%i,%ld,%ld") % (r->is_recv ? "rx":"tx") % r->buff_num % r->actual_length % r->status % end_time % r->start_time).str() );
+#endif
 }
 
 /*!
@@ -124,7 +153,6 @@ UHD_INLINE bool wait_for_completion(libusb_context *ctx, const double timeout, i
         tv.tv_usec = 10000; /*10ms*/
         libusb_handle_events_timeout_completed(ctx, &tv, &completed);
     }
-
     return completed;
 }
 
@@ -141,11 +169,18 @@ public:
         _ctx(libusb::session::get_global_session()->get_context()),
         _lut(lut), _frame_size(frame_size) { /* NOP */ }
 
-    void release(void){_release_cb(this);}
+    void release(void){
+    	_release_cb(this);
+    }
 
     UHD_INLINE void submit(void)
     {
-        _lut->length = (_is_recv)? _frame_size : size(); //always set length
+    	_lut->length = (_is_recv)? _frame_size : size(); //always set length
+#ifdef UHD_TXRX_DEBUG_PRINTS
+        result.start_time = boost::get_system_time().time_of_day().total_microseconds();
+        result.buff_num = num();
+        result.is_recv = _is_recv;
+#endif
         const int ret = libusb_submit_transfer(_lut);
         if (ret != 0) throw uhd::runtime_error(str(boost::format(
             "usb %s submit failed: %s") % _name % libusb_error_name(ret)));
@@ -313,7 +348,7 @@ private:
 
     void enqueue_damn_buffer(libusb_zero_copy_mb *mb)
     {
-        boost::mutex::scoped_lock l(_mutex);
+    	boost::mutex::scoped_lock l(_mutex);
         _released.push_back(mb);
         this->submit_what_we_can();
         l.unlock();
@@ -324,7 +359,7 @@ private:
     {
         while (not _released.empty() and not _enqueued.full())
         {
-            _released.front()->submit();
+        	_released.front()->submit();
             _enqueued.push_back(_released.front());
             _released.pop_front();
         }
