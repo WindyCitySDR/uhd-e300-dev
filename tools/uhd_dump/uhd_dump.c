@@ -269,6 +269,17 @@ void print_direction(const struct pbuf_info *packet_buffer, const struct in_addr
    fprintf(stdout,"UNKNOWN");
 }
 
+// Print to STDOUT the CHDR size in bytes
+void print_size(const struct pbuf_info *packet_buffer)
+{
+  const struct chdr_header *chdr_header;
+
+  // Overlay CHDR header on packet payload
+  chdr_header = (struct chdr_header *)(packet_buffer->current->payload+ETH_SIZE+IP_SIZE+UDP_SIZE);
+
+  fprintf(stdout,"Size: %04d ",(swapint(chdr_header->chdr_type) & SIZE));
+}
+
 // Print to STDOUT the CHDR SID decode
 void print_sid(const struct pbuf_info *packet_buffer)
 {
