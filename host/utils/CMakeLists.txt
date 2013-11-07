@@ -1,5 +1,5 @@
 #
-# Copyright 2010-2012 Ettus Research LLC
+# Copyright 2010-2013 Ettus Research LLC
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -25,6 +25,7 @@ SET(util_runtime_sources
     uhd_cal_tx_dc_offset.cpp
     uhd_cal_tx_iq_balance.cpp
     usrp_n2xx_simple_net_burner.cpp
+    usrp_x3xx_net_burner.cpp
 )
 
 #for each source: build an executable and install
@@ -99,6 +100,7 @@ FOREACH(util_source ${util_share_sources})
 ENDFOREACH(util_source)
 
 UHD_INSTALL(TARGETS usrp_n2xx_simple_net_burner RUNTIME DESTINATION ${PKG_LIB_DIR}/utils COMPONENT utilities)
+UHD_INSTALL(TARGETS usrp_x3xx_net_burner RUNTIME DESTINATION ${PKG_LIB_DIR}/utils COMPONENT utilities)
 
 #UHD images downloader configuration
 CONFIGURE_FILE(

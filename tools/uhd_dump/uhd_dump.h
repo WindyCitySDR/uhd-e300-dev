@@ -30,6 +30,7 @@
 #define EXT_CONTEXT 1<<31
 #define HAS_TIME 1<<29
 #define EOB 1<<28
+#define SIZE (1<<16)-1
 
 
 // UDP used as source for all CHDR comms.
@@ -230,6 +231,7 @@ void get_udp_port_from_file(u16, const char *, struct pbuf_info *, struct timeva
 void get_everything_from_file(const char *, struct pbuf_info *, struct timeval *);
 void get_connection_endpoints( struct pbuf_info *, struct in_addr *, struct in_addr *);
 void print_direction(const struct pbuf_info *, const struct in_addr *, const struct in_addr *);
+void print_size( const struct pbuf_info *);
 void print_sid( const struct pbuf_info *);
 void print_vita_header( const struct pbuf_info *, const struct in_addr *);
 

@@ -183,18 +183,20 @@ int main(int argc, char *argv[])
 
      dump_header = (u32 *) (packet_buffer->current->payload+ETH_SIZE+IP_SIZE+UDP_SIZE);
 
-  fprintf(stdout,"DUMP: %08x %08x %08x %08x %08x %08x\n",
- 	  swapint((int) *(dump_header)),
- 	  swapint((int) *(dump_header+1)),
- 	  swapint((int) *(dump_header+2)),
- 	  swapint((int) *(dump_header+3)),
- 	  swapint((int) *(dump_header+4)),
-	  swapint((int) *(dump_header+5)));
+  /* fprintf(stdout,"DUMP: %08x %08x %08x %08x %08x %08x\n", */
+  /* 	  swapint((int) *(dump_header)), */
+  /* 	  swapint((int) *(dump_header+1)), */
+  /* 	  swapint((int) *(dump_header+2)), */
+  /* 	  swapint((int) *(dump_header+3)), */
+  /* 	  swapint((int) *(dump_header+4)), */
+  /* 	  swapint((int) *(dump_header+5))); */
 
     // Extract the device portion of the SID to see which packet flow this belongs in
 
     fprintf(stdout,"%8d %f \t",x,time_since_start);
     print_direction(packet_buffer,&host_addr,&usrp_addr);
+    fprintf(stdout,"\t");
+    print_size(packet_buffer);
     fprintf(stdout,"\t");
     print_sid(packet_buffer);
     fprintf(stdout,"\t");

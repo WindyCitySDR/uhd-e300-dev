@@ -10,7 +10,7 @@ const struct radio_ctrl_names reg_list[] =
     {18,  "SR_GPIO_TX"},
     {19,  "SR_GPIO_FDX"},
     {20,  "SR_GPIO_DDR"},
-    {24,  "SR_SR_MISC_OUTS"},
+    {24,  "SR_MISC_OUTS"},
     {32,  "SR_READBACK"},
     {64,  "SR_ERROR_POLICY"},
     {66,  "SR_CYCLES"},
