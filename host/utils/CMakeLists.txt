@@ -25,7 +25,11 @@ SET(util_runtime_sources
     uhd_cal_tx_dc_offset.cpp
     uhd_cal_tx_iq_balance.cpp
     usrp_n2xx_simple_net_burner.cpp
+)
+
+SET(x3xx_burner_sources
     usrp_x3xx_net_burner.cpp
+    cdecode.c
 )
 
 #for each source: build an executable and install
@@ -35,6 +39,10 @@ FOREACH(util_source ${util_runtime_sources})
     TARGET_LINK_LIBRARIES(${util_name} uhd ${Boost_LIBRARIES})
     UHD_INSTALL(TARGETS ${util_name} RUNTIME DESTINATION ${RUNTIME_DIR} COMPONENT utilities)
 ENDFOREACH(util_source)
+
+ADD_EXECUTABLE(usrp_x3xx_net_burner ${x3xx_burner_sources})
+TARGET_LINK_LIBRARIES(usrp_x3xx_net_burner uhd ${Boost_LIBRARIES})
+UHD_INSTALL(TARGETS usrp_x3xx_net_burner RUNTIME DESTINATION ${RUNTIME_DIR} COMPONENT utilities)
 
 ########################################################################
 # nirio_programmer @TODO: Ashish: Move some of this functionality into
