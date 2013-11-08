@@ -27,6 +27,8 @@
 #include <boost/foreach.hpp>
 #include <boost/asio.hpp>
 #include <boost/program_options.hpp>
+#include <boost/property_tree/ptree.hpp>
+#include <boost/property_tree/xml_parser.hpp>
 #include <boost/assign.hpp>
 #include <boost/cstdint.hpp>
 #include <boost/assign/list_of.hpp>
@@ -41,6 +43,8 @@
 #include <uhd/utils/byteswap.hpp>
 #include <uhd/utils/safe_main.hpp>
 #include <uhd/utils/safe_call.hpp>
+
+#include "cdecode.h"
 
 #define X300_FPGA_BIN_SIZE_BYTES 15877916
 #define X300_FPGA_BIT_MAX_SIZE_BYTES 15878022
@@ -148,17 +152,38 @@ void list_usrps(){
     }
 }
 
+void extract_from_lvbitx(std::string lvbitx_path, std::vector<char> &bitstream)
+{
+    boost::property_tree::ptree pt;
+    boost::property_tree::xml_parser::read_xml(lvbitx_path.c_str(), pt, boost::property_tree::xml_parser::no_comments | boost::property_tree::xml_parser::trim_whitespace);
+    std::string const encoded_bitstream(pt.get<std::string>("Bitfile.Bitstream"));
+    std::vector<char> decoded_bitstream(encoded_bitstream.size());
+
+    base64_decodestate decode_state;
+    base64_init_decodestate(&decode_state);
+    size_t const decoded_size = base64_decode_block(encoded_bitstream.c_str(), encoded_bitstream.size(), &decoded_bitstream.front(), &decode_state);
+    decoded_bitstream.resize(decoded_size);
+    bitstream.swap(decoded_bitstream);
+}
+
 void burn_fpga_image(udp_simple::sptr udp_transport, std::string fpga_path, bool verify){
     uint32_t max_size;
-    if(fs::extension(fpga_path) == "bit") max_size = X300_FPGA_BIT_MAX_SIZE_BYTES;
-    //else lvbitx size
-    else max_size = X300_FPGA_BIN_SIZE_BYTES;
+    std::vector<char> bitstream;
+
+    if(fs::extension(fpga_path) == ".bit") max_size = X300_FPGA_BIT_MAX_SIZE_BYTES;
+    else max_size = X300_FPGA_BIN_SIZE_BYTES; //Use for both .bin and .lvbitx
+
+    bool is_lvbitx = (fs::extension(fpga_path) == ".lvbitx");
 
     size_t fpga_image_size;
     FILE* file;
     if((file = fopen(fpga_path.c_str(), "rb"))){
         fseek(file, 0, SEEK_END);
-        fpga_image_size = ftell(file);
+        if(is_lvbitx){
+            extract_from_lvbitx(fpga_path, bitstream);
+            fpga_image_size = bitstream.size();
+        }
+        else fpga_image_size = ftell(file);
         if(fpga_image_size > max_size){
             fclose(file);
             throw std::runtime_error(str(boost::format("FPGA size is too large (%d > %d).")
@@ -170,7 +195,6 @@ void burn_fpga_image(udp_simple::sptr udp_transport, std::string fpga_path, bool
         throw std::runtime_error(str(boost::format("Could not find FPGA image at location: %s")
                                      % fpga_path.c_str()));
     }
-
 
     const x300_fpga_update_data_t *update_data_in = reinterpret_cast<const x300_fpga_update_data_t *>(x300_data_in_mem);
 
@@ -194,6 +218,7 @@ void burn_fpga_image(udp_simple::sptr udp_transport, std::string fpga_path, bool
 
     int percentage = -1;
     int last_percentage = -1;
+    size_t current_pos = 0;
 
     //Each sector
     for(size_t i = 0; i < fpga_image_size; i += X300_FLASH_SECTOR_SIZE){
@@ -201,7 +226,7 @@ void burn_fpga_image(udp_simple::sptr udp_transport, std::string fpga_path, bool
         //Print percentage at beginning of first sector after each 10%
         int percentage = int(double(i)/double(fpga_image_size)*100);
         if((percentage != last_percentage) and (percentage % 10 == 0)){ //Don't print same percentage twice
-            std::cout << int(double(i)/double(fpga_image_size)*100) << "%..." << std::flush;
+            std::cout << percentage << "%..." << std::flush;
         }
         last_percentage = percentage;
 
@@ -219,18 +244,29 @@ void burn_fpga_image(udp_simple::sptr udp_transport, std::string fpga_path, bool
             send_packet.size = htonx<boost::uint32_t>(X300_PACKET_SIZE_BYTES / 2);
             memset(intermediary_packet_data,0,X300_PACKET_SIZE_BYTES);
             memset(send_packet.data,0,X300_PACKET_SIZE_BYTES);
-            size_t current_pos = ftell(file);
+            if(!is_lvbitx) current_pos = ftell(file);
 
             if(current_pos + X300_PACKET_SIZE_BYTES > fpga_image_size){
-                size_t len = fread(intermediary_packet_data, sizeof(boost::uint8_t), (fpga_image_size-current_pos), file);
-                if(len != (fpga_image_size-current_pos)){
-                    throw std::runtime_error("Error reading from file!");
+                if(is_lvbitx){
+                    memcpy(intermediary_packet_data, (&bitstream[current_pos]), (bitstream.size()-current_pos+1));
+                }
+                else{
+                    size_t len = fread(intermediary_packet_data, sizeof(boost::uint8_t), (fpga_image_size-current_pos), file);
+                    if(len != (fpga_image_size-current_pos)){
+                        throw std::runtime_error("Error reading from file!");
+                    }
                 }
             }
             else{
-                size_t len = fread(intermediary_packet_data, sizeof(boost::uint8_t), X300_PACKET_SIZE_BYTES, file);
-                if(len != X300_PACKET_SIZE_BYTES){
-                    throw std::runtime_error("Error reading from file!");
+                if(is_lvbitx){
+                    memcpy(intermediary_packet_data, (&bitstream[current_pos]), X300_PACKET_SIZE_BYTES);
+                    current_pos += X300_PACKET_SIZE_BYTES;
+                }
+                else{
+                    size_t len = fread(intermediary_packet_data, sizeof(boost::uint8_t), X300_PACKET_SIZE_BYTES, file);
+                    if(len != X300_PACKET_SIZE_BYTES){
+                        throw std::runtime_error("Error reading from file!");
+                    }
                 }
             }
 
@@ -348,6 +384,12 @@ int UHD_SAFE_MAIN(int argc, char *argv[]){
 
     if(fpga_path == "" and !vm.count("configure")){
         throw std::runtime_error("You must specify an FPGA image or select the option to configure the current image.");
+    }
+
+    //Check for proper file type
+    std::string ext = fs::extension(fpga_path.c_str());
+    if(ext != ".bin" and ext != ".bit" and ext != ".lvbitx"){
+        throw std::runtime_error("The image filename must end in .bin, .bit, or .lvbitx.");
     }
 
     //Establish UDP connection before doing anything
