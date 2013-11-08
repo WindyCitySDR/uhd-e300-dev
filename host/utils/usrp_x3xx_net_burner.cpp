@@ -42,7 +42,8 @@
 #include <uhd/utils/safe_main.hpp>
 #include <uhd/utils/safe_call.hpp>
 
-#define X300_FPGA_IMAGE_SIZE_BYTES 15877916
+#define X300_FPGA_BIN_SIZE_BYTES 15877916
+#define X300_FPGA_BIT_MAX_SIZE_BYTES 15878022
 #define X300_FPGA_PROG_UDP_PORT 49157
 #define X300_FLASH_SECTOR_SIZE 131072
 #define X300_PACKET_SIZE_BYTES 256
@@ -60,6 +61,7 @@
 #define X300_FPGA_PROG_CONFIGURE     64
 #define X300_FPGA_PROG_CONFIG_STATUS 128
 
+namespace fs = boost::filesystem;
 namespace po = boost::program_options;
 
 using namespace uhd;
@@ -147,15 +149,20 @@ void list_usrps(){
 }
 
 void burn_fpga_image(udp_simple::sptr udp_transport, std::string fpga_path, bool verify){
+    uint32_t max_size;
+    if(fs::extension(fpga_path) == "bit") max_size = X300_FPGA_BIT_MAX_SIZE_BYTES;
+    //else lvbitx size
+    else max_size = X300_FPGA_BIN_SIZE_BYTES;
+
     size_t fpga_image_size;
     FILE* file;
     if((file = fopen(fpga_path.c_str(), "rb"))){
         fseek(file, 0, SEEK_END);
         fpga_image_size = ftell(file);
-        if(fpga_image_size > X300_FPGA_IMAGE_SIZE_BYTES){
+        if(fpga_image_size > max_size){
             fclose(file);
             throw std::runtime_error(str(boost::format("FPGA size is too large (%d > %d).")
-                                         % fpga_image_size % X300_FPGA_IMAGE_SIZE_BYTES));
+                                         % fpga_image_size % max_size));
         }
         rewind(file);
     }
