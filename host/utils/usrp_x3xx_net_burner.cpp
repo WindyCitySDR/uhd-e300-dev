@@ -220,15 +220,18 @@ void burn_fpga_image(udp_simple::sptr udp_transport, std::string fpga_path, bool
             memset(intermediary_packet_data,0,X300_PACKET_SIZE_BYTES);
             memset(send_packet.data,0,X300_PACKET_SIZE_BYTES);
             size_t current_pos = ftell(file);
-            size_t send_size = 0;
 
             if(current_pos + X300_PACKET_SIZE_BYTES > fpga_image_size){
-                fread(intermediary_packet_data, sizeof(boost::uint8_t), (fpga_image_size-current_pos), file);
-                send_size = (fpga_image_size-current_pos);
+                size_t len = fread(intermediary_packet_data, sizeof(boost::uint8_t), (fpga_image_size-current_pos), file);
+                if(len != (fpga_image_size-current_pos)){
+                    throw std::runtime_error("Error reading from file!");
+                }
             }
             else{
-                fread(intermediary_packet_data, sizeof(boost::uint8_t), X300_PACKET_SIZE_BYTES, file);
-                send_size = X300_PACKET_SIZE_BYTES;
+                size_t len = fread(intermediary_packet_data, sizeof(boost::uint8_t), X300_PACKET_SIZE_BYTES, file);
+                if(len != X300_PACKET_SIZE_BYTES){
+                    throw std::runtime_error("Error reading from file!");
+                }
             }
 
             for(size_t k = 0; k < X300_PACKET_SIZE_BYTES; k++){
