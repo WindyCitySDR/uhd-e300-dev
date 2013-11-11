@@ -221,6 +221,13 @@ struct x300_clock_ctrl_impl : x300_clock_ctrl	{
 		
 		return _clock_rate;
 	}
+
+	double get_crystal_clock_rate(void) {
+		
+		return _lmkpll2_ref;
+	}
+
+
 //empty
 	void enable_clock(const x300_clock_which_t which, const bool enb) {}
 	

@@ -48,6 +48,13 @@ struct x300_clock_ctrl : boost::noncopyable
      */
     virtual double get_master_clock_rate(void) = 0;
 
+     /*!
+     * Get the crystal clock frequency for the fpga.
+     * \return the clock frequency in Hz
+     */
+    virtual double get_crystal_clock_rate(void) = 0;
+ 
+
     //! enable/disable a particular clock
     virtual void enable_clock(const x300_clock_which_t which, const bool) = 0;
 

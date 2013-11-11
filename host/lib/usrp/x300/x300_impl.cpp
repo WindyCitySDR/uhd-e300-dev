@@ -482,7 +482,8 @@ void x300_impl::setup_mb(const size_t mb_i, const uhd::device_addr_t &dev_addr)
     _tree->create<double>(mb_path / "tick_rate")
         .publish(boost::bind(&x300_clock_ctrl::get_master_clock_rate, mb.clock));
 
-    UHD_MSG(status) << "Radio 1x clock set to " << (mb.clock->get_master_clock_rate()/1e6) << std::dec << " MHz" << std::endl;
+    UHD_MSG(status) << "Radio 1x clock set to " << (mb.clock->get_master_clock_rate()/1e6) << std::dec << " MHz. Crystal is " << 
+      (mb.clock->get_crystal_clock_rate()/1e6) << std::dec << " MHz" << std::endl;
 
     ////////////////////////////////////////////////////////////////////
     // Create the GPSDO control
