@@ -208,7 +208,9 @@ void burn_fpga_image(udp_simple::sptr udp_transport, std::string fpga_path, bool
 
     udp_transport->recv(boost::asio::buffer(x300_data_in_mem), UDP_TIMEOUT);
     if((ntohl(update_data_in->flags) & X300_FPGA_PROG_FLAGS_ERROR) != X300_FPGA_PROG_FLAGS_ERROR){
-        std::cout << "Burning image: " << fpga_path << std::endl << std::endl;
+        std::cout << "Burning image: " << fpga_path << std::endl;
+        if(verify) std::cout << "NOTE: Verifying image. Burning will take much longer." << std::endl;
+        std::cout << std::endl;
     }
     else{
         throw std::runtime_error("Failed to start image burning! Did you specify the correct IP address? If so, power-cycle the device and try again.");
