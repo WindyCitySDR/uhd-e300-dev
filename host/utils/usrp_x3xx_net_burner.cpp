@@ -161,13 +161,16 @@ void list_usrps(){
 void extract_from_lvbitx(std::string lvbitx_path, std::vector<char> &bitstream)
 {
     boost::property_tree::ptree pt;
-    boost::property_tree::xml_parser::read_xml(lvbitx_path.c_str(), pt, boost::property_tree::xml_parser::no_comments | boost::property_tree::xml_parser::trim_whitespace);
+    boost::property_tree::xml_parser::read_xml(lvbitx_path.c_str(), pt,
+                                               boost::property_tree::xml_parser::no_comments |
+                                               boost::property_tree::xml_parser::trim_whitespace);
     std::string const encoded_bitstream(pt.get<std::string>("Bitfile.Bitstream"));
     std::vector<char> decoded_bitstream(encoded_bitstream.size());
 
     base64_decodestate decode_state;
     base64_init_decodestate(&decode_state);
-    size_t const decoded_size = base64_decode_block(encoded_bitstream.c_str(), encoded_bitstream.size(), &decoded_bitstream.front(), &decode_state);
+    size_t const decoded_size = base64_decode_block(encoded_bitstream.c_str(),
+                                encoded_bitstream.size(), &decoded_bitstream.front(), &decode_state);
     decoded_bitstream.resize(decoded_size);
     bitstream.swap(decoded_bitstream);
 }

@@ -44,10 +44,6 @@ ADD_EXECUTABLE(usrp_x3xx_net_burner ${x3xx_burner_sources})
 TARGET_LINK_LIBRARIES(usrp_x3xx_net_burner uhd ${Boost_LIBRARIES})
 UHD_INSTALL(TARGETS usrp_x3xx_net_burner RUNTIME DESTINATION ${RUNTIME_DIR} COMPONENT utilities)
 
-########################################################################
-# nirio_programmer @TODO: Ashish: Move some of this functionality into
-#                         the RPC server and remove this binary
-########################################################################
 SET(CMAKE_C_COMPILE_OBJECT ${CMAKE_CXX_COMPILE_OBJECT})
 SET(niro_prog_sources nirio_programmer.cpp
     ../lib/transport/nirio/niusrprio_session.cpp
