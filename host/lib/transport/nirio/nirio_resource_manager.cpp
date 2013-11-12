@@ -19,7 +19,9 @@
 #include <uhd/transport/nirio/nirio_resource_manager.h>
 
 //@TODO: Figure out a better way to suppress anonymous struct init warnings
-#ifdef __GNUC__
+#ifdef __clang__
+    #pragma GCC diagnostic push ignored "-Wmissing-field-initializers"
+#elif defined(__GNUC__)
     #pragma GCC diagnostic ignored "-Wmissing-field-initializers"
 #endif
 
