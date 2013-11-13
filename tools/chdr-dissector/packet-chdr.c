@@ -48,6 +48,11 @@ static int hf_chdr_dst_ep = -1;
 static int hf_chdr_timestamp = -1;
 static int hf_chdr_payload = -1;
 
+/* the heuristic dissector is called on every packet with payload.
+ * The warning printed for this should only be printed once.
+ */
+static int heur_warning_printed = 0;
+
 /* Forward-declare the dissector functions */
 static void dissect_chdr(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree);
 
@@ -59,7 +64,10 @@ static gint ett_chdr_id = -1;
 /* heuristic dissector call. Will always return. */
 static gboolean heur_dissect_chdr(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
 {
-	printf("heuristic dissector for UHD CHDR always returns true!\n");
+	if(heur_warning_printed < 1){
+		printf("heuristic dissector for UHD CHDR always returns true!\n");
+		heur_warning_printed++;
+	}
 	dissect_chdr(tvb, pinfo, tree); 
     return (TRUE);
 }
