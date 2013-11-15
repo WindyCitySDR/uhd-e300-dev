@@ -235,7 +235,7 @@ void burn_fpga_image(udp_simple::sptr udp_transport, std::string fpga_path, bool
     for(size_t i = 0; i < fpga_image_size; i += X300_FLASH_SECTOR_SIZE){
 
         //Print percentage at beginning of first sector after each 10%
-        int percentage = int(double(i)/double(fpga_image_size)*100);
+        percentage = int(double(i)/double(fpga_image_size)*100);
         if((percentage != last_percentage) and (percentage % 10 == 0)){ //Don't print same percentage twice
             std::cout << percentage << "%..." << std::flush;
         }
