@@ -27,16 +27,14 @@
 //@TODO: Move the register defs required by the class to a common location
 #include "../../usrp/x300/x300_regs.hpp"
 
-#define RPC_CLIENT_ARGS "localhost", "50000"
-
 namespace nifpga_interface
 {
 
-niusrprio_session::niusrprio_session(const std::string& resource_name) :
+niusrprio_session::niusrprio_session(const std::string& resource_name, const std::string& rpc_port_name) :
     _resource_name(resource_name),
     _session_open(false),
     _resource_manager(_riok_proxy),
-    _rpc_client(RPC_CLIENT_ARGS)
+    _rpc_client("localhost", rpc_port_name)
 {
 }
 
@@ -45,9 +43,9 @@ niusrprio_session::~niusrprio_session()
     close();
 }
 
-nirio_status niusrprio_session::enumerate(device_info_vtr& device_info_vtr)
+nirio_status niusrprio_session::enumerate(const std::string& rpc_port_name, device_info_vtr& device_info_vtr)
 {
-    usrprio_rpc::usrprio_rpc_client temp_rpc_client(RPC_CLIENT_ARGS);
+    usrprio_rpc::usrprio_rpc_client temp_rpc_client("localhost", rpc_port_name);
     nirio_status status = temp_rpc_client.get_ctor_status();
     nirio_status_chain(temp_rpc_client.niusrprio_enumerate(device_info_vtr), status);
     return status;
@@ -125,9 +123,11 @@ nirio_status niusrprio_session::download_bitstream_to_flash(const std::string& b
     return _rpc_client.niusrprio_download_fpga_to_flash(_resource_name, bitstream_path);
 }
 
-nirio_interface::niriok_proxy::sptr niusrprio_session::create_kernel_proxy(const std::string& resource_name)
+nirio_interface::niriok_proxy::sptr niusrprio_session::create_kernel_proxy(
+    const std::string& resource_name,
+    const std::string& rpc_port_name)
 {
-    usrprio_rpc::usrprio_rpc_client temp_rpc_client(RPC_CLIENT_ARGS);
+    usrprio_rpc::usrprio_rpc_client temp_rpc_client("localhost", rpc_port_name);
     nirio_status status = temp_rpc_client.get_ctor_status();
 
     std::string interface_path;
