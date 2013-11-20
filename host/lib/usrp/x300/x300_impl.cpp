@@ -38,6 +38,8 @@
 #include <uhd/transport/nirio/niusrprio_session.h>
 #include <uhd/utils/platform.hpp>
 
+#define NIUSRPRIO_DEFAULT_RPC_PORT "5444"
+
 using namespace uhd;
 using namespace uhd::usrp;
 using namespace uhd::transport;
@@ -122,9 +124,14 @@ static device_addrs_t x300_find_with_addr(const device_addr_t &hint)
 
 static device_addrs_t x300_find_pcie(const device_addr_t &hint, bool explicit_query)
 {
+    std::string rpc_port_name(NIUSRPRIO_DEFAULT_RPC_PORT);
+    if (hint.has_key("niusrpriorpc_port")) {
+        rpc_port_name = hint["niusrpriorpc_port"];
+    }
+
     device_addrs_t addrs;
     niusrprio_session::device_info_vtr dev_info_vtr;
-    nirio_status status = niusrprio_session::enumerate(dev_info_vtr);
+    nirio_status status = niusrprio_session::enumerate(rpc_port_name, dev_info_vtr);
     if (explicit_query) nirio_status_to_exception(status, "x300_find_pcie: Error enumerating NI-RIO devices.");
 
     BOOST_FOREACH(niusrprio_session::device_info &dev_info, dev_info_vtr)
@@ -321,10 +328,16 @@ void x300_impl::setup_mb(const size_t mb_i, const uhd::device_addr_t &dev_addr)
     {
         nirio_status status = 0;
 
+        std::string rpc_port_name(NIUSRPRIO_DEFAULT_RPC_PORT);
+        if (dev_addr.has_key("niusrpriorpc_port")) {
+            rpc_port_name = dev_addr["niusrpriorpc_port"];
+        }
+        UHD_MSG(status) << boost::format("Connecting to niusrpriorpc at localhost:%s...\n") % rpc_port_name;
+
         //Detect the PCIe product ID to distinguish between X300 and X310
         boost::uint32_t pid;
         nirio_interface::niriok_proxy::sptr discovery_proxy =
-            niusrprio_session::create_kernel_proxy(dev_addr["resource"]);
+            niusrprio_session::create_kernel_proxy(dev_addr["resource"], rpc_port_name);
         if (discovery_proxy) {
             nirio_status_chain(discovery_proxy->get_attribute(kRioProductNumber, pid), status);
             discovery_proxy->close();
@@ -341,7 +354,7 @@ void x300_impl::setup_mb(const size_t mb_i, const uhd::device_addr_t &dev_addr)
 
         //Load the lvbitx onto the device
         UHD_MSG(status) << boost::format("Loading LVBITX bitfile %s...\n") % lvbitx->get_bitfile_path();
-        mb.rio_fpga_interface.reset(new niusrprio_session(dev_addr["resource"]));
+        mb.rio_fpga_interface.reset(new niusrprio_session(dev_addr["resource"], rpc_port_name));
         nirio_status_chain(mb.rio_fpga_interface->open(lvbitx), status);
         nirio_status_to_exception(status, "x300_impl: Could not initialize RIO session.");
     }
@@ -482,7 +495,8 @@ void x300_impl::setup_mb(const size_t mb_i, const uhd::device_addr_t &dev_addr)
     _tree->create<double>(mb_path / "tick_rate")
         .publish(boost::bind(&x300_clock_ctrl::get_master_clock_rate, mb.clock));
 
-    UHD_MSG(status) << "Radio 1x clock set to " << (mb.clock->get_master_clock_rate()/1e6) << std::dec << " MHz" << std::endl;
+    UHD_MSG(status) << "Radio 1x clock set to " << (mb.clock->get_master_clock_rate()/1e6) << std::dec << " MHz. Crystal is " << 
+      (mb.clock->get_crystal_clock_rate()/1e6) << std::dec << " MHz" << std::endl;
 
     ////////////////////////////////////////////////////////////////////
     // Create the GPSDO control

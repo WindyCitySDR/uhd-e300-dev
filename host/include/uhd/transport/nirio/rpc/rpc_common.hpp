@@ -38,17 +38,19 @@ namespace usrprio_rpc {
 typedef boost::int32_t  func_id_t;
 typedef boost::uint64_t client_id_t;
 
+#define build_client_id(host_id, process_id) \
+    ((static_cast<boost::uint64_t>(host_id) << 32) | static_cast<boost::uint64_t>(process_id))
+#define get_process_id_from_client_id(client_id) \
+    (static_cast<boost::int32_t>(client_id))
+#define get_host_id_from_client_id(client_id) \
+    (static_cast<boost::uint32_t>(client_id >> 32))
+
 //[Over-the-wire] Handshake format
 struct hshake_args_t {
     boost::uint32_t version;
     boost::uint32_t oldest_comp_version;
-    union {
-        client_id_t         client_id;
-        struct {
-            boost::uint32_t pid;
-            boost::uint32_t hid;
-        } id;
-    };
+    boost::int32_t  boost_archive_version;
+    client_id_t     client_id;
 };
 
 //[Over-the-wire] Header for RPC request and response
@@ -73,7 +75,7 @@ public:
 //[Internal] Serializer for RPC input parameters
 class func_args_writer_t {
 public:
-    func_args_writer_t() : _stream(), _archive(_stream) {}
+    func_args_writer_t() : _stream(), _archive(_stream, boost::archive::no_header) {}
 
     template<typename data_t>
     void push(const data_t& d) {
@@ -120,9 +122,9 @@ public:
     void load(const std::vector<char>& data) {
         _stream.str(std::string(data.begin(), data.end()));
 #if (USE_BINARY_ARCHIVE)
-        _archive.reset(new boost::archive::binary_iarchive(_stream));
+        _archive.reset(new boost::archive::binary_iarchive(_stream, boost::archive::no_header));
 #else
-        _archive.reset(new boost::archive::text_iarchive(_stream));
+        _archive.reset(new boost::archive::text_iarchive(_stream, boost::archive::no_header));
 #endif
     }
 
@@ -133,6 +135,20 @@ private:
 #else
     boost::scoped_ptr<boost::archive::text_iarchive>    _archive;
 #endif
+};
+
+class boost_serialization_archive_utils {
+public:
+    static boost::int32_t get_version() {
+    #if (USE_BINARY_ARCHIVE)
+        typedef boost::archive::binary_oarchive archive_t;
+    #else
+        typedef boost::archive::text_oarchive   archive_t;
+    #endif
+        std::ostringstream stream;
+        archive_t dummy_archive(stream, boost::archive::no_header);
+        return static_cast<boost::int32_t>(dummy_archive.get_library_version());
+    }
 };
 
 }

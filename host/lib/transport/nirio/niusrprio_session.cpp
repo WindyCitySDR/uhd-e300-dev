@@ -27,16 +27,14 @@
 //@TODO: Move the register defs required by the class to a common location
 #include "../../usrp/x300/x300_regs.hpp"
 
-#define RPC_CLIENT_ARGS "localhost", "50000"
-
 namespace nifpga_interface
 {
 
-niusrprio_session::niusrprio_session(const std::string& resource_name) :
+niusrprio_session::niusrprio_session(const std::string& resource_name, const std::string& rpc_port_name) :
     _resource_name(resource_name),
-    _session(0),
+    _session_open(false),
     _resource_manager(_riok_proxy),
-    _rpc_client(RPC_CLIENT_ARGS)
+    _rpc_client("localhost", rpc_port_name)
 {
 }
 
@@ -45,9 +43,9 @@ niusrprio_session::~niusrprio_session()
     close();
 }
 
-nirio_status niusrprio_session::enumerate(device_info_vtr& device_info_vtr)
+nirio_status niusrprio_session::enumerate(const std::string& rpc_port_name, device_info_vtr& device_info_vtr)
 {
-    usrprio_rpc::usrprio_rpc_client temp_rpc_client(RPC_CLIENT_ARGS);
+    usrprio_rpc::usrprio_rpc_client temp_rpc_client("localhost", rpc_port_name);
     nirio_status status = temp_rpc_client.get_ctor_status();
     nirio_status_chain(temp_rpc_client.niusrprio_enumerate(device_info_vtr), status);
     return status;
@@ -69,8 +67,6 @@ nirio_status niusrprio_session::open(
 
     //Make sure that the RPC client connected to the server properly
     nirio_status_chain(_rpc_client.get_ctor_status(), status);
-    //Check if another process is using this device
-    nirio_status_chain(_wait_for_device_available(), status);
     //Get a handle to the kernel driver
     nirio_status_chain(_rpc_client.niusrprio_get_interface_path(_resource_name, _interface_path), status);
     nirio_status_chain(_riok_proxy.open(_interface_path), status);
@@ -85,7 +81,8 @@ nirio_status niusrprio_session::open(
         boost::uint16_t download_fpga = (force_download || (_read_bitstream_checksum() != lvbitx_checksum)) ? 1 : 0;
 
         nirio_status_chain(_rpc_client.niusrprio_open_session(
-            _resource_name, bitfile_path, signature, download_fpga, _session), status);
+            _resource_name, bitfile_path, signature, download_fpga), status);
+        _session_open = nirio_status_not_fatal(status);
 
         if (nirio_status_not_fatal(status)) {
             nirio_register_info_vtr reg_vtr;
@@ -106,18 +103,18 @@ void niusrprio_session::close(bool reset_fpga)
 {
     boost::unique_lock<boost::recursive_mutex> lock(_session_mutex);
 
-    if (_session) {
+    if (_session_open) {
         nirio_status status = NiRio_Status_Success;
         if (reset_fpga) reset();
-        nirio_status_chain(_rpc_client.niusrprio_close_session(_session, 0), status);
-        _session = 0;
+        nirio_status_chain(_rpc_client.niusrprio_close_session(_resource_name), status);
+        _session_open = false;
     }
 }
 
 nirio_status niusrprio_session::reset()
 {
     boost::unique_lock<boost::recursive_mutex> lock(_session_mutex);
-    return _rpc_client.niusrprio_reset_device(_session);
+    return _rpc_client.niusrprio_reset_device(_resource_name);
 }
 
 nirio_status niusrprio_session::download_bitstream_to_flash(const std::string& bitstream_path)
@@ -126,9 +123,11 @@ nirio_status niusrprio_session::download_bitstream_to_flash(const std::string& b
     return _rpc_client.niusrprio_download_fpga_to_flash(_resource_name, bitstream_path);
 }
 
-nirio_interface::niriok_proxy::sptr niusrprio_session::create_kernel_proxy(const std::string& resource_name)
+nirio_interface::niriok_proxy::sptr niusrprio_session::create_kernel_proxy(
+    const std::string& resource_name,
+    const std::string& rpc_port_name)
 {
-    usrprio_rpc::usrprio_rpc_client temp_rpc_client(RPC_CLIENT_ARGS);
+    usrprio_rpc::usrprio_rpc_client temp_rpc_client("localhost", rpc_port_name);
     nirio_status status = temp_rpc_client.get_ctor_status();
 
     std::string interface_path;
@@ -197,29 +196,6 @@ nirio_status niusrprio_session::_write_bitstream_checksum(const std::string& che
         }
         nirio_status_chain(_riok_proxy.poke(FPGA_USR_SIG_REG_BASE + i, quarter_sig), status);
     }
-    return status;
-}
-
-nirio_status niusrprio_session::_wait_for_device_available()
-{
-    boost::posix_time::ptime start_time = boost::posix_time::microsec_clock::local_time();
-    boost::posix_time::time_duration elapsed;
-
-    nirio_status status = NiRio_Status_Success;
-    do {
-        boost::uint16_t locked;
-        _rpc_client.niusrprio_query_device_lock(_resource_name, locked);
-        if (locked == 0) {
-            status = NiRio_Status_Success;
-        } else {
-            nirio_status_chain(NiRio_Status_DeviceLocked, status);
-            boost::this_thread::sleep(boost::posix_time::milliseconds(SESSION_LOCK_RETRY_INT_IN_MS));
-        }
-        elapsed = boost::posix_time::microsec_clock::local_time() - start_time;
-    } while (
-        nirio_status_fatal(status) &&
-        elapsed.total_milliseconds() < SESSION_LOCK_TIMEOUT_IN_MS);
-
     return status;
 }
 

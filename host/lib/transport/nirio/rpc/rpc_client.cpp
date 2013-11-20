@@ -17,6 +17,7 @@
 
 #include <uhd/transport/nirio/rpc/rpc_client.hpp>
 #include <boost/bind.hpp>
+#include <boost/format.hpp>
 
 #define CHAIN_BLOCKING_XFER(func, exp, status) \
     if (status) { \
@@ -39,8 +40,8 @@ rpc_client::rpc_client (
     //Fill in handshake info
     _hshake_args_client.version = CURRENT_VERSION;
     _hshake_args_client.oldest_comp_version = OLDEST_COMPATIBLE_VERSION;
-    _hshake_args_client.id.pid = process_id;
-    _hshake_args_client.id.hid = host_id;
+    _hshake_args_client.client_id = build_client_id(host_id, process_id);
+    _hshake_args_client.boost_archive_version = boost_serialization_archive_utils::get_version();
 
     try {
         //Synchronous resolve + connect
@@ -75,6 +76,9 @@ rpc_client::rpc_client (
                 UHD_LOG << "rpc_client handshake failed." << std::endl;
                 _exec_err.assign(boost::asio::error::connection_refused, boost::system::system_category());
             }
+            UHD_LOG << boost::format("rpc_client archive = %d, rpc_server archive = %d\n.") %
+                _hshake_args_client.boost_archive_version %
+                _hshake_args_server.boost_archive_version;
         } catch (boost::exception&) {
             UHD_LOG << "rpc_client handshake aborted." << std::endl;
             _exec_err.assign(boost::asio::error::connection_refused, boost::system::system_category());

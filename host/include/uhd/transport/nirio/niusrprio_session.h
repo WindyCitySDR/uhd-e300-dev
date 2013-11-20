@@ -38,9 +38,13 @@ public:
     typedef usrprio_rpc::usrprio_device_info device_info;
     typedef usrprio_rpc::usrprio_device_info_vtr device_info_vtr;
 
-	static nirio_status enumerate(device_info_vtr& device_info_vtr);
+	static nirio_status enumerate(
+        const std::string& rpc_port_name,
+        device_info_vtr& device_info_vtr);
 
-	niusrprio_session(const std::string& resource_name);
+	niusrprio_session(
+        const std::string& resource_name,
+        const std::string& port_name);
 	virtual ~niusrprio_session();
 
 	nirio_status open(
@@ -56,7 +60,7 @@ public:
 		const char* fifo_name,
 		boost::shared_ptr< nirio_interface::nirio_fifo<data_t> >& fifo)
 	{
-        if (!_session) return NiRio_Status_ResourceNotInitialized;
+        if (!_session_open) return NiRio_Status_ResourceNotInitialized;
         return _resource_manager.create_tx_fifo(fifo_name, fifo);
 	}
 
@@ -74,7 +78,7 @@ public:
 		const char* fifo_name,
 		boost::shared_ptr< nirio_interface::nirio_fifo<data_t> >& fifo)
 	{
-        if (!_session) return NiRio_Status_ResourceNotInitialized;
+        if (!_session_open) return NiRio_Status_ResourceNotInitialized;
         return _resource_manager.create_rx_fifo(fifo_name, fifo);
 	}
 
@@ -94,7 +98,9 @@ public:
     nirio_status download_bitstream_to_flash(const std::string& bitstream_path);
 
     //Static
-    static nirio_interface::niriok_proxy::sptr create_kernel_proxy(const std::string& resource_name);
+    static nirio_interface::niriok_proxy::sptr create_kernel_proxy(
+        const std::string& resource_name,
+        const std::string& rpc_port_name);
 
 private:
 	nirio_status _verify_signature();
@@ -105,7 +111,7 @@ private:
 	std::string								_resource_name;
 	nifpga_lvbitx::sptr                     _lvbitx;
     std::string                             _interface_path;
-    uint32_t                                _session;
+    bool                                    _session_open;
 	nirio_interface::niriok_proxy			_riok_proxy;
 	nirio_interface::nirio_resource_manager	_resource_manager;
     usrprio_rpc::usrprio_rpc_client         _rpc_client;

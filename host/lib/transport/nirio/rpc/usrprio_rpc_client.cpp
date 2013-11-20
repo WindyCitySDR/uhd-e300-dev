@@ -68,8 +68,7 @@ nirio_status usrprio_rpc_client::niusrprio_open_session(NIUSRPRIO_OPEN_SESSION_A
     const std::string& resource,        \
     const std::string& path,            \
     const std::string& signature,       \
-    const boost::uint16_t& download_fpga,   \
-    boost::uint32_t& session
+    const boost::uint16_t& download_fpga
 */
 {
     usrprio_rpc::func_args_writer_t in_args;
@@ -88,7 +87,6 @@ nirio_status usrprio_rpc_client::niusrprio_open_session(NIUSRPRIO_OPEN_SESSION_A
 
     if (nirio_status_not_fatal(status)) {
         out_args >> status;
-        out_args >> session;
     }
 
     return status;
@@ -97,16 +95,14 @@ nirio_status usrprio_rpc_client::niusrprio_open_session(NIUSRPRIO_OPEN_SESSION_A
 nirio_status usrprio_rpc_client::niusrprio_close_session(NIUSRPRIO_CLOSE_SESSION_ARGS)
 /*
 #define NIUSRPRIO_CLOSE_SESSION_ARGS    \
-    const boost::uint32_t& session,     \
-    const boost::uint32_t& attribute
+    const std::string& resource
 */
 {
     usrprio_rpc::func_args_writer_t in_args;
     usrprio_rpc::func_args_reader_t out_args;
     nirio_status status = NiRio_Status_Success;
 
-    in_args << session;
-    in_args << attribute;
+    in_args << resource;
 
     status = _boost_error_to_nirio_status(
         _rpc_client.call(NIUSRPRIO_CLOSE_SESSION, in_args, out_args, _timeout));
@@ -121,30 +117,7 @@ nirio_status usrprio_rpc_client::niusrprio_close_session(NIUSRPRIO_CLOSE_SESSION
 nirio_status usrprio_rpc_client::niusrprio_reset_device(NIUSRPRIO_RESET_SESSION_ARGS)
 /*
 #define NIUSRPRIO_RESET_SESSION_ARGS    \
-    const boost::uint32_t& session
-*/
-{
-    usrprio_rpc::func_args_writer_t in_args;
-    usrprio_rpc::func_args_reader_t out_args;
-    nirio_status status = NiRio_Status_Success;
-
-    in_args << session;
-
-    status = _boost_error_to_nirio_status(
-        _rpc_client.call(NIUSRPRIO_RESET_SESSION, in_args, out_args, _timeout));
-
-    if (nirio_status_not_fatal(status)) {
-        out_args >> status;
-    }
-
-    return status;
-}
-
-nirio_status usrprio_rpc_client::niusrprio_query_device_lock(NIUSRPRIO_QUERY_DEVICE_LOCK_ARGS)
-/*
-#define NIUSRPRIO_QUERY_DEVICE_LOCK_ARGS    \
-    const std::string& resource,            \
-    boost::uint16_t& device_locked
+    const std::string& resource
 */
 {
     usrprio_rpc::func_args_writer_t in_args;
@@ -154,11 +127,10 @@ nirio_status usrprio_rpc_client::niusrprio_query_device_lock(NIUSRPRIO_QUERY_DEV
     in_args << resource;
 
     status = _boost_error_to_nirio_status(
-        _rpc_client.call(NIUSRPRIO_QUERY_DEVICE_LOCK, in_args, out_args, _timeout));
+        _rpc_client.call(NIUSRPRIO_RESET_SESSION, in_args, out_args, _timeout));
 
     if (nirio_status_not_fatal(status)) {
         out_args >> status;
-        out_args >> device_locked;
     }
 
     return status;
@@ -215,14 +187,14 @@ nirio_status usrprio_rpc_client::niusrprio_download_fpga_to_flash(NIUSRPRIO_DOWN
 nirio_status usrprio_rpc_client::niusrprio_download_bitstream_to_fpga(NIUSRPRIO_DOWNLOAD_BITSTREAM_TO_FPGA_ARGS)
 /*
 #define NIUSRPRIO_DOWNLOAD_BITSTREAM_TO_FPGA_ARGS    \
-    const boost::uint32_t& session
+    const std::string& resource
 */
 {
     usrprio_rpc::func_args_writer_t in_args;
     usrprio_rpc::func_args_reader_t out_args;
     nirio_status status = NiRio_Status_Success;
 
-    in_args << session;
+    in_args << resource;
 
     status = _boost_error_to_nirio_status(
         _rpc_client.call(NIUSRPRIO_DOWNLOAD_BITSTREAM_TO_FPGA, in_args, out_args, _timeout));

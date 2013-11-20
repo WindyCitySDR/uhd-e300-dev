@@ -30,10 +30,9 @@ static const func_id_t NIUSRPRIO_ENUMERATE                  = NIUSRPRIO_FUNC_BAS
 static const func_id_t NIUSRPRIO_OPEN_SESSION               = NIUSRPRIO_FUNC_BASE + 1;
 static const func_id_t NIUSRPRIO_CLOSE_SESSION              = NIUSRPRIO_FUNC_BASE + 2;
 static const func_id_t NIUSRPRIO_RESET_SESSION              = NIUSRPRIO_FUNC_BASE + 3;
-static const func_id_t NIUSRPRIO_QUERY_DEVICE_LOCK          = NIUSRPRIO_FUNC_BASE + 4;
+static const func_id_t NIUSRPRIO_DOWNLOAD_BITSTREAM_TO_FPGA = NIUSRPRIO_FUNC_BASE + 4;
 static const func_id_t NIUSRPRIO_GET_INTERFACE_PATH         = NIUSRPRIO_FUNC_BASE + 5;
 static const func_id_t NIUSRPRIO_DOWNLOAD_FPGA_TO_FLASH     = NIUSRPRIO_FUNC_BASE + 6;
-static const func_id_t NIUSRPRIO_DOWNLOAD_BITSTREAM_TO_FPGA = NIUSRPRIO_FUNC_BASE + 7;
 
 //Function Args
 
@@ -63,19 +62,16 @@ typedef std::vector<usrprio_device_info> usrprio_device_info_vtr;
     const std::string& resource,            \
     const std::string& path,                \
     const std::string& signature,           \
-    const boost::uint16_t& download_fpga,   \
-    boost::uint32_t& session
+    const boost::uint16_t& download_fpga
 
 #define NIUSRPRIO_CLOSE_SESSION_ARGS    \
-    const boost::uint32_t& session,     \
-    const boost::uint32_t& attribute
+    const std::string& resource
 
 #define NIUSRPRIO_RESET_SESSION_ARGS    \
-    const boost::uint32_t& session
+    const std::string& resource
 
-#define NIUSRPRIO_QUERY_DEVICE_LOCK_ARGS    \
-    const std::string& resource,            \
-    boost::uint16_t& device_locked
+#define NIUSRPRIO_DOWNLOAD_BITSTREAM_TO_FPGA_ARGS   \
+    const std::string& resource
 
 #define NIUSRPRIO_GET_INTERFACE_PATH_ARGS   \
     const std::string& resource,            \
@@ -84,9 +80,6 @@ typedef std::vector<usrprio_device_info> usrprio_device_info_vtr;
 #define NIUSRPRIO_DOWNLOAD_FPGA_TO_FLASH_ARGS   \
     const std::string& resource,                \
     const std::string& bitstream_path
-
-#define NIUSRPRIO_DOWNLOAD_BITSTREAM_TO_FPGA_ARGS   \
-    const boost::uint32_t& session
 }
 
 #endif /* INCLUDED_USRPRIO_RPC_COMMON_HPP */

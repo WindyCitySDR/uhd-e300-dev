@@ -78,13 +78,14 @@ int main(int argc, char *argv[])
 
     //Setup the program options
     uint32_t interface_num, peek_addr, poke_addr, poke_data;
-    std::string fpga_lvbitx_path, flash_path, peek_tokens_str, poke_tokens_str;
+    std::string rpc_port, fpga_lvbitx_path, flash_path, peek_tokens_str, poke_tokens_str;
 
     namespace po = boost::program_options;
     po::options_description desc("Allowed options");
     desc.add_options()
         ("help", "help message")
         ("interface", po::value<uint32_t>(&interface_num)->default_value(0), "The interface number to communicate with.")
+        ("port", po::value<std::string>(&rpc_port)->default_value("5444"), "Port to communicate with RPC server.")
         ("fpga", po::value<std::string>(&fpga_lvbitx_path)->default_value(""), "The absolute path to the LVBITX file to download to the FPGA.")
         ("flash", po::value<std::string>(&flash_path)->default_value(""), "The path to the image to download to the flash OR 'erase' to erase the FPGA image from flash.")
         ("peek", po::value<std::string>(&peek_tokens_str)->default_value(""), "Peek32.")
@@ -108,7 +109,7 @@ int main(int argc, char *argv[])
     {
         printf("Downloading image %s to FPGA as %s...", fpga_lvbitx_path.c_str(), resource_name.c_str());
         fflush(stdout);
-        nifpga_interface::niusrprio_session fpga_session(resource_name);
+        nifpga_interface::niusrprio_session fpga_session(resource_name, rpc_port);
         nifpga_interface::nifpga_lvbitx::sptr lvbitx(new dummy_lvbitx(fpga_lvbitx_path));
         nirio_status_chain(fpga_session.open(lvbitx, true), status);
         //Download BIN to flash or erase
@@ -130,7 +131,7 @@ int main(int argc, char *argv[])
     }
 
     fflush(stdout);
-    usrprio_rpc::usrprio_rpc_client temp_rpc_client("localhost", "50000");
+    usrprio_rpc::usrprio_rpc_client temp_rpc_client("localhost", rpc_port);
     std::string interface_path;
     nirio_status_chain(temp_rpc_client.niusrprio_get_interface_path(resource_name, interface_path), status);
     if (interface_path.empty()) {
