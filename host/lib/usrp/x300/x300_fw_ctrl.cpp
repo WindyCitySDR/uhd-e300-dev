@@ -24,12 +24,13 @@
 #include <boost/format.hpp>
 #include <boost/thread/mutex.hpp>
 #include <uhd/transport/nirio/status.h>
-#include <uhd/transport/nirio/nirio_interface.h>
+#include <uhd/transport/nirio/niriok_proxy.h>
 #include "x300_regs.hpp"
 #include <boost/date_time/posix_time/posix_time.hpp>
 #include <boost/thread/thread.hpp>
 
 using namespace uhd;
+using namespace uhd::niusrprio;
 
 class x300_ctrl_iface : public wb_iface
 {
@@ -187,11 +188,11 @@ private:
 class x300_ctrl_iface_pcie : public x300_ctrl_iface
 {
 public:
-    x300_ctrl_iface_pcie(nirio_interface::niriok_proxy& drv_proxy):
+    x300_ctrl_iface_pcie(niriok_proxy& drv_proxy):
         _drv_proxy(drv_proxy)
     {
         nirio_status status = 0;
-        nirio_status_chain(_drv_proxy.set_attribute(kRioAddressSpace, kRioAddressSpaceBusInterface), status);
+        nirio_status_chain(_drv_proxy.set_attribute(ADDRESS_SPACE, BUS_INTERFACE), status);
 
         boost::uint32_t reg_data = 0xffffffff;
         boost::posix_time::ptime start_time = boost::posix_time::microsec_clock::local_time();
@@ -206,7 +207,7 @@ public:
             (reg_data & PCIE_ZPU_STATUS_SUSPENDED) &&
             elapsed.total_milliseconds() < INIT_TIMEOUT_IN_MS);
 
-        nirio_interface::nirio_status_to_exception(status, "Could not initialize x300_ctrl_iface_pcie.");
+        nirio_status_to_exception(status, "Could not initialize x300_ctrl_iface_pcie.");
 
         try
         {
@@ -279,7 +280,7 @@ protected:
     }
 
 private:
-    nirio_interface::niriok_proxy& _drv_proxy;
+    niriok_proxy& _drv_proxy;
     static const uint32_t READ_TIMEOUT_IN_MS = 10;
     static const uint32_t INIT_TIMEOUT_IN_MS = 5000;
 };
@@ -289,7 +290,7 @@ wb_iface::sptr x300_make_ctrl_iface_enet(uhd::transport::udp_simple::sptr udp)
     return wb_iface::sptr(new x300_ctrl_iface_enet(udp));
 }
 
-wb_iface::sptr x300_make_ctrl_iface_pcie(nirio_interface::niriok_proxy& drv_proxy)
+wb_iface::sptr x300_make_ctrl_iface_pcie(niriok_proxy& drv_proxy)
 {
     return wb_iface::sptr(new x300_ctrl_iface_pcie(drv_proxy));
 }

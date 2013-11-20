@@ -15,8 +15,8 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 //
 
-#ifndef __NIRIO_DRIVER_IFACE_H__
-#define __NIRIO_DRIVER_IFACE_H__
+#ifndef INCLUDED_UHD_TRANSPORT_NIRIO_NIRIO_DRIVER_IFACE_H
+#define INCLUDED_UHD_TRANSPORT_NIRIO_NIRIO_DRIVER_IFACE_H
 
 #include <stddef.h>
 #include <stdint.h>
@@ -37,16 +37,13 @@
     #define CTL_CODE(a,controlCode,b,c) (controlCode)
 #endif
 
-typedef int32_t tRioStatusCode;
+namespace nirio_driver_iface {
 
-namespace nNIRIOSRV200
-{
+const uint32_t NIRIO_IOCTL_BASE = 0x800;
 
-const uint32_t kPrivateIoctlBase = 0x800;
-
-const uint32_t kRioIoctlSyncOp =
+const uint32_t NIRIO_IOCTL_SYNCOP =
    CTL_CODE(FILE_DEVICE_UNKNOWN,
-            kPrivateIoctlBase + 4,
+            NIRIO_IOCTL_BASE + 4,
             METHOD_OUT_DIRECT,
             FILE_READ_DATA | FILE_WRITE_DATA);
                                 ///< The synchronous operation code. Note: We
@@ -54,160 +51,115 @@ const uint32_t kRioIoctlSyncOp =
                                 /// IOCTL to ensure the contents of the output
                                 /// block are available in the kernel.
 
-const uint32_t kRioIoctlGetInterfaceNumber =
+const uint32_t NIRIO_IOCTL_GET_IFACE_NUM =
    CTL_CODE(FILE_DEVICE_UNKNOWN,
-            kPrivateIoctlBase + 6,
+            NIRIO_IOCTL_BASE + 6,
             METHOD_BUFFERED,
             FILE_READ_DATA);    ///< Get the interface number for a device
 
-const uint32_t kRioIoctlGetSession =
+const uint32_t NIRIO_IOCTL_GET_SESSION =
    CTL_CODE(FILE_DEVICE_UNKNOWN,
-            kPrivateIoctlBase + 8,
+            NIRIO_IOCTL_BASE + 8,
             METHOD_BUFFERED,
             FILE_READ_ACCESS);  ///< Gets a previously opened session to a device
 
-
-const uint32_t kRioIoctlPostOpen =
+const uint32_t NIRIO_IOCTL_POST_OPEN =
    CTL_CODE(FILE_DEVICE_UNKNOWN,
-            kPrivateIoctlBase + 9,
+            NIRIO_IOCTL_BASE + 9,
             METHOD_BUFFERED,
             FILE_READ_ACCESS);  ///< Called after opening a session
 
-
-const uint32_t kRioIoctlPreClose =
+const uint32_t NIRIO_IOCTL_PRE_CLOSE =
    CTL_CODE(FILE_DEVICE_UNKNOWN,
-            kPrivateIoctlBase + 10,
+            NIRIO_IOCTL_BASE + 10,
             METHOD_BUFFERED,
             FILE_READ_ACCESS);  ///< Called before closing a session
 
-struct tIoctlPacketOut {
-   tIoctlPacketOut(void* const _outBuf,
-               const uint32_t _outSize,
-               const tRioStatusCode _statusCode)
-      {
-         //Clear all 64 bits before assignment since it may only be 32bit pointer
-         outBuf._64BitField = 0;
-         outBuf.pointer = _outBuf;
-
-         outSize    = _outSize;
-         statusCode = _statusCode;
-      };
-
-   union
-   {
-      void* pointer;
-      uint64_t _64BitField;
-   } outBuf;
-
-   uint32_t outSize;
-   tRioStatusCode statusCode;
-};
 
 // -------------------------------
-// kRioIoctlSyncOp defines
-
 // Function Codes: defined as integers rather than enums because they
 // are going to be carried accross boundaries so size matters
 
-/// RIO function codes
-namespace nRioFunction
+namespace NIRIO_FUNC
 {
-   const uint32_t kGet32              = 0x00000001;
-   const uint32_t kSet32              = 0x00000002;
-   const uint32_t kGet64              = 0x00000003; // Obsolete in 230
-   const uint32_t kSet64              = 0x00000004; // Obsolete in 230
-   const uint32_t kBeginDownload      = 0x00000005; // Obsolete in 230
-   const uint32_t kEndDownload        = 0x00000006; // Obsolete in 230
-   const uint32_t kSetDriverConfig    = 0x00000007;
-   const uint32_t kFifo               = 0x00000008;
-   const uint32_t kUnused             = 0x00000009; // Used to be kIO
-   const uint32_t kIO                 = 0x0000000A; // Used to be kAtomicIO
-   const uint32_t kEvent              = 0x0000000B;
-   const uint32_t kFifoStopAll        = 0x0000000C;
-   const uint32_t kAddResource        = 0x0000000D;
-   const uint32_t kGetString          = 0x0000000E;
-   const uint32_t kSetString          = 0x0000000F;
-   const uint32_t kGetResourceStrings = 0x00000010;
-   const uint32_t kResolveAlias       = 0x00000011;
-   const uint32_t kIrq                = 0x00000012;
-   const uint32_t kDownload           = 0x00000013;
-   const uint32_t kReset              = 0x00000014;
+   const uint32_t GET32             = 0x00000001;
+   const uint32_t SET32             = 0x00000002;
+   const uint32_t SET_DRIVER_CONFIG = 0x00000007;
+   const uint32_t FIFO              = 0x00000008;
+   const uint32_t IO                = 0x0000000A;
+   const uint32_t FIFO_STOP_ALL     = 0x0000000C;
+   const uint32_t ADD_RESOURCE      = 0x0000000D;
+   const uint32_t GET_STRING        = 0x0000000E;
+   const uint32_t SET_STRING        = 0x0000000F;
+   const uint32_t DOWNLOAD          = 0x00000013;
+   const uint32_t RESET             = 0x00000014;
 }
 
-/// Add resource sub-function codes
-namespace nRioDeviceAddResourceFunction
+namespace NIRIO_RESOURCE
 {
-   const uint32_t kInputFifo        = 0xD0000001;
-   const uint32_t kOutputFifo       = 0xD0000002;
-   const uint32_t kAtomicRange      = 0xD0000003; // Obsolete in 230
+   const uint32_t INPUT_FIFO    = 0xD0000001;
+   const uint32_t OUTPUT_FIFO   = 0xD0000002;
 }
 
-/// Event sub-function codes
-namespace nRioDeviceEventFunction
+namespace NIRIO_FIFO
 {
-   const uint32_t kEnable           = 0xB0000001;
-   const uint32_t kEnableLocal      = 0xB0000002;
-   const uint32_t kDisable          = 0xB0000003;
-   const uint32_t kDisableLocal     = 0xB0000004; // Obsolete in 230
-   const uint32_t kWait             = 0xB0000005;
+   const uint32_t CONFIGURE = 0x80000001;
+   const uint32_t START     = 0x80000002;
+   const uint32_t STOP      = 0x80000003;
+   const uint32_t READ      = 0x80000004;
+   const uint32_t WRITE     = 0x80000005;
+   const uint32_t WAIT      = 0x80000006;
+   const uint32_t GRANT     = 0x80000007;
 }
 
-/// Fifo sub-function codes
-namespace nRioDeviceFifoFunction
+namespace NIRIO_IO
 {
-   const uint32_t kConfigure        = 0x80000001;
-   const uint32_t kStart            = 0x80000002;
-   const uint32_t kStop             = 0x80000003;
-   const uint32_t kRead             = 0x80000004;
-   const uint32_t kWrite            = 0x80000005;
-   const uint32_t kWait             = 0x80000006;
-   const uint32_t kGrant            = 0x80000007;
+   const uint32_t POKE64             = 0xA0000005;
+   const uint32_t POKE32             = 0xA0000006;
+   const uint32_t POKE16             = 0xA0000007;
+   const uint32_t POKE8              = 0xA0000008;
+   const uint32_t PEEK64             = 0xA0000009;
+   const uint32_t PEEK32             = 0xA000000A;
+   const uint32_t PEEK16             = 0xA000000B;
+   const uint32_t PEEK8              = 0xA000000C;
+   const uint32_t READ_BLOCK         = 0xA000000D;
+   const uint32_t WRITE_BLOCK        = 0xA000000E;
+   const uint32_t GET_IO_WINDOW      = 0xA000000F;
+   const uint32_t GET_IO_WINDOW_SIZE = 0xA0000010;
 }
 
-/// IO sub-function codes
-///
-/// Used to be called nRioDeviceAtomicIOFunction
-///
-namespace nRioDeviceIOFunction
-{
-   const uint32_t kRead32                       = 0xA0000001; // Obsolete
-   const uint32_t kWrite32                      = 0xA0000002; // Obsolete
-   const uint32_t kRegAcquire                   = 0xA0000003; // Obsolete
-   const uint32_t kRegRelease                   = 0xA0000004; // Obsolete
-   const uint32_t kPoke64                       = 0xA0000005;
-   const uint32_t kPoke32                       = 0xA0000006;
-   const uint32_t kPoke16                       = 0xA0000007;
-   const uint32_t kPoke8                        = 0xA0000008;
-   const uint32_t kPeek64                       = 0xA0000009;
-   const uint32_t kPeek32                       = 0xA000000A;
-   const uint32_t kPeek16                       = 0xA000000B;
-   const uint32_t kPeek8                        = 0xA000000C;
-   const uint32_t kReadBlock                    = 0xA000000D;
-   const uint32_t kWriteBlock                   = 0xA000000E;
-   const uint32_t kGetMemoryMappedIoWindow      = 0xA000000F;
-   const uint32_t kGetMemoryMappedIoWindowSize  = 0xA0000010;
-}
+struct nirio_ioctl_packet_t {
+    nirio_ioctl_packet_t(
+        void* const _outBuf,
+        const uint32_t _outSize,
+        const int32_t _statusCode)
+    {
+        outBuf._64BitField = 0;
+        outBuf.pointer = _outBuf;
+        outSize    = _outSize;
+        statusCode = _statusCode;
+    };
 
-/// Irq sub-function codes
-namespace nRioDeviceIrqFunction
-{
-   const uint32_t kIrqReserve      = 0x12000001;
-   const uint32_t kIrqReserveLocal = 0x12000002;
-   const uint32_t kIrqUnreserve    = 0x12000003;
-   const uint32_t kIrqWait         = 0x12000004;
-}
+    union {
+        void* pointer;
+        uint64_t _64BitField;
+    } outBuf;
 
-struct tRioIoctlBlock
-{
-	uint64_t inBuf;
-	uint64_t outBuf;
-	uint32_t inBufLength;
-	uint32_t outBufLength;
-	uint32_t bytesReturned;
-	uint32_t padding;
+    uint32_t outSize;
+    int32_t statusCode;
 };
 
-struct tRioDeviceSocketInputParameters
+struct nirio_ioctl_block_t
+{
+    uint64_t inBuf;
+    uint64_t outBuf;
+    uint32_t inBufLength;
+    uint32_t outBufLength;
+    uint32_t bytesReturned;
+    uint32_t padding;
+};
+
+struct nirio_syncop_in_params_t
 {
    uint32_t function;
    uint32_t subfunction;
@@ -240,18 +192,18 @@ struct tRioDeviceSocketInputParameters
       {
          struct
          {
-            uint32_t eventType;
-         } enable;
+            uint32_t reserved_field_0_0_0;
+         } reserved_field_0_0;
          struct
          {
-            uint32_t eventType;
-            uint32_t timeout;
-         } wait;
+            uint32_t reserved_field_0_1_0;
+            uint32_t reserved_field_0_1_1;
+         } reserved_field_0_1;
          struct
          {
-            uint32_t eventType;
-         } disable;
-      } event;
+            uint32_t reserved_field_0_2_0;
+         } reserved_field_0_2;
+      } reserved_field_0;
 
       union
       {
@@ -287,7 +239,7 @@ struct tRioDeviceSocketInputParameters
          {
             struct
             {
-               uint32_t requestedDepth; // TODO: when we make win64U builds, we'll want size_t
+               uint32_t requestedDepth;
                uint8_t  requiresActuals;
             } config;
             struct
@@ -312,8 +264,7 @@ struct tRioDeviceSocketInputParameters
             } writeWithDataType;
             struct
             {
-               // didn't use size_t because it made our struct too big!
-               uint32_t elementsRequested; // TODO: when we make win64U builds, we'll want size_t
+               uint32_t elementsRequested;
                uint32_t scalarType;
                uint32_t bitWidth;
                uint32_t timeout;
@@ -321,17 +272,17 @@ struct tRioDeviceSocketInputParameters
             } wait;
             struct
             {
-               uint32_t elements; // TODO: when we make win64U builds, we'll want size_t
+               uint32_t elements;
             } grant;
          } op;
       } fifo;
 
       struct
       {
-         uint64_t addr64;
-         uint32_t timeout;
-         uint32_t attribute;
-      } atomic; // Obsolete
+         uint64_t reserved_field_1_0;
+         uint32_t reserved_field_1_1;
+         uint32_t reserved_field_1_2;
+      } reserved_field_1; // Obsolete
 
       struct
       {
@@ -351,23 +302,23 @@ struct tRioDeviceSocketInputParameters
 
       struct
       {
-         uint32_t offset;
-         uint32_t attribute;
-      } ioblock;
+         uint32_t reserved_field_2_0;
+         uint32_t reserved_field_2_1;
+      } reserved_field_2;
 
       struct
       {
-         uint32_t reverse;
-      } resolveAlias;
+         uint32_t reserved_field_3_0;
+      } reserved_field_3;
 
       union
       {
          struct
          {
-            uint32_t irqs;
-            int32_t  timeout;
+            uint32_t reserved_field_4_0;
+            int32_t  reserved_field_4_1;
          } wait;
-      } irq;
+      } reserved_field_4;
 
    } params;
 
@@ -376,21 +327,20 @@ struct tRioDeviceSocketInputParameters
    union
    {
       const void* pointer;
-      uint64_t    _64BitField;   // Makes us 64-bit ready
+      uint64_t    _64BitField;
    } inbuf;
 };
 
-static inline void initRioDeviceSocketInputParameters(tRioDeviceSocketInputParameters& param, const void* const buf, const uint32_t len)
+static inline void init_syncop_in_params(nirio_syncop_in_params_t& param, const void* const buf, const uint32_t len)
 {
-   param.inbuf._64BitField = 0;  //Zero's out .pointer in case it isn't 64-bit
+   param.inbuf._64BitField = 0;
    param.inbuf.pointer = buf;
    param.inbufByteLen = len;
 }
 
 
-struct tRioDeviceSocketOutputParameters
+struct nirio_syncop_out_params_t
 {
-   // Return paramters: [out]
    union
    {
       struct
@@ -407,9 +357,9 @@ struct tRioDeviceSocketOutputParameters
       {
          struct
          {
-            uint32_t handle;
+            uint32_t reserved_field_0_0;
          } enable;
-      } event;
+      } reserved_field_0;
 
       struct
       {
@@ -417,8 +367,8 @@ struct tRioDeviceSocketOutputParameters
          {
             struct
             {
-               uint32_t actualDepth; // TODO: when we make win64U builds, we'll want size_t
-               uint32_t actualSize; // TODO: when we make win64U builds, we'll want size_t
+               uint32_t actualDepth;
+               uint32_t actualSize;
             } config;
             struct
             {
@@ -434,10 +384,8 @@ struct tRioDeviceSocketOutputParameters
                union
                {
                   void*    pointer;
-                  uint64_t _64BitField; // Makes us 64-bit ready
+                  uint64_t _64BitField;
                } elements;
-               // elementsAcquired: stuffed in the buffer so the struct wouldn't grow
-               // elementsRemaining: stuffed in the buffer so the struct wouldn't grow
             } wait;
          } op;
       } fifo;
@@ -456,7 +404,7 @@ struct tRioDeviceSocketOutputParameters
             union
             {
                void*    memoryMappedAddress;
-               uint64_t _64BitField; // Makes us 64-bit ready
+               uint64_t _64BitField;
             } memoryMappedIoWindow;
             union
             {
@@ -469,8 +417,8 @@ struct tRioDeviceSocketOutputParameters
 
       struct
       {
-         uint32_t asserted;
-      } irq;
+         uint32_t reserved_field_1_0;
+      } reserved_field_1;
 
    } params;
 
@@ -479,21 +427,18 @@ struct tRioDeviceSocketOutputParameters
    union
    {
       void*    pointer;
-      uint64_t _64BitField; // Makes us 64-bit ready
+      uint64_t _64BitField;
    } outbuf;
 };
 
-static inline void initRioDeviceSocketOutputParameters(tRioDeviceSocketOutputParameters& param, void* buf, uint32_t len)
+static inline void init_syncop_out_params(nirio_syncop_out_params_t& param, void* buf, uint32_t len)
 {
-   param.outbuf._64BitField = 0;  //Zero's out .pointer in case it isn't 64-bit
+   param.outbuf._64BitField = 0;
    param.outbuf.pointer = buf;
    param.outbufByteLen = len;
 }
 
-} // namespace nNIRIOSRV200
 
-
-namespace nirio_driver_iface {
 
 //Device handle definition
 #if defined(UHD_PLATFORM_LINUX)
@@ -518,8 +463,8 @@ static const rio_dev_handle_t INVALID_RIO_HANDLE = ((rio_dev_handle_t)-1);
     };
 #elif defined(UHD_PLATFORM_WIN32)
     enum access_mode_t {
-       nNIAPAL200_kAccessModeRead,
-       nNIAPAL200_kAccessModeWrite
+       ACCESS_MODE_READ,
+       ACCESS_MODE_WRITE
     };
 
     struct rio_mmap_params_t

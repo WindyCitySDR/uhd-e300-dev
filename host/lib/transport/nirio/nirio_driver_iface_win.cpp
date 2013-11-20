@@ -18,8 +18,8 @@
 #include <uhd/transport/nirio/nirio_driver_iface.h>
 #include <process.h>
 
-#define nNIAPAL210_kIoctlMapMemory CTL_CODE(FILE_DEVICE_UNKNOWN, 0xF00, METHOD_BUFFERED, (FILE_READ_ACCESS | FILE_WRITE_ACCESS))
-#define nNIAPAL210_kIoctlUnmapMemory CTL_CODE(FILE_DEVICE_UNKNOWN, 0xF01, METHOD_BUFFERED, (FILE_READ_ACCESS | FILE_WRITE_ACCESS))
+#define NIRIO_IOCTL_MAP_MEMORY CTL_CODE(FILE_DEVICE_UNKNOWN, 0xF00, METHOD_BUFFERED, (FILE_READ_ACCESS | FILE_WRITE_ACCESS))
+#define NIRIO_IOCTL_UNMAP_MEMORY CTL_CODE(FILE_DEVICE_UNKNOWN, 0xF01, METHOD_BUFFERED, (FILE_READ_ACCESS | FILE_WRITE_ACCESS))
 
 namespace nirio_driver_iface {
 
@@ -68,7 +68,7 @@ nirio_status rio_ioctl(
             &outLen, &zeroedOverlapped )))
     {
         lastError = GetLastError();
-        return NiRio_Status_InternalError;
+        return NiRio_Status_SoftwareFault;
     }
 
     return NiRio_Status_Success;
@@ -77,7 +77,7 @@ nirio_status rio_ioctl(
 unsigned int __stdcall memory_map_thread_routine(void *context)
 {
     rio_mmap_threadargs_t *args = (rio_mmap_threadargs_t*)context;
-    args->status = rio_ioctl(args->device_handle, nNIAPAL210_kIoctlMapMemory, &(args->params), sizeof(args->params), NULL, 0);
+    args->status = rio_ioctl(args->device_handle, NIRIO_IOCTL_MAP_MEMORY, &(args->params), sizeof(args->params), NULL, 0);
     if (nirio_status_fatal(args->status))
     {
         SetEvent(reinterpret_cast<HANDLE>(args->params.map_ready_event_handle));
@@ -94,7 +94,7 @@ nirio_status rio_mmap(
 {
     if (!rio_isopen(device_handle)) return NiRio_Status_ResourceNotInitialized;
 
-    access_mode_t access_mode = writable ? nNIAPAL200_kAccessModeWrite : nNIAPAL200_kAccessModeRead;
+    access_mode_t access_mode = writable ? ACCESS_MODE_WRITE : ACCESS_MODE_READ;
 
     uint64_t mapped_addr = 0;
     map.map_thread_args.device_handle = device_handle;
@@ -135,7 +135,7 @@ nirio_status rio_munmap(rio_mmap_t &map)
     nirio_status status = NiRio_Status_Success;
     if (map.addr != NULL) {
         uint64_t mapped_addr = reinterpret_cast<uintptr_t>(map.addr);
-        status = rio_ioctl(map.map_thread_args.device_handle, nNIAPAL210_kIoctlUnmapMemory, &mapped_addr, sizeof(mapped_addr), NULL, 0);
+        status = rio_ioctl(map.map_thread_args.device_handle, NIRIO_IOCTL_UNMAP_MEMORY, &mapped_addr, sizeof(mapped_addr), NULL, 0);
         if (nirio_status_not_fatal(status)) {
             WaitForSingleObject(map.map_thread_handle, INFINITE);
         }

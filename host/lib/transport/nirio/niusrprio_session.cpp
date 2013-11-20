@@ -27,8 +27,7 @@
 //@TODO: Move the register defs required by the class to a common location
 #include "../../usrp/x300/x300_regs.hpp"
 
-namespace nifpga_interface
-{
+namespace uhd { namespace niusrprio {
 
 niusrprio_session::niusrprio_session(const std::string& resource_name, const std::string& rpc_port_name) :
     _resource_name(resource_name),
@@ -56,8 +55,6 @@ nirio_status niusrprio_session::open(
     bool force_download)
 {
     boost::unique_lock<boost::recursive_mutex> lock(_session_mutex);
-
-    using namespace nirio_interface;
 
     _lvbitx = lvbitx;
 
@@ -123,7 +120,7 @@ nirio_status niusrprio_session::download_bitstream_to_flash(const std::string& b
     return _rpc_client.niusrprio_download_fpga_to_flash(_resource_name, bitstream_path);
 }
 
-nirio_interface::niriok_proxy::sptr niusrprio_session::create_kernel_proxy(
+niriok_proxy::sptr niusrprio_session::create_kernel_proxy(
     const std::string& resource_name,
     const std::string& rpc_port_name)
 {
@@ -133,9 +130,9 @@ nirio_interface::niriok_proxy::sptr niusrprio_session::create_kernel_proxy(
     std::string interface_path;
     nirio_status_chain(temp_rpc_client.niusrprio_get_interface_path(resource_name, interface_path), status);
 
-    nirio_interface::niriok_proxy::sptr proxy;
+    niriok_proxy::sptr proxy;
     if (nirio_status_not_fatal(status)) {
-        proxy.reset(new nirio_interface::niriok_proxy());
+        proxy.reset(new niriok_proxy());
         if (proxy) nirio_status_chain(proxy->open(interface_path), status);
     }
 
@@ -147,8 +144,8 @@ nirio_status niusrprio_session::_verify_signature()
     //Validate the signature using the kernel proxy
     nirio_status status = NiRio_Status_Success;
     boost::uint32_t sig_offset = 0;
-    nirio_status_chain(_riok_proxy.get_attribute(kRioFpgaDefaultSignatureOffset, sig_offset), status);
-    nirio_status_chain(_riok_proxy.set_attribute(kRioAddressSpace, kRioAddressSpaceFpga), status);
+    nirio_status_chain(_riok_proxy.get_attribute(DEFAULT_FPGA_SIGNATURE_OFFSET, sig_offset), status);
+    niriok_scoped_addr_space(_riok_proxy, FPGA, status);
     std::string signature;
     for (boost::uint32_t i = 0; i < 8; i++) {
         boost::uint32_t quarter_sig;
@@ -169,7 +166,7 @@ nirio_status niusrprio_session::_verify_signature()
 std::string niusrprio_session::_read_bitstream_checksum()
 {
     nirio_status status = NiRio_Status_Success;
-    nirio_status_chain(_riok_proxy.set_attribute(kRioAddressSpace, kRioAddressSpaceBusInterface), status);
+    niriok_scoped_addr_space(_riok_proxy, BUS_INTERFACE, status);
     std::string usr_signature;
     for (boost::uint32_t i = 0; i < FPGA_USR_SIG_REG_SIZE; i+=4) {
         boost::uint32_t quarter_sig;
@@ -184,7 +181,7 @@ std::string niusrprio_session::_read_bitstream_checksum()
 nirio_status niusrprio_session::_write_bitstream_checksum(const std::string& checksum)
 {
     nirio_status status = NiRio_Status_Success;
-    nirio_status_chain(_riok_proxy.set_attribute(kRioAddressSpace, kRioAddressSpaceBusInterface), status);
+    niriok_scoped_addr_space(_riok_proxy, BUS_INTERFACE, status);
     for (boost::uint32_t i = 0; i < FPGA_USR_SIG_REG_SIZE; i+=4) {
         boost::uint32_t quarter_sig;
         try {
@@ -199,4 +196,4 @@ nirio_status niusrprio_session::_write_bitstream_checksum(const std::string& che
     return status;
 }
 
-}
+}}

@@ -23,9 +23,9 @@
 #include <uhd/transport/nirio/rpc/usrprio_rpc_common.hpp>
 #include <uhd/transport/nirio/status.h>
 
-namespace usrprio_rpc {
+namespace uhd { namespace usrprio_rpc {
 
-class usrprio_rpc_client {
+class UHD_API usrprio_rpc_client {
 public:
     usrprio_rpc_client(
         std::string server,
@@ -65,6 +65,6 @@ private:
     nirio_status                    _ctor_status;
 };
 
-}
+}}
 
 #endif /* INCLUDED_USRPRIO_RPC_CLIENT_HPP */

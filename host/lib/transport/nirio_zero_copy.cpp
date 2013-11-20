@@ -32,7 +32,7 @@
 
 using namespace uhd;
 using namespace uhd::transport;
-using namespace nifpga_interface;
+using namespace uhd::niusrprio;
 
 //A reasonable number of frames for send/recv and async/sync
 static const size_t DEFAULT_NUM_FRAMES  = 32;
@@ -43,7 +43,7 @@ typedef uint64_t fifo_data_t;
 class nirio_zero_copy_mrb : public managed_recv_buffer
 {
 public:
-    nirio_zero_copy_mrb(nirio_interface::nirio_fifo<fifo_data_t>& fifo, const size_t frame_size):
+    nirio_zero_copy_mrb(nirio_fifo<fifo_data_t>& fifo, const size_t frame_size):
         _fifo(fifo), _frame_size(frame_size) { }
 
     void release(void)
@@ -71,16 +71,16 @@ public:
     }
 
 private:
-    nirio_interface::nirio_fifo<fifo_data_t>&   _fifo;
-    fifo_data_t*                                _typed_buffer;
-    const size_t                                _frame_size;
-    size_t                                      _num_frames;
+    nirio_fifo<fifo_data_t>&    _fifo;
+    fifo_data_t*                _typed_buffer;
+    const size_t                _frame_size;
+    size_t                      _num_frames;
 };
 
 class nirio_zero_copy_msb : public managed_send_buffer
 {
 public:
-    nirio_zero_copy_msb(nirio_interface::nirio_fifo<fifo_data_t>& fifo, const size_t frame_size):
+    nirio_zero_copy_msb(nirio_fifo<fifo_data_t>& fifo, const size_t frame_size):
         _fifo(fifo), _frame_size(frame_size) { }
 
     void release(void)
@@ -108,10 +108,10 @@ public:
     }
 
 private:
-    nirio_interface::nirio_fifo<fifo_data_t>&   _fifo;
-    fifo_data_t*                                _typed_buffer;
-    const size_t                                _frame_size;
-    size_t                                      _num_frames;
+    nirio_fifo<fifo_data_t>&    _fifo;
+    fifo_data_t*                _typed_buffer;
+    const size_t                _frame_size;
+    size_t                      _num_frames;
 };
 
 class nirio_zero_copy_impl : public nirio_zero_copy {
@@ -119,7 +119,7 @@ public:
     typedef boost::shared_ptr<nirio_zero_copy_impl> sptr;
 
     nirio_zero_copy_impl(
-        nifpga_interface::niusrprio_session::sptr fpga_session,
+        uhd::niusrprio::niusrprio_session::sptr fpga_session,
         uint32_t instance,
         const device_addr_t &hints
     ):
@@ -192,7 +192,7 @@ public:
             nirio_status_chain(NiRio_Status_ResourceNotInitialized, status);
         }
 
-        nirio_interface::nirio_status_to_exception(status, "Could not create nirio_zero_copy transport.");
+        nirio_status_to_exception(status, "Could not create nirio_zero_copy transport.");
     }
 
     ~nirio_zero_copy_impl() {
@@ -232,9 +232,9 @@ public:
 
 private:
     //memory management -> buffers and fifos
-    nirio_interface::niriok_proxy& _reg_int;
+    niriok_proxy& _reg_int;
     uint32_t _fifo_instance;
-    nirio_interface::nirio_fifo<fifo_data_t>::sptr _recv_fifo, _send_fifo;
+    nirio_fifo<fifo_data_t>::sptr _recv_fifo, _send_fifo;
     const size_t _recv_frame_size, _num_recv_frames;
     const size_t _send_frame_size, _num_send_frames;
     buffer_pool::sptr _recv_buffer_pool, _send_buffer_pool;
@@ -245,7 +245,7 @@ private:
 
 
 nirio_zero_copy::sptr nirio_zero_copy::make(
-    nifpga_interface::niusrprio_session::sptr fpga_session,
+    uhd::niusrprio::niusrprio_session::sptr fpga_session,
     const uint32_t instance,
     const device_addr_t &hints
 ){

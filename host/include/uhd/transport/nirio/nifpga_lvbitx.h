@@ -15,16 +15,16 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 //
 
-#ifndef NIFPGA_LVBITX_H_
-#define NIFPGA_LVBITX_H_
+#ifndef INCLUDED_UHD_TRANSPORT_NIRIO_NIFPGA_LVBITX_H
+#define INCLUDED_UHD_TRANSPORT_NIRIO_NIFPGA_LVBITX_H
 
 #include <uhd/transport/nirio/nirio_resource_manager.h>
-#include <uhd/transport/nirio/nirio_interface.h>
+#include <uhd/transport/nirio/niriok_proxy.h>
 #include <boost/smart_ptr.hpp>
 
-namespace nifpga_interface {
+namespace uhd { namespace niusrprio {
 
-class nifpga_lvbitx {
+class UHD_API nifpga_lvbitx {
 public:
     typedef boost::shared_ptr<nifpga_lvbitx> sptr;
 
@@ -44,10 +44,10 @@ public:
     virtual size_t get_indicator_count() = 0;
     virtual const char** get_indicator_names() = 0;
 
-    virtual void init_register_info(nirio_interface::nirio_register_info_vtr& vtr) = 0;
-    virtual void init_fifo_info(nirio_interface::nirio_fifo_info_vtr& vtr) = 0;
+    virtual void init_register_info(nirio_register_info_vtr& vtr) = 0;
+    virtual void init_fifo_info(nirio_fifo_info_vtr& vtr) = 0;
 };
-}
+}}
 
-#endif /* NIFPGA_LVBITX_H_ */
+#endif /* INCLUDED_UHD_TRANSPORT_NIRIO_NIFPGA_LVBITX_H */
 

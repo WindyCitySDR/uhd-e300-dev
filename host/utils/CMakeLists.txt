@@ -15,6 +15,8 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
 
+SET(CMAKE_C_COMPILE_OBJECT ${CMAKE_CXX_COMPILE_OBJECT})
+
 ########################################################################
 # Utilities that get installed into the runtime path
 ########################################################################
@@ -25,6 +27,7 @@ SET(util_runtime_sources
     uhd_cal_tx_dc_offset.cpp
     uhd_cal_tx_iq_balance.cpp
     usrp_n2xx_simple_net_burner.cpp
+    nirio_programmer.cpp
 )
 
 SET(x3xx_burner_sources
@@ -43,33 +46,6 @@ ENDFOREACH(util_source)
 ADD_EXECUTABLE(usrp_x3xx_net_burner ${x3xx_burner_sources})
 TARGET_LINK_LIBRARIES(usrp_x3xx_net_burner uhd ${Boost_LIBRARIES})
 UHD_INSTALL(TARGETS usrp_x3xx_net_burner RUNTIME DESTINATION ${RUNTIME_DIR} COMPONENT utilities)
-
-SET(CMAKE_C_COMPILE_OBJECT ${CMAKE_CXX_COMPILE_OBJECT})
-SET(niro_prog_sources nirio_programmer.cpp
-    ../lib/transport/nirio/niusrprio_session.cpp
-    ../lib/transport/nirio/nirio_interface.cpp
-    ../lib/transport/nirio/nirio_resource_manager.cpp
-    ../lib/utils/platform.cpp
-    ../lib/transport/nirio/rpc/rpc_client.cpp
-    ../lib/transport/nirio/rpc/usrprio_rpc_client.cpp
-)
-
-IF(WIN32)
-    LIST(APPEND niro_prog_sources ../lib/transport/nirio/nirio_driver_iface_win.cpp)
-ELSE(WIN32)
-    IF(APPLE)
-        LIST(APPEND niro_prog_sources ../lib/transport/nirio/nirio_driver_iface_macos.cpp)
-    ELSE(APPLE)
-        LIST(APPEND niro_prog_sources ../lib/transport/nirio/nirio_driver_iface_linux.cpp)
-    ENDIF(APPLE)
-ENDIF(WIN32)
-
-ADD_EXECUTABLE(nirio_programmer ${niro_prog_sources})
-IF(WIN32)
-    TARGET_LINK_LIBRARIES(nirio_programmer uhd Setupapi.lib)
-ELSE()
-    TARGET_LINK_LIBRARIES(nirio_programmer uhd)
-ENDIF()
 
 ########################################################################
 # Utilities that get installed into the share path

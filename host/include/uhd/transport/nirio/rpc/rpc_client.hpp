@@ -25,7 +25,7 @@
 #include "rpc_common.hpp"
 #include <uhd/utils/log.hpp>
 
-namespace usrprio_rpc {
+namespace uhd { namespace usrprio_rpc {
 
 class rpc_client : private boost::noncopyable
 {
@@ -89,6 +89,6 @@ private:
     boost::system::error_code           _exec_err;
 };
 
-}
+}}
 
 #endif /* INCLUDED_RPC_CLIENT_HPP */

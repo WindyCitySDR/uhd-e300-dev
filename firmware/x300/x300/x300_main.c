@@ -141,9 +141,9 @@ void handle_udp_fpga_prog(
             chinch_flash_cleanup();
         } else if (request->flags & X300_FPGA_PROG_CONFIGURE) {
             //This is a self-destructive operation and will most likely not return an ack.
-            chinch_start_posc();
+            chinch_start_config();
         } else if (request->flags & X300_FPGA_PROG_CONFIG_STATUS) {
-            if (chinch_get_posc_status() != CHINCH_POSC_COMPLETED)
+            if (chinch_get_config_status() != CHINCH_CONFIG_COMPLETED)
                 reply.flags |= X300_FPGA_PROG_FLAGS_ERROR;
         } else {
             STATUS_MERGE(chinch_flash_select_sector(request->sector), status);
@@ -178,48 +178,6 @@ void handle_udp_fpga_prog(
     {
         u3_net_stack_send_udp_pkt(ethno, src, dst_port, src_port, &reply, sizeof(reply));
     }
-}
-
-/***********************************************************************
- * Flash access test -- for the debugs
- **********************************************************************/
-void run_flash_access_test()
-{
-    printf("Running flash access test...\n");
-    bool status = true, result = true;
-
-    chinch_poke32(0x200, 0);
-
-    STATUS_CHAIN(chinch_flash_init(), status);
-    STATUS_CHAIN(chinch_flash_select_sector(156), status);
-    STATUS_CHAIN(chinch_flash_erase_sector(), status);
-
-    uint16_t wr_data[4] = {0xDEAD, 0xBEEF, 0x1234, 0x5678};
-    uint16_t rd_data[4] = {0x0000, 0x0000, 0x0000, 0x0000};
-
-    STATUS_CHAIN(chinch_flash_write(0x20, 0x0ACE), status);
-    STATUS_CHAIN(chinch_flash_write(0x22, 0xBA5E), status);
-    STATUS_CHAIN(chinch_flash_write_buf(0x0, wr_data, 4), status);
-
-    STATUS_CHAIN(chinch_flash_read_buf(0x0, rd_data, 4), status);
-    for (uint32_t i = 0; i < 4; i++) result &= (rd_data[i] == wr_data[i]);
-
-    uint16_t data = 0;
-    STATUS_CHAIN(chinch_flash_read(0x10, &data), status);
-    result &= (data == 0xFFFF);
-    STATUS_CHAIN(chinch_flash_read(0x12, &data), status);
-    result &= (data == 0xFFFF);
-    STATUS_CHAIN(chinch_flash_read(0x20, &data), status);
-    result &= (data == 0x0ACE);
-    STATUS_CHAIN(chinch_flash_read(0x22, &data), status);
-    result &= (data == 0xBA5E);
-
-    chinch_flash_cleanup();
-    result &= status;
-
-    chinch_poke32(0x200, result);
-
-    printf("[Debug] Flash access test %s\n", result?"PASSED":"FAILED");
 }
 
 /***********************************************************************

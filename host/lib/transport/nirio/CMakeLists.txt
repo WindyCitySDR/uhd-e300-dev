@@ -31,8 +31,7 @@ INCLUDE_SUBDIRECTORY(rpc)
 
 LIBUHD_APPEND_SOURCES(
     ${CMAKE_CURRENT_SOURCE_DIR}/niusrprio_session.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/nirio_fifo.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/nirio_interface.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/niriok_proxy.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/nirio_resource_manager.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/status.cpp
 )

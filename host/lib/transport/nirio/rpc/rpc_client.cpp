@@ -26,7 +26,7 @@
         UHD_LOG << "rpc_client operation skipped: " #func "\n"; \
     } \
 
-namespace usrprio_rpc {
+namespace uhd { namespace usrprio_rpc {
 
 using boost::asio::ip::tcp;
 
@@ -198,4 +198,4 @@ void rpc_client::_wait_for_next_response_header() {
             sizeof(_response.header)));
 }
 
-}
+}}

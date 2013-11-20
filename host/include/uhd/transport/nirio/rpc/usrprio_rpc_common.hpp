@@ -20,7 +20,7 @@
 
 #include <uhd/transport/nirio/rpc/rpc_common.hpp>
 
-namespace usrprio_rpc {
+namespace uhd { namespace usrprio_rpc {
 
 //Function IDs
 
@@ -80,6 +80,6 @@ typedef std::vector<usrprio_device_info> usrprio_device_info_vtr;
 #define NIUSRPRIO_DOWNLOAD_FPGA_TO_FLASH_ARGS   \
     const std::string& resource,                \
     const std::string& bitstream_path
-}
+}}
 
 #endif /* INCLUDED_USRPRIO_RPC_COMMON_HPP */

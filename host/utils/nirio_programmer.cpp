@@ -1,6 +1,6 @@
 
 #include <uhd/transport/nirio/niusrprio_session.h>
-#include <uhd/transport/nirio/nirio_interface.h>
+#include <uhd/transport/nirio/niriok_proxy.h>
 #include <uhd/transport/nirio/nifpga_lvbitx.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -14,7 +14,10 @@
 #include <boost/algorithm/string.hpp>
 #include <boost/regex.hpp>
 
-class dummy_lvbitx : public nifpga_interface::nifpga_lvbitx {
+using namespace uhd::niusrprio;
+using namespace uhd::usrprio_rpc;
+
+class dummy_lvbitx : public nifpga_lvbitx {
 public:
     dummy_lvbitx(const std::string& fpga_lvbitx_path) : _fpga_lvbitx_path(fpga_lvbitx_path) {
         std::ifstream lvbitx_stream(_fpga_lvbitx_path.c_str());
@@ -62,8 +65,8 @@ public:
     virtual size_t get_indicator_count() { return 0; }
     virtual const char** get_indicator_names() { return NULL; }
 
-    virtual void init_register_info(nirio_interface::nirio_register_info_vtr& vtr) { vtr.clear(); }
-    virtual void init_fifo_info(nirio_interface::nirio_fifo_info_vtr& vtr) { vtr.clear(); }
+    virtual void init_register_info(nirio_register_info_vtr& vtr) { vtr.clear(); }
+    virtual void init_fifo_info(nirio_fifo_info_vtr& vtr) { vtr.clear(); }
 
 private:
     std::string _fpga_lvbitx_path;
@@ -73,7 +76,6 @@ private:
 
 int main(int argc, char *argv[])
 {
-    using namespace nirio_interface;
     nirio_status status = NiRio_Status_Success;
 
     //Setup the program options
@@ -109,8 +111,8 @@ int main(int argc, char *argv[])
     {
         printf("Downloading image %s to FPGA as %s...", fpga_lvbitx_path.c_str(), resource_name.c_str());
         fflush(stdout);
-        nifpga_interface::niusrprio_session fpga_session(resource_name, rpc_port);
-        nifpga_interface::nifpga_lvbitx::sptr lvbitx(new dummy_lvbitx(fpga_lvbitx_path));
+        uhd::niusrprio::niusrprio_session fpga_session(resource_name, rpc_port);
+        uhd::niusrprio::nifpga_lvbitx::sptr lvbitx(new dummy_lvbitx(fpga_lvbitx_path));
         nirio_status_chain(fpga_session.open(lvbitx, true), status);
         //Download BIN to flash or erase
         if (flash_path != "erase") {
@@ -131,7 +133,7 @@ int main(int argc, char *argv[])
     }
 
     fflush(stdout);
-    usrprio_rpc::usrprio_rpc_client temp_rpc_client("localhost", rpc_port);
+    usrprio_rpc_client temp_rpc_client("localhost", rpc_port);
     std::string interface_path;
     nirio_status_chain(temp_rpc_client.niusrprio_get_interface_path(resource_name, interface_path), status);
     if (interface_path.empty()) {
@@ -153,8 +155,7 @@ int main(int argc, char *argv[])
         ss << std::hex << poke_tokens[2];
         ss >> poke_data;
 
-        tRioAddressSpace addr_space = poke_tokens[0]=="c"?kRioAddressSpaceBusInterface:kRioAddressSpaceFpga;
-        nirio_status_chain(dev_proxy.set_attribute(kRioAddressSpace, addr_space), status);
+        niriok_scoped_addr_space(dev_proxy, poke_tokens[0]=="c"?BUS_INTERFACE:FPGA, status);
         if (poke_tokens[0]=="z") {
             nirio_status_chain(dev_proxy.poke(poke_addr, (uint32_t)0x70000 + poke_addr), status);
         } else {
@@ -171,8 +172,7 @@ int main(int argc, char *argv[])
         ss << std::hex << peek_tokens[1];
         ss >> peek_addr;
 
-        tRioAddressSpace addr_space = peek_tokens[0]=="c"?kRioAddressSpaceBusInterface:kRioAddressSpaceFpga;
-        nirio_status_chain(dev_proxy.set_attribute(kRioAddressSpace, addr_space), status);
+        niriok_scoped_addr_space(dev_proxy, peek_tokens[0]=="c"?BUS_INTERFACE:FPGA, status);
         uint32_t reg_val;
         if (peek_tokens[0]=="z") {
             nirio_status_chain(dev_proxy.poke((uint32_t)0x60000 + peek_addr, (uint32_t)0), status);
@@ -191,27 +191,27 @@ int main(int argc, char *argv[])
     if (vm.count("status")){
         printf("[Interface %u Status]\n", interface_num);
         uint32_t attr_val;
-        nirio_status_chain(dev_proxy.get_attribute(kRioIsFpgaProgrammed, attr_val), status);
+        nirio_status_chain(dev_proxy.get_attribute(IS_FPGA_PROGRAMMED, attr_val), status);
         printf("* Is FPGA Programmed? = %s\n", (attr_val==1)?"YES":"NO");
 
         std::string signature;
         for (int i = 0; i < 4; i++) {
-            nirio_status_chain(dev_proxy.peek(0xFFF4, attr_val), status);
+            nirio_status_chain(dev_proxy.peek(0x3FFF4, attr_val), status);
             signature += boost::str(boost::format("%08x") % attr_val);
         }
         printf("* FPGA Signature = %s\n", signature.c_str());
 
         uint32_t reg_val;
-        nirio_status_chain(dev_proxy.set_attribute(kRioAddressSpace, kRioAddressSpaceBusInterface), status);
+        nirio_status_chain(dev_proxy.set_attribute(ADDRESS_SPACE, BUS_INTERFACE), status);
         nirio_status_chain(dev_proxy.peek(0, reg_val), status);
         printf("* Chinch Signature = %x\n", reg_val);
-        nirio_status_chain(dev_proxy.set_attribute(kRioAddressSpace, kRioAddressSpaceFpga), status);
+        nirio_status_chain(dev_proxy.set_attribute(ADDRESS_SPACE, FPGA), status);
         nirio_status_chain(dev_proxy.peek(0, reg_val), status);
         printf("* PCIe FPGA Signature = %x\n", reg_val);
 
         printf("\n[DMA Stream Status]\n");
 
-        nirio_status_chain(dev_proxy.set_attribute(kRioAddressSpace, kRioAddressSpaceFpga), status);
+        nirio_status_chain(dev_proxy.set_attribute(ADDRESS_SPACE, FPGA), status);
 
         printf("----------------------------------------------------------------------------------");
         printf("\nChannel =>     |");
@@ -221,42 +221,42 @@ int main(int argc, char *argv[])
         printf("\n----------------------------------------------------------------------------------");
         printf("\nTX Status      |");
         for (uint32_t i = 0; i < 6; i++) {
-            nirio_status_chain(dev_proxy.peek(0x200 + (i * 16), reg_val), status);
+            nirio_status_chain(dev_proxy.peek(0x40200 + (i * 16), reg_val), status);
             printf("%s |", reg_val==0 ? "     Good" : "    Error");
         }
         printf("\nRX Status      |");
         for (uint32_t i = 0; i < 6; i++) {
-            nirio_status_chain(dev_proxy.peek(0x400 + (i * 16), reg_val), status);
+            nirio_status_chain(dev_proxy.peek(0x40400 + (i * 16), reg_val), status);
             printf("%s |", reg_val==0 ? "     Good" : "    Error");
         }
         printf("\nTX Frm Size    |");
         for (uint32_t i = 0; i < 6; i++) {
-            nirio_status_chain(dev_proxy.peek(0x204 + (i * 16), reg_val), status);
+            nirio_status_chain(dev_proxy.peek(0x40204 + (i * 16), reg_val), status);
             printf("%9d |", reg_val);
         }
         printf("\nRX Frm Size    |");
         for (uint32_t i = 0; i < 6; i++) {
-            nirio_status_chain(dev_proxy.peek(0x404 + (i * 16), reg_val), status);
+            nirio_status_chain(dev_proxy.peek(0x40404 + (i * 16), reg_val), status);
             printf("%9d |", reg_val);
         }
         printf("\nTX Pkt Count   |");
         for (uint32_t i = 0; i < 6; i++) {
-            nirio_status_chain(dev_proxy.peek(0x20C + (i * 16), reg_val), status);
+            nirio_status_chain(dev_proxy.peek(0x4020C + (i * 16), reg_val), status);
             printf("%9d |", reg_val);
         }
         printf("\nTX Samp Count  |");
         for (uint32_t i = 0; i < 6; i++) {
-            nirio_status_chain(dev_proxy.peek(0x208 + (i * 16), reg_val), status);
+            nirio_status_chain(dev_proxy.peek(0x40208 + (i * 16), reg_val), status);
             printf("%9d |", reg_val);
         }
         printf("\nRX Pkt Count   |");
         for (uint32_t i = 0; i < 6; i++) {
-            nirio_status_chain(dev_proxy.peek(0x40C + (i * 16), reg_val), status);
+            nirio_status_chain(dev_proxy.peek(0x4040C + (i * 16), reg_val), status);
             printf("%9d |", reg_val);
         }
         printf("\nRX Samp Count  |");
         for (uint32_t i = 0; i < 6; i++) {
-            nirio_status_chain(dev_proxy.peek(0x408 + (i * 16), reg_val), status);
+            nirio_status_chain(dev_proxy.peek(0x40408 + (i * 16), reg_val), status);
             printf("%9d |", reg_val);
         }
         printf("\n----------------------------------------------------------------------------------\n");

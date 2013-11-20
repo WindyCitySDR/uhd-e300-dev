@@ -43,8 +43,7 @@
 using namespace uhd;
 using namespace uhd::usrp;
 using namespace uhd::transport;
-using namespace nifpga_interface;
-using namespace nirio_interface;
+using namespace uhd::niusrprio;
 namespace asio = boost::asio;
 
 /***********************************************************************
@@ -336,10 +335,10 @@ void x300_impl::setup_mb(const size_t mb_i, const uhd::device_addr_t &dev_addr)
 
         //Detect the PCIe product ID to distinguish between X300 and X310
         boost::uint32_t pid;
-        nirio_interface::niriok_proxy::sptr discovery_proxy =
+        niriok_proxy::sptr discovery_proxy =
             niusrprio_session::create_kernel_proxy(dev_addr["resource"], rpc_port_name);
         if (discovery_proxy) {
-            nirio_status_chain(discovery_proxy->get_attribute(kRioProductNumber, pid), status);
+            nirio_status_chain(discovery_proxy->get_attribute(PRODUCT_NUMBER, pid), status);
             discovery_proxy->close();
         }
         nirio_status_to_exception(status, "x300_impl: Could not detect device type. Please ensure that that x300 device drivers are loaded and the device has a valid FPGA bitstream.");

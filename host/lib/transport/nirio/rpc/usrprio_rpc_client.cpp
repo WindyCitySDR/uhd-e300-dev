@@ -18,7 +18,7 @@
 #include <uhd/transport/nirio/rpc/usrprio_rpc_client.hpp>
 #include <uhd/utils/platform.hpp>
 
-namespace usrprio_rpc {
+namespace uhd { namespace usrprio_rpc {
 
 usrprio_rpc_client::usrprio_rpc_client(
     std::string server,
@@ -224,4 +224,4 @@ nirio_status usrprio_rpc_client::_boost_error_to_nirio_status(const boost::syste
     }
 }
 
-}
+}}

@@ -8,9 +8,7 @@
 #include <boost/algorithm/string.hpp>
 #include <boost/regex.hpp>
 
-namespace nifpga_interface {{
-
-using namespace nirio_interface;
+namespace uhd {{ namespace niusrprio {{
 
 const char* {lvbitx_classname}_lvbitx::CONTROLS[] = {{{control_list}
 }};
@@ -90,10 +88,10 @@ const char** {lvbitx_classname}_lvbitx::get_indicator_names() {{
     return INDICATORS;
 }}
 
-void {lvbitx_classname}_lvbitx::init_register_info(nirio_interface::nirio_register_info_vtr& vtr) {{ {register_init}
+void {lvbitx_classname}_lvbitx::init_register_info(nirio_register_info_vtr& vtr) {{ {register_init}
 }}
 
-void {lvbitx_classname}_lvbitx::init_fifo_info(nirio_interface::nirio_fifo_info_vtr& vtr) {{ {fifo_init}
+void {lvbitx_classname}_lvbitx::init_fifo_info(nirio_fifo_info_vtr& vtr) {{ {fifo_init}
 }}
 
-}}
+}}}}

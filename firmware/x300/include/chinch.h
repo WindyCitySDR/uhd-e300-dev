@@ -1,10 +1,19 @@
-/*
- * chinch.h
- *
- *  Created on: May 14, 2013
- *      Author: ashish
- */
-
+//
+// Copyright 2013 Ettus Research LLC
+//
+// This program is free software: you can redistribute it and/or modify
+// it under the terms of the GNU General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// This program is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU General Public License for more details.
+//
+// You should have received a copy of the GNU General Public License
+// along with this program.  If not, see <http://www.gnu.org/licenses/>.
+//
 #ifndef INCLUDED_CHINCH_H
 #define INCLUDED_CHINCH_H
 
@@ -16,9 +25,8 @@
 #define STATUS_MERGE(x, status) status &= (x)
 #define STATUS_CHAIN_DBG(x, status) STATUS_CHAIN(x, status); printf("%s: %s\n", #x, status?"succeeded":"failed!")
 
-//@TODO: Ashish
 //The unit for this timeout is somewhat arbitrary. We could use the counter reg to enforce this in
-//terms of clock cycles but is that worth the extra code?
+//terms of clock cycles but that is not worth the extra code
 static const uint32_t CHINCH_DEFAULT_XACT_TIMEOUT   = 32768;
 static const uint32_t CHINCH_FLASH_MAX_BUF_WRITES   = 32;
 
@@ -59,16 +67,16 @@ static inline bool chinch_flash_write(uint32_t offset, uint16_t data) {
 }
 
 //-----------------------------------------------------
-// POSC
+// FPGA Configuration
 //-----------------------------------------------------
-typedef uint8_t chinch_posc_status_t;
-static const chinch_posc_status_t CHINCH_POSC_RUNNING   = 0;
-static const chinch_posc_status_t CHINCH_POSC_DISABLED  = 1;
-static const chinch_posc_status_t CHINCH_POSC_COMPLETED = 2;
-static const chinch_posc_status_t CHINCH_POSC_ERROR     = 3;
+typedef uint8_t config_status_t;
+static const config_status_t CHINCH_CONFIG_RUNNING   = 0;
+static const config_status_t CHINCH_CONFIG_DISABLED  = 1;
+static const config_status_t CHINCH_CONFIG_COMPLETED = 2;
+static const config_status_t CHINCH_CONFIG_ERROR     = 3;
 
-void chinch_start_posc();   //Caution: This operation will make the ZPU self-destruct!
-chinch_posc_status_t chinch_get_posc_status();
+void chinch_start_config();   //Caution: This operation will make the ZPU self-destruct!
+config_status_t chinch_get_config_status();
 
 //-----------------------------------------------------
 // Read-back interface for user initiated

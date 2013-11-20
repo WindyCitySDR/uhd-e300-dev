@@ -19,7 +19,7 @@
 #include <uhd/transport/nirio/status.h>
 #include <boost/format.hpp>
 
-namespace nirio_interface {
+namespace uhd { namespace niusrprio {
 
 #define NIRIO_ERR_INFO(CONST_NAME, ERR_CODE, ERR_MSG) \
     nirio_err_info(ERR_CODE, ERR_MSG),
@@ -49,7 +49,7 @@ void nirio_status_to_exception(const nirio_status& status, const std::string& me
     }
 }
 
-}
+}}
 
 
 

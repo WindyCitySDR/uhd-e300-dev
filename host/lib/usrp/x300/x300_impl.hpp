@@ -102,7 +102,7 @@ uhd::usrp::dboard_iface::sptr x300_make_dboard_iface(const x300_dboard_iface_con
 uhd::uart_iface::sptr x300_make_uart_iface(uhd::wb_iface::sptr iface);
 
 uhd::wb_iface::sptr x300_make_ctrl_iface_enet(uhd::transport::udp_simple::sptr udp);
-uhd::wb_iface::sptr x300_make_ctrl_iface_pcie(nirio_interface::niriok_proxy& drv_proxy);
+uhd::wb_iface::sptr x300_make_ctrl_iface_pcie(uhd::niusrprio::niriok_proxy& drv_proxy);
 
 struct x300_impl : public uhd::device
 {
@@ -158,7 +158,7 @@ struct x300_impl : public uhd::device
         uhd::device_addr_t send_args;
         uhd::device_addr_t recv_args;
         bool if_pkt_is_big_endian;
-        nifpga_interface::niusrprio_session::sptr  rio_fpga_interface;
+        uhd::niusrprio::niusrprio_session::sptr  rio_fpga_interface;
 
         //perifs in the zpu
         uhd::wb_iface::sptr zpu_ctrl;

@@ -16,8 +16,8 @@
 //
 
 
-#ifndef STATUS_H_
-#define STATUS_H_
+#ifndef INCLUDED_UHD_TRANSPORT_NIRIO_STATUS_H
+#define INCLUDED_UHD_TRANSPORT_NIRIO_STATUS_H
 
 #include <stdio.h>
 #include <stddef.h>
@@ -29,7 +29,7 @@
 
 typedef int32_t nirio_status;
 
-namespace nirio_interface {
+namespace uhd { namespace niusrprio {
 struct nirio_err_info {
     nirio_err_info(nirio_status arg_code, const char* arg_msg): code(arg_code), msg(arg_msg) {}
 
@@ -43,7 +43,7 @@ struct nirio_err_info {
 const std::string lookup_err_msg(nirio_status code);
 
 void nirio_status_to_exception(const nirio_status& status, const std::string& message);
-}
+}}
 
 #define nirio_status_fatal(status) ((status) < 0)
 #define nirio_status_not_fatal(status) ((status) >= 0)
@@ -62,4 +62,4 @@ void nirio_status_to_exception(const nirio_status& status, const std::string& me
 #include "nirio_err_template.h"
 #undef NIRIO_ERR_INFO
 
-#endif /* STATUS_H_ */
+#endif /* INCLUDED_UHD_TRANSPORT_NIRIO_STATUS_H */

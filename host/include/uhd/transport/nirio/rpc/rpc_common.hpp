@@ -32,7 +32,7 @@
     #include <boost/archive/text_iarchive.hpp>
 #endif
 
-namespace usrprio_rpc {
+namespace uhd { namespace usrprio_rpc {
 
 //[Over-the-wire] IDs
 typedef boost::int32_t  func_id_t;
@@ -151,7 +151,7 @@ public:
     }
 };
 
-}
+}}
 
 #undef USE_BINARY_ARCHIVE
 

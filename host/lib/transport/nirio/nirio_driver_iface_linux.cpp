@@ -46,68 +46,66 @@ bool rio_isopen(rio_dev_handle_t device_handle)
 
 nirio_status rio_ioctl(
     rio_dev_handle_t device_handle,
-	uint32_t ioctl_code,
-	const void *write_buf,
-	size_t write_buf_len,
-	void *read_buf,
-	size_t read_buf_len)
+    uint32_t ioctl_code,
+    const void *write_buf,
+    size_t write_buf_len,
+    void *read_buf,
+    size_t read_buf_len)
 {
-	nNIRIOSRV200::tRioIoctlBlock ioctl_block = {0,0,0,0,0,0};
+    nirio_ioctl_block_t ioctl_block = {0,0,0,0,0,0};
 
-	// two-casts necessary to prevent pointer sign-extension
-	ioctl_block.inBuf        = static_cast<uint64_t>(reinterpret_cast<uintptr_t>(write_buf));
-	ioctl_block.inBufLength  = write_buf_len;
-	ioctl_block.outBuf       = static_cast<uint64_t>(reinterpret_cast<uintptr_t>(read_buf));
-	ioctl_block.outBufLength = read_buf_len;
+    // two-casts necessary to prevent pointer sign-extension
+    ioctl_block.inBuf        = static_cast<uint64_t>(reinterpret_cast<uintptr_t>(write_buf));
+    ioctl_block.inBufLength  = write_buf_len;
+    ioctl_block.outBuf       = static_cast<uint64_t>(reinterpret_cast<uintptr_t>(read_buf));
+    ioctl_block.outBufLength = read_buf_len;
 
-	int status = ::ioctl(device_handle, ioctl_code, &ioctl_block);
-	if (status == -1) {
-        if (errno == EINVAL)
-            return NiRio_Status_InvalidParameter;
-        else if (errno == EFAULT)
-            return NiRio_Status_MemoryFull;
-        else
-            return NiRio_Status_SoftwareFault;
-	} else {
+    int status = ::ioctl(device_handle, ioctl_code, &ioctl_block);
+    if (status == -1) {
+        switch (errno) {
+            case EINVAL:    return NiRio_Status_InvalidParameter;
+            case EFAULT:    return NiRio_Status_MemoryFull;
+            default:        return NiRio_Status_SoftwareFault;
+        }
+    } else {
         return NiRio_Status_Success;
-	}
+    }
 }
 
 nirio_status rio_mmap(
     rio_dev_handle_t device_handle,
-	uint16_t memory_type,
-	size_t size,
-	bool writable,
-	rio_mmap_t &map)
+    uint16_t memory_type,
+    size_t size,
+    bool writable,
+    rio_mmap_t &map)
 {
     int access_mode = PROT_READ;    //Write-only mode not supported
-	if (writable) access_mode |= PROT_WRITE;
-	map.addr = ::mmap(NULL, size, access_mode, MAP_SHARED, device_handle, (off_t) memory_type * sysconf(_SC_PAGESIZE));
-	map.size = size;
+    if (writable) access_mode |= PROT_WRITE;
+    map.addr = ::mmap(NULL, size, access_mode, MAP_SHARED, device_handle, (off_t) memory_type * sysconf(_SC_PAGESIZE));
+    map.size = size;
 
-	if (map.addr == MAP_FAILED)	{
-		map.addr = NULL;
-		map.size = 0;
-		if (errno == EINVAL)
-		    return NiRio_Status_InvalidParameter;
-		else if (errno == ENOMEM)
-		    return NiRio_Status_MemoryFull;
-		else
-		    return NiRio_Status_SoftwareFault;
-	}
-	return NiRio_Status_Success;
+    if (map.addr == MAP_FAILED)    {
+        map.addr = NULL;
+        map.size = 0;
+        switch (errno) {
+            case EINVAL:    return NiRio_Status_InvalidParameter;
+            case EFAULT:    return NiRio_Status_MemoryFull;
+            default:        return NiRio_Status_SoftwareFault;
+        }
+    }
+    return NiRio_Status_Success;
 }
 
 nirio_status rio_munmap(rio_mmap_t &map)
 {
-	nirio_status status = 0;
-	if (map.addr != NULL) {
-		status = ::munmap(map.addr, map.size);
+    nirio_status status = 0;
+    if (map.addr != NULL) {
+        status = ::munmap(map.addr, map.size);
 
-		map.addr = NULL;
-		map.size = 0;
-	}
-	return status;
+        map.addr = NULL;
+        map.size = 0;
+    }
+    return status;
 }
 
 }

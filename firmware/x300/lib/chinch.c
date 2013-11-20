@@ -1,9 +1,19 @@
-/*
- * chinch.c
- *
- *  Created on: May 14, 2013
- *      Author: ashish
- */
+//
+// Copyright 2013 Ettus Research LLC
+//
+// This program is free software: you can redistribute it and/or modify
+// it under the terms of the GNU General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// This program is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU General Public License for more details.
+//
+// You should have received a copy of the GNU General Public License
+// along with this program.  If not, see <http://www.gnu.org/licenses/>.
+//
 
 #include "chinch.h"
 
@@ -39,16 +49,14 @@
 #define PCIE_STATUS_REG_RESP_PENDING    (1<<2)
 #define PCIE_STATUS_REG_BUSY            (1<<4)
 
-#define CHINCH_SIG_REG                  0x0
-#define CHINCH_CCCS_REG                 0x58
-#define CHINCH_CPWBS_REG                0xC0
-#define CHINCH_CPWC_REG                 0xE0
-#define CHINCH_SCRATCH_REG_BASE         0x200
+#define CHINCH_FPGA_CONFIG_REG          0x58
+#define CHINCH_FLASH_WINDOW_REG0        0xC0
+#define CHINCH_FLASH_WINDOW_REG1        0xE0
 #define CHINCH_FLASH_2AAA_REG           0x400
 #define CHINCH_FLASH_5555_REG           0x408
 #define CHINCH_FLASH_WINDOW_BASE        0x60000
 #define CHINCH_FLASH_WINDOW_SIZE        0x20000
-#define CHINCH_FLASH_WINDOW_CONF        0x91    //ESSS SSSS: Enable, Size (as pow of 2)
+#define CHINCH_FLASH_WINDOW_CONF        0x91
 
 //-----------------------------------------------------
 // Peek-Poke interface
@@ -117,28 +125,26 @@ bool chinch_peek(
 // Flash access
 //-----------------------------------------------------
 
-uint32_t    g_cached_cpwbsr;
-uint32_t    g_cached_cpwcr;
+uint32_t    g_cached_win_reg0;
+uint32_t    g_cached_win_reg1;
 
 bool chinch_flash_init()
 {
-    //Backup window and page registers
-    chinch_peek32(CHINCH_CPWBS_REG, &g_cached_cpwbsr);
-    chinch_peek32(CHINCH_CPWC_REG, &g_cached_cpwcr);
+    chinch_peek32(CHINCH_FLASH_WINDOW_REG0, &g_cached_win_reg0);
+    chinch_peek32(CHINCH_FLASH_WINDOW_REG1, &g_cached_win_reg1);
 
     bool status = true, passed = true;
-    //Setup window
-    STATUS_MERGE(chinch_poke32(CHINCH_CPWBS_REG, CHINCH_FLASH_WINDOW_BASE | CHINCH_FLASH_WINDOW_CONF), status);
+    STATUS_MERGE(chinch_poke32(CHINCH_FLASH_WINDOW_REG0, CHINCH_FLASH_WINDOW_BASE | CHINCH_FLASH_WINDOW_CONF), status);
 
     //Run a loopback test to ensure that we will not corrupt the flash.
-    STATUS_MERGE(chinch_poke32(CHINCH_SCRATCH_REG_BASE + 0, 0xDEADBEEF), status);
-    STATUS_MERGE(chinch_poke16(CHINCH_SCRATCH_REG_BASE + 4, 0x5678), status);
+    STATUS_MERGE(chinch_poke32(0x200, 0xDEADBEEF), status);
+    STATUS_MERGE(chinch_poke16(0x204, 0x5678), status);
     uint32_t reg_val;
-    STATUS_MERGE(chinch_peek16(CHINCH_SIG_REG, &reg_val), status);
-    STATUS_MERGE(chinch_poke16(CHINCH_SCRATCH_REG_BASE + 6, reg_val), status);
-    STATUS_MERGE(chinch_peek32(CHINCH_SCRATCH_REG_BASE + 0, &reg_val), status);
+    STATUS_MERGE(chinch_peek16(0x0, &reg_val), status);
+    STATUS_MERGE(chinch_poke16(0x206, reg_val), status);
+    STATUS_MERGE(chinch_peek32(0x200, &reg_val), status);
     passed &= (reg_val == 0xDEADBEEF);
-    STATUS_MERGE(chinch_peek32(CHINCH_SCRATCH_REG_BASE + 4, &reg_val), status);
+    STATUS_MERGE(chinch_peek32(0x204, &reg_val), status);
     passed &= (reg_val == 0x7AD05678);
 
     return status && passed;
@@ -146,14 +152,13 @@ bool chinch_flash_init()
 
 void chinch_flash_cleanup()
 {
-    //Restore window and page registers
-    chinch_poke32(CHINCH_CPWBS_REG, g_cached_cpwbsr);
-    chinch_poke32(CHINCH_CPWC_REG, g_cached_cpwcr);
+    chinch_poke32(CHINCH_FLASH_WINDOW_REG0, g_cached_win_reg0);
+    chinch_poke32(CHINCH_FLASH_WINDOW_REG1, g_cached_win_reg1);
 }
 
 bool chinch_flash_select_sector(uint32_t sector)
 {
-    return chinch_poke32(CHINCH_CPWC_REG, sector * CHINCH_FLASH_WINDOW_SIZE);
+    return chinch_poke32(CHINCH_FLASH_WINDOW_REG1, sector * CHINCH_FLASH_WINDOW_SIZE);
 }
 
 bool chinch_flash_erase_sector()
@@ -218,19 +223,19 @@ bool chinch_flash_write_buf(uint32_t offset, uint16_t* buf, uint32_t size)
 }
 
 //-----------------------------------------------------
-// POSC
+// FPGA Configuration
 //-----------------------------------------------------
-void chinch_start_posc()
+void chinch_start_config()
 {
-    chinch_poke32(CHINCH_CCCS_REG, 0x1);
+    chinch_poke32(CHINCH_FPGA_CONFIG_REG, 0x1);
 }
 
-chinch_posc_status_t chinch_get_posc_status()
+config_status_t chinch_get_config_status()
 {
     bool status = true;
     uint32_t read_data;
-    STATUS_MERGE(chinch_peek32(CHINCH_CCCS_REG, &read_data), status);
-    return status ? (chinch_posc_status_t)read_data : CHINCH_POSC_ERROR;
+    STATUS_MERGE(chinch_peek32(CHINCH_FPGA_CONFIG_REG, &read_data), status);
+    return status ? (config_status_t)read_data : CHINCH_CONFIG_ERROR;
 }
 
 //-----------------------------------------------------
