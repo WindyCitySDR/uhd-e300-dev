@@ -172,6 +172,8 @@ protected:
 
     virtual void __flush(void)
     {
+        boost::mutex::scoped_lock lock(mutex);
+
         char buff[X300_FW_COMMS_MTU] = {};
         while (udp->recv(boost::asio::buffer(buff), 0.0)){} //flush
     }
