@@ -397,6 +397,9 @@ int UHD_SAFE_MAIN(int argc, char *argv[]){
         throw std::runtime_error("You must specify an FPGA image or select the option to configure the current image.");
     }
 
+    //Expand tilde usage if applicable
+    if(fpga_path.find("~/") == 0) fpga_path.replace(0,1,getenv("HOME"));
+
     //Check for proper file type
     std::string ext = fs::extension(fpga_path.c_str());
     if(ext != ".bin" and ext != ".bit" and ext != ".lvbitx"){
