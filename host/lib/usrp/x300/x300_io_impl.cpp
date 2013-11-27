@@ -139,9 +139,9 @@ void x300_impl::update_tx_subdev_spec(const size_t mb_i, const subdev_spec_t &sp
         //extract connection
         const std::string conn = _tree->access<std::string>(root / db_name / "tx_frontends" / fe_name / "connection").get();
 
-        //swap condition
-        const bool swap = (conn[0] == 'Q');
-        _mb[mb_i].radio_perifs[i].dac->set_iq_swap(swap);
+	//swap condition
+        _mb[mb_i].radio_perifs[i].tx_fe->set_mux(conn);
+	
     }
 
     _mb[mb_i].tx_fe_map = spec;

@@ -742,6 +742,17 @@ void x300_impl::setup_radio(const size_t mb_i, const size_t i, const std::string
         .subscribe(boost::bind(&rx_frontend_core_200::set_iq_balance, perif.rx_fe, _1))
         .set(std::complex<double>(0.0, 0.0));
 
+    perif.tx_fe = tx_frontend_core_200::make(perif.ctrl, TOREG(SR_TX_FRONT));
+    const fs_path tx_fe_path = mb_path / "tx_frontends" / db_name;
+    _tree->create<std::complex<double> >(tx_fe_path / "dc_offset" / "value")
+        .coerce(boost::bind(&tx_frontend_core_200::set_dc_offset, perif.tx_fe, _1))
+        .set(std::complex<double>(0.0, 0.0));
+    _tree->create<std::complex<double> >(tx_fe_path / "iq_balance" / "value")
+        .subscribe(boost::bind(&tx_frontend_core_200::set_iq_balance, perif.tx_fe, _1))
+        .set(std::complex<double>(0.0, 0.0));
+
+
+
     ////////////////////////////////////////////////////////////////////
     // create rx dsp control objects
     ////////////////////////////////////////////////////////////////////

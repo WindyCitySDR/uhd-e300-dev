@@ -37,6 +37,7 @@ localparam SR_TX_DSP    = 184;
 localparam SR_LEDS      = 196;
 localparam SR_FP_GPIO   = 200;
 localparam SR_RX_FRONT  = 208;
+localparam SR_TX_FRONT  = 216;
 
 localparam RB32_GPIO            = 0;
 localparam RB32_SPI             = 4;
