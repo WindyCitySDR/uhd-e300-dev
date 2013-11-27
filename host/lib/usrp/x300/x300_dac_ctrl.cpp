@@ -93,8 +93,8 @@ public:
         write_ad9146_reg(0x1B, 0xE4); // Bypass: Modulator, InvSinc, IQ Bal
 
         /* Configure interpolation filters */
-        write_ad9146_reg(0x1C, 0x00); // Bypass HB1
-        write_ad9146_reg(0x1D, 0x00); // Bypass HB2
+        write_ad9146_reg(0x1C, 0x00); // Configure HB1
+        write_ad9146_reg(0x1D, 0x00); // Configure HB2
 
     }
 

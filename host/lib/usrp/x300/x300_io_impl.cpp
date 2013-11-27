@@ -141,7 +141,7 @@ void x300_impl::update_tx_subdev_spec(const size_t mb_i, const subdev_spec_t &sp
 
 	//swap condition
         _mb[mb_i].radio_perifs[i].tx_fe->set_mux(conn);
-	
+
     }
 
     _mb[mb_i].tx_fe_map = spec;
