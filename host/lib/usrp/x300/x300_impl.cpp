@@ -148,6 +148,10 @@ static device_addrs_t x300_find_pcie(const device_addr_t &hint, bool explicit_qu
         //This operation can throw due to compatibility mismatch.
         try
         {
+            //This call could throw an exception if the user is switching to using UHD
+            //after LabVIEW FPGA. In that case, skip reading the name and serial and pick
+            //a default FPGA flavor. During make, a new image will be loaded and everything
+            //will be OK
             wb_iface::sptr zpu_ctrl = x300_make_ctrl_iface_pcie(kernel_proxy);
             if (x300_impl::is_claimed(zpu_ctrl)) continue; //claimed by another process
 
@@ -166,6 +170,9 @@ static device_addrs_t x300_find_pcie(const device_addr_t &hint, bool explicit_qu
         {
             //set these values as empty string so the device may still be found
             //and the filter's below can still operate on the discovered device
+            if (not hint.has_key("fpga")) {
+                new_addr["fpga"] = "HG";
+            }
             new_addr["name"] = "";
             new_addr["serial"] = "";
         }
@@ -352,9 +359,9 @@ void x300_impl::setup_mb(const size_t mb_i, const uhd::device_addr_t &dev_addr)
         }
 
         //Load the lvbitx onto the device
-        UHD_MSG(status) << boost::format("Loading LVBITX bitfile %s...\n") % lvbitx->get_bitfile_path();
+        UHD_MSG(status) << boost::format("Using LVBITX bitfile %s...\n") % lvbitx->get_bitfile_path();
         mb.rio_fpga_interface.reset(new niusrprio_session(dev_addr["resource"], rpc_port_name));
-        nirio_status_chain(mb.rio_fpga_interface->open(lvbitx), status);
+        nirio_status_chain(mb.rio_fpga_interface->open(lvbitx, dev_addr.has_key("download-fpga")), status);
         nirio_status_to_exception(status, "x300_impl: Could not initialize RIO session.");
     }
 
@@ -894,13 +901,16 @@ x300_impl::both_xports_t x300_impl::make_transport(
     sid = this->allocate_sid(mb, config);
 
     if (xport_path == "nirio") {
-        device_addr_t xport_args(args);
-        xport_args["send_frame_size"] = boost::lexical_cast<std::string>(
-            (prefix == X300_RADIO_DEST_PREFIX_TX) ? X300_PCIE_DATA_FRAME_SIZE : X300_PCIE_MSG_FRAME_SIZE);
-        xport_args["recv_frame_size"] = boost::lexical_cast<std::string>(
-            (prefix == X300_RADIO_DEST_PREFIX_RX) ? X300_PCIE_DATA_FRAME_SIZE : X300_PCIE_MSG_FRAME_SIZE);
+        nirio_zero_copy_buff_args default_buff_args;
+        default_buff_args.send_frame_size =
+            (prefix == X300_RADIO_DEST_PREFIX_TX) ? X300_PCIE_DATA_FRAME_SIZE : X300_PCIE_MSG_FRAME_SIZE;
+        default_buff_args.recv_frame_size =
+            (prefix == X300_RADIO_DEST_PREFIX_RX) ? X300_PCIE_DATA_FRAME_SIZE : X300_PCIE_MSG_FRAME_SIZE;
+        default_buff_args.num_send_frames = X300_PCIE_NUM_FRAMES;
+        default_buff_args.num_recv_frames = X300_PCIE_NUM_FRAMES;
 
-        xports.recv = nirio_zero_copy::make(mb.rio_fpga_interface, get_pcie_dma_channel(destination, prefix), xport_args);
+        xports.recv = nirio_zero_copy::make(
+            mb.rio_fpga_interface, get_pcie_dma_channel(destination, prefix), default_buff_args, args);
         xports.send = xports.recv;
     } else {
         //make a new transport - fpga has no idea how to talk to use on this yet

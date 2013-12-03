@@ -26,6 +26,13 @@
 
 namespace uhd{ namespace transport{
 
+struct nirio_zero_copy_buff_args {
+    size_t recv_frame_size;
+    size_t send_frame_size;
+    size_t num_recv_frames;
+    size_t num_send_frames;
+};
+
 class UHD_API nirio_zero_copy : public virtual zero_copy_if{
 public:
     typedef boost::shared_ptr<nirio_zero_copy> sptr;
@@ -33,10 +40,9 @@ public:
     static sptr make(
         uhd::niusrprio::niusrprio_session::sptr fpga_session,
         const uint32_t instance,
+        const nirio_zero_copy_buff_args &default_buff_args,
         const device_addr_t &hints = device_addr_t()
     );
-
-    static size_t get_default_buffer_size(void);
 };
 
 }} //namespace

@@ -34,10 +34,6 @@ using namespace uhd;
 using namespace uhd::transport;
 using namespace uhd::niusrprio;
 
-//A reasonable number of frames for send/recv and async/sync
-static const size_t DEFAULT_NUM_FRAMES  = 32;
-static const size_t DEFAULT_FRAMES_SIZE = 8192;
-
 typedef uint64_t fifo_data_t;
 
 class nirio_zero_copy_mrb : public managed_recv_buffer
@@ -121,14 +117,15 @@ public:
     nirio_zero_copy_impl(
         uhd::niusrprio::niusrprio_session::sptr fpga_session,
         uint32_t instance,
+        const nirio_zero_copy_buff_args &default_buff_args,
         const device_addr_t &hints
     ):
         _reg_int(fpga_session->get_kernel_proxy()),
         _fifo_instance(instance),
-        _recv_frame_size(size_t(hints.cast<double>("recv_frame_size", DEFAULT_FRAMES_SIZE))),
-        _num_recv_frames(size_t(hints.cast<double>("num_recv_frames", DEFAULT_NUM_FRAMES))),
-        _send_frame_size(size_t(hints.cast<double>("send_frame_size", DEFAULT_FRAMES_SIZE))),
-        _num_send_frames(size_t(hints.cast<double>("num_send_frames", DEFAULT_NUM_FRAMES))),
+        _recv_frame_size(size_t(hints.cast<double>("recv_frame_size", default_buff_args.recv_frame_size))),
+        _num_recv_frames(size_t(hints.cast<double>("num_recv_frames", default_buff_args.num_recv_frames))),
+        _send_frame_size(size_t(hints.cast<double>("send_frame_size", default_buff_args.send_frame_size))),
+        _num_send_frames(size_t(hints.cast<double>("num_send_frames", default_buff_args.num_send_frames))),
         _recv_buffer_pool(buffer_pool::make(_num_recv_frames, _recv_frame_size)),
         _send_buffer_pool(buffer_pool::make(_num_send_frames, _send_frame_size)),
         _next_recv_buff_index(0), _next_send_buff_index(0)
@@ -247,12 +244,9 @@ private:
 nirio_zero_copy::sptr nirio_zero_copy::make(
     uhd::niusrprio::niusrprio_session::sptr fpga_session,
     const uint32_t instance,
+    const nirio_zero_copy_buff_args &default_buff_args,
     const device_addr_t &hints
 ){
-    return nirio_zero_copy::sptr(new nirio_zero_copy_impl(fpga_session, instance, hints));
-}
-
-size_t nirio_zero_copy::get_default_buffer_size(void) {
-    return (DEFAULT_NUM_FRAMES * DEFAULT_FRAMES_SIZE);
+    return nirio_zero_copy::sptr(new nirio_zero_copy_impl(fpga_session, instance, default_buff_args, hints));
 }
 

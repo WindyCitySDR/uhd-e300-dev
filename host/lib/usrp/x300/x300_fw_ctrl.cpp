@@ -193,6 +193,15 @@ public:
         nirio_status status = 0;
         nirio_status_chain(_drv_proxy.set_attribute(ADDRESS_SPACE, BUS_INTERFACE), status);
 
+        //Verify that the Ettus FPGA loaded in the device. This may not be true if the
+        //user is switching to UHD after using LabVIEW FPGA.
+        boost::uint32_t pcie_fpga_signature = 0;
+        _drv_proxy.peek(FPGA_PCIE_SIG_REG, pcie_fpga_signature);
+        if (pcie_fpga_signature != FPGA_X3xx_SIG_VALUE)
+            throw uhd::io_error("cannot create x300_ctrl_iface_pcie. incorrect/no fpga image");
+
+        //Also, poll on the ZPU_STATUS bit to ensure all the state machines in the FPGA are
+        //ready to accept register transaction requests.
         boost::uint32_t reg_data = 0xffffffff;
         boost::posix_time::ptime start_time = boost::posix_time::microsec_clock::local_time();
         boost::posix_time::time_duration elapsed;

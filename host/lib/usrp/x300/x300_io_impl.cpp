@@ -364,10 +364,10 @@ rx_streamer::sptr x300_impl::get_rx_stream(const uhd::stream_args_t &args_)
         device_addr_t device_addr = mb.recv_args;
         if (not device_addr.has_key("recv_buff_size"))
         {
-            if (mb.xport_path == "nirio") {
-                device_addr["recv_buff_size"] = boost::lexical_cast<std::string>(
-                        uhd::transport::nirio_zero_copy::get_default_buffer_size());
-            } else {
+            if (mb.xport_path != "nirio") {
+                //For the ethernet transport, the buffer has to be set before creating
+                //the transport because it is independent of the frame size and # frames
+                //For nirio, the buffer size is not configurable by the user
                 #if defined(UHD_PLATFORM_MACOS) || defined(UHD_PLATFORM_BSD)
                     //limit buffer resize on macos or it will error
                     device_addr["recv_buff_size"] = "1e6";
@@ -384,6 +384,11 @@ rx_streamer::sptr x300_impl::get_rx_stream(const uhd::stream_args_t &args_)
         UHD_LOG << "creating rx stream " << device_addr.to_string() << std::endl;
         both_xports_t xport = this->make_transport(mb_index, dest, X300_RADIO_DEST_PREFIX_RX, device_addr, data_sid);
         UHD_LOG << boost::format("data_sid = 0x%08x\n") % data_sid << std::endl;
+
+        if (mb.xport_path == "nirio") {
+            device_addr["recv_buff_size"] = boost::lexical_cast<std::string>(
+                xport.recv->get_num_recv_frames() * xport.recv->get_recv_frame_size());
+        }
 
         //calculate packet size
         static const size_t hdr_size = 0

@@ -90,11 +90,12 @@ static const uint32_t X300_PCIE_VID         = 0x1093;
 static const uint32_t X300_PCIE_PID         = 0xC4C4;
 static const uint32_t X300_PCIE_SSID        = 0x7736;
 static const uint32_t X310_PCIE_SSID        = 0x76CA;
+static const uint32_t FPGA_X3xx_SIG_VALUE   = 0x58333030;
 
 static const uint32_t PCIE_FPGA_ADDR_BASE   = 0xC0000;
 #define PCIE_FPGA_REG(X)                    (PCIE_FPGA_ADDR_BASE + X)
 
-static const uint32_t FPGA_X300_SIG_REG     = PCIE_FPGA_REG(0x0000);
+static const uint32_t FPGA_PCIE_SIG_REG     = PCIE_FPGA_REG(0x0000);
 static const uint32_t FPGA_CNTR_LO_REG      = PCIE_FPGA_REG(0x0004);
 static const uint32_t FPGA_CNTR_HI_REG      = PCIE_FPGA_REG(0x0008);
 static const uint32_t FPGA_CNTR_FREQ_REG    = PCIE_FPGA_REG(0x000C);

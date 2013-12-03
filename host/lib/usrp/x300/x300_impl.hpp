@@ -49,16 +49,15 @@
 #include <uhd/transport/vrt_if_packet.hpp>
 #include "recv_packet_demuxer_3000.hpp"
 
-//static const size_t X300_TX_FC_PKT_WINDOW = 2048; //16MB/8Kpkts
-static const size_t X300_TX_FC_PKT_WINDOW = 72; //512K+64KByte/72 packets
+static const size_t X300_TX_FC_PKT_WINDOW = 72; //16MB/8Kpkts
 static const std::string X300_FW_FILE_NAME = "usrp_x300_fw.bin";
 static const double X300_DEFAULT_TICK_RATE = 200e6;
-static const double X300_DEFAULT_PLL2REF_FREQ = 96e6;  // New Crystal
-//static const double X300_DEFAULT_PLL2REF_FREQ = 120e6;  // Old Crystal
+static const double X300_DEFAULT_PLL2REF_FREQ = 96e6;
 static const double X300_BUS_CLOCK_RATE = 175000000;
 static const bool X300_ENABLE_RX_FC = false;
 static const size_t X300_PCIE_DATA_FRAME_SIZE = 8192;   //bytes
 static const size_t X300_PCIE_MSG_FRAME_SIZE  = 256;    //bytes
+static const size_t X300_PCIE_NUM_FRAMES      = 32;
 
 #define X300_RADIO_DEST_PREFIX_TX 0
 #define X300_RADIO_DEST_PREFIX_CTRL 1
