@@ -251,6 +251,18 @@ struct x300_tx_fc_guts_t
     boost::shared_ptr<x300_impl::async_md_type> old_async_queue;
 };
 
+static size_t get_tx_flow_control_window(size_t frame_size, const device_addr_t& tx_args)
+{
+    double hw_buff_size = tx_args.cast<double>("send_buff_size", X300_TX_HW_BUFF_SIZE);
+    size_t window_in_pkts = (static_cast<size_t>(hw_buff_size) / frame_size);
+    if (window_in_pkts == 0) {
+        throw uhd::value_error("send_buff_size must be larger than the send_frame_size.");
+    }
+
+    UHD_LOG << "tx_flow_control_window = " << window_in_pkts << std::endl;
+    return (window_in_pkts & 0xFFF);
+}
+
 static void handle_tx_async_msgs(boost::shared_ptr<x300_tx_fc_guts_t> guts, zero_copy_if::sptr xport, bool big_endian, x300_clock_ctrl::sptr clock)
 {
     managed_recv_buffer::sptr buff = xport->get_recv_buff();
@@ -305,12 +317,13 @@ static managed_send_buffer::sptr get_tx_buff_with_flowctrl(
     task::sptr /*holds ref*/,
     boost::shared_ptr<x300_tx_fc_guts_t> guts,
     zero_copy_if::sptr xport,
+    size_t fc_pkt_window,
     const double timeout
 ){
     while (true)
     {
         const size_t delta = (guts->last_seq_out & 0xfff) - (guts->last_seq_ack & 0xfff);
-        if ((delta & 0xfff) <= X300_TX_FC_PKT_WINDOW) break;
+        if ((delta & 0xfff) <= fc_pkt_window) break;
 
         const bool ok = guts->seq_queue.pop_with_timed_wait(guts->last_seq_ack, timeout);
         if (not ok) return managed_send_buffer::sptr(); //timeout waiting for flow control
@@ -523,10 +536,6 @@ tx_streamer::sptr x300_impl::get_tx_stream(const uhd::stream_args_t &args_)
 
         //setup the dsp transport hints (TODO)
         device_addr_t device_addr = mb.send_args;
-        //TODO: we could set the send_buff_size to match the available on-board buffering
-        //but its not clear that this is actually needed. The thought is that if the UDP
-        //socket can overflow the kernels buffers, then we can resize the buffer to match
-        //the flow control window.
 
         //allocate sid and create transport
         uint8_t dest = (mb_chan == 0)? X300_XB_DST_R0 : X300_XB_DST_R1;
@@ -573,7 +582,8 @@ tx_streamer::sptr x300_impl::get_tx_stream(const uhd::stream_args_t &args_)
         perif.duc->setup(args);
 
         //flow control setup
-        perif.deframer->configure_flow_control(0/*cycs off*/, X300_TX_FC_PKT_WINDOW/8/*pkts*/);
+        size_t fc_pkt_window = get_tx_flow_control_window(xport.send->get_send_frame_size(), device_addr);  //In packets
+        perif.deframer->configure_flow_control(0/*cycs off*/, fc_pkt_window/X300_TX_FC_RESPONSE_FREQ);
         boost::shared_ptr<x300_tx_fc_guts_t> guts(new x300_tx_fc_guts_t());
         guts->stream_channel = stream_i;
         guts->device_channel = chan;
@@ -582,7 +592,7 @@ tx_streamer::sptr x300_impl::get_tx_stream(const uhd::stream_args_t &args_)
         task::sptr task = task::make(boost::bind(&handle_tx_async_msgs, guts, xport.recv, mb.if_pkt_is_big_endian, mb.clock));
 
         my_streamer->set_xport_chan_get_buff(stream_i, boost::bind(
-            &get_tx_buff_with_flowctrl, task, guts, xport.send, _1
+            &get_tx_buff_with_flowctrl, task, guts, xport.send, fc_pkt_window, _1
         ));
         my_streamer->set_async_receiver(boost::bind(
             &async_md_type::pop_with_timed_wait, async_md, _1, _2
