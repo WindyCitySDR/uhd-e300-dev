@@ -49,18 +49,23 @@
 #include <uhd/transport/vrt_if_packet.hpp>
 #include "recv_packet_demuxer_3000.hpp"
 
-static const std::string X300_FW_FILE_NAME      = "usrp_x300_fw.bin";
+static const std::string X300_FW_FILE_NAME  = "usrp_x300_fw.bin";
 
-static const double X300_DEFAULT_TICK_RATE      = 200e6;
-static const double X300_DEFAULT_PLL2REF_FREQ   =  96e6;
-static const double X300_BUS_CLOCK_RATE         = 175e6;
+static const double X300_DEFAULT_TICK_RATE      = 200e6;        //Hz
+static const double X300_DEFAULT_PLL2REF_FREQ   =  96e6;        //Hz
+static const double X300_BUS_CLOCK_RATE         = 175e6;        //Hz
 
-static const size_t X300_TX_HW_BUFF_SIZE        = 0x90000; //576KiB
-static const size_t X300_TX_FC_RESPONSE_FREQ    = 8;
+static const size_t X300_TX_HW_BUFF_SIZE        = 0x90000;      //576KiB
+static const size_t X300_TX_FC_RESPONSE_FREQ    = 8;            //per flow-control window
 
-static const size_t X300_PCIE_DATA_FRAME_SIZE   = 8192;   //bytes
-static const size_t X300_PCIE_MSG_FRAME_SIZE    = 256;    //bytes
-static const size_t X300_PCIE_NUM_FRAMES        = 32;
+static const size_t X300_RX_SW_BUFF_SIZE_ETH        = 0x2000000; //32MiB    For an ~8k MTU any size >32MiB is just wasted buffer space
+static const size_t X300_RX_SW_BUFF_SIZE_ETH_MACOS  = 0x100000;  //1Mib
+static const size_t X300_RX_SW_BUFF_FULL_FACTOR     = 2;         //Buffer should ideally be half full.
+static const size_t X300_RX_FC_REQUEST_FREQ         = 32;        //per flow-control window
+
+static const size_t X300_PCIE_DATA_FRAME_SIZE   = 8192;         //bytes
+static const size_t X300_PCIE_MSG_FRAME_SIZE    = 256;          //bytes
+static const size_t X300_PCIE_NUM_FRAMES        = 256;
 
 #define X300_RADIO_DEST_PREFIX_TX 0
 #define X300_RADIO_DEST_PREFIX_CTRL 1

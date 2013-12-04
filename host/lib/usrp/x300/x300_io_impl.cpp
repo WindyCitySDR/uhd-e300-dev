@@ -185,6 +185,16 @@ static void x300_if_hdr_pack_le(
 /***********************************************************************
  * RX flow control handler
  **********************************************************************/
+static size_t get_rx_flow_control_window(size_t frame_size, const device_addr_t& rx_args)
+{
+    double sw_buff_size = rx_args.cast<double>("recv_buff_size", 1e6 /*default*/);
+    size_t window_in_pkts = (static_cast<size_t>(sw_buff_size) / (frame_size * X300_RX_SW_BUFF_FULL_FACTOR));
+    if (window_in_pkts == 0) {
+        throw uhd::value_error("recv_buff_size must be larger than the recv_frame_size.");
+    }
+    return window_in_pkts;
+}
+
 static void handle_rx_flowctrl(const boost::uint32_t sid, zero_copy_if::sptr xport, bool big_endian, boost::shared_ptr<boost::uint32_t> seq32_state, const size_t last_seq)
 {
     managed_send_buffer::sptr buff = xport->get_send_buff(0.0);
@@ -258,9 +268,7 @@ static size_t get_tx_flow_control_window(size_t frame_size, const device_addr_t&
     if (window_in_pkts == 0) {
         throw uhd::value_error("send_buff_size must be larger than the send_frame_size.");
     }
-
-    UHD_LOG << "tx_flow_control_window = " << window_in_pkts << std::endl;
-    return (window_in_pkts & 0xFFF);
+    return window_in_pkts;
 }
 
 static void handle_tx_async_msgs(boost::shared_ptr<x300_tx_fc_guts_t> guts, zero_copy_if::sptr xport, bool big_endian, x300_clock_ctrl::sptr clock)
@@ -383,10 +391,10 @@ rx_streamer::sptr x300_impl::get_rx_stream(const uhd::stream_args_t &args_)
                 //For nirio, the buffer size is not configurable by the user
                 #if defined(UHD_PLATFORM_MACOS) || defined(UHD_PLATFORM_BSD)
                     //limit buffer resize on macos or it will error
-                    device_addr["recv_buff_size"] = "1e6";
+                    device_addr["recv_buff_size"] = boost::lexical_cast<std::string>(X300_RX_SW_BUFF_SIZE_ETH_MACOS);
                 #elif defined(UHD_PLATFORM_LINUX) || defined(UHD_PLATFORM_WIN32)
                     //set to half-a-second of buffering at max rate
-                    device_addr["recv_buff_size"] = "50e6";
+                    device_addr["recv_buff_size"] = boost::lexical_cast<std::string>(X300_RX_SW_BUFF_SIZE_ETH);
                 #endif
             }
         }
@@ -398,9 +406,12 @@ rx_streamer::sptr x300_impl::get_rx_stream(const uhd::stream_args_t &args_)
         both_xports_t xport = this->make_transport(mb_index, dest, X300_RADIO_DEST_PREFIX_RX, device_addr, data_sid);
         UHD_LOG << boost::format("data_sid = 0x%08x\n") % data_sid << std::endl;
 
-        if (mb.xport_path == "nirio") {
-            device_addr["recv_buff_size"] = boost::lexical_cast<std::string>(
-                xport.recv->get_num_recv_frames() * xport.recv->get_recv_frame_size());
+        if (not device_addr.has_key("recv_buff_size"))
+        {
+            if (mb.xport_path == "nirio") {
+                device_addr["recv_buff_size"] = boost::lexical_cast<std::string>(
+                    xport.recv->get_num_recv_frames() * xport.recv->get_recv_frame_size());
+            }
         }
 
         //calculate packet size
@@ -444,8 +455,11 @@ rx_streamer::sptr x300_impl::get_rx_stream(const uhd::stream_args_t &args_)
         perif.ddc->setup(args);
 
         //flow control setup
-        const size_t max_buffering = size_t(device_addr.cast<double>("recv_buff_size", 1e6));
-        const size_t fc_window = max_buffering/xport.recv->get_recv_frame_size();
+        const size_t fc_window = get_rx_flow_control_window(xport.recv->get_recv_frame_size(), device_addr);
+        const size_t fc_handle_window = fc_window / X300_RX_FC_REQUEST_FREQ;
+
+        UHD_LOG << "RX Flow Control Window = " << fc_window << ", RX Flow Control Handler Window = " << fc_handle_window << std::endl;
+
         perif.framer->configure_flow_control(fc_window);
 
         boost::shared_ptr<boost::uint32_t> seq32(new boost::uint32_t(0));
@@ -457,7 +471,7 @@ rx_streamer::sptr x300_impl::get_rx_stream(const uhd::stream_args_t &args_)
         ));
         my_streamer->set_xport_handle_flowctrl(stream_i, boost::bind(
             &handle_rx_flowctrl, data_sid, xport.send, mb.if_pkt_is_big_endian, seq32, _1
-        ), fc_window, true/*init*/);
+        ), fc_handle_window, true/*init*/);
         my_streamer->set_issue_stream_cmd(stream_i, boost::bind(
             &rx_vita_core_3000::issue_stream_command, perif.framer, _1
         ));
@@ -582,8 +596,12 @@ tx_streamer::sptr x300_impl::get_tx_stream(const uhd::stream_args_t &args_)
         perif.duc->setup(args);
 
         //flow control setup
-        size_t fc_pkt_window = get_tx_flow_control_window(xport.send->get_send_frame_size(), device_addr);  //In packets
-        perif.deframer->configure_flow_control(0/*cycs off*/, fc_pkt_window/X300_TX_FC_RESPONSE_FREQ);
+        size_t fc_window = get_tx_flow_control_window(xport.send->get_send_frame_size(), device_addr);  //In packets
+        const size_t fc_handle_window = fc_window/X300_TX_FC_RESPONSE_FREQ;
+
+        UHD_LOG << "TX Flow Control Window = " << fc_window << ", TX Flow Control Handler Window = " << fc_handle_window << std::endl;
+
+        perif.deframer->configure_flow_control(0/*cycs off*/, fc_handle_window);
         boost::shared_ptr<x300_tx_fc_guts_t> guts(new x300_tx_fc_guts_t());
         guts->stream_channel = stream_i;
         guts->device_channel = chan;
@@ -592,7 +610,7 @@ tx_streamer::sptr x300_impl::get_tx_stream(const uhd::stream_args_t &args_)
         task::sptr task = task::make(boost::bind(&handle_tx_async_msgs, guts, xport.recv, mb.if_pkt_is_big_endian, mb.clock));
 
         my_streamer->set_xport_chan_get_buff(stream_i, boost::bind(
-            &get_tx_buff_with_flowctrl, task, guts, xport.send, fc_pkt_window, _1
+            &get_tx_buff_with_flowctrl, task, guts, xport.send, fc_window, _1
         ));
         my_streamer->set_async_receiver(boost::bind(
             &async_md_type::pop_with_timed_wait, async_md, _1, _2

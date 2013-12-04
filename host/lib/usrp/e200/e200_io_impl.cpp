@@ -340,7 +340,7 @@ rx_streamer::sptr e200_impl::get_rx_stream(const uhd::stream_args_t &args_)
     boost::shared_ptr<boost::uint32_t> seq32(new boost::uint32_t(0));
     my_streamer->set_xport_handle_flowctrl(0, boost::bind(
         &handle_rx_flowctrl, data_sid, perif.rx_flow_xport, seq32, _1
-    ), fc_window, true/*init*/);
+    ), (fc_window / E200_RX_SW_BUFF_FULL_FACTOR), true/*init*/);
 
     my_streamer->set_issue_stream_cmd(0, boost::bind(
         &rx_vita_core_3000::issue_stream_command, perif.framer, _1

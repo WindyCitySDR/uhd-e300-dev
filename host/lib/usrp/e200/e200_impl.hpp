@@ -45,6 +45,8 @@ static std::string E200_SERVER_CODEC_PORT = "321759";
 
 static const double E200_DEFAULT_TICK_RATE = 32e6;
 
+static const size_t E200_RX_SW_BUFF_FULL_FACTOR = 2;        //Buffer should be half full
+
 /*!
  * USRP-E200 implementation guts:
  * The implementation details are encapsulated here.

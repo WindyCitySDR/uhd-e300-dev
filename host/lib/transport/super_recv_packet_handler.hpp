@@ -415,7 +415,7 @@ private:
         //handle flow control
         if (_props[index].handle_flowctrl)
         {
-            if ((info.ifpi.packet_count % _props[index].fc_update_window/2) == 0)
+            if ((info.ifpi.packet_count % _props[index].fc_update_window) == 0)
             {
                 _props[index].handle_flowctrl(info.ifpi.packet_count);
             }
