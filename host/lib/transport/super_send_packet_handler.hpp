@@ -56,7 +56,7 @@ public:
      * \param size the number of transport channels
      */
     send_packet_handler(const size_t size = 1):
-        _next_packet_seq(0)
+        _next_packet_seq(0), _cached_metadata(false)
     {
         this->set_enable_trailer(true);
         this->resize(size);
@@ -183,6 +183,23 @@ public:
         if_packet_info.sob     = metadata.start_of_burst;
         if_packet_info.eob     = metadata.end_of_burst;
 
+        /*
+         * Metadata is cached when we get a send requesting a start of burst with no samples.
+         * It is applied here on the next call to send() that actually has samples to send.
+         */
+        if (_cached_metadata && nsamps_per_buff != 0)
+        {
+            // If the new metada has a time_spec, do not use the cached time_spec.
+            if (!metadata.has_time_spec)
+            {
+                if_packet_info.has_tsf = _metadata_cache.has_time_spec;
+                if_packet_info.tsf     = _metadata_cache.time_spec.to_ticks(_tick_rate);
+            }
+            if_packet_info.sob     = _metadata_cache.start_of_burst;
+            if_packet_info.eob     = _metadata_cache.end_of_burst;
+            _cached_metadata = false;
+        }
+
         if (nsamps_per_buff <= _max_samples_per_packet){
 
             //TODO remove this code when sample counts of zero are supported by hardware
@@ -190,9 +207,20 @@ public:
                 static const boost::uint64_t zero = 0;
                 _zero_buffs.resize(buffs.size(), &zero);
 
-                if (nsamps_per_buff == 0) return send_one_packet(
-                    _zero_buffs, 1, if_packet_info, timeout
-                ) & 0x0;
+                if (nsamps_per_buff == 0)
+                {
+                    // if this is a start of a burst and there are no samples
+                    if (metadata.start_of_burst)
+                    {
+                        // cache metadata and apply on the next send()
+                        _metadata_cache = metadata;
+                        _cached_metadata = true;
+                        return 0;
+                    } else {
+                        // send requests with no samples are handled here (such as end of burst)
+                        return send_one_packet(_zero_buffs, 1, if_packet_info, timeout) & 0x0;
+                    }
+                }
             #endif
 
             return send_one_packet(buffs, nsamps_per_buff, if_packet_info, timeout);
@@ -255,6 +283,8 @@ private:
     size_t _next_packet_seq;
     bool _has_tlr;
     async_receiver_type _async_receiver;
+    bool _cached_metadata;
+    uhd::tx_metadata_t _metadata_cache;
 
     /*******************************************************************
      * Send a single packet:
@@ -266,6 +296,7 @@ private:
         const double timeout,
         const size_t buffer_offset_bytes = 0
     ){
+
         //load the rest of the if_packet_info in here
         if_packet_info.num_payload_bytes = nsamps_per_buff*_num_inputs*_bytes_per_otw_item;
         if_packet_info.num_payload_words32 = (if_packet_info.num_payload_bytes + 3/*round up*/)/sizeof(boost::uint32_t);
