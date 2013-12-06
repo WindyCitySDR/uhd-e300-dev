@@ -722,6 +722,7 @@ void x300_impl::setup_radio(const size_t mb_i, const size_t i, const std::string
     perif.dac->arm_dac_sync();               // Put DAC into data Sync mode
     perif.ctrl->poke32(TOREG(SR_DACSYNC), 0x1);  // Arm FRAMEP/N sync pulse
 
+
     ////////////////////////////////////////////////////////////////
     // create codec control objects
     ////////////////////////////////////////////////////////////////

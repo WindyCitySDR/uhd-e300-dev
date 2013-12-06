@@ -24,6 +24,8 @@
 
 #define localparam static const int
 
+localparam SR_DACSYNC   = 5;
+localparam SR_LOOPBACK  = 6;
 localparam SR_TEST      = 7;
 localparam SR_SPI       = 8;
 localparam SR_GPIO      = 16;

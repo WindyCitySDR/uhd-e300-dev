@@ -35,6 +35,9 @@ public:
      */
     static sptr make(uhd::spi_iface::sptr iface, const size_t slaveno, const double clock_rate);
 
+    // ! Arm the sync feature in DAC
+    virtual void arm_dac_sync(void) = 0;
+
     //! Set the IQ data mode (swap means QI)
     virtual void set_iq_swap(const bool swap) = 0;
 };

@@ -16,6 +16,7 @@
 //
 
 #include "x300_dac_ctrl.hpp"
+#include "x300_regs.hpp"
 #include <uhd/types/time_spec.hpp>
 #include <uhd/utils/msg.hpp>
 #include <uhd/utils/log.hpp>
@@ -114,7 +115,7 @@ public:
     // Attempt to synchronize AD9146's
     //
     write_ad9146_reg(0x10, 0xCF); // Enable SYNC mode. Sync Averaging set to 128.
- 
+
     const time_spec_t exit_time = time_spec_t::get_system_time() + time_spec_t(1.0);
     while (true)
       {
@@ -137,6 +138,7 @@ public:
         const int bit = (swap)? 0 : (1 << 6);
         write_ad9146_reg(0x03, 0x00 | bit); //2s comp, i first, byte mode
     }
+
 
 private:
     uhd::spi_iface::sptr _iface;
