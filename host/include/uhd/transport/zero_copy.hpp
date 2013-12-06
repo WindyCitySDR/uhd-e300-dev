@@ -29,7 +29,14 @@ namespace uhd{ namespace transport{
     //! Simple managed buffer with release interface
     class UHD_API managed_buffer{
     public:
-        managed_buffer(void):_ref_count(0),_buffer(NULL),_length(0){}
+        managed_buffer(void):_ref_count(0),_buffer(NULL),_length(0)
+		{
+#ifdef UHD_TXRX_DEBUG_PRINTS
+            _mb_num = s_buffer_count;
+            // From Boost website: atomic_count seems only to have precrement operator.
+            ++s_buffer_count;
+#endif
+        }
 
         virtual ~managed_buffer(void) {}
 
@@ -76,9 +83,27 @@ namespace uhd{ namespace transport{
         boost::detail::atomic_count _ref_count;
         typedef boost::intrusive_ptr<managed_buffer> sptr;
 
+        int ref_count(){
+        	return (int) _ref_count;
+        }
+
+#ifdef UHD_TXRX_DEBUG_PRINTS
+        int num() const{
+        	return _mb_num;
+        }
+#endif
+
     protected:
         void *_buffer;
         size_t _length;
+#ifdef UHD_TXRX_DEBUG_PRINTS
+        int _mb_num;
+#endif
+
+    private:
+#ifdef UHD_TXRX_DEBUG_PRINTS
+        static boost::detail::atomic_count s_buffer_count;
+#endif
     };
 
     UHD_INLINE void intrusive_ptr_add_ref(managed_buffer *p){
