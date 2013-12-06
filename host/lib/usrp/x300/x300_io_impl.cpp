@@ -188,7 +188,13 @@ static void x300_if_hdr_pack_le(
 static size_t get_rx_flow_control_window(size_t frame_size, const device_addr_t& rx_args)
 {
     double sw_buff_size = rx_args.cast<double>("recv_buff_size", 1e6 /*default*/);
-    size_t window_in_pkts = (static_cast<size_t>(sw_buff_size) / (frame_size * X300_RX_SW_BUFF_FULL_FACTOR));
+    double fullness_factor = rx_args.cast<double>("recv_buff_fullness", X300_RX_SW_BUFF_FULL_FACTOR);
+
+    if (fullness_factor < 0.01 || fullness_factor > 1) {
+        throw uhd::value_error("recv_buff_fullness must be between 0.01 and 1 inclusive (1% to 100%)");
+    }
+
+    size_t window_in_pkts = (static_cast<size_t>(sw_buff_size * fullness_factor) / frame_size);
     if (window_in_pkts == 0) {
         throw uhd::value_error("recv_buff_size must be larger than the recv_frame_size.");
     }
@@ -408,6 +414,7 @@ rx_streamer::sptr x300_impl::get_rx_stream(const uhd::stream_args_t &args_)
 
         if (not device_addr.has_key("recv_buff_size"))
         {
+            //For the nirio transport, buffer size is depends on the frame size and num frames
             if (mb.xport_path == "nirio") {
                 device_addr["recv_buff_size"] = boost::lexical_cast<std::string>(
                     xport.recv->get_num_recv_frames() * xport.recv->get_recv_frame_size());
@@ -456,7 +463,7 @@ rx_streamer::sptr x300_impl::get_rx_stream(const uhd::stream_args_t &args_)
 
         //flow control setup
         const size_t fc_window = get_rx_flow_control_window(xport.recv->get_recv_frame_size(), device_addr);
-        const size_t fc_handle_window = fc_window / X300_RX_FC_REQUEST_FREQ;
+        const size_t fc_handle_window = std::max<size_t>(1, fc_window / X300_RX_FC_REQUEST_FREQ);
 
         UHD_LOG << "RX Flow Control Window = " << fc_window << ", RX Flow Control Handler Window = " << fc_handle_window << std::endl;
 
@@ -597,7 +604,7 @@ tx_streamer::sptr x300_impl::get_tx_stream(const uhd::stream_args_t &args_)
 
         //flow control setup
         size_t fc_window = get_tx_flow_control_window(xport.send->get_send_frame_size(), device_addr);  //In packets
-        const size_t fc_handle_window = fc_window/X300_TX_FC_RESPONSE_FREQ;
+        const size_t fc_handle_window = std::max<size_t>(1, fc_window/X300_TX_FC_RESPONSE_FREQ);
 
         UHD_LOG << "TX Flow Control Window = " << fc_window << ", TX Flow Control Handler Window = " << fc_handle_window << std::endl;
 

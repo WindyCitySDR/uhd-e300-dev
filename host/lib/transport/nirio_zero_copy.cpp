@@ -27,6 +27,7 @@
 #include <boost/make_shared.hpp>
 #include <boost/thread/thread.hpp> //sleep
 #include <vector>
+#include <algorithm>    // std::max
 //@TODO: Move the register defs required by the class to a common location
 #include "../usrp/x300/x300_regs.hpp"
 
@@ -123,14 +124,67 @@ public:
         _reg_int(fpga_session->get_kernel_proxy()),
         _fifo_instance(instance),
         _recv_frame_size(size_t(hints.cast<double>("recv_frame_size", default_buff_args.recv_frame_size))),
-        _num_recv_frames(size_t(hints.cast<double>("num_recv_frames", default_buff_args.num_recv_frames))),
         _send_frame_size(size_t(hints.cast<double>("send_frame_size", default_buff_args.send_frame_size))),
-        _num_send_frames(size_t(hints.cast<double>("num_send_frames", default_buff_args.num_send_frames))),
-        _recv_buffer_pool(buffer_pool::make(_num_recv_frames, _recv_frame_size)),
-        _send_buffer_pool(buffer_pool::make(_num_send_frames, _send_frame_size)),
         _next_recv_buff_index(0), _next_send_buff_index(0)
     {
-        UHD_LOG << boost::format("Creating PCIe transport for instance %d") % instance << std::endl;
+        UHD_LOG << boost::format("Creating PCIe transport for channel %d") % instance << std::endl;
+
+        //The kernel buffer for this transport must be (num_frames * frame_size) big. Unlike ethernet,
+        //where the kernel buffer size is independent of the circular buffer size for the transport,
+        //it is possible for users to over constrain the system when they set the num_frames and the buff_size
+        //So we give buff_size priority over num_frames and throw an error if they conflict.
+
+        //RX
+        size_t usr_num_recv_frames = static_cast<size_t>(
+            hints.cast<double>("num_recv_frames", default_buff_args.num_recv_frames));
+        size_t usr_recv_buff_size = static_cast<size_t>(
+            hints.cast<double>("recv_buff_size", default_buff_args.num_recv_frames));
+
+        if (hints.has_key("num_recv_frames") and hints.has_key("recv_buff_size")) {
+            if (usr_recv_buff_size < _recv_frame_size)
+                throw uhd::value_error("recv_buff_size must be equal to or greater than (num_recv_frames * recv_frame_size)");
+
+            if ((usr_recv_buff_size/_recv_frame_size) != usr_num_recv_frames)
+                throw uhd::value_error("Conflicting values for recv_buff_size and num_recv_frames");
+        }
+
+        if (hints.has_key("recv_buff_size")) {
+            _num_recv_frames = std::max<size_t>(1, usr_recv_buff_size/_recv_frame_size);    //Round down
+        } else if (hints.has_key("num_recv_frames")) {
+            _num_recv_frames = usr_num_recv_frames;
+        } else {
+            _num_recv_frames = default_buff_args.num_recv_frames;
+        }
+
+        //TX
+        size_t usr_num_send_frames = static_cast<size_t>(
+            hints.cast<double>("num_send_frames", default_buff_args.num_send_frames));
+        size_t usr_send_buff_size = static_cast<size_t>(
+            hints.cast<double>("send_buff_size", default_buff_args.num_send_frames));
+
+        if (hints.has_key("num_send_frames") and hints.has_key("send_buff_size")) {
+            if (usr_send_buff_size < _send_frame_size)
+                throw uhd::value_error("send_buff_size must be equal to or greater than (num_send_frames * send_frame_size)");
+
+            if ((usr_send_buff_size/_send_frame_size) != usr_num_send_frames)
+                throw uhd::value_error("Conflicting values for send_buff_size and num_send_frames");
+        }
+
+        if (hints.has_key("send_buff_size")) {
+        _num_send_frames = std::max<size_t>(1, usr_send_buff_size/_send_frame_size);    //Round down
+        } else if (hints.has_key("num_send_frames")) {
+            _num_send_frames = usr_num_send_frames;
+        } else {
+            _num_send_frames = default_buff_args.num_send_frames;
+        }
+
+        UHD_LOG << boost::format("Creating nirio zero-copy RX transport with frame size = %u, #frames = %u, buffer size = %u\n")
+                    % _recv_frame_size % _num_recv_frames % (_recv_frame_size * _num_recv_frames);
+        UHD_LOG << boost::format("Creating nirio zero-copy TX transport with frame size = %u, #frames = %u, buffer size = %u\n")
+                    % _send_frame_size % _num_send_frames % (_send_frame_size * _num_send_frames);
+
+        _recv_buffer_pool = buffer_pool::make(_num_recv_frames, _recv_frame_size);
+        _send_buffer_pool = buffer_pool::make(_num_send_frames, _send_frame_size);
 
         nirio_status status = 0;
         size_t actual_depth = 0, actual_size = 0;
@@ -232,8 +286,8 @@ private:
     niriok_proxy& _reg_int;
     uint32_t _fifo_instance;
     nirio_fifo<fifo_data_t>::sptr _recv_fifo, _send_fifo;
-    const size_t _recv_frame_size, _num_recv_frames;
-    const size_t _send_frame_size, _num_send_frames;
+    size_t _recv_frame_size, _num_recv_frames;
+    size_t _send_frame_size, _num_send_frames;
     buffer_pool::sptr _recv_buffer_pool, _send_buffer_pool;
     std::vector<boost::shared_ptr<nirio_zero_copy_msb> > _msb_pool;
     std::vector<boost::shared_ptr<nirio_zero_copy_mrb> > _mrb_pool;

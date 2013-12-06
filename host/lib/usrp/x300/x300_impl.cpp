@@ -900,21 +900,28 @@ x300_impl::both_xports_t x300_impl::make_transport(
     config.router_dst_here      = mb.router_dst_here;
     sid = this->allocate_sid(mb, config);
 
+    static const uhd::device_addr_t DEFAULT_XPORT_ARGS;
+
+    const uhd::device_addr_t& xport_args =
+        (prefix != X300_RADIO_DEST_PREFIX_CTRL) ? args : DEFAULT_XPORT_ARGS;
+
     if (xport_path == "nirio") {
         nirio_zero_copy_buff_args default_buff_args;
         default_buff_args.send_frame_size =
             (prefix == X300_RADIO_DEST_PREFIX_TX) ? X300_PCIE_DATA_FRAME_SIZE : X300_PCIE_MSG_FRAME_SIZE;
         default_buff_args.recv_frame_size =
             (prefix == X300_RADIO_DEST_PREFIX_RX) ? X300_PCIE_DATA_FRAME_SIZE : X300_PCIE_MSG_FRAME_SIZE;
-        default_buff_args.num_send_frames = X300_PCIE_NUM_FRAMES;
-        default_buff_args.num_recv_frames = X300_PCIE_NUM_FRAMES;
+        default_buff_args.num_send_frames =
+            (prefix == X300_RADIO_DEST_PREFIX_TX) ? X300_PCIE_DATA_NUM_FRAMES : X300_PCIE_MSG_NUM_FRAMES;
+        default_buff_args.num_recv_frames =
+            (prefix == X300_RADIO_DEST_PREFIX_RX) ? X300_PCIE_DATA_NUM_FRAMES : X300_PCIE_MSG_NUM_FRAMES;
 
         xports.recv = nirio_zero_copy::make(
-            mb.rio_fpga_interface, get_pcie_dma_channel(destination, prefix), default_buff_args, args);
+            mb.rio_fpga_interface, get_pcie_dma_channel(destination, prefix), default_buff_args, xport_args);
         xports.send = xports.recv;
     } else {
         //make a new transport - fpga has no idea how to talk to use on this yet
-        xports.recv = udp_zero_copy::make(addr, BOOST_STRINGIZE(X300_VITA_UDP_PORT), args);
+        xports.recv = udp_zero_copy::make(addr, BOOST_STRINGIZE(X300_VITA_UDP_PORT), xport_args);
         xports.send = xports.recv;
     }
 
