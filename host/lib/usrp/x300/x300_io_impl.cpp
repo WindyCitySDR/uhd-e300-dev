@@ -222,7 +222,7 @@ static void handle_rx_flowctrl(const boost::uint32_t sid, zero_copy_if::sptr xpo
     packet_info.packet_type = vrt::if_packet_info_t::PACKET_TYPE_CONTEXT;
     packet_info.num_payload_words32 = 2;
     packet_info.num_payload_bytes = packet_info.num_payload_words32*sizeof(boost::uint32_t);
-    packet_info.packet_count = 0;
+    packet_info.packet_count = seq32;
     packet_info.sob = false;
     packet_info.eob = false;
     packet_info.sid = sid;
