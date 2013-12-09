@@ -367,8 +367,8 @@ void x300_impl::setup_mb(const size_t mb_i, const uhd::device_addr_t &dev_addr)
 
     BOOST_FOREACH(const std::string &key, dev_addr.keys())
     {
-        if (key[0] == 'r') mb.recv_args[key] = dev_addr[key];
-        if (key[0] == 's') mb.send_args[key] = dev_addr[key];
+        if (key.find("recv") != std::string::npos) mb.recv_args[key] = dev_addr[key];
+        if (key.find("send") != std::string::npos) mb.send_args[key] = dev_addr[key];
     }
 
     const std::vector<std::string> DB_NAMES = boost::assign::list_of("A")("B");
