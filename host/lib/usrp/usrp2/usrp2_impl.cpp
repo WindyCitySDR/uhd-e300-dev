@@ -71,6 +71,10 @@ static device_addrs_t usrp2_find(const device_addr_t &hint_){
     //return an empty list of addresses when type is set to non-usrp2
     if (hint.has_key("type") and hint["type"] != "usrp2") return usrp2_addrs;
 
+    //Return an empty list of addresses when a resource is specified,
+    //since a resource is intended for a different, non-USB, device.
+    if (hint.has_key("resource")) return usrp2_addrs;
+
     //if no address was specified, send a broadcast on each interface
     if (not hint.has_key("addr")){
         BOOST_FOREACH(const if_addrs_t &if_addrs, get_if_addrs()){
