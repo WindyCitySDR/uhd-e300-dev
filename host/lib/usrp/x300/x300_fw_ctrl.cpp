@@ -39,6 +39,7 @@ public:
 
     void flush(void)
     {
+        boost::mutex::scoped_lock lock(reg_acccess);
         __flush();
     }
 
@@ -46,6 +47,7 @@ public:
     {
         for (size_t i = 1; i <= num_retries; i++)
         {
+            boost::mutex::scoped_lock lock(reg_acccess);
             try
             {
                 return this->__poke32(addr, data);
@@ -64,6 +66,7 @@ public:
     {
         for (size_t i = 1; i <= num_retries; i++)
         {
+            boost::mutex::scoped_lock lock(reg_acccess);
             try
             {
                 boost::uint32_t data = this->__peek32(addr);
@@ -85,7 +88,7 @@ protected:
     virtual boost::uint32_t __peek32(const wb_addr_type addr) = 0;
     virtual void __flush() = 0;
 
-    boost::mutex mutex;
+    boost::mutex reg_acccess;
 };
 
 
@@ -108,8 +111,6 @@ public:
 protected:
     virtual void __poke32(const wb_addr_type addr, const boost::uint32_t data)
     {
-        boost::mutex::scoped_lock lock(mutex);
-
         //load request struct
         x300_fw_comms_t request = x300_fw_comms_t();
         request.flags = uhd::htonx<boost::uint32_t>(X300_FW_COMMS_FLAGS_ACK | X300_FW_COMMS_FLAGS_POKE32);
@@ -139,8 +140,6 @@ protected:
 
     virtual boost::uint32_t __peek32(const wb_addr_type addr)
     {
-        boost::mutex::scoped_lock lock(mutex);
-
         //load request struct
         x300_fw_comms_t request = x300_fw_comms_t();
         request.flags = uhd::htonx<boost::uint32_t>(X300_FW_COMMS_FLAGS_ACK | X300_FW_COMMS_FLAGS_PEEK32);
@@ -219,8 +218,6 @@ public:
 protected:
     virtual void __poke32(const wb_addr_type addr, const boost::uint32_t data)
     {
-        boost::mutex::scoped_lock lock(mutex);
-
         nirio_status status = 0;
         boost::uint32_t reg_data = 0xffffffff;
         boost::posix_time::ptime start_time = boost::posix_time::microsec_clock::local_time();
@@ -246,8 +243,6 @@ protected:
 
     virtual boost::uint32_t __peek32(const wb_addr_type addr)
     {
-        boost::mutex::scoped_lock lock(mutex);
-
         nirio_status status = 0;
         boost::uint32_t reg_data = 0xffffffff;
         boost::posix_time::ptime start_time = boost::posix_time::microsec_clock::local_time();
