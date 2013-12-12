@@ -1,6 +1,8 @@
 
 const struct radio_ctrl_names reg_list[] =
   {
+    {5,   "SR_DACSYNC"},
+    {6,   "SR_LOOPBACK"},
     {7,   "SR_TEST"},
     {8,   "SR_SPI_DIVIDER"},
     {9,   "SR_SPI_CONFIG"},

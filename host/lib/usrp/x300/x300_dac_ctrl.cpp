@@ -108,6 +108,26 @@ public:
         )
     }
 
+  void arm_dac_sync(void)
+  {
+    //
+    // Attempt to synchronize AD9146's
+    //
+    write_ad9146_reg(0x10, 0xCF); // Enable SYNC mode. Sync Averaging set to 128.
+ 
+    const time_spec_t exit_time = time_spec_t::get_system_time() + time_spec_t(1.0);
+    while (true)
+      {
+	const size_t reg_12 = read_ad9146_reg(0x12); /* Expect bit 7 = 0, bit 6 = 1 */
+	if (((reg_12 & (1 << 6)) != 0) && ((reg_12 & (1 << 7)) == 0))  break;
+	if (exit_time < time_spec_t::get_system_time()) throw uhd::runtime_error(
+										 "x300_dac_ctrl: timeout waiting for backend synchronization"
+										 );
+	boost::this_thread::sleep(boost::posix_time::milliseconds(10));
+      }
+  }
+
+  // FIXME - Delete this method, obselete
     void set_iq_swap(const bool swap)
     {
         //fpga wants I,Q in the sample word:

@@ -716,6 +716,13 @@ void x300_impl::setup_radio(const size_t mb_i, const size_t i, const std::string
     perif.adc->set_test_word("normal", "normal");
 
     ////////////////////////////////////////////////////////////////
+    // Sync DAC's for MIMO
+    ////////////////////////////////////////////////////////////////
+    UHD_MSG(status) << "Sync DAC's." << std::endl;
+    perif.dac->arm_dac_sync();               // Put DAC into data Sync mode
+    perif.ctrl->poke32(TOREG(SR_DACSYNC), 0x1);  // Arm FRAMEP/N sync pulse
+
+    ////////////////////////////////////////////////////////////////
     // create codec control objects
     ////////////////////////////////////////////////////////////////
     _tree->create<int>(mb_path / "rx_codecs" / db_name / "gains"); //phony property so this dir exists
