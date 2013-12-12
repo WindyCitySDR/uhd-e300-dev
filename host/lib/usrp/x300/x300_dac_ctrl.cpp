@@ -70,11 +70,10 @@ public:
         const time_spec_t exit_time = time_spec_t::get_system_time() + time_spec_t(1.0);
         while (true)
         {
-            const size_t reg_e = read_ad9146_reg(0x0E); /* Expect bit 7 = 0, bit 6 = 1 */
-            if ((reg_e & ((1 << 7) | (1 << 6))) != 0) break;
-            if (exit_time < time_spec_t::get_system_time()) throw uhd::runtime_error(
-                "x300_dac_ctrl: timeout waiting for DAC PLL to lock"
-            );
+            const size_t reg_e = read_ad9146_reg(0x0E); /* Expect bit 7 = 1 */
+            if ((exit_time < time_spec_t::get_system_time()) && ((reg_e & (1 << 7)) == 0))
+	      throw uhd::runtime_error("x300_dac_ctrl: timeout waiting for DAC PLL to lock");
+	    else if  ((reg_e & ((1 << 7) | (1 << 6))) != 0) break;
             boost::this_thread::sleep(boost::posix_time::milliseconds(10));
         }
 
@@ -120,10 +119,9 @@ public:
     while (true)
       {
 	const size_t reg_12 = read_ad9146_reg(0x12); /* Expect bit 7 = 0, bit 6 = 1 */
-	if (((reg_12 & (1 << 6)) != 0) && ((reg_12 & (1 << 7)) == 0))  break;
-	if (exit_time < time_spec_t::get_system_time()) throw uhd::runtime_error(
-										 "x300_dac_ctrl: timeout waiting for backend synchronization"
-										 );
+	if ((exit_time < time_spec_t::get_system_time()) && (((reg_12 & (1 << 6)) == 0) || ((reg_12 & (1 << 7)) != 0)))
+	  throw uhd::runtime_error("x300_dac_ctrl: timeout waiting for backend synchronization");
+	else if (((reg_12 & (1 << 6)) != 0) && ((reg_12 & (1 << 7)) == 0))  break;
 	boost::this_thread::sleep(boost::posix_time::milliseconds(10));
       }
   }
