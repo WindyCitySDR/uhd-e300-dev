@@ -50,10 +50,14 @@ namespace asio = boost::asio;
  * Discovery over the udp and pcie transport
  **********************************************************************/
 static std::string get_fpga_option(wb_iface::sptr zpu_ctrl) {
-    //1G = {0:1G, 1:1G}, HG = {0:1G, 1:10G}, XG = {0:10G, 1:10G}
+    //1G = {0:1G, 1:1G} w/ DRAM, HG = {0:1G, 1:10G} w/ DRAM, XG = {0:10G, 1:10G} w/ DRAM
+    //HGS = {0:1G, 1:10G} w/ SRAM, XGS = {0:10G, 1:10G} w/ SRAM
+
+    //In the default configuration, UHD does not support the HG and XG images so
+    //they are never autodetected.
     bool eth0XG = (zpu_ctrl->peek32(SR_ADDR(SET0_BASE, ZPU_RB_ETH_TYPE0)) == 0x1);
     bool eth1XG = (zpu_ctrl->peek32(SR_ADDR(SET0_BASE, ZPU_RB_ETH_TYPE1)) == 0x1);
-    return (eth0XG && eth1XG) ? "XG" : (eth1XG ? "HG" : "1G");
+    return (eth0XG && eth1XG) ? "XGS" : (eth1XG ? "HGS" : "1G");
 }
 
 //@TODO: Refactor the find functions to collapse common code for ethernet and PCIe
@@ -171,7 +175,7 @@ static device_addrs_t x300_find_pcie(const device_addr_t &hint, bool explicit_qu
             //set these values as empty string so the device may still be found
             //and the filter's below can still operate on the discovered device
             if (not hint.has_key("fpga")) {
-                new_addr["fpga"] = "HG";
+                new_addr["fpga"] = "HGS";
             }
             new_addr["name"] = "";
             new_addr["serial"] = "";
