@@ -66,14 +66,15 @@ void benchmark_rx_rate(uhd::usrp::multi_usrp::sptr usrp, const std::string &rx_c
     cmd.time_spec = usrp->get_time_now() + uhd::time_spec_t(0.05);
     cmd.stream_now = (buffs.size() == 1);
     rx_stream->issue_stream_cmd(cmd);
+
     while (not boost::this_thread::interruption_requested()){
         try {
           num_rx_samps += rx_stream->recv(buffs, max_samps_per_packet, md)*rx_stream->get_num_channels();
         }
         catch (...) {
           /* apparently, the boost thread interruption can sometimes result in
-             throwing exceptions not of type boost::exception, this catch allows 
-             this thread to still attempt to issue the STREAM_MODE_STOP_CONTINUOUS 
+             throwing exceptions not of type boost::exception, this catch allows
+             this thread to still attempt to issue the STREAM_MODE_STOP_CONTINUOUS
           */
           break;
         }
@@ -87,10 +88,13 @@ void benchmark_rx_rate(uhd::usrp::multi_usrp::sptr usrp, const std::string &rx_c
             }
             break;
 
+        // ERROR_CODE_OVERFLOW can indicate overflow or sequence error
         case uhd::rx_metadata_t::ERROR_CODE_OVERFLOW:
+            last_time = md.time_spec;
             had_an_overflow = true;
-	    last_time = md.time_spec;
-            num_overflows++;
+            // check out_of_sequence flag to see if it was a sequence error or overflow
+            if (!md.out_of_sequence)
+                num_overflows++;
             break;
 
         default:
@@ -98,7 +102,6 @@ void benchmark_rx_rate(uhd::usrp::multi_usrp::sptr usrp, const std::string &rx_c
             std::cerr << "Unexpected error on recv, continuing..." << std::endl;
             break;
         }
-
     }
     rx_stream->issue_stream_cmd(uhd::stream_cmd_t::STREAM_MODE_STOP_CONTINUOUS);
 }

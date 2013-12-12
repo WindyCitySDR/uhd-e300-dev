@@ -83,6 +83,10 @@ public:
         _queue_error_for_next_call(false),
         _buffers_infos_index(0)
     {
+        #ifdef  ERROR_INJECT_DROPPED_PACKETS
+        recvd_packets = 0;
+        #endif
+
         this->resize(size);
         set_alignment_failure_threshold(1000);
     }
@@ -304,6 +308,13 @@ private:
 
     //! information stored for a received buffer
     struct per_buffer_info_type{
+        void reset()
+        {
+            buff.reset();
+            vrt_hdr = NULL;
+            time = time_spec_t(0.0);
+            copy_buff = NULL;
+        }
         managed_recv_buffer::sptr buff;
         const boost::uint32_t *vrt_hdr;
         vrt::if_packet_info_t ifpi;
@@ -320,6 +331,17 @@ private:
             data_bytes_to_copy(0),
             fragment_offset_in_samps(0)
         {/* NOP */}
+        void reset()
+        {
+            indexes_todo.set();
+            alignment_time = time_spec_t(0.0);
+            alignment_time_valid = false;
+            data_bytes_to_copy = 0;
+            fragment_offset_in_samps = 0;
+            metadata.reset();
+            for (size_t i = 0; i < size(); i++)
+                at(i).reset();
+        }
         boost::dynamic_bitset<> indexes_todo; //used in alignment logic
         time_spec_t alignment_time; //used in alignment logic
         bool alignment_time_valid; //used in alignment logic
@@ -345,6 +367,10 @@ private:
         PACKET_SEQUENCE_ERROR
     };
 
+    #ifdef  ERROR_INJECT_DROPPED_PACKETS
+    int recvd_packets;
+    #endif
+
     /*******************************************************************
      * Get and process a single packet from the transport:
      * Receive a single packet at the given index.
@@ -361,6 +387,16 @@ private:
         managed_recv_buffer::sptr &buff = curr_buffer_info[index].buff;
         buff = _props[index].get_buff(timeout);
         if (buff.get() == NULL) return PACKET_TIMEOUT_ERROR;
+
+        #ifdef  ERROR_INJECT_DROPPED_PACKETS
+        if (++recvd_packets > 1000)
+        {
+            recvd_packets = 0;
+            buff.reset();
+            buff = _props[index].get_buff(timeout);
+            if (buff.get() == NULL) return PACKET_TIMEOUT_ERROR;
+        }
+        #endif
 
         //bounds check before extract
         size_t num_packet_words32 = buff->size()/sizeof(boost::uint32_t);
@@ -451,7 +487,10 @@ private:
      ******************************************************************/
     UHD_INLINE void get_aligned_buffs(double timeout){
 
+        get_prev_buffer_info().reset(); // no longer need the previous info - reset it for future use
+
         increment_buffer_info(); //increment to next buffer
+
         buffers_info_type &prev_info = get_prev_buffer_info();
         buffers_info_type &curr_info = get_curr_buffer_info();
         buffers_info_type &next_info = get_next_buffer_info();
@@ -480,12 +519,6 @@ private:
                     "The receive packet handler caught an exception.\n%s"
                 ) % e.what() << std::endl;
                 std::swap(curr_info, next_info); //save progress from curr -> next
-                curr_info.metadata.has_time_spec = false;
-                curr_info.metadata.time_spec = time_spec_t(0.0);
-                curr_info.metadata.more_fragments = false;
-                curr_info.metadata.fragment_offset = 0;
-                curr_info.metadata.start_of_burst = false;
-                curr_info.metadata.end_of_burst = false;
                 curr_info.metadata.error_code = rx_metadata_t::ERROR_CODE_BAD_PACKET;
                 return;
             }
@@ -510,10 +543,6 @@ private:
                 std::swap(curr_info, next_info); //save progress from curr -> next
                 curr_info.metadata.has_time_spec = next_info[index].ifpi.has_tsf;
                 curr_info.metadata.time_spec = next_info[index].time;
-                curr_info.metadata.more_fragments = false;
-                curr_info.metadata.fragment_offset = 0;
-                curr_info.metadata.start_of_burst = false;
-                curr_info.metadata.end_of_burst = false;
                 curr_info.metadata.error_code = rx_metadata_t::error_code_t(get_context_code(next_info[index].vrt_hdr, next_info[index].ifpi));
                 if (curr_info.metadata.error_code == rx_metadata_t::ERROR_CODE_OVERFLOW){
                     _props[index].handle_overflow();
@@ -523,12 +552,6 @@ private:
 
             case PACKET_TIMEOUT_ERROR:
                 std::swap(curr_info, next_info); //save progress from curr -> next
-                curr_info.metadata.has_time_spec = false;
-                curr_info.metadata.time_spec = time_spec_t(0.0);
-                curr_info.metadata.more_fragments = false;
-                curr_info.metadata.fragment_offset = 0;
-                curr_info.metadata.start_of_burst = false;
-                curr_info.metadata.end_of_burst = false;
                 curr_info.metadata.error_code = rx_metadata_t::ERROR_CODE_TIMEOUT;
                 return;
 
@@ -538,10 +561,7 @@ private:
                 curr_info.metadata.has_time_spec = prev_info.metadata.has_time_spec;
                 curr_info.metadata.time_spec = prev_info.metadata.time_spec + time_spec_t::from_ticks(
                     prev_info[index].ifpi.num_payload_words32*sizeof(boost::uint32_t)/_bytes_per_otw_item, _samp_rate);
-                curr_info.metadata.more_fragments = false;
-                curr_info.metadata.fragment_offset = 0;
-                curr_info.metadata.start_of_burst = false;
-                curr_info.metadata.end_of_burst = false;
+                curr_info.metadata.out_of_sequence = true;
                 curr_info.metadata.error_code = rx_metadata_t::ERROR_CODE_OVERFLOW;
                 UHD_MSG(fastpath) << "D";
                 return;
@@ -556,12 +576,6 @@ private:
                     "However, a timestamp match could not be determined.\n"
                 ) % iterations << std::endl;
                 std::swap(curr_info, next_info); //save progress from curr -> next
-                curr_info.metadata.has_time_spec = false;
-                curr_info.metadata.time_spec = time_spec_t(0.0);
-                curr_info.metadata.more_fragments = false;
-                curr_info.metadata.fragment_offset = 0;
-                curr_info.metadata.start_of_burst = false;
-                curr_info.metadata.end_of_burst = false;
                 curr_info.metadata.error_code = rx_metadata_t::ERROR_CODE_ALIGNMENT;
                 _props[index].handle_overflow();
                 return;
@@ -594,13 +608,8 @@ private:
         const size_t buffer_offset_bytes = 0
     ){
         //get the next buffer if the current one has expired
-        if (get_curr_buffer_info().data_bytes_to_copy == 0){
-
-            //reset current buffer info members for reuse
-            get_curr_buffer_info().fragment_offset_in_samps = 0;
-            get_curr_buffer_info().alignment_time_valid = false;
-            get_curr_buffer_info().indexes_todo.set();
-
+        if (get_curr_buffer_info().data_bytes_to_copy == 0)
+        {
             //perform receive with alignment logic
             get_aligned_buffs(timeout);
         }
