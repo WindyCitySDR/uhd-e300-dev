@@ -39,7 +39,7 @@ public:
 
     void flush(void)
     {
-        boost::mutex::scoped_lock lock(reg_acccess);
+        boost::mutex::scoped_lock lock(reg_access);
         __flush();
     }
 
@@ -47,7 +47,7 @@ public:
     {
         for (size_t i = 1; i <= num_retries; i++)
         {
-            boost::mutex::scoped_lock lock(reg_acccess);
+            boost::mutex::scoped_lock lock(reg_access);
             try
             {
                 return this->__poke32(addr, data);
@@ -66,7 +66,7 @@ public:
     {
         for (size_t i = 1; i <= num_retries; i++)
         {
-            boost::mutex::scoped_lock lock(reg_acccess);
+            boost::mutex::scoped_lock lock(reg_access);
             try
             {
                 boost::uint32_t data = this->__peek32(addr);
@@ -88,7 +88,7 @@ protected:
     virtual boost::uint32_t __peek32(const wb_addr_type addr) = 0;
     virtual void __flush() = 0;
 
-    boost::mutex reg_acccess;
+    boost::mutex reg_access;
 };
 
 
@@ -119,7 +119,7 @@ protected:
         request.data = uhd::htonx(data);
 
         //send request
-        this->flush();
+        __flush();
         udp->send(boost::asio::buffer(&request, sizeof(request)));
 
         //recv reply
@@ -148,7 +148,7 @@ protected:
         request.data = 0;
 
         //send request
-        this->flush();
+        __flush();
         udp->send(boost::asio::buffer(&request, sizeof(request)));
 
         //recv reply
@@ -248,7 +248,7 @@ protected:
             throw uhd::io_error("x300 fw poke32 - hardware IO error");
         if (elapsed.total_milliseconds() > READ_TIMEOUT_IN_MS)
             throw uhd::io_error("x300 fw poke32 - operation timed out");
-}
+    }
 
     virtual boost::uint32_t __peek32(const wb_addr_type addr)
     {
