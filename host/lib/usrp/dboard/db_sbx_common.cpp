@@ -164,6 +164,8 @@ UHD_STATIC_BLOCK(reg_sbx_dboards){
     dboard_manager::register_dboard(0x0054, 0x0055, &make_sbx, "SBX");
     dboard_manager::register_dboard(0x0065, 0x0064, &make_sbx, "SBX v4");
     dboard_manager::register_dboard(0x0067, 0x0066, &make_sbx, "CBX");
+    dboard_manager::register_dboard(0x0083, 0x0082, &make_sbx, "SBX-120");
+    dboard_manager::register_dboard(0x0085, 0x0084, &make_sbx, "CBX-120");
 }
 
 
@@ -244,15 +246,23 @@ double sbx_xcvr::set_rx_gain(double gain, const std::string &name){
  **********************************************************************/
 sbx_xcvr::sbx_xcvr(ctor_args_t args) : xcvr_dboard_base(args){
     switch(get_rx_id().to_uint16()) {
-        case 0x054:
+        case 0x0054:
             db_actual = sbx_versionx_sptr(new sbx_version3(this));
             freq_range = sbx_freq_range;
             break;
-        case 0x065:
+        case 0x0065:
             db_actual = sbx_versionx_sptr(new sbx_version4(this));
             freq_range = sbx_freq_range;
             break;
-        case 0x067:
+        case 0x0067:
+            db_actual = sbx_versionx_sptr(new cbx(this));
+            freq_range = cbx_freq_range;
+            break;
+        case 0x0083:
+            db_actual = sbx_versionx_sptr(new sbx_version4(this));
+            freq_range = sbx_freq_range;
+            break;
+        case 0x0085:
             db_actual = sbx_versionx_sptr(new cbx(this));
             freq_range = cbx_freq_range;
             break;
@@ -264,9 +274,13 @@ sbx_xcvr::sbx_xcvr(ctor_args_t args) : xcvr_dboard_base(args){
     ////////////////////////////////////////////////////////////////////
     // Register RX properties
     ////////////////////////////////////////////////////////////////////
-    if(get_rx_id() == 0x054) this->get_rx_subtree()->create<std::string>("name").set("SBXv3 RX");
-    else if(get_rx_id() == 0x065) this->get_rx_subtree()->create<std::string>("name").set("SBXv4 RX");
-    else if(get_rx_id() == 0x067) this->get_rx_subtree()->create<std::string>("name").set("CBX RX");
+    boost::uint16_t rx_id = get_rx_id().to_uint16();
+
+    if(rx_id == 0x0054) this->get_rx_subtree()->create<std::string>("name").set("SBXv3 RX");
+    else if(rx_id == 0x0065) this->get_rx_subtree()->create<std::string>("name").set("SBXv4 RX");
+    else if(rx_id == 0x0067) this->get_rx_subtree()->create<std::string>("name").set("CBX RX");
+    else if(rx_id == 0x0083) this->get_rx_subtree()->create<std::string>("name").set("SBX-120 RX");
+    else if(rx_id == 0x0085) this->get_rx_subtree()->create<std::string>("name").set("CBX-120 RX");
     else this->get_rx_subtree()->create<std::string>("name").set("SBX/CBX RX");
 
     this->get_rx_subtree()->create<sensor_value_t>("sensors/lo_locked")
@@ -290,16 +304,29 @@ sbx_xcvr::sbx_xcvr(ctor_args_t args) : xcvr_dboard_base(args){
     this->get_rx_subtree()->create<std::string>("connection").set("IQ");
     this->get_rx_subtree()->create<bool>("enabled").set(true); //always enabled
     this->get_rx_subtree()->create<bool>("use_lo_offset").set(false);
-    this->get_rx_subtree()->create<double>("bandwidth/value").set(2*20.0e6); //20MHz low-pass, we want complex double-sided
-    this->get_rx_subtree()->create<meta_range_t>("bandwidth/range")
-        .set(freq_range_t(2*20.0e6, 2*20.0e6));
+
+    if((rx_id != 0x0083) && (rx_id != 0x0085)) {
+        //20MHz low-pass, we want complex double-sided
+        this->get_rx_subtree()->create<double>("bandwidth/value").set(2*20.0e6);
+        this->get_rx_subtree()->create<meta_range_t>("bandwidth/range")
+            .set(freq_range_t(2*20.0e6, 2*20.0e6));
+    } else {
+        //60MHz low-pass, we want complex double-sided
+        this->get_rx_subtree()->create<double>("bandwidth/value").set(2*60.0e6);
+        this->get_rx_subtree()->create<meta_range_t>("bandwidth/range")
+            .set(freq_range_t(2*60.0e6, 2*60.0e6));
+    }
 
     ////////////////////////////////////////////////////////////////////
     // Register TX properties
     ////////////////////////////////////////////////////////////////////
-    if(get_tx_id() == 0x055) this->get_tx_subtree()->create<std::string>("name").set("SBXv3 TX");
-    else if(get_tx_id() == 0x064) this->get_tx_subtree()->create<std::string>("name").set("SBXv4 TX");
-    else if(get_tx_id() == 0x066) this->get_tx_subtree()->create<std::string>("name").set("CBX TX");
+    boost::uint16_t tx_id = get_tx_id().to_uint16();
+
+    if(tx_id == 0x0055) this->get_tx_subtree()->create<std::string>("name").set("SBXv3 TX");
+    else if(tx_id == 0x0064) this->get_tx_subtree()->create<std::string>("name").set("SBXv4 TX");
+    else if(tx_id == 0x0066) this->get_tx_subtree()->create<std::string>("name").set("CBX TX");
+    else if(tx_id == 0x0082) this->get_tx_subtree()->create<std::string>("name").set("SBX-120 TX");
+    else if(tx_id == 0x0084) this->get_tx_subtree()->create<std::string>("name").set("CBX-120 TX");
     else this->get_tx_subtree()->create<std::string>("name").set("SBX/CBX TX");
 
     this->get_tx_subtree()->create<sensor_value_t>("sensors/lo_locked")
@@ -323,9 +350,18 @@ sbx_xcvr::sbx_xcvr(ctor_args_t args) : xcvr_dboard_base(args){
     this->get_tx_subtree()->create<std::string>("connection").set("QI");
     this->get_tx_subtree()->create<bool>("enabled").set(true); //always enabled
     this->get_tx_subtree()->create<bool>("use_lo_offset").set(false);
-    this->get_tx_subtree()->create<double>("bandwidth/value").set(2*20.0e6); //20MHz low-pass, we want complex double-sided
-    this->get_tx_subtree()->create<meta_range_t>("bandwidth/range")
-        .set(freq_range_t(2*20.0e6, 2*20.0e6));
+
+    if((tx_id != 0x0082) && (tx_id != 0x0084)) {
+        //20MHz low-pass, we want complex double-sided
+        this->get_tx_subtree()->create<double>("bandwidth/value").set(2*20.0e6);
+        this->get_tx_subtree()->create<meta_range_t>("bandwidth/range")
+            .set(freq_range_t(2*20.0e6, 2*20.0e6));
+    } else {
+        //60MHz low-pass, we want complex double-sided
+        this->get_tx_subtree()->create<double>("bandwidth/value").set(2*60.0e6);
+        this->get_tx_subtree()->create<meta_range_t>("bandwidth/range")
+            .set(freq_range_t(2*60.0e6, 2*60.0e6));
+    }
 
     //enable the clocks that we need
     this->get_iface()->set_clock_enabled(dboard_iface::UNIT_TX, true);

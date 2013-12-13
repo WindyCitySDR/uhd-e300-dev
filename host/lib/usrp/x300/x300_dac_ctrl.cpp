@@ -16,6 +16,7 @@
 //
 
 #include "x300_dac_ctrl.hpp"
+#include "x300_regs.hpp"
 #include <uhd/types/time_spec.hpp>
 #include <uhd/utils/msg.hpp>
 #include <uhd/utils/log.hpp>
@@ -69,11 +70,10 @@ public:
         const time_spec_t exit_time = time_spec_t::get_system_time() + time_spec_t(1.0);
         while (true)
         {
-            const size_t reg_e = read_ad9146_reg(0x0E); /* Expect bit 7 = 0, bit 6 = 1 */
-            if ((reg_e & ((1 << 7) | (1 << 6))) != 0) break;
-            if (exit_time < time_spec_t::get_system_time()) throw uhd::runtime_error(
-                "x300_dac_ctrl: timeout waiting for DAC PLL to lock"
-            );
+            const size_t reg_e = read_ad9146_reg(0x0E); /* Expect bit 7 = 1 */
+            if ((exit_time < time_spec_t::get_system_time()) && ((reg_e & (1 << 7)) == 0))
+	      throw uhd::runtime_error("x300_dac_ctrl: timeout waiting for DAC PLL to lock");
+	    else if  ((reg_e & ((1 << 7) | (1 << 6))) != 0) break;
             boost::this_thread::sleep(boost::posix_time::milliseconds(10));
         }
 
@@ -108,6 +108,25 @@ public:
         )
     }
 
+  void arm_dac_sync(void)
+  {
+    //
+    // Attempt to synchronize AD9146's
+    //
+    write_ad9146_reg(0x10, 0xCF); // Enable SYNC mode. Sync Averaging set to 128.
+
+    const time_spec_t exit_time = time_spec_t::get_system_time() + time_spec_t(1.0);
+    while (true)
+      {
+	const size_t reg_12 = read_ad9146_reg(0x12); /* Expect bit 7 = 0, bit 6 = 1 */
+	if ((exit_time < time_spec_t::get_system_time()) && (((reg_12 & (1 << 6)) == 0) || ((reg_12 & (1 << 7)) != 0)))
+	  throw uhd::runtime_error("x300_dac_ctrl: timeout waiting for backend synchronization");
+	else if (((reg_12 & (1 << 6)) != 0) && ((reg_12 & (1 << 7)) == 0))  break;
+	boost::this_thread::sleep(boost::posix_time::milliseconds(10));
+      }
+  }
+
+  // FIXME - Delete this method, obselete
     void set_iq_swap(const bool swap)
     {
         //fpga wants I,Q in the sample word:
@@ -117,6 +136,7 @@ public:
         const int bit = (swap)? 0 : (1 << 6);
         write_ad9146_reg(0x03, 0x00 | bit); //2s comp, i first, byte mode
     }
+
 
 private:
     uhd::spi_iface::sptr _iface;

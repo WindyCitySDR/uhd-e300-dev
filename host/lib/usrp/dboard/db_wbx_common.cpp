@@ -63,8 +63,10 @@ wbx_base::wbx_base(ctor_args_t args) : xcvr_dboard_base(args){
     this->get_iface()->set_clock_enabled(dboard_iface::UNIT_RX, true);
 
     ////////////////////////////////////////////////////////////////////
-    // Register RX properties
+    // Register RX and TX properties
     ////////////////////////////////////////////////////////////////////
+    boost::uint16_t rx_id = get_rx_id().to_uint16();
+
     this->get_rx_subtree()->create<sensor_value_t>("sensors/lo_locked")
         .publish(boost::bind(&wbx_base::get_locked, this, dboard_iface::UNIT_RX));
     BOOST_FOREACH(const std::string &name, wbx_rx_gain_ranges.keys()){
@@ -79,30 +81,44 @@ wbx_base::wbx_base(ctor_args_t args) : xcvr_dboard_base(args){
         .subscribe(boost::bind(&wbx_base::set_rx_enabled, this, _1))
         .set(true); //start enabled
     this->get_rx_subtree()->create<bool>("use_lo_offset").set(false);
-    this->get_rx_subtree()->create<double>("bandwidth/value").set(2*20.0e6); //20MHz low-pass, we want complex double-sided
-    this->get_rx_subtree()->create<meta_range_t>("bandwidth/range")
-        .set(freq_range_t(2*20.0e6, 2*20.0e6));
 
-    ////////////////////////////////////////////////////////////////////
-    // Register TX properties
-    ////////////////////////////////////////////////////////////////////
+    if(rx_id != 0x0081) {
+        //20MHz low-pass, we want complex double-sided
+        this->get_rx_subtree()->create<double>("bandwidth/value").set(2*20.0e6); 
+        this->get_rx_subtree()->create<meta_range_t>("bandwidth/range")
+            .set(freq_range_t(2*20.0e6, 2*20.0e6));
+
+        this->get_tx_subtree()->create<double>("bandwidth/value").set(2*20.0e6);
+        this->get_tx_subtree()->create<meta_range_t>("bandwidth/range")
+            .set(freq_range_t(2*20.0e6, 2*20.0e6));
+    } else {
+        //60MHz low-pass, we want complex double-sided
+        this->get_rx_subtree()->create<double>("bandwidth/value").set(2*60.0e6); 
+        this->get_rx_subtree()->create<meta_range_t>("bandwidth/range")
+            .set(freq_range_t(2*60.0e6, 2*60.0e6));
+
+        this->get_tx_subtree()->create<double>("bandwidth/value").set(2*60.0e6);
+        this->get_tx_subtree()->create<meta_range_t>("bandwidth/range")
+            .set(freq_range_t(2*60.0e6, 2*60.0e6));
+    }
+
     this->get_tx_subtree()->create<sensor_value_t>("sensors/lo_locked")
         .publish(boost::bind(&wbx_base::get_locked, this, dboard_iface::UNIT_TX));
     this->get_tx_subtree()->create<std::string>("connection").set("IQ");
     this->get_tx_subtree()->create<bool>("use_lo_offset").set(false);
-    this->get_tx_subtree()->create<double>("bandwidth/value").set(2*20.0e6); //20MHz low-pass, we want complex double-sided
-    this->get_tx_subtree()->create<meta_range_t>("bandwidth/range")
-        .set(freq_range_t(2*20.0e6, 2*20.0e6));
 
     // instantiate subclass foo
-    switch(get_rx_id().to_uint16()) {
-        case 0x053:
+    switch(rx_id) {
+        case 0x0053:
             db_actual = wbx_versionx_sptr(new wbx_version2(this));
             return;
-        case 0x057:
+        case 0x0057:
             db_actual = wbx_versionx_sptr(new wbx_version3(this));
             return;
-        case 0x063:
+        case 0x0063:
+            db_actual = wbx_versionx_sptr(new wbx_version4(this));
+            return;
+        case 0x0081:
             db_actual = wbx_versionx_sptr(new wbx_version4(this));
             return;
         default:

@@ -423,7 +423,7 @@ void print_vita_header(const struct pbuf_info *packet_buffer, const struct in_ad
 	if (direction == H2U)
 	    {
 	      radio_ctrl_payload = (struct radio_ctrl_payload *)(packet_buffer->current->payload+ETH_SIZE+IP_SIZE+UDP_SIZE+CHDR_SIZE+(VITA_TIME_SIZE*has_time));
-	      fprintf(stdout,"Radio Ctrl (%s)=0x%08x",reg_addr_to_name(swapint(radio_ctrl_payload->addr)),swapint(radio_ctrl_payload->data));
+	      fprintf(stdout,"Radio Ctrl %s(0x%02x)=0x%08x",reg_addr_to_name(swapint(radio_ctrl_payload->addr)),(u8)swapint(radio_ctrl_payload->addr),swapint(radio_ctrl_payload->data));
 	    }
 	  else
 	    // U2H
