@@ -20,7 +20,7 @@ from xml.etree import ElementTree
 from collections import namedtuple
 import optparse
 import base64
-import md5
+import hashlib
 import os
 import sys
 
@@ -147,7 +147,7 @@ codegen_transform['in_fifo_list'] = in_fifo_list
 if (options.merge_bin is not None):
     with open(os.path.abspath(options.merge_bin), 'rb') as bin_file:
         bitstream = bin_file.read()
-        bitstream_md5 = md5.new(bitstream).hexdigest()
+        bitstream_md5 = hashlib.md5(bitstream).hexdigest()
         bitstream_b64 = base64.b64encode(bitstream)
         bitstream_b64_lb = ''
         for i in range(0, len(bitstream_b64), 76):
@@ -160,7 +160,7 @@ codegen_transform['lvbitx_signature'] = str.upper(root.find('SignatureRegister')
 
 # Write BIN file
 bitstream = base64.b64decode(root.find('Bitstream').text)
-if (options.output_lvbitx_path is not None and md5.new(bitstream).hexdigest() != root.find('BitstreamMD5').text):
+if (options.output_lvbitx_path is not None and hashlib.md5(bitstream).hexdigest() != root.find('BitstreamMD5').text):
     print 'ERROR: The MD5 sum for the output LVBITX was incorrect. Make sure that the bitstream in the input LVBITX or BIN file is valid.'
     sys.exit(1)
 if (options.output_bin):
