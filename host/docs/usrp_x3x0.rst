@@ -27,6 +27,23 @@ Comparative features list
 * Timed sampling in FPGA
 * sc8 and sc16 sample modes
  * Up to 200 MHz of RF BW with 16-bit samples
+ 
+Hardware setup
+LED indications
+Ref clock and 1 PPS
+Using GPIO expansion
+Using internal GPSDO 
+
+Burning FPGA images
+1/10 GigE
+PCIe and ExpressCard
+JTAG (for FPGA devel)
+1 GigE setup
+10 Gig,)E setup
+PCIe setup
+Express card setup
+Addressing 
+Alternate Stream Dest
 
 ------------------------------------------------------------------------
 Load the Images onto the On-board Flash
