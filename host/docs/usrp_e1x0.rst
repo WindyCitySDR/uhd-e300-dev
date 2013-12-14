@@ -8,16 +8,22 @@ UHD - USRP-E1x0 Series Device Manual
 Comparative features list
 ------------------------------------------------------------------------
 
-* 1 transceiver card slot
-* 2 RX DDC chains in FPGA
-* 1 TX DUC chain in FPGA
-* Timed commands in FPGA
-* Timed sampling in FPGA
-* Internal PPS reference
-* Internal 10MHz reference
-* Configurable clock rate (defaults 64 MHz)
-* Internal GPSDO option
-* sc8 and sc16 sample modes
+**Hardware Capabilities:**
+ * 1 transceiver card slot
+ * Internal PPS reference input
+ * Internal 10MHz reference input
+ * Configurable clock rate (defaults to 64 MHz)
+ * Internal GPSDO option
+
+**FPGA Capabilities:**
+ * 2 RX DDC chains in FPGA
+ * 1 TX DUC chain in FPGA
+ * Timed commands in FPGA
+ * Timed sampling in FPGA
+ * sc8 and sc16 sample modes
+
+   * Up to 8 MHz of RF BW with 16-bit samples
+   * Up to 16 MHz of RF BW with 8-bit samples
 
 ------------------------------------------------------------------------
 Specify a Non-standard Image

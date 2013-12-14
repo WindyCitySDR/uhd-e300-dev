@@ -8,17 +8,23 @@ UHD - USRP2 and N2x0 Series Device Manual
 Comparative features list
 ------------------------------------------------------------------------
 
-* 1 transceiver card slot
-* 2 RX DDC chains in FPGA
-* 1 TX DUC chain in FPGA
-* Timed commands in FPGA (N2x0 only)
-* Timed sampling in FPGA
-* External PPS reference
-* External 10MHz reference
-* MIMO cable shared reference
-* Fixed 100 MHz clock rate
-* Internal GPSDO option (N2x0 only)
-* sc8 and sc16 sample modes
+**Hardware Capabilities:**
+ * 1 transceiver card slot
+ * External PPS reference input
+ * External 10MHz reference input
+ * MIMO cable shared reference
+ * Fixed 100 MHz clock rate
+ * Internal GPSDO option (N2x0 only)
+
+**FPGA Capabilities:**
+ * 2 RX DDC chains in FPGA
+ * 1 TX DUC chain in FPGA
+ * Timed commands in FPGA (N2x0 only)
+ * Timed sampling in FPGA
+ * sc8 and sc16 sample modes
+
+   * Up to 25 MHz of RF BW with 16-bit samples
+   * Up to 50 MHz of RF BW with 8-bit samples
 
 ------------------------------------------------------------------------
 Load the Images onto the SD card (USRP2 only)

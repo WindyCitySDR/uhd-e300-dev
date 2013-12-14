@@ -8,12 +8,20 @@ UHD - USRP1 Device Manual
 Comparative features list
 ------------------------------------------------------------------------
 
-* 2 transceiver card slots
-* 2 RX DDC chains in FPGA
-* 2 TX DUC chains in FPGA (no TX CORDIC -> uses DAC)
-* 64 MHz fixed clock rate
-* sc16 sample modes
-* sc8 sample mode - RX only
+**Hardware Capabilities:**
+ * 2 transceiver card slots
+ * 64 MHz fixed clock rate
+
+**FPGA Capabilities:**
+ * 2 RX DDC chains in FPGA
+ * 2 TX DUC chains in FPGA (no TX CORDIC -> uses DAC)
+ * sc16 sample modes - RX & TX
+
+   - Up to 8 MHz of RF BW with 16-bit samples
+
+ * sc8 sample mode - RX only
+
+   - Up to 16 MHz of RF BW with 8-bit samples
 
 ------------------------------------------------------------------------
 Specify a Non-standard Image
