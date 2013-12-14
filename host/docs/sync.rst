@@ -163,7 +163,7 @@ will remain constant after each re-tune. See notes below:
 * This phase offset is different for different LO frequencies
 * This phase offset remains constant after retuning
 
-    * Due to a divider, WBX phase offset will be randomly +/- 180 deg after re-tune
+  * Due to a divider, WBX phase offset will be randomly +/- 180 deg after re-tune
 
 * This phase offset will drift over time due to thermal and other characteristics
 * Periodic calibration will be necessary for phase-coherent applications
