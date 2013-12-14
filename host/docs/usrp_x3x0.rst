@@ -8,60 +8,28 @@ UHD - X3x0 Series Device Manual
 Comparative features list
 ------------------------------------------------------------------------
 
-* 1 transceiver card slot
+**Hardware Capabilities**
+* 2 transceiver card slots
+* Dual SFP+ Transceivers (can be used with 1 GigE, 10 GigE, or CPRI)
+* PCIe over cable (MXI) gen1 x4
+* External PPS input & output
+* External 10MHz input & output
+* Expandable via 2nd SFP+ interface
+* Supported master clock rates: 200 MHz, 184.32 MHz
+* External GPIO Connector with UHD API control
+* External USB Connection for built-in JTAG debugger
+* Internal GPSDO option
+
+**FPGA Capabilities**
 * 2 RX DDC chains in FPGA
-* 1 TX DUC chain in FPGA
-* Timed commands in FPGA (N2x0 only)
+* 2 TX DUC chain in FPGA
+* Timed commands in FPGA
 * Timed sampling in FPGA
-* External PPS reference
-* External 10MHz reference
-* MIMO cable shared reference
-* Fixed 100 MHz clock rate
-* Internal GPSDO option (N2x0 only)
 * sc8 and sc16 sample modes
+ * Up to 200 MHz of RF BW with 16-bit samples
 
 ------------------------------------------------------------------------
-Load the Images onto the SD card (USRP2 only)
-------------------------------------------------------------------------
-**Warning!**
-Use **usrp2_card_burner.py** with caution. If you specify the wrong device node,
-you could overwrite your hard drive. Make sure that **--dev=** specifies the SD card.
-
-**Warning!**
-It is possible to use 3rd party SD cards with the USRP2.
-However, certain types of SD cards will not interface with the CPLD:
-
-* Cards can be SDHC, which is not a supported interface.
-* Cards can have unexpected timing characteristics.
-
-For these reasons, we recommend that you use the SD card that was supplied with the USRP2.
-
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Use the card burner tool (UNIX)
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-::
-
-    sudo <install-path>/share/uhd/utils/usrp2_card_burner_gui.py
-
-    -- OR --
-
-    cd <install-path>/share/uhd/utils
-    sudo ./usrp2_card_burner.py --dev=/dev/sd<XXX> --fpga=<path_to_fpga_image>
-    sudo ./usrp2_card_burner.py --dev=/dev/sd<XXX> --fw=<path_to_firmware_image>
-
-Use the **--list** option to get a list of possible raw devices.
-The list result will filter out disk partitions and devices too large to be the sd card.
-The list option has been implemented on Linux, Mac OS X, and Windows.
-
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Use the card burner tool (Windows)
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-::
-
-    <path_to_python.exe> <install-path>/share/uhd/utils/usrp2_card_burner_gui.py
-
-------------------------------------------------------------------------
-Load the Images onto the On-board Flash (USRP-N Series only)
+Load the Images onto the On-board Flash
 ------------------------------------------------------------------------
 The USRP-N Series can be reprogrammed over the network
 to update or change the firmware and FPGA images.
@@ -78,20 +46,20 @@ Use the net burner tool (UNIX)
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 ::
 
-    <install-path>/share/uhd/utils/usrp_n2xx_net_burner_gui.py
+    <install-path>/share/uhd/utils/usrp_x3xx_net_burner_gui.py
 
     -- OR --
 
     cd <install-path>/share/uhd/utils
-    ./usrp_n2xx_net_burner.py --addr=<ip address> --fw=<path for firmware image>
-    ./usrp_n2xx_net_burner.py --addr=<ip address> --fpga=<path to FPGA image>
+    ./usrp_x3xx_net_burner.py --addr=<ip address> --fw=<path for firmware image>
+    ./usrp_x3xx_net_burner.py --addr=<ip address> --fpga=<path to FPGA image>
 
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Use the net burner tool (Windows)
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 ::
 
-    <path_to_python.exe> <install-path>/share/uhd/utils/usrp_n2xx_net_burner_gui.py
+    <path_to_python.exe> <install-path>/share/uhd/utils/usrp_x3xx_net_burner_gui.py
 
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Burning images without Python
