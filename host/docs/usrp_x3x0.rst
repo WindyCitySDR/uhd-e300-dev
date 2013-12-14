@@ -1,5 +1,5 @@
 ========================================================================
-UHD - USRP2 and N2X0 Series Application Notes
+UHD - X3x0 Series Device Manual
 ========================================================================
 
 .. contents:: Table of Contents

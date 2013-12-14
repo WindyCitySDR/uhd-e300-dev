@@ -1,5 +1,5 @@
 ========================================================================
-UHD - USRP-E1X0 Series Application Notes
+UHD - USRP-E1x0 Series Device Manual
 ========================================================================
 
 .. contents:: Table of Contents

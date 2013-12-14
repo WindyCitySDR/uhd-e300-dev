@@ -1,5 +1,5 @@
 ========================================================================
-UHD - USRP-B100 Series Application Notes
+UHD - USRP-B100 Series Device Manual
 ========================================================================
 
 .. contents:: Table of Contents

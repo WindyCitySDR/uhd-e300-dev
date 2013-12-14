@@ -1,5 +1,5 @@
 ========================================================================
-UHD - USRP-B2X0 Series Application Notes
+UHD - USRP-B2x0 Series Device Manual
 ========================================================================
 
 .. contents:: Table of Contents
@@ -81,7 +81,7 @@ Frontend gain
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 All frontends have individual analog gain controls.
 The receive frontends have 73 dB of available gain;
-and the transmit frontends have 89 dB of available gain.
+and the transmit frontends have 89.5 dB of available gain.
 Gain settings are application specific,
 but its recommended that users consider using at least
 half of the available gain to get reasonable dynamic range.
