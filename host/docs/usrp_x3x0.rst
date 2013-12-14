@@ -8,26 +8,27 @@ UHD - X3x0 Series Device Manual
 Comparative features list
 ------------------------------------------------------------------------
 
-**Hardware Capabilities**
-* 2 transceiver card slots
-* Dual SFP+ Transceivers (can be used with 1 GigE, 10 GigE, or CPRI)
-* PCIe over cable (MXI) gen1 x4
-* External PPS input & output
-* External 10MHz input & output
-* Expandable via 2nd SFP+ interface
-* Supported master clock rates: 200 MHz, 184.32 MHz
-* External GPIO Connector with UHD API control
-* External USB Connection for built-in JTAG debugger
-* Internal GPSDO option
+**Hardware Capabilities:**
+ * 2 transceiver card slots
+ * Dual SFP+ Transceivers (can be used with 1 GigE, 10 GigE, or CPRI)
+ * PCIe over cable (MXI) gen1 x4
+ * External PPS input & output
+ * External 10MHz input & output
+ * Expandable via 2nd SFP+ interface
+ * Supported master clock rates: 200 MHz, 184.32 MHz
+ * External GPIO Connector with UHD API control
+ * External USB Connection for built-in JTAG debugger
+ * Internal GPSDO option
 
-**FPGA Capabilities**
-* 2 RX DDC chains in FPGA
-* 2 TX DUC chain in FPGA
-* Timed commands in FPGA
-* Timed sampling in FPGA
-* sc8 and sc16 sample modes
- * Up to 200 MHz of RF BW with 16-bit samples
- 
+**FPGA Capabilities:**
+ * 2 RX DDC chains in FPGA
+ * 2 TX DUC chain in FPGA
+ * Timed commands in FPGA
+ * Timed sampling in FPGA
+ * sc8 and sc16 sample modes
+
+   * Up to 200 MHz of RF BW with 16-bit samples
+
 Hardware setup
 LED indications
 Ref clock and 1 PPS
