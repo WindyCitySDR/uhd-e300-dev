@@ -52,6 +52,7 @@ USRP X-Series Devices
 ^^^^^^^^^^^^^^^^^^^^^
 * `USRP-X3x0 Series Device Manual <./usrp_x3x0.html>`_
 * `USRP-X3x0 Internal GPSDO Device Manual <./gpsdo_x3x0.html>`_
+* `USRP-X3x0 Front Panel GPIO API <./gpio_api.html>`_
 
 ^^^^^^^^^^^^^^^^^^^^^
 USRP Legacy Series
