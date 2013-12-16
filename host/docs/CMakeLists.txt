@@ -25,6 +25,7 @@ SET(manual_sources
     calibration.rst
     coding.rst
     dboards.rst
+    gpio_api.rst
     gpsdo.rst
     gpsdo_b2x0.rst
     gpsdo_x3x0.rst
