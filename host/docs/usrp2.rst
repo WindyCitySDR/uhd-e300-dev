@@ -277,11 +277,11 @@ Addressing the Device
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Single device configuration
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-In a single-device configuration,
-the USRP device must have a unique IPv4 address on the host computer.
-The USRP can be identified through its IPv4 address, resolvable hostname, or by other means.
-See the application notes on `device identification <./identification.html>`_.
-Use this addressing scheme with the **single_usrp** interface.
+In a single-device configuration, the USRP device must have a unique IPv4
+address on the host computer.  The USRP can be identified through its IPv4
+address, resolvable hostname, or by other means.  See the application notes on
+`device identification <./identification.html>`_.  Please note that this
+addressing scheme should also be used with the **multi_usrp** interface.
 
 Example device address string representation for a USRP2 with IPv4 address **192.168.10.2**:
 
