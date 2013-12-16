@@ -95,16 +95,23 @@ static device_addrs_t x300_find_with_addr(const device_addr_t &hint)
             wb_iface::sptr zpu_ctrl = x300_make_ctrl_iface_enet(udp_simple::make_connected(new_addr["addr"], BOOST_STRINGIZE(X300_FW_COMMS_UDP_PORT)));
             if (x300_impl::is_claimed(zpu_ctrl)) continue; //claimed by another process
 
-            //Attempt to autodetect the FPGA type
-            if (not hint.has_key("fpga")) {
-                new_addr["fpga"] = get_fpga_option(zpu_ctrl);
-            }
+            new_addr["fpga"] = get_fpga_option(zpu_ctrl);
 
             i2c_core_100_wb32::sptr zpu_i2c = i2c_core_100_wb32::make(zpu_ctrl, I2C1_BASE);
             i2c_iface::sptr eeprom16 = zpu_i2c->eeprom16();
             const mboard_eeprom_t mb_eeprom(*eeprom16, "X300");
             new_addr["name"] = mb_eeprom["name"];
             new_addr["serial"] = mb_eeprom["serial"];
+            switch (boost::lexical_cast<boost::uint16_t>(mb_eeprom["product"]))
+            {
+                case X300_PCIE_SSID:
+                    new_addr["product"] = "X300";
+                    break;
+                case X310_PCIE_SSID:
+                    new_addr["product"] = "X310";
+                    break;
+                default: UHD_MSG(error) << "X300 unknown product code: " << mb_eeprom["product"] << std::endl;
+            }
         }
         catch(const std::exception &)
         {
@@ -115,8 +122,10 @@ static device_addrs_t x300_find_with_addr(const device_addr_t &hint)
         }
         //filter the discovered device below by matching optional keys
         if (
-            (not hint.has_key("name")   or hint["name"]   == new_addr["name"]) and
-            (not hint.has_key("serial") or hint["serial"] == new_addr["serial"])
+            (not hint.has_key("name")    or hint["name"]   == new_addr["name"]) and
+            (not hint.has_key("serial")  or hint["serial"] == new_addr["serial"]) and
+            (not hint.has_key("product") or hint["product"] == new_addr["product"]) and
+            (not hint.has_key("fpga") or hint["fpga"] == new_addr["fpga"])
         ){
             addrs.push_back(new_addr);
         }
