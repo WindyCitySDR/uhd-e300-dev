@@ -893,10 +893,10 @@ public:
      *  - CTRL - 1 for ATR mode 0 for GPIO mode
      *  - DDR - 1 for output 0 for input
      *  - OUT - GPIO output level (not ATR mode)
-     *  - ATR0 - ATR idle state
-     *  - ATRR - ATR receive only state
-     *  - ATRT - ATR transmit only state
-     *  - ATRX - ATR full duplex state
+     *  - ATR_0X - ATR idle state
+     *  - ATR_RX - ATR receive only state
+     *  - ATR_TX - ATR transmit only state
+     *  - ATR_XX - ATR full duplex state
      * \param bank the name of a GPIO bank
      * \param attr the name of a GPIO attribute
      * \param value the new value for this GPIO bank
