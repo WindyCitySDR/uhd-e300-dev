@@ -28,13 +28,6 @@ Comparative features list
  * sc8 and sc16 sample modes
  * Up to 200 MHz of RF BW with 16-bit samples
 
-PENDING:
-LED indications
-Ref clock and 1 PPS
-Using GPIO expansion
-Using internal GPSDO 
-Multiple channels
-
 --------------
 Hardware Setup
 --------------
@@ -466,31 +459,61 @@ Use Wireshark to monitor packets sent to and received from the device.
 Hardware Notes
 --------------
 
-* **LED A:** transmitting
-* **LED B:** mimo cable link
-* **LED C:** receiving
-* **LED D:** firmware loaded
-* **LED E:** reference lock
-* **LED F:** CPLD loaded
+^^^^^^^^^^^
+Front Panel
+^^^^^^^^^^^
 
+.. image:: ./res/x3x0_fp_overlay.png
+   :scale: 80%
+   :align: left
+
+* **JTAG**: USB connector for the on-board USB-JTAG programmer
+* **RF A Group**
+
+  * **TX/RX LED**: Indicates that data is streaming on the TX/RX channel on daughter board A
+  * **RX2 LED**: Indicates that data is streaming on the RX2 channel on daughter board A
+
+* **REF**: Indicates that the external Reference Clock is locked
+* **PPS**: Indicates a valid PPS signal by pulsing once per second
+* **AUX IO**: Front panel GPIO connector.
+* **GPS**: Indicates that GPS reference is locked
+* **LINK**: Indicates that the host computer is communicating with the device
+
+* **RF B Group**
+
+  * **TX/RX LED**: Indicates that data is streaming on the TX/RX channel on daughter board B
+  * **RX2 LED**: Indicates that data is streaming on the RX2 channel on daughter board B
+
+* **PWR**: Power switch
+
+^^^^^^^^^^
+Rear Panel
+^^^^^^^^^^
+   
+.. image:: ./res/x3x0_rp_overlay.png
+   :scale: 80%
+   :align: left
+   
+
+* **PWR**: Connector for the USRP-X Series power supply
+* **1G/10G ETH**: SFP+ ports for Ethernet interfaces
+* **REF OUT**: Output port for the exported reference clock
+* **REF IN**: Reference clock input
+* **PCIe x4**: Connector for Cabled PCI Express link
+* **PPS/TRIG OUT**: Output port for the PPS signal
+* **PPS/TRIG IN**: Input port for the PPS signal 
+* **GPS**: Connection for the GPS antenna
 
 ^^^^^^^^^^^^^^^^^
 Ref Clock - 10MHz
 ^^^^^^^^^^^^^^^^^
 Using an external 10MHz reference clock, a square wave will offer the best phase
-noise performance, but a sinusoid is acceptable.  The reference clock requires the following power level:
-
-* **USRP2** 5 to 15dBm
-* **N2XX** 0 to 15dBm
-
+noise performance, but a sinusoid is acceptable.  The power level of the reference clock cannot exceed +15dBm.
 
 ^^^^^^^^^^^^^^^^^^^^^^
 PPS - Pulse Per Second
 ^^^^^^^^^^^^^^^^^^^^^^
-Using a PPS signal for timestamp synchronization requires a square wave signal with the following amplitude:
-
-* **USRP2** 5Vpp
-* **N2XX** 3.3 to 5Vpp
+Using a PPS signal for timestamp synchronization requires a square wave signal with the following a 5Vpp amplitude.
 
 Test the PPS input with the following app:
 
@@ -507,9 +530,58 @@ Internal GPSDO
 Please see the `Internal GPSDO Application Notes <./gpsdo.html>`_
 for information on configuring and using the internal GPSDO.
 
+^^^^^^^^^^^^^^^^
+Front Panel GPIO
+^^^^^^^^^^^^^^^^
+
+Connector
+:::::::::
+
+.. image:: ./res/x3x0_gpio_conn.png
+   :scale: 25%
+   :align: left
+
+Pin Mapping
+:::::::::::
+
+* Pin 1:  +3.3V
+* Pin 2:  Data[0]
+* Pin 3:  Data[1]
+* Pin 4:  Data[2]
+* Pin 5:  Data[3]
+* Pin 6:  Data[4]
+* Pin 7:  Data[5]
+* Pin 8:  Data[6]
+* Pin 9:  Data[7]
+* Pin 10: Data[8]
+* Pin 11: Data[9]
+* Pin 12: Data[10]
+* Pin 13: Data[11]
+* Pin 14: 0V
+* Pin 15: 0V
+
+
+Please see the `GPIO API Notes <./gpio_api.html>`_ for information on configuring and using the GPIO bus.
+
 -------------
 Miscellaneous
 -------------
+
+^^^^^^^^^^^^^^^^^^^^
+Multiple RX channels
+^^^^^^^^^^^^^^^^^^^^
+There are two complete DDC and DUC DSP chains in the FPGA. In the single channel case, 
+only one chain is ever used. To receive from both channels, the user must set the **RX** or **TX**
+subdevice specification.
+
+In the following example, a TVRX2 is installed.
+Channel 0 is sourced from subdevice **RX1**,
+and channel 1 is sourced from subdevice **RX2**:
+
+::
+
+    usrp->set_rx_subdev_spec("A:RX1 A:RX2");
+
 
 ^^^^^^^^^^^^^^^^^
 Available Sensors
@@ -519,20 +591,4 @@ they can be queried through the API.
 
 * **ref_locked** - clock reference locked (internal/external)
 * Other sensors are added when the GPSDO is enabled
-
-^^^^^^^^^^^^^^^^^^^^
-Multiple RX channels
-^^^^^^^^^^^^^^^^^^^^
-There are two complete DDC chains in the FPGA.
-In the single channel case, only one chain is ever used.
-To receive from both channels,
-the user must set the **RX** subdevice specification.
-This hardware has only one daughterboard slot,
-which has been aptly named slot **A**.
-
-In the following example, a TVRX2 is installed.
-Channel 0 is sourced from subdevice **RX1**,
-and channel 1 is sourced from subdevice **RX2**:
-::::::::::::::::::::::::::::::::::::::::::::::::
-
-    usrp->set_rx_subdev_spec("A:RX1 A:RX2");
+    
