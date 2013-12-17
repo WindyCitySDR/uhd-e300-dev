@@ -99,36 +99,11 @@ boost::uint8_t bitswap(uint8_t b){
 }
 
 void list_usrps(){
-    const x300_fpga_update_data_t *update_data_in = reinterpret_cast<const x300_fpga_update_data_t *>(x300_data_in_mem);
+    device_addrs_t found_devices = device::find(device_addr_t("type=x300"));
 
-    udp_simple::sptr udp_bc_transport;
-    x300_fpga_update_data_t list_packet;
-    list_packet.flags = htonx<boost::uint32_t>(X300_FPGA_PROG_FLAGS_INIT | X300_FPGA_PROG_FLAGS_ACK);
-    list_packet.sector = 0;
-    list_packet.size = 0;
-    list_packet.index = 0;
-    memset(list_packet.data, 0, sizeof(list_packet.data));
-    
     std::cout << "Available X3x0 devices:" << std::endl;
-    
-    BOOST_FOREACH(const if_addrs_t &if_addrs, get_if_addrs()){
-        //Avoid the loopback device
-        if(if_addrs.inet == boost::asio::ip::address_v4::loopback().to_string()) continue;
-        udp_bc_transport = udp_simple::make_broadcast(if_addrs.bcast, BOOST_STRINGIZE(X300_FPGA_PROG_UDP_PORT));
-        udp_bc_transport->send(boost::asio::buffer(&list_packet, sizeof(list_packet)));
-        
-        udp_bc_transport->recv(boost::asio::buffer(x300_data_in_mem), 1);
-        if(((ntohl(update_data_in->flags) & X300_FPGA_PROG_FLAGS_ERROR) != X300_FPGA_PROG_FLAGS_ERROR)
-           and (udp_bc_transport->get_recv_addr() != "0.0.0.0")){
-            list_packet.flags = htonx<boost::uint32_t>(X300_FPGA_PROG_FLAGS_CLEANUP | X300_FPGA_PROG_FLAGS_ACK);
-            udp_bc_transport->send(boost::asio::buffer(&list_packet, sizeof(list_packet)));
-            
-            udp_bc_transport->recv(boost::asio::buffer(x300_data_in_mem), 1);
-            if(((ntohl(update_data_in->flags) & X300_FPGA_PROG_FLAGS_ERROR) != X300_FPGA_PROG_FLAGS_ERROR)
-               and (udp_bc_transport->get_recv_addr() != "0.0.0.0")){
-                std::cout << " * " << udp_bc_transport->get_recv_addr() << std::endl;
-            }
-        }
+    BOOST_FOREACH(const device_addr_t &dev, found_devices){
+        std::cout << str(boost::format(" * %s (%s)") % dev["product"] % dev["addr"]) << std::endl;
     }
 }
 
@@ -392,10 +367,10 @@ int UHD_SAFE_MAIN(int argc, char *argv[]){
         throw std::runtime_error("Found multiple X3x0 units with the specified address!");
     }
     else {
-        std::cout << (boost::format("Found %s.") % found_devices[0]["product"]) << std::endl;
+        std::cout << (boost::format("Found %s.") % found_devices[0]["product"]) << std::endl << std::endl;
     }
 
-    /*udp_simple::sptr udp_transport = udp_simple::make_connected(ip_addr, BOOST_STRINGIZE(X300_FPGA_PROG_UDP_PORT));
+    udp_simple::sptr udp_transport = udp_simple::make_connected(ip_addr, BOOST_STRINGIZE(X300_FPGA_PROG_UDP_PORT));
 
     //If user specifies FPGA path, burn the image
     if(fpga_path != "") burn_fpga_image(udp_transport, fpga_path, vm.count("verify"));
@@ -405,7 +380,7 @@ int UHD_SAFE_MAIN(int argc, char *argv[]){
     if((fpga_path != "") or vm.count("configure")){
         if(configure_fpga(udp_transport, ip_addr)) std::cout << "Successfully configured FPGA!" << std::endl;
         else throw std::runtime_error("FPGA configuring failed!");
-    }*/
+    }
 
     return EXIT_SUCCESS;
 }
