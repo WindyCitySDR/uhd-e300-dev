@@ -28,22 +28,99 @@ Comparative features list
  * sc8 and sc16 sample modes
  * Up to 200 MHz of RF BW with 16-bit samples
 
-Hardware setup
+PENDING:
 LED indications
 Ref clock and 1 PPS
 Using GPIO expansion
 Using internal GPSDO 
+Multiple channels
 
-Burning FPGA images
-1/10 GigE
-PCI Express and ExpressCard
-JTAG (for FPGA devel)
-1 GigE setup
-10 Gig,)E setup
-PCI Express setup
-Express card setup
-Addressing 
-Alternate Stream Dest
+--------------
+Hardware Setup
+--------------
+
+^^^^^^^^^^^^^^^^
+Gigabit Ethernet
+^^^^^^^^^^^^^^^^
+
+Installing the USRP X300/X310
+:::::::::::::::::::::::::::::
+* Prior to installing the module, the host PC can remain powered on.
+* Plug a 1 Gigabit SFP+ Transciever into Ethernet Port 0 on the USRP X300/x310 device.
+* Use the Ethernet cable to connect the SFP+ transciever on the device to the host computer. For maximum throughput, Ettus Research recommends that you connect each device to its own dedicated Gigabit Ethernet interface on the host computer.
+* Connect the AC/DC power supply to the device and plug the supply into a wall outlet.
+* The OS with automatically recognize the device.
+
+^^^^^^^^^^^^^^^^^^^^
+Ten Gigabit Ethernet
+^^^^^^^^^^^^^^^^^^^^
+
+Installing the Host Ethernet Interface
+::::::::::::::::::::::::::::::::::::::
+Ettus Research recommends the Intel Ethernet Converged Network Adapter X520-DA2 interface for communication with the USRP X300/X310 device.
+Installation instructions for this interface are available on the official Intel website.
+
+Installing the USRP X300/X310
+:::::::::::::::::::::::::::::
+* Prior to installing the module, the host PC can remain powered on.
+* Use a 10 Gigabit SFP+ cable to connect Ethernet Port 1 on the USRP X300/x310 device to the host computer. For maximum throughput, Ettus Research recommends that you connect the device to its own dedicated Ten Gigabit, Ettus Research recommended Ethernet interface on the host computer.
+* Connect the AC/DC power supply to the device and plug the supply into a wall outlet.
+* The OS with automatically recognize the device.
+
+The LEDs on the front panel can be useful in debugging hardware and software issues.
+The LEDs reveal the following about the state of the device:
+
+^^^^^^^^^^^^^^^^^^^^^
+PCI Express (Desktop)
+^^^^^^^^^^^^^^^^^^^^^
+Installing the PCI Express Interface Kit
+::::::::::::::::::::::::::::::::::::::::
+Follow the instructions listed in the `Set Up Your MXI-Express x4 System <http://www.ni.com/pdf/manuals/371976c.pdf>`_ 
+document to setup the NI PCIe-8371 module.
+
+Installing the USRP X300/X310
+:::::::::::::::::::::::::::::
+* Prior to installing the module, make sure that the PC is powered off.
+* Using a MXI-Express Cable connect the USRP X300/X310 to the NI PCIe-8371.
+* Connect the AC/DC power supply to the device and plug the supply into a wall outlet.
+* Power on the USRP X300/X310 device using the power switch located in the bottom-right corner of the front panel.
+* Power on the PC (The OS automatically recognizes the new device)
+
+NOTE: The USRP device is not hot-pluggable over PCI Express. Any connection changes with only be detected by your 
+computer after a successful reboot.
+
+Troubleshooting
+:::::::::::::::
+If your computer does not boot when connected to your PXI chassis through MXI-Express, or if Windows does not 
+properly discover your devices. (For example, there is a yellow exclamation point on a PCI to PCI bridge in 
+Windows Device Manager, despite drivers for all devices being installed.) These situations often are due to 
+programming errors in PCI Express device configuration of the BIOS. To use this software, you need a MXI-Express 
+device that supports Mode 1 operation. 
+Refer to `NI MXI-Express BIOS Compatibility Software Readme <http://download.ni.com/support/softlib//PXI/MXIe%20Compatibility%20Software/1.5.0/readme.html#SupportedHardware>`_ 
+for more information.
+
+The BIOS Compatibility Software can be downloaded for Windows from the `MXI-Express BIOS Compatibility Software <http://www.ni.com/download/mxi-express-bios-compatibility-software-1.5/3764/en/>`_ page
+
+^^^^^^^^^^^^^^^^^^^^
+PCI Express (Laptop)
+^^^^^^^^^^^^^^^^^^^^
+Installing the PCI Express Card
+:::::::::::::::::::::::::::::::
+Follow the instructions listed in the “Installing an NI ExpressCard-8360 Host Card” section of the 
+`Set Up Your MXI-Express x1 System <http://www.ni.com/pdf/manuals/373259d.pdf#page=10>`_ 
+document to setup the NI ExpressCard-8360B module.
+
+Installing the USRP X300/X310
+:::::::::::::::::::::::::::::
+Because a laptop computer is not grounded, follow this procedure to safely connect a laptop
+computer to your USRP device.
+
+* Connect the AC/DC power supply to the device and plug the supply into a wall outlet. Ensure that the USRP device is powered off
+* Touch the NI ExpressCard-8360B and a metal part of the USRP device simultaneously. Do not install the NI ExpressCard-8360B into the laptop computer yet.
+* Connect the cable to the NI ExpressCard-8360B and USRP.
+* Plug the NI ExpressCard-8360B into an available ExpressCard slot. If your laptop computer is already running (or hibernating, suspended, etc) when you install an NI ExpressCard-8360B, you must reboot to detect the USRP. Otherwise, the USRP is detected when you start your computer.
+
+NOTE: The USRP device is not hot-pluggable over PCI Express. Any connection changes will only be detected by your computer after a successful reboot.
 
 --------------------------------
 Load FPGA Images onto the Device
@@ -251,6 +328,50 @@ Run the following commands:
     cd <install-path>\share\uhd\utils
     usrp_burn_mb_eeprom.exe --args=<optional device args> --key=ip-addr --val=192.168.10.3
 
+---------------------
+Addressing the Device
+---------------------
+
+^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Single device configuration
+^^^^^^^^^^^^^^^^^^^^^^^^^^^
+In a single-device configuration,
+the USRP device must have a unique IPv4 address on the host computer.
+The USRP can be identified through its IPv4 address, resolvable hostname, NI-RIO resource name or by other means.
+See the application notes on `device identification <./identification.html>`_.
+Use this addressing scheme with the **single_usrp** interface.
+
+Example device address string representation for a USRP-X Series device with IPv4 address **192.168.10.2**:
+
+::
+
+    addr=192.168.10.2
+
+Example device address string representation for a USRP-X Series device with RIO resource name **RIO0** over PCI Express:
+
+::
+
+    resource=RIO0
+
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Multiple device configuration
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+In a multi-device configuration,
+each USRP device must have a unique IPv4 address on the host computer.
+The device address parameter keys must be suffixed with the device index.
+Each parameter key should be of the format <key><index>.
+Use this addressing scheme with the **multi_usrp** interface.
+
+* The order in which devices are indexed corresponds to the indexing of the transmit and receive channels.
+* The key indexing provides the same granularity of device identification as in the single device case.
+
+Example device address string representation for 2 USRPs with IPv4 addresses **192.168.10.2** and **192.168.20.2**:
+
+::
+
+    addr0=192.168.10.2, addr1=192.168.20.2
+
+
 ----------------------
 Communication Problems
 ----------------------
@@ -270,7 +391,6 @@ will likely see a 'no control response' error message.
 Fixing this is simple - just set the your host PC's IP address to the same
 subnet as that of your USRP device. Instructions for setting your IP address are in the
 previous section of this documentation.
-
 
 ^^^^^^^^^^^^^^^
 Firewall issues
@@ -295,158 +415,56 @@ and that it is using the expected IP address.
 
     ping 192.168.10.2
 
-^^^^^^^^^^^^^^^^^^^^^^^^^
-Monitor the serial output
-^^^^^^^^^^^^^^^^^^^^^^^^^
-Read the serial port to get debug verbose output from the embedded microcontroller.
-The microcontroller prints useful information about IP addresses,
-MAC addresses, control packets, fast-path settings, and bootloading.
-Use a standard USB to 3.3v-level serial converter at 230400 baud.
-Connect **GND** to the converter ground, and connect **TXD** to the converter receive.
-The **RXD** pin can be left unconnected as this is only a one-way communication.
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+USRP RIO device not enumerated (Linux)
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+UHD requires the RIO device manager service to be running in order to communicate with any USRP RIO device.
+This service is installed as a part of the USRP RIO (or NI-USRP) installer. On Linux, the service
+is not started at system boot time. To start it, run the following command:
 
-* **USRP2:** Serial port located on the rear edge
-* **N210:** Serial port located on the left side
+::
+
+    sudo /etc/init.d/niusrpriorpc start
+
+If the device still does not enumerate after starting the device manager, make sure that the host computer
+has successfully detected it. You can do so by running the following command:
+
+::
+
+   lspci -k -d 1093:c4c4
+
+A device similar to the following should be detected:
+
+::
+
+   $ lspci -k -d 1093:c4c4
+   04:00.0 Signal processing controller: National Instruments ...
+           Subsystem: National Instruments Device 76ca
+           Kernel driver in use: niusrpriok_shipped
+
+* A USRP X300 should appear with 'Subsystem: National Instruments Device 7736'
+* A USRP X310 should appear with 'Subsystem: National Instruments Device 76ca'
+
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+USRP RIO device not enumerated (Windows)
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+UHD requires the RIO device manager service to be running in order to communicate with any USRP RIO device.
+This service is installed as a part of the USRP RIO (or NI-USRP) installer. On Windows, it can be found in
+the **Services** section in the Control Panel and it is started at system boot time. To ensure that the 
+service is indeed started, navigate to the Services tag in the Windows Task Manager and ensure that the 
+status of **niusrpriorpc** is "Running" 
+
+If the device still does not enumerate after starting the device manager, make sure that the host computer
+has successfully detected it. You can do so by checking if your device shows up in the Windows Device Manager
 
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Monitor the host network traffic
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Use Wireshark to monitor packets sent to and received from the device.
 
----------------------
-Addressing the Device
----------------------
-
-^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Single device configuration
-^^^^^^^^^^^^^^^^^^^^^^^^^^^
-In a single-device configuration,
-the USRP device must have a unique IPv4 address on the host computer.
-The USRP can be identified through its IPv4 address, resolvable hostname, or by other means.
-See the application notes on `device identification <./identification.html>`_.
-Use this addressing scheme with the **single_usrp** interface.
-
-Example device address string representation for a USRP2 with IPv4 address **192.168.10.2**:
-
-::
-
-    addr=192.168.10.2
-
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Multiple device configuration
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-In a multi-device configuration,
-each USRP device must have a unique IPv4 address on the host computer.
-The device address parameter keys must be suffixed with the device index.
-Each parameter key should be of the format <key><index>.
-Use this addressing scheme with the **multi_usrp** interface.
-
-* The order in which devices are indexed corresponds to the indexing of the transmit and receive channels.
-* The key indexing provides the same granularity of device identification as in the single device case.
-
-Example device address string representation for 2 USRP2s with IPv4 addresses **192.168.10.2** and **192.168.20.2**:
-::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
-
-    addr0=192.168.10.2, addr1=192.168.20.2
-
---------------------
-Using the MIMO Cable
---------------------
-The MIMO cable allows two USRP devices to share reference clocks,
-time synchronization, and the Ethernet interface.
-One of the devices will sync its clock and time references to the MIMO cable.
-This device will be referred to as the slave, and the other device, the master.
-
-* The slave device acquires the clock and time references from the master device.
-* The master and slave may be used individually or in a multi-device configuration.
-* External clocking is optional and should only be supplied to the master device.
-
-^^^^^^^^^^^^^^^^^^^^
-Shared ethernet mode
-^^^^^^^^^^^^^^^^^^^^
-In shared Ethernet mode,
-only one device in the configuration can be attached to the Ethernet.
-
-* Clock reference, time reference, and data are communicated over the MIMO cable.
-* Master and slave must have different IPv4 addresses in the same subnet.
-
-^^^^^^^^^^^^^^^^^^
-Dual ethernet mode
-^^^^^^^^^^^^^^^^^^
-In dual Ethernet mode,
-both devices in the configuration must be attached to the Ethernet.
-
-* Only clock reference and time reference are communicated over the MIMO cable.
-* The master and slave must have different IPv4 addresses in different subnets.
-
-^^^^^^^^^^^^^^^^^^^^^
-Configuring the slave
-^^^^^^^^^^^^^^^^^^^^^
-In order for the slave to synchronize to the master over MIMO cable,
-the following clock configuration must be set on the slave device:
-::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
-
-    usrp->set_time_source("mimo", slave_index);
-    usrp->set_clock_source("mimo", slave_index);
-
-
-------------------------------
-Alternative stream destination
-------------------------------
-It is possible to program the USRP device to send RX packets to an alternative IP/UDP destination.
-
-^^^^^^^^^^^^^^^^^^^^^^^^^^
-Set the subnet and gateway
-^^^^^^^^^^^^^^^^^^^^^^^^^^
-To use an alternative streaming destination,
-the device needs to be able to determine if the destination address
-is within its subnet, and ARP appropriately.
-Therefore, the user should ensure that subnet and gateway addresses
-have been programmed into the device's EEPROM.
-
-Run the following commands:
-:::::::::::::::::::::::::::
-
-    cd <install-path>/share/uhd/utils
-    ./usrp_burn_mb_eeprom --args=<optional device args> --key=subnet --val=255.255.255.0
-    ./usrp_burn_mb_eeprom --args=<optional device args> --key=gateway --val=192.168.10.1
-
-^^^^^^^^^^^^^^^^^^^^^^^^^
-Create a receive streamer
-^^^^^^^^^^^^^^^^^^^^^^^^^
-Set the stream args "addr" and "port" values to the alternative destination.
-Packets will be sent to this destination when the user issues a stream command.
-
-::
-
-    //create a receive streamer, host type does not matter
-    uhd::stream_args_t stream_args("fc32");
-
-    //resolvable address and port for a remote udp socket
-    stream_args.args["addr"] = "192.168.10.42";
-    stream_args.args["port"] = "12345";
-
-    //create the streamer
-    uhd::rx_streamer::sptr rx_stream = usrp->get_rx_stream(stream_args);
-
-    //issue stream command
-    uhd::stream_cmd_t stream_cmd(uhd::stream_cmd_t::STREAM_MODE_NUM_SAMPS_AND_DONE);
-    stream_cmd.num_samps = total_num_samps;
-    stream_cmd.stream_now = true;
-    usrp->issue_stream_cmd(stream_cmd);
-
-**Note:**
-Calling recv() on this streamer object should yield a timeout.
-
---------------------
-Hardware Setup Notes
---------------------
-
-^^^^^^^^^^^^^^^^
-Front panel LEDs
-^^^^^^^^^^^^^^^^
-The LEDs on the front panel can be useful in debugging hardware and software issues.
-The LEDs reveal the following about the state of the device:
+--------------
+Hardware Notes
+--------------
 
 * **LED A:** transmitting
 * **LED B:** mimo cable link
@@ -496,12 +514,11 @@ Miscellaneous
 ^^^^^^^^^^^^^^^^^
 Available Sensors
 ^^^^^^^^^^^^^^^^^
-The following sensors are available for the USRP2/N-Series motherboards;
+The following sensors are available for the USRP-X Series motherboards;
 they can be queried through the API.
 
-* **mimo_locked** - clock reference locked over the MIMO cable
 * **ref_locked** - clock reference locked (internal/external)
-* other sensors are added when the GPSDO is enabled
+* Other sensors are added when the GPSDO is enabled
 
 ^^^^^^^^^^^^^^^^^^^^
 Multiple RX channels
