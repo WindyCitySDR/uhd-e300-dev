@@ -95,6 +95,12 @@ static device_addrs_t x300_find_with_addr(const device_addr_t &hint)
             wb_iface::sptr zpu_ctrl = x300_make_ctrl_iface_enet(udp_simple::make_connected(new_addr["addr"], BOOST_STRINGIZE(X300_FW_COMMS_UDP_PORT)));
             if (x300_impl::is_claimed(zpu_ctrl)) continue; //claimed by another process
 
+            if(hint.has_key("fpga") and not FPGA_ETH_WARNING_GIVEN)
+            {
+                UHD_MSG(warning) << "You muse use PCIe, JTAG, or the usrp_x3xx_burner to change the FPGA image." << std::endl;
+                //Set flag to true to prevent multiple warnings
+                FPGA_ETH_WARNING_GIVEN = true;
+            }
             new_addr["fpga"] = get_fpga_option(zpu_ctrl);
 
             i2c_core_100_wb32::sptr zpu_i2c = i2c_core_100_wb32::make(zpu_ctrl, I2C1_BASE);
@@ -122,10 +128,9 @@ static device_addrs_t x300_find_with_addr(const device_addr_t &hint)
         }
         //filter the discovered device below by matching optional keys
         if (
-            (not hint.has_key("name")    or hint["name"]   == new_addr["name"]) and
-            (not hint.has_key("serial")  or hint["serial"] == new_addr["serial"]) and
-            (not hint.has_key("product") or hint["product"] == new_addr["product"]) and
-            (not hint.has_key("fpga") or hint["fpga"] == new_addr["fpga"])
+            (not hint.has_key("name")    or hint["name"]    == new_addr["name"]) and
+            (not hint.has_key("serial")  or hint["serial"]  == new_addr["serial"]) and
+            (not hint.has_key("product") or hint["product"] == new_addr["product"])
         ){
             addrs.push_back(new_addr);
         }
@@ -178,6 +183,16 @@ static device_addrs_t x300_find_pcie(const device_addr_t &hint, bool explicit_qu
             const mboard_eeprom_t mb_eeprom(*eeprom16, "X300");
             new_addr["name"] = mb_eeprom["name"];
             new_addr["serial"] = mb_eeprom["serial"];
+            switch (boost::lexical_cast<boost::uint16_t>(mb_eeprom["product"]))
+            {
+                case X300_PCIE_SSID:
+                    new_addr["product"] = "X300";
+                    break;
+                case X310_PCIE_SSID:
+                    new_addr["product"] = "X310";
+                    break;
+                default: UHD_MSG(error) << "X300 unknown product code: " << mb_eeprom["product"] << std::endl;
+            }
         }
         catch(const std::exception &)
         {
@@ -198,7 +213,8 @@ static device_addrs_t x300_find_pcie(const device_addr_t &hint, bool explicit_qu
         if (
             (not hint.has_key("resource") or resource_i     == resource_d) and
             (not hint.has_key("name")     or hint["name"]   == new_addr["name"]) and
-            (not hint.has_key("serial")   or hint["serial"] == new_addr["serial"])
+            (not hint.has_key("serial")   or hint["serial"] == new_addr["serial"]) and
+            (not hint.has_key("product") or hint["product"] == new_addr["product"])
         ){
             addrs.push_back(new_addr);
         }
@@ -224,6 +240,7 @@ static device_addrs_t x300_find(const device_addr_t &hint_)
         }
         if (found_devices.empty()) return device_addrs_t();
         if (not error_msg.empty()) throw uhd::value_error(error_msg);
+
         return device_addrs_t(1, combine_device_addrs(found_devices));
     }
 
@@ -234,9 +251,14 @@ static device_addrs_t x300_find(const device_addr_t &hint_)
     device_addrs_t addrs;
     if (hint.has_key("type") and hint["type"] != "x300") return addrs;
 
+
     //use the address given
     if (hint.has_key("addr"))
     {
+        //If "fpga" key not given initially, set warning flag to true to prevent
+        //false positive
+        if(not hint.has_key("fpga")) FPGA_ETH_WARNING_GIVEN = true;
+
         device_addrs_t reply_addrs;
         try
         {

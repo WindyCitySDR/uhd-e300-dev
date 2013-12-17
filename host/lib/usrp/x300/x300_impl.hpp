@@ -68,6 +68,8 @@ static const size_t X300_PCIE_DATA_NUM_FRAMES   = 1024;
 static const size_t X300_PCIE_MSG_FRAME_SIZE    = 256;          //bytes
 static const size_t X300_PCIE_MSG_NUM_FRAMES    = 32;
 
+static bool FPGA_ETH_WARNING_GIVEN = false;
+
 #define X300_RADIO_DEST_PREFIX_TX 0
 #define X300_RADIO_DEST_PREFIX_CTRL 1
 #define X300_RADIO_DEST_PREFIX_RX 2
