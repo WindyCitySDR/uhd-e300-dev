@@ -94,13 +94,6 @@ static device_addrs_t x300_find_with_addr(const device_addr_t &hint)
         {
             wb_iface::sptr zpu_ctrl = x300_make_ctrl_iface_enet(udp_simple::make_connected(new_addr["addr"], BOOST_STRINGIZE(X300_FW_COMMS_UDP_PORT)));
             if (x300_impl::is_claimed(zpu_ctrl)) continue; //claimed by another process
-
-            if(hint.has_key("fpga") and not FPGA_ETH_WARNING_GIVEN)
-            {
-                UHD_MSG(warning) << "You muse use PCIe, JTAG, or the usrp_x3xx_burner to change the FPGA image." << std::endl;
-                //Set flag to true to prevent multiple warnings
-                FPGA_ETH_WARNING_GIVEN = true;
-            }
             new_addr["fpga"] = get_fpga_option(zpu_ctrl);
 
             i2c_core_100_wb32::sptr zpu_i2c = i2c_core_100_wb32::make(zpu_ctrl, I2C1_BASE);
@@ -255,10 +248,6 @@ static device_addrs_t x300_find(const device_addr_t &hint_)
     //use the address given
     if (hint.has_key("addr"))
     {
-        //If "fpga" key not given initially, set warning flag to true to prevent
-        //false positive
-        if(not hint.has_key("fpga")) FPGA_ETH_WARNING_GIVEN = true;
-
         device_addrs_t reply_addrs;
         try
         {
