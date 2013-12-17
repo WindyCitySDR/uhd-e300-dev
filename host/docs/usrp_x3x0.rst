@@ -66,6 +66,9 @@ The LEDs reveal the following about the state of the device:
 ^^^^^^^^^^^^^^^^^^^^^
 PCI Express (Desktop)
 ^^^^^^^^^^^^^^^^^^^^^
+*Important Note: The USRP X-Series provides PCIe connectivity over MXI cable.
+We will use the 'MXI' nomenclature for the rest of this manual.*
+
 Installing the PCI Express Interface Kit
 ::::::::::::::::::::::::::::::::::::::::
 Follow the instructions listed in the `Set Up Your MXI-Express x4 System <http://www.ni.com/pdf/manuals/371976c.pdf>`_ 
@@ -84,10 +87,12 @@ computer after a successful reboot.
 
 Troubleshooting
 :::::::::::::::
-If your computer does not boot when connected to your PXI chassis through MXI-Express, or if Windows does not 
-properly discover your devices. (For example, there is a yellow exclamation point on a PCI to PCI bridge in 
-Windows Device Manager, despite drivers for all devices being installed.) These situations often are due to 
-programming errors in PCI Express device configuration of the BIOS. To use this software, you need a MXI-Express 
+Two possible failure modes are your computer not booting when connected to your
+USRP device through MXI-Express, and Windows not properly discovering your
+devices (i.e., for example, there is a yellow exclamation point on a PCI to PCI
+bridge in Windows Device Manager, despite drivers for all devices being
+installed.) These situations often are due to programming errors in PCI Express
+device configuration of the BIOS. To use this software, you need a MXI-Express
 device that supports Mode 1 operation. 
 Refer to `NI MXI-Express BIOS Compatibility Software Readme <http://download.ni.com/support/softlib//PXI/MXIe%20Compatibility%20Software/1.5.0/readme.html#SupportedHardware>`_ 
 for more information.
@@ -97,6 +102,9 @@ The BIOS Compatibility Software can be downloaded for Windows from the `MXI-Expr
 ^^^^^^^^^^^^^^^^^^^^
 PCI Express (Laptop)
 ^^^^^^^^^^^^^^^^^^^^
+*Important Note: The USRP X-Series provides PCIe connectivity over MXI cable.
+We will use the 'MXI' nomenclature for the rest of this manual.*
+
 Installing the PCI Express Card
 :::::::::::::::::::::::::::::::
 Follow the instructions listed in the “Installing an NI ExpressCard-8360 Host Card” section of the 
@@ -116,18 +124,37 @@ computer to your USRP device.
 NOTE: The USRP device is not hot-pluggable over PCI Express. Any connection changes will only be detected by your computer after a successful reboot.
 
 --------------------------------
+On-Board JTAG Programmer
+--------------------------------
+The USRP X3x0 includes an on-board JTAG programmer, built into the motherboard.
+To connect to this JTAG device, simply connect your computer to the USB JTAG
+port on the front of the X3x0 device. You may now use the JTAG programmer in
+the same way you would use any other, including:
+
+* `Xilinx Programming Tools (ISE, iMPACT) <http://www.xilinx.com/support/download/index.htm>`_
+* `Xilinx Chipscope <http://www.xilinx.com/tools/cspro.htm>`_
+* `Digilent ADEPT <https://www.digilentinc.com/Products/Detail.cfm?NavPath=2,66,828&Prod=ADEPT2>`_
+
+--------------------------------
 Load FPGA Images onto the Device
 --------------------------------
-The USRP-X Series device ships with a bitstream pre-programmed in the flash, and it is loaded 
-onto the FPGA during device power-up. However, a new FPGA image can be configured over the 
-PCI Express interface or the on-board USB-JTAG programmer.
+The USRP-X Series device ships with a bitstream pre-programmed in the flash,
+which is automatically loaded onto the FPGA during device power-up. However,
+a new FPGA image can be configured over the PCI Express interface or the
+on-board USB-JTAG programmer. This process can be seen as a "one-time load", in
+that if you power-cycle the device, it will not retain the FPGA image.
+
+Please note that this process is *different* than replacing the FPGA image
+stored in the flash, which will then be automatically loaded the next time the
+device is reset.
 
 ^^^^^^^^^^^^^^^^^^
 FPGA Image Flavors
 ^^^^^^^^^^^^^^^^^^
-The USRP-X Series devices contains two SPF+ port for the two Ethernet channels. Because the 
-SFP+ ports support both 1 Gigabit and 10 Gigabit transcievers, multiple the FPGA images are 
-shipped with UHD to determine the behavior of the above interfaces.
+The USRP-X Series devices contains two SFP+ port for the two Ethernet channels.
+Because the SFP+ ports support both 1 Gigabit (SFP) and 10 Gigabit (SFP+)
+transcievers, multiple the FPGA images are shipped with UHD to determine the
+behavior of the above interfaces.
 
 +---------------------+------------------------+------------------------+
 |  FPGA Image Flavor  |  SFP+ Port 0 Interface |  SFP+ Port 1 Interface |
@@ -139,8 +166,9 @@ shipped with UHD to determine the behavior of the above interfaces.
 
 FPGA images are shipped in 2 formats:
 
-* **LVBITX**: LabVIEW FPGA configuration bitstream format (for use over PCI Express)
-* **BIT**: Xilinx configuration bitstream format (for use over JTAG)
+* **LVBITX**: LabVIEW FPGA configuration bitstream format (for use over PCI Express and Ethernet)
+* **BIT**: Xilinx configuration bitstream format (for use over Ethernet and JTAG)
+* **BIN**: Xilinx configuration binary format (for use over Ethernet)
 
 To get the latest images, simply use the uhd_images_downloader script:
 
@@ -166,7 +194,7 @@ Because FPGA configuration is a part of normal operation over PCI Express, there
 before running UHD.
 
 The **fpga** tag can be set in the optional device args passed to indicate the FPGA image flavor to UHD.
-If the above tag is speficied, UHD will attempt to load the FPGA image with the requested flavor from the
+If the above tag is specified, UHD will attempt to load the FPGA image with the requested flavor from the
 UHD images directory. If the tag is not specified, UHD will automatically detect the flavor of the image
 and attempt to load the corresponding configuration bitstream onto the device. Note that if UHD detects
 that the requested image is already loaded onto the FPGA then it will not reload it. 
@@ -181,11 +209,14 @@ the JTAG interface.
 ---------------------------------------
 Load the Images onto the On-board Flash
 ---------------------------------------
-The USRP-X Series device can be reprogrammed over the network or PCI Express to update or change the FPGA image.
+To change the FPGA image stored in the on-board flash, the USRP-X Series device
+can be reprogramed over the network or PCI Express. Once you have programmed an
+image into the flash, that image will be automatically loaded on the FPGA
+during the device boot-up sequence.
 
 **Note:**
 Different hardware revisions require different FPGA images.
-Determine the revision number from the sticker on the rear of the chassis.
+Determine the revision number from the sticker on the rear of the device.
 Use this number to select the correct FPGA image for your device.
 
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -231,10 +262,14 @@ Setup Networking
 The USRP-X Series only supports Gigabit and Ten Gigabit Ethernet and will not work with a 10/100 Mbps interface.
 However, a 10/100 Mbps interface can be connected indirectly to a USRP-X through a Gigabit Ethernet switch.
 
+**Please note that 10 Gigabit Ethernet defines the protocol, not necessary the
+medium. For example, you may use 10GigE over optical with optical SFP+
+transceiver modules.**
+
 ^^^^^^^^^^^^^^^^^^^^^^^^
 Setup the host interface
 ^^^^^^^^^^^^^^^^^^^^^^^^
-The USRP-X Series communicates at the IP/UDP layer over the gigabit and ten gigabit ethernet.
+The USRP-X Series communicates at the IP/UDP layer over the Gigabit and Ten Gigabit Ethernet.
 The default IP address for the USRP X300/X310 device depends on the Ethernet Port and interface used. 
 You must configure the host Ethernet interface with a static IP address on the same subnet as the connected 
 device to enable communication, as shown in the following table:
@@ -332,7 +367,7 @@ In a single-device configuration,
 the USRP device must have a unique IPv4 address on the host computer.
 The USRP can be identified through its IPv4 address, resolvable hostname, NI-RIO resource name or by other means.
 See the application notes on `device identification <./identification.html>`_.
-Use this addressing scheme with the **single_usrp** interface.
+Use this addressing scheme with the **multi_usrp** interface (not a typo!).
 
 Example device address string representation for a USRP-X Series device with IPv4 address **192.168.10.2**:
 
@@ -409,11 +444,13 @@ and that it is using the expected IP address.
     ping 192.168.10.2
 
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-USRP RIO device not enumerated (Linux)
+USRP device not enumerated (Linux)
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-UHD requires the RIO device manager service to be running in order to communicate with any USRP RIO device.
-This service is installed as a part of the USRP RIO (or NI-USRP) installer. On Linux, the service
-is not started at system boot time. To start it, run the following command:
+UHD requires the RIO device manager service to be running in order to
+communicate with an X-Series USRP over PCIe.  This service is installed as
+a part of the USRP RIO (or NI-USRP) installer. On Linux, the service is not
+started at system boot time, and is left to the user to control. To start it,
+run the following command:
 
 ::
 
@@ -439,9 +476,10 @@ A device similar to the following should be detected:
 * A USRP X310 should appear with 'Subsystem: National Instruments Device 76ca'
 
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-USRP RIO device not enumerated (Windows)
+USRP device not enumerated (Windows)
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-UHD requires the RIO device manager service to be running in order to communicate with any USRP RIO device.
+UHD requires the RIO device manager service to be running in order to
+communicate with an X-Series USRP over PCIe.
 This service is installed as a part of the USRP RIO (or NI-USRP) installer. On Windows, it can be found in
 the **Services** section in the Control Panel and it is started at system boot time. To ensure that the 
 service is indeed started, navigate to the Services tag in the Windows Task Manager and ensure that the 
@@ -477,7 +515,7 @@ Front Panel
 * **PPS**: Indicates a valid PPS signal by pulsing once per second
 * **AUX IO**: Front panel GPIO connector.
 * **GPS**: Indicates that GPS reference is locked
-* **LINK**: Indicates that the host computer is communicating with the device
+* **LINK**: Indicates that the host computer is communicating with the device (Activity)
 
 * **RF B Group**
 
@@ -538,7 +576,7 @@ Connector
 :::::::::
 
 .. image:: ./res/x3x0_gpio_conn.png
-   :scale: 25%
+   :scale: 75%
    :align: left
 
 Pin Mapping
@@ -591,4 +629,3 @@ they can be queried through the API.
 
 * **ref_locked** - clock reference locked (internal/external)
 * Other sensors are added when the GPSDO is enabled
-    
