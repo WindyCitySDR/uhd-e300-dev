@@ -6,7 +6,9 @@ UHD - Internal GPSDO Application Notes (USRP-X3x0 Models)
 
 This application note describes the use of the board-mounted GPS Disciplined OCXO, 
 as used with the USRP X300/X310.  For information regarding the GPSDO that is 
-compatible with the USRP N2xx or E1xx, please see 'this page<./gpsdo.html>'.
+compatible with the USRP N2xx or E1xx, please see:
+
+`USRP-N2x0/E1x0 Internal GPSDO Device Manual <./gpsdo.html>`_
 
 ------------------------------------------------------------------------
 Specifications
