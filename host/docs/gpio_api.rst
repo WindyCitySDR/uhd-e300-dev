@@ -13,6 +13,37 @@ controlled directly by the FPGA, where they are controlled by an ATR (Automatic
 Transmit / Receive). This allows them to be toggled simultaneously with other
 radio-level changes (e.g., enabling or disabling a TX or RX mixer).
 
+
+^^^^^^^^^^^^^^^^
+Front Panel GPIO
+^^^^^^^^^^^^^^^^
+
+Connector
+:::::::::
+
+.. image:: ./res/x3x0_gpio_conn.png
+   :scale: 75%
+   :align: left
+
+Pin Mapping
+:::::::::::
+
+* Pin 1:  +3.3V
+* Pin 2:  Data[0]
+* Pin 3:  Data[1]
+* Pin 4:  Data[2]
+* Pin 5:  Data[3]
+* Pin 6:  Data[4]
+* Pin 7:  Data[5]
+* Pin 8:  Data[6]
+* Pin 9:  Data[7]
+* Pin 10: Data[8]
+* Pin 11: Data[9]
+* Pin 12: Data[10]
+* Pin 13: Data[11]
+* Pin 14: 0V
+* Pin 15: 0V
+
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Explaining ATR
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -23,7 +54,7 @@ when the radio is transmitting and receiving (full duplex), GPIO6 should be
 high, but when it is only transmitting, GPI06 should be low. This state machine
 is set up using a series of GPIO attributes, with paired values and a mask,
 which you will want to define for the GPIO pins you intend to use. To set up
-the ATR, you use the **multi_usrp** function *set_gpio_attr*. The
+the ATR, you use the **multi_usrp** function *set_gpio_attr*. 
 
 * **CTRL**: Is this pin controlled by ATR (automatic), or by manual control
   only?

@@ -31,7 +31,7 @@ General UHD Manuals
 ^^^^^^^^^^^^^^^^^^^^^
 USRP N-Series Devices
 ^^^^^^^^^^^^^^^^^^^^^
-* `USRP-N2x0 Series Device Manual <./usrp2.html>`_
+* `USRP-N2x0 Series Device Manual <./gpsdo_x3x0.html>`_
 * `USRP-N2x0 Internal GPSDO Device Manual <./gpsdo.html>`_
 
 ^^^^^^^^^^^^^^^^^^^^^
@@ -39,7 +39,7 @@ USRP B-Series Devices
 ^^^^^^^^^^^^^^^^^^^^^
 * `USRP-B100 Series Device Manual <./usrp_b100.html>`_
 * `USRP-B2x0 Series Device Manual <./usrp_b200.html>`_
-* `USRP-B2x0 Internal GPSDO Device Manual <./gpsdo_b2x0.html>`_
+* `USRP1 Device Manual <./usrp1.html>`_
 
 ^^^^^^^^^^^^^^^^^^^^^
 USRP E-Series Devices
@@ -57,7 +57,6 @@ USRP X-Series Devices
 ^^^^^^^^^^^^^^^^^^^^^
 USRP Legacy Series
 ^^^^^^^^^^^^^^^^^^^^^
-* `USRP1 Device Manual <./usrp1.html>`_
 * `USRP2 Device Manual <./usrp2.html>`_
 
 ^^^^^^^^^^^^^^^^^^^^^

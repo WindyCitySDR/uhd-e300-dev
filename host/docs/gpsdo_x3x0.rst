@@ -4,8 +4,9 @@ UHD - Internal GPSDO Application Notes (USRP-X3x0 Models)
 
 .. contents:: Table of Contents
 
-This application note describes the use of integrated GPS-disciplined
-oscillators with Ettus Research USRP devices.
+This application note describes the use of the board-mounted GPS Disciplined OCXO, 
+as used with the USRP X300/X310.  For information regarding the GPSDO that is 
+compatible with the USRP N2xx or E1xx, please see 'this page<./gpsdo.html>'.
 
 ------------------------------------------------------------------------
 Specifications

@@ -10,7 +10,7 @@ Comparative features list
 
 **Hardware Capabilities:**
  * 2 transceiver card slots
- * Dual SFP+ Transceivers (can be used with 1 GigE, 10 GigE, or CPRI)
+ * Dual SFP+ Transceivers (can be used with 1 GigE, 10 GigE)
  * PCI Express over cable (MXI) gen1 x4
  * External PPS input & output
  * External 10MHz input & output
@@ -19,6 +19,7 @@ Comparative features list
  * External GPIO Connector with UHD API control
  * External USB Connection for built-in JTAG debugger
  * Internal GPSDO option
+ * Kintex-7 FPGA (X310: XC7K410T, X300: XC7K325T)
 
 **FPGA Capabilities:**
  * 2 RX DDC chains in FPGA
@@ -26,7 +27,7 @@ Comparative features list
  * Timed commands in FPGA
  * Timed sampling in FPGA
  * sc8 and sc16 sample modes
- * Up to 200 MHz of RF BW with 16-bit samples
+ * Up to 120 MHz of RF BW with 16-bit samples
 
 --------------
 Hardware Setup
@@ -260,7 +261,6 @@ Once booted into the safe image, the user can once again load images onto the de
 Setup Networking
 ----------------
 The USRP-X Series only supports Gigabit and Ten Gigabit Ethernet and will not work with a 10/100 Mbps interface.
-However, a 10/100 Mbps interface can be connected indirectly to a USRP-X through a Gigabit Ethernet switch.
 
 **Please note that 10 Gigabit Ethernet defines the protocol, not necessary the
 medium. For example, you may use 10GigE over optical with optical SFP+
@@ -565,7 +565,7 @@ Test the PPS input with the following app:
 ^^^^^^^^^^^^^^
 Internal GPSDO
 ^^^^^^^^^^^^^^
-Please see the `Internal GPSDO Application Notes <./gpsdo.html>`_
+Please see the `Internal GPSDO Application Notes <./gpsdo_x3x0.html>`_
 for information on configuring and using the internal GPSDO.
 
 ^^^^^^^^^^^^^^^^
