@@ -1,5 +1,5 @@
 ========================================================================
-UHD - USRP-B100 Series Application Notes
+UHD - USRP-B100 Series Device Manual
 ========================================================================
 
 .. contents:: Table of Contents
@@ -8,15 +8,21 @@ UHD - USRP-B100 Series Application Notes
 Comparative features list
 ------------------------------------------------------------------------
 
-* 1 transceiver card slot
-* 1 RX DDC chain in FPGA
-* 1 TX DUC chain in FPGA
-* Timed commands in FPGA
-* Timed sampling in FPGA
-* External PPS reference
-* External 10MHz reference
-* Configurable clock rate (defaults 64 MHz)
-* sc8 and sc16 sample modes
+**Hardware Capabilities:**
+ * 1 transceiver card slot
+ * External PPS reference input
+ * External 10MHz reference input
+ * Configurable clock rate (defaults 64 MHz)
+
+**FPGA Capabilities:**
+ * 1 RX DDC chain in FPGA
+ * 1 TX DUC chain in FPGA
+ * Timed commands in FPGA
+ * Timed sampling in FPGA
+ * sc8 and sc16 sample modes
+
+   * Up to 8 MHz of RF BW with 16-bit samples
+   * Up to 16 MHz of RF BW with 8-bit samples
 
 ------------------------------------------------------------------------
 Specify a Non-standard Image

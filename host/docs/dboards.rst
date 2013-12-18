@@ -204,10 +204,9 @@ Transmit Gains: **PGA0**, Range: 0-25dB
 
 Receive Gains: **PGA0**, Range: 0-31.5dB
 
-Bandwidths (Hz):
-
-* **RX**: 40M
-* **TX**: 40M
+Bandwidths:
+* **WBX**: 40 MHz, RX & TX
+* **WBX-120**: 120 MHz, RX & TX
 
 Sensors:
 
@@ -237,10 +236,9 @@ Transmit Gains: **PGA0**, Range: 0-31.5dB
 
 Receive Gains: **PGA0**, Range: 0-31.5dB
 
-Bandwidths (Hz):
-
-* **RX**: 40M
-* **TX**: 40M
+Bandwidths:
+* **SBX**: 40 MHz, RX & TX
+* **SBX-120**: 120 MHz, RX & TX
 
 Sensors:
 
@@ -255,9 +253,44 @@ LEDs:
 * **RX1/RX2**: Receiver on RX2 antenna port
 
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^
-CBX
+CBX Series
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^
-See SBX Series for more details.
+The CBX Series boards have 2 quadrature frontends, one transmit, one receive.
+Transmit and Receive default to direct conversion but
+can be used in low IF mode through lo_offset in **uhd::tune_request_t**.
+
+The SBX Series boards have independent receive and transmit LO's and synthesizers 
+allowing full-duplex operation on different transmit and receive frequencies.
+
+Transmit Antennas: **TX/RX**
+
+Receive Antennas: **TX/RX** or **RX2**
+
+* **Frontend 0:** Complex baseband signal for selected antenna
+
+The user may set the receive antenna to be TX/RX or RX2.
+However, when using an SBX board in full-duplex mode,
+the receive antenna will always be set to RX2, regardless of the settings.
+
+Transmit Gains: **PGA0**, Range: 0-31.5dB
+
+Receive Gains: **PGA0**, Range: 0-31.5dB
+
+Bandwidths:
+* **CBX**: 40 MHz, RX & TX
+* **CBX-120**: 120 MHz, RX & TX
+
+Sensors:
+
+* **lo_locked**: boolean for LO lock state
+
+LEDs:
+
+* All LEDs flash when dboard control is initialized
+* **TX LD**: Transmit Synthesizer Lock Detect
+* **TX/RX**: Receiver on TX/RX antenna port (No TX)
+* **RX LD**: Receive Synthesizer Lock Detect
+* **RX1/RX2**: Receiver on RX2 antenna port
 
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^
 TVRX
@@ -301,15 +334,6 @@ Sensors:
 * **lo_locked**: boolean for LO lock state
 * **rssi**: float for measured RSSI in dBm
 * **temperature**: float for measured temperature in degC
-
-------------------------------------------------------------------------
-Daughterboard Modifications
-------------------------------------------------------------------------
-
-Sometimes, daughterboards will require modification
-to work on certain frequencies or to work with certain hardware.
-Modification usually involves moving/removing an SMT component
-and burning a new daughterboard ID into the EEPROM.
 
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^
 DBSRX - Mod
