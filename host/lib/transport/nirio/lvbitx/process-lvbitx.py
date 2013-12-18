@@ -20,7 +20,7 @@ from xml.etree import ElementTree
 from collections import namedtuple
 import optparse
 import base64
-import md5
+import hashlib
 import os
 import sys
 
@@ -35,8 +35,8 @@ parser.add_option("--output-src-path", type="string", dest="output_src_path", he
 
 # Args
 if (len(args) < 1):
-	print 'ERROR: Please specify the input LVBITX file name'
-	sys.exit(1)
+    print 'ERROR: Please specify the input LVBITX file name'
+    sys.exit(1)
 
 lvbitx_filename = args[0]
 input_filename = os.path.abspath(lvbitx_filename)
@@ -44,17 +44,17 @@ autogen_src_path = os.path.abspath(options.output_src_path) if (options.output_s
 class_name = os.path.splitext(os.path.basename(input_filename))[0]
 
 if (not os.path.isfile(input_filename)):
-	print 'ERROR: FPGA File ' + input_filename + ' could not be accessed or is not a file.'
-	sys.exit(1)
+    print 'ERROR: FPGA File ' + input_filename + ' could not be accessed or is not a file.'
+    sys.exit(1)
 if (options.merge_bin is not None and not os.path.isfile(os.path.abspath(options.merge_bin))):
-	print 'ERROR: FPGA Bin File ' + options.merge_bin + ' could not be accessed or is not a file.'
-	sys.exit(1)
+    print 'ERROR: FPGA Bin File ' + options.merge_bin + ' could not be accessed or is not a file.'
+    sys.exit(1)
 if (not os.path.exists(autogen_src_path)):
-	print 'ERROR: Output path ' + autogen_src_path + ' could not be accessed.'
-	sys.exit(1)
+    print 'ERROR: Output path ' + autogen_src_path + ' could not be accessed.'
+    sys.exit(1)
 if (options.output_lvbitx_path is not None and input_filename == os.path.join(autogen_src_path, class_name + '.lvbitx')):
-	print 'ERROR: Input and output LVBITX files were the same. Choose a difference input file or output path.'
-	sys.exit(1)
+    print 'ERROR: Input and output LVBITX files were the same. Choose a difference input file or output path.'
+    sys.exit(1)
 
 # Get XML Tree Node
 tree = ElementTree.parse(input_filename)
@@ -77,24 +77,24 @@ indicator_list = ''
 control_idx = 0
 indicator_idx = 0
 for register in register_list.findall('Register'):
-	reg_type = 'INDICATOR' if (register.find('Indicator').text.lower() == 'true') else 'CONTROL'
-	reg_name = '\"' + register.find('Name').text + '\"'
+    reg_type = 'INDICATOR' if (register.find('Indicator').text.lower() == 'true') else 'CONTROL'
+    reg_name = '\"' + register.find('Name').text + '\"'
 
-	if (reg_type == 'INDICATOR'):
-		indicator_list += '\n    ' + reg_name + ','
-		idx = indicator_idx
-		indicator_idx += 1
-	else:
-		control_list += '\n    ' + reg_name + ','
-		idx = control_idx
-		control_idx += 1
+    if (reg_type == 'INDICATOR'):
+        indicator_list += '\n    ' + reg_name + ','
+        idx = indicator_idx
+        indicator_idx += 1
+    else:
+        control_list += '\n    ' + reg_name + ','
+        idx = control_idx
+        control_idx += 1
 
-	reg_init_seq += '\n    vtr.push_back(nirio_register_info_t('
-	reg_init_seq += hex(int(register.find('Offset').text)) + ', '
-	reg_init_seq += reg_type + 'S[' + str(idx) + '], '
-	reg_init_seq += reg_type
-	reg_init_seq += ')); //' + reg_name
-	
+    reg_init_seq += '\n    vtr.push_back(nirio_register_info_t('
+    reg_init_seq += hex(int(register.find('Offset').text)) + ', '
+    reg_init_seq += reg_type + 'S[' + str(idx) + '], '
+    reg_init_seq += reg_type
+    reg_init_seq += ')); //' + reg_name
+
 
 codegen_transform['register_init'] = reg_init_seq
 codegen_transform['control_list'] = control_list
@@ -111,32 +111,32 @@ in_fifo_list = ''
 out_fifo_idx = 0
 in_fifo_idx = 0
 for dma_channel in dma_channel_list:
-	fifo_name = '\"' + dma_channel.attrib['name'] + '\"'
-	direction = 'OUTPUT_FIFO' if (dma_channel.find('Direction').text == 'HostToTarget') else 'INPUT_FIFO'
-	for reg_block in reg_block_list.findall('RegisterBlock'):
-		if (reg_block.attrib['name'] == dma_channel.find('BaseAddressTag').text):
-			base_addr = reg_block.find('Offset').text
-			break
-	
-	if (direction == 'OUTPUT_FIFO'):
-		out_fifo_list += '\n    ' + fifo_name + ','
-		idx = out_fifo_idx
-		out_fifo_idx += 1
-	else:
-		in_fifo_list += '\n    ' + fifo_name + ','
-		idx = in_fifo_idx
-		in_fifo_idx += 1
+    fifo_name = '\"' + dma_channel.attrib['name'] + '\"'
+    direction = 'OUTPUT_FIFO' if (dma_channel.find('Direction').text == 'HostToTarget') else 'INPUT_FIFO'
+    for reg_block in reg_block_list.findall('RegisterBlock'):
+        if (reg_block.attrib['name'] == dma_channel.find('BaseAddressTag').text):
+            base_addr = reg_block.find('Offset').text
+            break
 
-	fifo_init_seq += '\n    vtr.push_back(nirio_fifo_info_t('
-	fifo_init_seq += dma_channel.find('Number').text + ', '
-	fifo_init_seq += direction + 'S[' + str(idx) + '], '
-	fifo_init_seq += direction + ', '
-	fifo_init_seq += str.lower(base_addr) + ', '
-	fifo_init_seq += dma_channel.find('NumberOfElements').text + ', '
-	fifo_init_seq += 'SCALAR_' + dma_channel.find('DataType').find('SubType').text + ', '
-	fifo_init_seq += dma_channel.find('DataType').find('WordLength').text + ', '
-	fifo_init_seq += bitstream_version
-	fifo_init_seq += ')); //' + fifo_name
+    if (direction == 'OUTPUT_FIFO'):
+        out_fifo_list += '\n    ' + fifo_name + ','
+        idx = out_fifo_idx
+        out_fifo_idx += 1
+    else:
+        in_fifo_list += '\n    ' + fifo_name + ','
+        idx = in_fifo_idx
+        in_fifo_idx += 1
+
+    fifo_init_seq += '\n    vtr.push_back(nirio_fifo_info_t('
+    fifo_init_seq += dma_channel.find('Number').text + ', '
+    fifo_init_seq += direction + 'S[' + str(idx) + '], '
+    fifo_init_seq += direction + ', '
+    fifo_init_seq += str.lower(base_addr) + ', '
+    fifo_init_seq += dma_channel.find('NumberOfElements').text + ', '
+    fifo_init_seq += 'SCALAR_' + dma_channel.find('DataType').find('SubType').text + ', '
+    fifo_init_seq += dma_channel.find('DataType').find('WordLength').text + ', '
+    fifo_init_seq += bitstream_version
+    fifo_init_seq += ')); //' + fifo_name
 
 
 codegen_transform['fifo_init'] = fifo_init_seq
@@ -145,32 +145,32 @@ codegen_transform['in_fifo_list'] = in_fifo_list
 
 # Merge bitstream into LVBITX
 if (options.merge_bin is not None):
-	with open(os.path.abspath(options.merge_bin), 'rb') as bin_file:
-		bitstream = bin_file.read()
-		bitstream_md5 = md5.new(bitstream).hexdigest()
-		bitstream_b64 = base64.b64encode(bitstream)
-		bitstream_b64_lb = ''
-		for i in range(0, len(bitstream_b64), 76):
-			bitstream_b64_lb += bitstream_b64[i:i+76] + '\n'
+    with open(os.path.abspath(options.merge_bin), 'rb') as bin_file:
+        bitstream = bin_file.read()
+        bitstream_md5 = hashlib.md5(bitstream).hexdigest()
+        bitstream_b64 = base64.b64encode(bitstream)
+        bitstream_b64_lb = ''
+        for i in range(0, len(bitstream_b64), 76):
+            bitstream_b64_lb += bitstream_b64[i:i+76] + '\n'
 
-		root.find('Bitstream').text = bitstream_b64_lb
-		root.find('BitstreamMD5').text = bitstream_md5
+        root.find('Bitstream').text = bitstream_b64_lb
+        root.find('BitstreamMD5').text = bitstream_md5
 
 codegen_transform['lvbitx_signature'] = str.upper(root.find('SignatureRegister').text)
 
 # Write BIN file
 bitstream = base64.b64decode(root.find('Bitstream').text)
-if (options.output_lvbitx_path is not None and md5.new(bitstream).hexdigest() != root.find('BitstreamMD5').text):
-	print 'ERROR: The MD5 sum for the output LVBITX was incorrect. Make sure that the bitstream in the input LVBITX or BIN file is valid.'
-	sys.exit(1)
+if (options.output_lvbitx_path is not None and hashlib.md5(bitstream).hexdigest() != root.find('BitstreamMD5').text):
+    print 'ERROR: The MD5 sum for the output LVBITX was incorrect. Make sure that the bitstream in the input LVBITX or BIN file is valid.'
+    sys.exit(1)
 if (options.output_bin):
-	fpga_bin_file = open(os.path.join(options.output_lvbitx_path, class_name + '.bin'), 'w')
-	fpga_bin_file.write(bitstream)
-	fpga_bin_file.close()
-	
+    fpga_bin_file = open(os.path.join(options.output_lvbitx_path, class_name + '.bin'), 'w')
+    fpga_bin_file.write(bitstream)
+    fpga_bin_file.close()
+
 # Save LVBITX
 if (options.output_lvbitx_path is not None):
-	tree.write(os.path.join(options.output_lvbitx_path, class_name + '_fpga.lvbitx'), encoding="utf-8", xml_declaration=True, default_namespace=None, method="xml")
+    tree.write(os.path.join(options.output_lvbitx_path, class_name + '_fpga.lvbitx'), encoding="utf-8", xml_declaration=True, default_namespace=None, method="xml")
 
 # Save HPP and CPP
 with open(os.path.join(os.path.dirname(os.path.abspath(__file__)), 'template_lvbitx.hpp'), 'r') as template_file:
