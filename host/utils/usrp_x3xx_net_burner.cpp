@@ -43,6 +43,7 @@
 #include <uhd/device.hpp>
 #include <uhd/types/device_addr.hpp>
 #include <uhd/utils/byteswap.hpp>
+#include <uhd/utils/images.hpp>
 #include <uhd/utils/safe_main.hpp>
 #include <uhd/utils/safe_call.hpp>
 
@@ -107,8 +108,16 @@ void list_usrps(){
     }
 }
 
-void extract_from_lvbitx(std::string lvbitx_path, std::vector<char> &bitstream)
-{
+std::string get_default_image_path(std::string model, std::string image_type){
+    std::transform(model.begin(), model.end(), model.begin(), ::tolower);
+
+    std::string image_name = str(boost::format("usrp_%s_fpga_%s.bit")
+                                            % model.c_str() % image_type.c_str());
+
+    return find_image_path(image_name);
+}
+
+void extract_from_lvbitx(std::string lvbitx_path, std::vector<char> &bitstream){
     boost::property_tree::ptree pt;
     boost::property_tree::xml_parser::read_xml(lvbitx_path.c_str(), pt,
                                                boost::property_tree::xml_parser::no_comments |
@@ -315,13 +324,14 @@ bool configure_fpga(udp_simple::sptr udp_transport, std::string ip_addr){
 
 int UHD_SAFE_MAIN(int argc, char *argv[]){
     memset(intermediary_packet_data, 0, X300_PACKET_SIZE_BYTES);
-    std::string ip_addr, fpga_path;
+    std::string ip_addr, fpga_path, image_type;
 
     po::options_description desc("Allowed options");
     desc.add_options()
         ("help", "Display this help message.")
         ("addr", po::value<std::string>(&ip_addr)->default_value("192.168.10.2"), "Specify an IP address.")
-        ("fpga-path", po::value<std::string>(&fpga_path)->default_value(""), "Specify an FPGA path.")
+        ("fpga-path", po::value<std::string>(&fpga_path), "Specify an FPGA path.")
+        ("type", po::value<std::string>(&image_type), "Specify an image type (1G, HGS, XGS)")
         ("configure", "Set FPGA image currently in flash (automatically done after downloading)")
         ("verify", "Verify data downloaded to flash (download will take much longer)")
         ("list", "List all available X3x0 devices.")
@@ -342,20 +352,15 @@ int UHD_SAFE_MAIN(int argc, char *argv[]){
         return EXIT_SUCCESS;
     }
 
-    if(fpga_path == "" and !vm.count("configure")){
-        throw std::runtime_error("You must specify an FPGA image or select the option to configure the current image.");
+    /*
+     * If the user doesn't specify their own FPGA image, they must select a type (1G, HGS, XGS)
+     * so the utility can use the appropriate image from the default location.
+     */
+    if(not (vm.count("fpga-path") xor vm.count("type"))){
+        throw std::runtime_error("You must specify fpga-path OR type!");
     }
 
-    //Expand tilde usage if applicable
-    if(fpga_path.find("~/") == 0) fpga_path.replace(0,1,getenv("HOME"));
-
-    //Check for proper file type
-    std::string ext = fs::extension(fpga_path.c_str());
-    if(ext != ".bin" and ext != ".bit" and ext != ".lvbitx"){
-        throw std::runtime_error("The image filename must end in .bin, .bit, or .lvbitx.");
-    }
-
-    //Establish UDP connection before doing anything
+    //Find X3x0 with specified arguments
     std::cout << "Attempting to find X3x0 with IP address: " << ip_addr << std::endl;
     const device_addr_t dev = device_addr_t(str(boost::format("addr=%s") % ip_addr));
     device_addrs_t found_devices = device::find(dev);
@@ -370,17 +375,36 @@ int UHD_SAFE_MAIN(int argc, char *argv[]){
         std::cout << (boost::format("Found %s.") % found_devices[0]["product"]) << std::endl << std::endl;
     }
 
-    udp_simple::sptr udp_transport = udp_simple::make_connected(ip_addr, BOOST_STRINGIZE(X300_FPGA_PROG_UDP_PORT));
+    if(vm.count("type")){
+        //Make sure the specified type is 1G, HGS, or XGS
+        if((image_type != "1G") and (image_type != "HGS") and (image_type != "XGS")){
+            throw std::runtime_error("--type must be 1G, HGS, or XGS!");
+        }
+        else
+        {
+            fpga_path = get_default_image_path(found_devices[0]["product"], image_type);
+        }
+    }
+    else{
+        //Expand tilde usage if applicable
+        #ifndef UHD_PLATFORM_WIN32
+            if(fpga_path.find("~/") == 0) fpga_path.replace(0,1,getenv("HOME"));
+        #endif
 
-    //If user specifies FPGA path, burn the image
-    if(fpga_path != "") burn_fpga_image(udp_transport, fpga_path, vm.count("verify"));
+        //Check for proper file type
+        std::string ext = fs::extension(fpga_path.c_str());
+        if(ext != ".bin" and ext != ".bit" and ext != ".lvbitx"){
+            throw std::runtime_error("The image filename must end in .bin, .bit, or .lvbitx.");
+        }
+    }
+
+    udp_simple::sptr udp_transport = udp_simple::make_connected(ip_addr, BOOST_STRINGIZE(X300_FPGA_PROG_UDP_PORT));
+    burn_fpga_image(udp_transport, fpga_path, vm.count("verify"));
 
     //If new image is burned, automatically configure
     //If not, user needs to specify
-    if((fpga_path != "") or vm.count("configure")){
-        if(configure_fpga(udp_transport, ip_addr)) std::cout << "Successfully configured FPGA!" << std::endl;
-        else throw std::runtime_error("FPGA configuring failed!");
-    }
+    if(configure_fpga(udp_transport, ip_addr)) std::cout << "Successfully configured FPGA!" << std::endl;
+    else throw std::runtime_error("FPGA configuring failed!");
 
     return EXIT_SUCCESS;
 }
