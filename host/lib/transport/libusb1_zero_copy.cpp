@@ -249,7 +249,7 @@ public:
             UHD_ASSERT_THROW(lut != NULL);
 
             _mb_pool.push_back(boost::make_shared<libusb_zero_copy_mb>(
-                lut, this->get_frame_size(), boost::bind(&libusb_zero_copy_single::enqueue_damn_buffer, this, _1), is_recv, name
+                lut, this->get_frame_size(), boost::bind(&libusb_zero_copy_single::enqueue_buffer, this, _1), is_recv, name
             ));
 
             libusb_fill_bulk_transfer(
@@ -339,7 +339,7 @@ private:
     //! why 2 queues? there is room in the future to have > N buffers but only N in flight
     boost::circular_buffer<libusb_zero_copy_mb *> _enqueued, _released;
 
-    void enqueue_damn_buffer(libusb_zero_copy_mb *mb)
+    void enqueue_buffer(libusb_zero_copy_mb *mb)
     {
         boost::mutex::scoped_lock l(_mutex);
         _released.push_back(mb);

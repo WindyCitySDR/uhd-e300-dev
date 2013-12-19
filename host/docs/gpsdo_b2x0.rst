@@ -1,12 +1,11 @@
 ========================================================================
-UHD - Internal GPSDO Application Notes (USRP-B2X0 Models)
+UHD - Internal GPSDO Application Notes (USRP-B2x0 Models)
 ========================================================================
 
 .. contents:: Table of Contents
 
 This application note describes the use of integrated GPS-disciplined
-oscillators with Ettus Research USRP devices. It pertains specifically
-to the Jackson Labs LC_XO device unless noted otherwise.
+oscillators with Ettus Research USRP devices.
 
 ------------------------------------------------------------------------
 Specifications
@@ -18,21 +17,21 @@ Specifications
 
 **Phase noise**:
 
-+------------+-------------+------------+
-|            |     TCXO    |    OXCO    |
-+============+=============+============+
-| **1Hz**    | -65dBc/Hz   | -75dBc/Hz  |
-+------------+-------------+------------+
-| **10Hz**   |  -102dBc/Hz | -110dBc/Hz |
-+------------+-------------+------------+
-| **100Hz**  | -132dBc/Hz  | -132dBc/Hz |
-+------------+-------------+------------+
-| **1kHz**   | -148dBc/Hz  | -142dBc/Hz |
-+------------+-------------+------------+
-| **10kHz**  | -152dBc/Hz  | -145dBc/Hz |
-+------------+-------------+------------+
-| **100kHz** | <-155dBc/Hz | -150dBc/Hz |
-+------------+-------------+------------+
++------------+-------------+
+|            |     TCXO    |
++============+=============+
+| **1Hz**    | -65dBc/Hz   |
++------------+-------------+
+| **10Hz**   |  -102dBc/Hz |
++------------+-------------+
+| **100Hz**  | -132dBc/Hz  |
++------------+-------------+
+| **1kHz**   | -148dBc/Hz  |
++------------+-------------+
+| **10kHz**  | -152dBc/Hz  |
++------------+-------------+
+| **100kHz** | <-155dBc/Hz |
++------------+-------------+
 
 **Antenna Types:**
 
