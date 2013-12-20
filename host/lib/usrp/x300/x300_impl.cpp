@@ -937,8 +937,8 @@ x300_impl::both_xports_t x300_impl::make_transport(
     const uhd::device_addr_t& xport_args =
         (prefix != X300_RADIO_DEST_PREFIX_CTRL) ? args : DEFAULT_XPORT_ARGS;
 
+    zero_copy_xport_params default_buff_args;
     if (xport_path == "nirio") {
-        nirio_zero_copy_buff_args default_buff_args;
         default_buff_args.send_frame_size =
             (prefix == X300_RADIO_DEST_PREFIX_TX) ? X300_PCIE_DATA_FRAME_SIZE : X300_PCIE_MSG_FRAME_SIZE;
         default_buff_args.recv_frame_size =
@@ -951,10 +951,28 @@ x300_impl::both_xports_t x300_impl::make_transport(
         xports.recv = nirio_zero_copy::make(
             mb.rio_fpga_interface, get_pcie_dma_channel(destination, prefix), default_buff_args, xport_args);
         xports.send = xports.recv;
+
+        //For the nirio transport, buffer size is depends on the frame size and num frames
+        xports.recv_buff_size = xports.recv->get_num_recv_frames() * xports.recv->get_recv_frame_size();
+        xports.send_buff_size = xports.send->get_num_send_frames() * xports.send->get_send_frame_size();
     } else {
+        default_buff_args.send_frame_size =
+            (prefix == X300_RADIO_DEST_PREFIX_TX) ? X300_ETH_DATA_FRAME_SIZE : X300_ETH_MSG_FRAME_SIZE;
+        default_buff_args.recv_frame_size =
+            (prefix == X300_RADIO_DEST_PREFIX_RX) ? X300_ETH_DATA_FRAME_SIZE : X300_ETH_MSG_FRAME_SIZE;
+        default_buff_args.num_send_frames =
+            (prefix == X300_RADIO_DEST_PREFIX_TX) ? X300_ETH_DATA_NUM_FRAMES : X300_ETH_MSG_NUM_FRAMES;
+        default_buff_args.num_recv_frames =
+            (prefix == X300_RADIO_DEST_PREFIX_RX) ? X300_ETH_DATA_NUM_FRAMES : X300_ETH_MSG_NUM_FRAMES;
+
         //make a new transport - fpga has no idea how to talk to use on this yet
-        xports.recv = udp_zero_copy::make(addr, BOOST_STRINGIZE(X300_VITA_UDP_PORT), xport_args);
+        udp_zero_copy::buff_params buff_params;
+        xports.recv = udp_zero_copy::make(addr, BOOST_STRINGIZE(X300_VITA_UDP_PORT), default_buff_args, buff_params, xport_args);
         xports.send = xports.recv;
+
+        //For the UDP transport the buffer size if the size of the socket buffer in the kernel
+        xports.recv_buff_size = buff_params.recv_buff_size;
+        xports.send_buff_size = buff_params.send_buff_size;
     }
 
     //always program the framer if this is a socket, even its caching was used
