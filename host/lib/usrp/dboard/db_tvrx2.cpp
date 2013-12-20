@@ -1,5 +1,5 @@
 //
-// Copyright 2010,2012 Ettus Research LLC
+// Copyright 2010,2012-2013 Ettus Research LLC
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -592,7 +592,7 @@ static const std::vector<tvrx2_tda18272_freq_map_t> tvrx2_tda18272_freq_map = li
     ( tvrx2_tda18272_freq_map_t(662528000, 0x85, 0x19, 3) )
     ( tvrx2_tda18272_freq_map_t(664576000, 0x84, 0x18, 3) )
     ( tvrx2_tda18272_freq_map_t(665600000, 0x83, 0x18, 3) )
-    ( tvrx2_tda18272_freq_map_t(666624000, 0x82, 0https://github.com/x18, 3) )
+    ( tvrx2_tda18272_freq_map_t(666624000, 0x82, 0x18, 3) )
     ( tvrx2_tda18272_freq_map_t(668672000, 0x81, 0x18, 3) )
     ( tvrx2_tda18272_freq_map_t(669696000, 0x80, 0x17, 3) )
     ( tvrx2_tda18272_freq_map_t(671744000, 0x7F, 0x17, 3) )
@@ -692,7 +692,7 @@ static const std::vector<tvrx2_tda18272_freq_map_t> tvrx2_tda18272_freq_map = li
     ( tvrx2_tda18272_freq_map_t(847872000, 0x23, 0x0F, 3) )
     ( tvrx2_tda18272_freq_map_t(849920000, 0x22, 0x0F, 3) )
     ( tvrx2_tda18272_freq_map_t(852992000, 0x21, 0x0E, 3) )
-    ( tvrx2_tda18272_freq_map_t(855040000, 0xhttps://github.com/20, 0x0E, 3) )
+    ( tvrx2_tda18272_freq_map_t(855040000, 0x20, 0x0E, 3) )
     ( tvrx2_tda18272_freq_map_t(858112000, 0x1F, 0x0E, 3) )
     ( tvrx2_tda18272_freq_map_t(861184000, 0x1E, 0x0E, 3) )
     ( tvrx2_tda18272_freq_map_t(863232000, 0x1D, 0x0E, 3) )
