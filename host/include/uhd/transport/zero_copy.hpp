@@ -135,6 +135,16 @@ namespace uhd{ namespace transport{
     };
 
     /*!
+     * Transport parameters
+     */
+    struct zero_copy_xport_params {
+        size_t recv_frame_size;
+        size_t send_frame_size;
+        size_t num_recv_frames;
+        size_t num_send_frames;
+    };
+
+    /*!
      * A zero-copy interface for transport objects.
      * Provides a way to get send and receive buffers
      * with memory managed by the transport object.

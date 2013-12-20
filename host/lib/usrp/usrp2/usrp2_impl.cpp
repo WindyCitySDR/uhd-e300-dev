@@ -41,6 +41,9 @@ using namespace uhd::usrp;
 using namespace uhd::transport;
 namespace asio = boost::asio;
 
+//A reasonable number of frames for send/recv and async/sync
+static const size_t DEFAULT_NUM_FRAMES = 32;
+
 /***********************************************************************
  * Discovery over the udp transport
  **********************************************************************/
@@ -285,8 +288,15 @@ static zero_copy_if::sptr make_xport(
         filtered_hints[key] = hints[key];
     }
 
+    zero_copy_xport_params default_buff_args;
+    default_buff_args.send_frame_size = transport::udp_simple::mtu;
+    default_buff_args.recv_frame_size = transport::udp_simple::mtu;
+    default_buff_args.num_send_frames = DEFAULT_NUM_FRAMES;
+    default_buff_args.num_recv_frames = DEFAULT_NUM_FRAMES;
+
     //make the transport object with the filtered hints
-    zero_copy_if::sptr xport = udp_zero_copy::make(addr, port, filtered_hints);
+    udp_zero_copy::buff_params ignored_params;
+    zero_copy_if::sptr xport = udp_zero_copy::make(addr, port, default_buff_args, ignored_params, filtered_hints);
 
     //Send a small data packet so the usrp2 knows the udp source port.
     //This setup must happen before further initialization occurs

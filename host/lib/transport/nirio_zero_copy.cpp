@@ -118,73 +118,22 @@ public:
     nirio_zero_copy_impl(
         uhd::niusrprio::niusrprio_session::sptr fpga_session,
         uint32_t instance,
-        const nirio_zero_copy_buff_args &default_buff_args,
-        const device_addr_t &hints
+        const zero_copy_xport_params& xport_params
     ):
         _reg_int(fpga_session->get_kernel_proxy()),
         _fifo_instance(instance),
-        _recv_frame_size(size_t(hints.cast<double>("recv_frame_size", default_buff_args.recv_frame_size))),
-        _send_frame_size(size_t(hints.cast<double>("send_frame_size", default_buff_args.send_frame_size))),
+        _xport_params(xport_params),
         _next_recv_buff_index(0), _next_send_buff_index(0)
     {
         UHD_LOG << boost::format("Creating PCIe transport for channel %d") % instance << std::endl;
+        UHD_LOG << boost::format("nirio zero-copy RX transport configured with frame size = %u, #frames = %u, buffer size = %u\n")
+                    % _xport_params.recv_frame_size % _xport_params.num_recv_frames %
+                    (_xport_params.recv_frame_size * _xport_params.num_recv_frames);
+        UHD_LOG << boost::format("nirio zero-copy TX transport configured with frame size = %u, #frames = %u, buffer size = %u\n")
+                    % _xport_params.send_frame_size % _xport_params.num_send_frames % (_xport_params.send_frame_size * _xport_params.num_send_frames);
 
-        //The kernel buffer for this transport must be (num_frames * frame_size) big. Unlike ethernet,
-        //where the kernel buffer size is independent of the circular buffer size for the transport,
-        //it is possible for users to over constrain the system when they set the num_frames and the buff_size
-        //So we give buff_size priority over num_frames and throw an error if they conflict.
-
-        //RX
-        size_t usr_num_recv_frames = static_cast<size_t>(
-            hints.cast<double>("num_recv_frames", default_buff_args.num_recv_frames));
-        size_t usr_recv_buff_size = static_cast<size_t>(
-            hints.cast<double>("recv_buff_size", default_buff_args.num_recv_frames));
-
-        if (hints.has_key("num_recv_frames") and hints.has_key("recv_buff_size")) {
-            if (usr_recv_buff_size < _recv_frame_size)
-                throw uhd::value_error("recv_buff_size must be equal to or greater than (num_recv_frames * recv_frame_size)");
-
-            if ((usr_recv_buff_size/_recv_frame_size) != usr_num_recv_frames)
-                throw uhd::value_error("Conflicting values for recv_buff_size and num_recv_frames");
-        }
-
-        if (hints.has_key("recv_buff_size")) {
-            _num_recv_frames = std::max<size_t>(1, usr_recv_buff_size/_recv_frame_size);    //Round down
-        } else if (hints.has_key("num_recv_frames")) {
-            _num_recv_frames = usr_num_recv_frames;
-        } else {
-            _num_recv_frames = default_buff_args.num_recv_frames;
-        }
-
-        //TX
-        size_t usr_num_send_frames = static_cast<size_t>(
-            hints.cast<double>("num_send_frames", default_buff_args.num_send_frames));
-        size_t usr_send_buff_size = static_cast<size_t>(
-            hints.cast<double>("send_buff_size", default_buff_args.num_send_frames));
-
-        if (hints.has_key("num_send_frames") and hints.has_key("send_buff_size")) {
-            if (usr_send_buff_size < _send_frame_size)
-                throw uhd::value_error("send_buff_size must be equal to or greater than (num_send_frames * send_frame_size)");
-
-            if ((usr_send_buff_size/_send_frame_size) != usr_num_send_frames)
-                throw uhd::value_error("Conflicting values for send_buff_size and num_send_frames");
-        }
-
-        if (hints.has_key("send_buff_size")) {
-        _num_send_frames = std::max<size_t>(1, usr_send_buff_size/_send_frame_size);    //Round down
-        } else if (hints.has_key("num_send_frames")) {
-            _num_send_frames = usr_num_send_frames;
-        } else {
-            _num_send_frames = default_buff_args.num_send_frames;
-        }
-
-        UHD_LOG << boost::format("Creating nirio zero-copy RX transport with frame size = %u, #frames = %u, buffer size = %u\n")
-                    % _recv_frame_size % _num_recv_frames % (_recv_frame_size * _num_recv_frames);
-        UHD_LOG << boost::format("Creating nirio zero-copy TX transport with frame size = %u, #frames = %u, buffer size = %u\n")
-                    % _send_frame_size % _num_send_frames % (_send_frame_size * _num_send_frames);
-
-        _recv_buffer_pool = buffer_pool::make(_num_recv_frames, _recv_frame_size);
-        _send_buffer_pool = buffer_pool::make(_num_send_frames, _send_frame_size);
+        _recv_buffer_pool = buffer_pool::make(_xport_params.num_recv_frames, _xport_params.recv_frame_size);
+        _send_buffer_pool = buffer_pool::make(_xport_params.num_send_frames, _xport_params.send_frame_size);
 
         nirio_status status = 0;
         size_t actual_depth = 0, actual_size = 0;
@@ -192,11 +141,11 @@ public:
         //Configure frame width
         nirio_status_chain(
             _reg_int.poke(PCIE_TX_DMA_REG(DMA_FRAME_SIZE_REG, _fifo_instance),
-                          static_cast<uint32_t>(_send_frame_size/sizeof(fifo_data_t))),
+                          static_cast<uint32_t>(_xport_params.send_frame_size/sizeof(fifo_data_t))),
             status);
         nirio_status_chain(
             _reg_int.poke(PCIE_RX_DMA_REG(DMA_FRAME_SIZE_REG, _fifo_instance),
-                          static_cast<uint32_t>(_recv_frame_size/sizeof(fifo_data_t))),
+                          static_cast<uint32_t>(_xport_params.recv_frame_size/sizeof(fifo_data_t))),
             status);
         //Config 32-bit word flipping and Reset DMA streams
         nirio_status_chain(
@@ -219,10 +168,14 @@ public:
         if ((_recv_fifo.get() != NULL) && (_send_fifo.get() != NULL)) {
             //Initialize FIFOs
             nirio_status_chain(
-                _recv_fifo->initialize((_recv_frame_size*_num_recv_frames)/sizeof(fifo_data_t), actual_depth, actual_size),
+                _recv_fifo->initialize(
+                    (_xport_params.recv_frame_size*_xport_params.num_recv_frames)/sizeof(fifo_data_t),
+                    actual_depth, actual_size),
                 status);
             nirio_status_chain(
-                _send_fifo->initialize((_send_frame_size*_num_send_frames)/sizeof(fifo_data_t), actual_depth, actual_size),
+                _send_fifo->initialize(
+                    (_xport_params.send_frame_size*_xport_params.num_send_frames)/sizeof(fifo_data_t),
+                    actual_depth, actual_size),
                 status);
 
             nirio_status_chain(_recv_fifo->start(), status);
@@ -246,7 +199,7 @@ public:
         nirio_status_to_exception(status, "Could not create nirio_zero_copy transport.");
     }
 
-    ~nirio_zero_copy_impl() {
+    virtual ~nirio_zero_copy_impl() {
         //Reset DMA streams
         nirio_status status = 0;
         nirio_status_chain(
@@ -262,32 +215,31 @@ public:
      * Block on the managed buffer's get call and advance the index.
      ******************************************************************/
     managed_recv_buffer::sptr get_recv_buff(double timeout){
-        if (_next_recv_buff_index == _num_recv_frames) _next_recv_buff_index = 0;
+        if (_next_recv_buff_index == _xport_params.num_recv_frames) _next_recv_buff_index = 0;
         return _mrb_pool[_next_recv_buff_index]->get_new(timeout, _next_recv_buff_index);
     }
 
-    size_t get_num_recv_frames(void) const {return _num_recv_frames;}
-    size_t get_recv_frame_size(void) const {return _recv_frame_size;}
+    size_t get_num_recv_frames(void) const {return _xport_params.num_recv_frames;}
+    size_t get_recv_frame_size(void) const {return _xport_params.recv_frame_size;}
 
     /*******************************************************************
      * Send implementation:
      * Block on the managed buffer's get call and advance the index.
      ******************************************************************/
     managed_send_buffer::sptr get_send_buff(double timeout){
-        if (_next_send_buff_index == _num_send_frames) _next_send_buff_index = 0;
+        if (_next_send_buff_index == _xport_params.num_send_frames) _next_send_buff_index = 0;
         return _msb_pool[_next_send_buff_index]->get_new(timeout, _next_send_buff_index);
     }
 
-    size_t get_num_send_frames(void) const {return _num_send_frames;}
-    size_t get_send_frame_size(void) const {return _send_frame_size;}
+    size_t get_num_send_frames(void) const {return _xport_params.num_send_frames;}
+    size_t get_send_frame_size(void) const {return _xport_params.send_frame_size;}
 
 private:
     //memory management -> buffers and fifos
     niriok_proxy& _reg_int;
     uint32_t _fifo_instance;
     nirio_fifo<fifo_data_t>::sptr _recv_fifo, _send_fifo;
-    size_t _recv_frame_size, _num_recv_frames;
-    size_t _send_frame_size, _num_send_frames;
+    const zero_copy_xport_params _xport_params;
     buffer_pool::sptr _recv_buffer_pool, _send_buffer_pool;
     std::vector<boost::shared_ptr<nirio_zero_copy_msb> > _msb_pool;
     std::vector<boost::shared_ptr<nirio_zero_copy_mrb> > _mrb_pool;
@@ -298,9 +250,61 @@ private:
 nirio_zero_copy::sptr nirio_zero_copy::make(
     uhd::niusrprio::niusrprio_session::sptr fpga_session,
     const uint32_t instance,
-    const nirio_zero_copy_buff_args &default_buff_args,
+    const zero_copy_xport_params& default_buff_args,
     const device_addr_t &hints
 ){
-    return nirio_zero_copy::sptr(new nirio_zero_copy_impl(fpga_session, instance, default_buff_args, hints));
+    //Initialize xport_params
+    zero_copy_xport_params xport_params = default_buff_args;
+
+    //The kernel buffer for this transport must be (num_frames * frame_size) big. Unlike ethernet,
+    //where the kernel buffer size is independent of the circular buffer size for the transport,
+    //it is possible for users to over constrain the system when they set the num_frames and the buff_size
+    //So we give buff_size priority over num_frames and throw an error if they conflict.
+
+    //RX
+    xport_params.recv_frame_size = size_t(hints.cast<double>("recv_frame_size", default_buff_args.recv_frame_size));
+
+    size_t usr_num_recv_frames = static_cast<size_t>(
+        hints.cast<double>("num_recv_frames", default_buff_args.num_recv_frames));
+    size_t usr_recv_buff_size = static_cast<size_t>(
+        hints.cast<double>("recv_buff_size", default_buff_args.num_recv_frames));
+
+    if (hints.has_key("num_recv_frames") and hints.has_key("recv_buff_size")) {
+        if (usr_recv_buff_size < xport_params.recv_frame_size)
+            throw uhd::value_error("recv_buff_size must be equal to or greater than (num_recv_frames * recv_frame_size)");
+
+        if ((usr_recv_buff_size/xport_params.recv_frame_size) != usr_num_recv_frames)
+            throw uhd::value_error("Conflicting values for recv_buff_size and num_recv_frames");
+    }
+
+    if (hints.has_key("recv_buff_size")) {
+        xport_params.num_recv_frames = std::max<size_t>(1, usr_recv_buff_size/xport_params.recv_frame_size);    //Round down
+    } else if (hints.has_key("num_recv_frames")) {
+        xport_params.num_recv_frames = usr_num_recv_frames;
+    }
+
+    //TX
+    xport_params.send_frame_size = size_t(hints.cast<double>("send_frame_size", default_buff_args.send_frame_size));
+
+    size_t usr_num_send_frames = static_cast<size_t>(
+        hints.cast<double>("num_send_frames", default_buff_args.num_send_frames));
+    size_t usr_send_buff_size = static_cast<size_t>(
+        hints.cast<double>("send_buff_size", default_buff_args.num_send_frames));
+
+    if (hints.has_key("num_send_frames") and hints.has_key("send_buff_size")) {
+        if (usr_send_buff_size < xport_params.send_frame_size)
+            throw uhd::value_error("send_buff_size must be equal to or greater than (num_send_frames * send_frame_size)");
+
+        if ((usr_send_buff_size/xport_params.send_frame_size) != usr_num_send_frames)
+            throw uhd::value_error("Conflicting values for send_buff_size and num_send_frames");
+    }
+
+    if (hints.has_key("send_buff_size")) {
+        xport_params.num_send_frames = std::max<size_t>(1, usr_send_buff_size/xport_params.send_frame_size);    //Round down
+    } else if (hints.has_key("num_send_frames")) {
+        xport_params.num_send_frames = usr_num_send_frames;
+    }
+
+    return nirio_zero_copy::sptr(new nirio_zero_copy_impl(fpga_session, instance, xport_params));
 }
 
