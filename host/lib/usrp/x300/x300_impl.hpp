@@ -27,7 +27,7 @@
 #include <uhd/types/sensors.hpp>
 #include "x300_clock_ctrl.hpp"
 #include "x300_fw_common.h"
-#include <uhd/transport/udp_simple.hpp>
+#include <uhd/transport/udp_simple.hpp> //mtu
 #include <uhd/utils/tasks.hpp>
 #include "spi_core_3000.hpp"
 #include "x300_adc_ctrl.hpp"
@@ -60,13 +60,18 @@ static const size_t X300_TX_FC_RESPONSE_FREQ    = 8;            //per flow-contr
 
 static const size_t X300_RX_SW_BUFF_SIZE_ETH        = 0x2000000; //32MiB    For an ~8k MTU any size >32MiB is just wasted buffer space
 static const size_t X300_RX_SW_BUFF_SIZE_ETH_MACOS  = 0x100000;  //1Mib
-static const double X300_RX_SW_BUFF_FULL_FACTOR     = 0.75;      //Buffer should ideally be 75% full.
-static const size_t X300_RX_FC_REQUEST_FREQ         = 16;        //per flow-control window
+static const double X300_RX_SW_BUFF_FULL_FACTOR     = 0.90;      //Buffer should ideally be 90% full.
+static const size_t X300_RX_FC_REQUEST_FREQ         = 32;        //per flow-control window
 
 static const size_t X300_PCIE_DATA_FRAME_SIZE   = 8192;         //bytes
-static const size_t X300_PCIE_DATA_NUM_FRAMES   = 1024;
+static const size_t X300_PCIE_DATA_NUM_FRAMES   = 2048;
 static const size_t X300_PCIE_MSG_FRAME_SIZE    = 256;          //bytes
 static const size_t X300_PCIE_MSG_NUM_FRAMES    = 32;
+
+static const size_t X300_ETH_DATA_FRAME_SIZE    = 8000;                             //bytes
+static const size_t X300_ETH_DATA_NUM_FRAMES    = 32;
+static const size_t X300_ETH_MSG_FRAME_SIZE     = uhd::transport::udp_simple::mtu;  //bytes
+static const size_t X300_ETH_MSG_NUM_FRAMES     = 32;
 
 #define X300_RADIO_DEST_PREFIX_TX 0
 #define X300_RADIO_DEST_PREFIX_CTRL 1
@@ -221,6 +226,8 @@ struct x300_impl : public uhd::device
     {
         uhd::transport::zero_copy_if::sptr recv;
         uhd::transport::zero_copy_if::sptr send;
+        size_t recv_buff_size;
+        size_t send_buff_size;
     };
     both_xports_t make_transport(
         const size_t mb_index,
