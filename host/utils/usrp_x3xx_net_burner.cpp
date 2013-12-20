@@ -40,7 +40,10 @@
 #include <uhd/exception.hpp>
 #include <uhd/transport/if_addrs.hpp>
 #include <uhd/transport/udp_simple.hpp>
+#include <uhd/device.hpp>
+#include <uhd/types/device_addr.hpp>
 #include <uhd/utils/byteswap.hpp>
+#include <uhd/utils/images.hpp>
 #include <uhd/utils/safe_main.hpp>
 #include <uhd/utils/safe_call.hpp>
 
@@ -96,70 +99,25 @@ boost::uint8_t bitswap(uint8_t b){
     return b;
 }
 
-bool detect_usrp(udp_simple::sptr udp_transport){
-    const x300_fpga_update_data_t *update_data_in = reinterpret_cast<const x300_fpga_update_data_t *>(x300_data_in_mem);
-
-    x300_fpga_update_data_t detect_packet;
-    detect_packet.flags = htonx<boost::uint32_t>(X300_FPGA_PROG_FLAGS_INIT | X300_FPGA_PROG_FLAGS_ACK);
-    detect_packet.sector = 0;
-    detect_packet.size = 0;
-    detect_packet.index = 0;
-    memset(detect_packet.data, 0, sizeof(detect_packet.data));
-    udp_transport->send(boost::asio::buffer(&detect_packet, sizeof(detect_packet)));
-
-    udp_transport->recv(boost::asio::buffer(x300_data_in_mem), UDP_TIMEOUT);
-    if((ntohl(update_data_in->flags) & X300_FPGA_PROG_FLAGS_ERROR) == X300_FPGA_PROG_FLAGS_ERROR
-       and (udp_transport->get_recv_addr() != "0.0.0.0")){
-        return false;
-    }
-
-    detect_packet.flags = htonx<boost::uint32_t>(X300_FPGA_PROG_FLAGS_CLEANUP | X300_FPGA_PROG_FLAGS_ACK);
-    udp_transport->send(boost::asio::buffer(&detect_packet, sizeof(detect_packet)));
-
-    udp_transport->recv(boost::asio::buffer(x300_data_in_mem), UDP_TIMEOUT);
-    if((ntohl(update_data_in->flags) & X300_FPGA_PROG_FLAGS_ERROR) != X300_FPGA_PROG_FLAGS_ERROR){
-        std::cout << "Found X3x0 at: " << udp_transport->get_recv_addr() << std::endl;
-        return true;
-    }
-    else return false;
-}
-
 void list_usrps(){
-    const x300_fpga_update_data_t *update_data_in = reinterpret_cast<const x300_fpga_update_data_t *>(x300_data_in_mem);
+    device_addrs_t found_devices = device::find(device_addr_t("type=x300"));
 
-    udp_simple::sptr udp_bc_transport;
-    x300_fpga_update_data_t list_packet;
-    list_packet.flags = htonx<boost::uint32_t>(X300_FPGA_PROG_FLAGS_INIT | X300_FPGA_PROG_FLAGS_ACK);
-    list_packet.sector = 0;
-    list_packet.size = 0;
-    list_packet.index = 0;
-    memset(list_packet.data, 0, sizeof(list_packet.data));
-    
     std::cout << "Available X3x0 devices:" << std::endl;
-    
-    BOOST_FOREACH(const if_addrs_t &if_addrs, get_if_addrs()){
-        //Avoid the loopback device
-        if(if_addrs.inet == boost::asio::ip::address_v4::loopback().to_string()) continue;
-        udp_bc_transport = udp_simple::make_broadcast(if_addrs.bcast, BOOST_STRINGIZE(X300_FPGA_PROG_UDP_PORT));
-        udp_bc_transport->send(boost::asio::buffer(&list_packet, sizeof(list_packet)));
-        
-        udp_bc_transport->recv(boost::asio::buffer(x300_data_in_mem), 1);
-        if(((ntohl(update_data_in->flags) & X300_FPGA_PROG_FLAGS_ERROR) != X300_FPGA_PROG_FLAGS_ERROR)
-           and (udp_bc_transport->get_recv_addr() != "0.0.0.0")){
-            list_packet.flags = htonx<boost::uint32_t>(X300_FPGA_PROG_FLAGS_CLEANUP | X300_FPGA_PROG_FLAGS_ACK);
-            udp_bc_transport->send(boost::asio::buffer(&list_packet, sizeof(list_packet)));
-            
-            udp_bc_transport->recv(boost::asio::buffer(x300_data_in_mem), 1);
-            if(((ntohl(update_data_in->flags) & X300_FPGA_PROG_FLAGS_ERROR) != X300_FPGA_PROG_FLAGS_ERROR)
-               and (udp_bc_transport->get_recv_addr() != "0.0.0.0")){
-                std::cout << " * " << udp_bc_transport->get_recv_addr() << std::endl;
-            }
-        }
+    BOOST_FOREACH(const device_addr_t &dev, found_devices){
+        std::cout << str(boost::format(" * %s (%s)") % dev["product"] % dev["addr"]) << std::endl;
     }
 }
 
-void extract_from_lvbitx(std::string lvbitx_path, std::vector<char> &bitstream)
-{
+std::string get_default_image_path(std::string model, std::string image_type){
+    std::transform(model.begin(), model.end(), model.begin(), ::tolower);
+
+    std::string image_name = str(boost::format("usrp_%s_fpga_%s.bit")
+                                            % model.c_str() % image_type.c_str());
+
+    return find_image_path(image_name);
+}
+
+void extract_from_lvbitx(std::string lvbitx_path, std::vector<char> &bitstream){
     boost::property_tree::ptree pt;
     boost::property_tree::xml_parser::read_xml(lvbitx_path.c_str(), pt,
                                                boost::property_tree::xml_parser::no_comments |
@@ -176,7 +134,7 @@ void extract_from_lvbitx(std::string lvbitx_path, std::vector<char> &bitstream)
 }
 
 void burn_fpga_image(udp_simple::sptr udp_transport, std::string fpga_path, bool verify){
-    uint32_t max_size;
+    boost::uint32_t max_size;
     std::vector<char> bitstream;
 
     if(fs::extension(fpga_path) == ".bit") max_size = X300_FPGA_BIT_MAX_SIZE_BYTES;
@@ -366,13 +324,14 @@ bool configure_fpga(udp_simple::sptr udp_transport, std::string ip_addr){
 
 int UHD_SAFE_MAIN(int argc, char *argv[]){
     memset(intermediary_packet_data, 0, X300_PACKET_SIZE_BYTES);
-    std::string ip_addr, fpga_path;
+    std::string ip_addr, fpga_path, image_type;
 
     po::options_description desc("Allowed options");
     desc.add_options()
         ("help", "Display this help message.")
         ("addr", po::value<std::string>(&ip_addr)->default_value("192.168.10.2"), "Specify an IP address.")
-        ("fpga-path", po::value<std::string>(&fpga_path)->default_value(""), "Specify an FPGA path.")
+        ("fpga-path", po::value<std::string>(&fpga_path), "Specify an FPGA path.")
+        ("type", po::value<std::string>(&image_type), "Specify an image type (1G, HGS, XGS)")
         ("configure", "Set FPGA image currently in flash (automatically done after downloading)")
         ("verify", "Verify data downloaded to flash (download will take much longer)")
         ("list", "List all available X3x0 devices.")
@@ -393,35 +352,59 @@ int UHD_SAFE_MAIN(int argc, char *argv[]){
         return EXIT_SUCCESS;
     }
 
-    if(fpga_path == "" and !vm.count("configure")){
-        throw std::runtime_error("You must specify an FPGA image or select the option to configure the current image.");
+    /*
+     * If the user doesn't specify their own FPGA image, they must select a type (1G, HGS, XGS)
+     * so the utility can use the appropriate image from the default location.
+     */
+    if(not (vm.count("fpga-path") xor vm.count("type"))){
+        throw std::runtime_error("You must specify fpga-path OR type!");
     }
 
-    //Expand tilde usage if applicable
-    if(fpga_path.find("~/") == 0) fpga_path.replace(0,1,getenv("HOME"));
+    //Find X3x0 with specified arguments
+    std::cout << "Attempting to find X3x0 with IP address: " << ip_addr << std::endl;
+    const device_addr_t dev = device_addr_t(str(boost::format("addr=%s") % ip_addr));
+    device_addrs_t found_devices = device::find(dev);
 
-    //Check for proper file type
-    std::string ext = fs::extension(fpga_path.c_str());
-    if(ext != ".bin" and ext != ".bit" and ext != ".lvbitx"){
-        throw std::runtime_error("The image filename must end in .bin, .bit, or .lvbitx.");
+    if(found_devices.size() < 1) {
+        throw std::runtime_error("Could not find X3x0 with the specified address!");
+    }
+    else if(found_devices.size() > 1) {
+        throw std::runtime_error("Found multiple X3x0 units with the specified address!");
+    }
+    else {
+        std::cout << (boost::format("Found %s.") % found_devices[0]["product"]) << std::endl << std::endl;
     }
 
-    //Establish UDP connection before doing anything
-    std::cout << "Attempting to connect to: " << ip_addr << std::endl;
+    if(vm.count("type")){
+        //Make sure the specified type is 1G, HGS, or XGS
+        if((image_type != "1G") and (image_type != "HGS") and (image_type != "XGS")){
+            throw std::runtime_error("--type must be 1G, HGS, or XGS!");
+        }
+        else
+        {
+            fpga_path = get_default_image_path(found_devices[0]["product"], image_type);
+        }
+    }
+    else{
+        //Expand tilde usage if applicable
+        #ifndef UHD_PLATFORM_WIN32
+            if(fpga_path.find("~/") == 0) fpga_path.replace(0,1,getenv("HOME"));
+        #endif
+
+        //Check for proper file type
+        std::string ext = fs::extension(fpga_path.c_str());
+        if(ext != ".bin" and ext != ".bit" and ext != ".lvbitx"){
+            throw std::runtime_error("The image filename must end in .bin, .bit, or .lvbitx.");
+        }
+    }
+
     udp_simple::sptr udp_transport = udp_simple::make_connected(ip_addr, BOOST_STRINGIZE(X300_FPGA_PROG_UDP_PORT));
-    if(not detect_usrp(udp_transport)){
-        throw std::runtime_error("Could not detect X3x0! Did you specify the correct IP address? If so, power-cycle the device and try again.");
-    }
-
-    //If user specifies FPGA path, burn the image
-    if(fpga_path != "") burn_fpga_image(udp_transport, fpga_path, vm.count("verify"));
+    burn_fpga_image(udp_transport, fpga_path, vm.count("verify"));
 
     //If new image is burned, automatically configure
     //If not, user needs to specify
-    if((fpga_path != "") or vm.count("configure")){
-        if(configure_fpga(udp_transport, ip_addr)) std::cout << "Successfully configured FPGA!" << std::endl;
-        else throw std::runtime_error("FPGA configuring failed!");
-    }
+    if(configure_fpga(udp_transport, ip_addr)) std::cout << "Successfully configured FPGA!" << std::endl;
+    else throw std::runtime_error("FPGA configuring failed!");
 
     return EXIT_SUCCESS;
 }
