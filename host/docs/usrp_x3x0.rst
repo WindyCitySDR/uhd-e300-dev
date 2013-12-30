@@ -43,7 +43,7 @@ Installing the USRP X300/X310
 * Plug a 1 Gigabit SFP+ Transciever into Ethernet Port 0 on the USRP X300/x310 device.
 * Use the Ethernet cable to connect the SFP+ transciever on the device to the host computer. For maximum throughput, Ettus Research recommends that you connect each device to its own dedicated Gigabit Ethernet interface on the host computer.
 * Connect the AC/DC power supply to the device and plug the supply into a wall outlet.
-* The OS with automatically recognize the device.
+* The OS will automatically recognize the device.
 
 ^^^^^^^^^^^^^^^^^^^^
 Ten Gigabit Ethernet
@@ -59,7 +59,7 @@ Installing the USRP X300/X310
 * Prior to installing the module, the host PC can remain powered on.
 * Use a 10 Gigabit SFP+ cable to connect Ethernet Port 1 on the USRP X300/x310 device to the host computer. For maximum throughput, Ettus Research recommends that you connect the device to its own dedicated Ten Gigabit, Ettus Research recommended Ethernet interface on the host computer.
 * Connect the AC/DC power supply to the device and plug the supply into a wall outlet.
-* The OS with automatically recognize the device.
+* The OS will automatically recognize the device.
 
 The LEDs on the front panel can be useful in debugging hardware and software issues.
 The LEDs reveal the following about the state of the device:
