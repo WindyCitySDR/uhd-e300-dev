@@ -104,7 +104,19 @@ void list_usrps(){
 
     std::cout << "Available X3x0 devices:" << std::endl;
     BOOST_FOREACH(const device_addr_t &dev, found_devices){
-        std::cout << str(boost::format(" * %s (%s)") % dev["product"] % dev["addr"]) << std::endl;
+        std::string dev_string;
+        if(dev.has_key("addr")){
+            dev_string = str(boost::format(" * %s (%s, addr: %s)")
+                             % dev["product"]
+                             % dev["fpga"]
+                             % dev["addr"]);
+        }
+        else{
+            dev_string = str(boost::format(" * %s (%s, resource: %s)")
+                             % dev["product"]
+                             % dev["fpga"]
+                             % dev["resource"]);
+        }
     }
 }
 
@@ -133,7 +145,7 @@ void extract_from_lvbitx(std::string lvbitx_path, std::vector<char> &bitstream){
     bitstream.swap(decoded_bitstream);
 }
 
-void burn_fpga_image(udp_simple::sptr udp_transport, std::string fpga_path, bool verify){
+void ethernet_burn(udp_simple::sptr udp_transport, std::string fpga_path, bool verify){
     boost::uint32_t max_size;
     std::vector<char> bitstream;
 
@@ -324,12 +336,13 @@ bool configure_fpga(udp_simple::sptr udp_transport, std::string ip_addr){
 
 int UHD_SAFE_MAIN(int argc, char *argv[]){
     memset(intermediary_packet_data, 0, X300_PACKET_SIZE_BYTES);
-    std::string ip_addr, fpga_path, image_type;
+    std::string ip_addr, resource, fpga_path, image_type;
 
     po::options_description desc("Allowed options");
     desc.add_options()
         ("help", "Display this help message.")
-        ("addr", po::value<std::string>(&ip_addr)->default_value("192.168.10.2"), "Specify an IP address.")
+        ("addr", po::value<std::string>(&ip_addr), "Specify an IP address.")
+        ("resource", po::value<std::string>(&resource), "Specify a resource.")
         ("fpga-path", po::value<std::string>(&fpga_path), "Specify an FPGA path.")
         ("type", po::value<std::string>(&image_type), "Specify an image type (1G, HGS, XGS)")
         ("configure", "Set FPGA image currently in flash (automatically done after downloading)")
@@ -350,6 +363,13 @@ int UHD_SAFE_MAIN(int argc, char *argv[]){
     if(vm.count("list")){
         list_usrps();
         return EXIT_SUCCESS;
+    }
+
+    /*
+     * The user must specify whether to burn the image over Ethernet or PCI-e.
+     */
+    if(not (vm.count("addr") xor vm.count("resource"))){
+        throw std::runtime_error("You must specify addr or resource!");
     }
 
     /*
@@ -399,7 +419,7 @@ int UHD_SAFE_MAIN(int argc, char *argv[]){
     }
 
     udp_simple::sptr udp_transport = udp_simple::make_connected(ip_addr, BOOST_STRINGIZE(X300_FPGA_PROG_UDP_PORT));
-    burn_fpga_image(udp_transport, fpga_path, vm.count("verify"));
+    ethernet_burn(udp_transport, fpga_path, vm.count("verify"));
 
     //If new image is burned, automatically configure
     //If not, user needs to specify
