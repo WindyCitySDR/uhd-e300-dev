@@ -286,20 +286,19 @@ device to enable communication, as shown in the following table:
 +---------------+-------------------------+----------------+----------------+---------------+
 
 
-On a Linux system, you can set a static IP address very easily by using the
-'ifconfig' command
+On a Linux system, you can add a static IP address very easily by using the
+'ip' command
 
 ::
 
-    sudo ifconfig <interface> 192.168.10.1
+    sudo ip addr add 192.168.10.1/24 dev <interface>
 
 Note that **<interface>** is usually something like **eth0**.  You can discover the
-names of the network interfaces in your computer by running **ifconfig** without
-any parameters:
+names of the network interfaces in your computer by running **ip addr show**:
 
 ::
 
-    ifconfig -a
+    ip addr show
 
 **Note:**
 When using UHD software, if an IP address for the USRP-X Series device is not specified,
