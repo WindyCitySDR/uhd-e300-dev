@@ -326,6 +326,16 @@ the software will use UDP broadcast packets to locate the USRP-X Series device.
 On some systems, the firewall will block UDP broadcast packets.
 It is recommended that you change or disable your firewall settings.
 
+^^^^^^^^^^^^^^^
+Setting the MTU
+^^^^^^^^^^^^^^^
+As UHD uses receive and transmit frames larger than the standard MTU,
+the NIC needs to be configured to use a larger MTU when used with the USRP X series devices.
+
+::
+
+    sudo ip link set mtu 9000 dev <interface>
+
 ^^^^^^^^^^^^^^^^^^^^^^^^^
 Multiple devices per host
 ^^^^^^^^^^^^^^^^^^^^^^^^^
