@@ -136,6 +136,26 @@ the same way you would use any other, including:
 * `Xilinx Chipscope <http://www.xilinx.com/tools/cspro.htm>`_
 * `Digilent ADEPT <https://www.digilentinc.com/Products/Detail.cfm?NavPath=2,66,828&Prod=ADEPT2>`_
 
+In order to use the JTAG programmer with the Xilinx tools, the Digilent drivers and plugin have to be installed first.
+Although recent versions of ISE ship with the driver, it has to still be manually installed.
+
+Note: Sometimes the ISE shipped versions are newer than the ones available via Digilent's website. It is therefore advisable to
+use the ISE provided plugin and drivers.
+
+To install first locate your ISE installation path (default is /opt/Xilinx/<Version>).
+
+**LINUX**
+::
+
+    sudo <ise install path>/ISE_DS/common/bin/lin64/digilent/install_digilent.sh
+
+Afterwards either reboot or force udev to reload its rules by:
+::
+
+    sudo udevadm control --reload
+
+The USRP-X series device should now be usable with all the tools mentioned above.
+
 --------------------------------
 Load FPGA Images onto the Device
 --------------------------------
