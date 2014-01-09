@@ -118,8 +118,9 @@ uhd::uart_iface::sptr x300_make_uart_iface(uhd::wb_iface::sptr iface);
 uhd::wb_iface::sptr x300_make_ctrl_iface_enet(uhd::transport::udp_simple::sptr udp);
 uhd::wb_iface::sptr x300_make_ctrl_iface_pcie(uhd::niusrprio::niriok_proxy& drv_proxy);
 
-struct x300_impl : public uhd::device
+class x300_impl : public uhd::device
 {
+public:
     x300_impl(const uhd::device_addr_t &);
     void setup_mb(const size_t which, const uhd::device_addr_t &);
     ~x300_impl(void);

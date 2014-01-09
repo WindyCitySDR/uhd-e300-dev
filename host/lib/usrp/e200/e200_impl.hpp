@@ -52,8 +52,9 @@ static const double E200_RX_SW_BUFF_FULLNESS = 0.5;        //Buffer should be ha
  * The implementation details are encapsulated here.
  * Handles properties on the mboard, dboard, dsps...
  */
-struct e200_impl : public uhd::device
+class e200_impl : public uhd::device
 {
+public:
     //structors
     e200_impl(const uhd::device_addr_t &);
     ~e200_impl(void);

@@ -80,8 +80,9 @@ static const boost::uint32_t B200_LOCAL_RESP_SID = FLIP_SID(B200_LOCAL_CTRL_SID)
  **********************************************************************/
 
 //! Implementation guts
-struct b200_impl : public uhd::device
+class b200_impl : public uhd::device
 {
+public:
     //structors
     b200_impl(const uhd::device_addr_t &);
     ~b200_impl(void);
