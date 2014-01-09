@@ -130,16 +130,14 @@ public:
     uhd::tx_streamer::sptr get_tx_stream(const uhd::stream_args_t &);
 
     //support old async call
-    typedef uhd::transport::bounded_buffer<uhd::async_metadata_t> async_md_type;
-    boost::shared_ptr<async_md_type> _async_md;
     bool recv_async_msg(uhd::async_metadata_t &, double);
 
-    uhd::property_tree::sptr _tree;
-    //device properties interface
-    uhd::property_tree::sptr get_tree(void) const
-    {
-        return _tree;
-    }
+    static bool is_claimed(uhd::wb_iface::sptr);
+
+    typedef uhd::transport::bounded_buffer<uhd::async_metadata_t> async_md_type;
+
+private:
+    boost::shared_ptr<async_md_type> _async_md;
 
     //perifs in the radio core
     struct radio_perifs_t
@@ -205,7 +203,7 @@ public:
 
     //task for periodically reclaiming the device from others
     void claimer_loop(uhd::wb_iface::sptr);
-    static bool is_claimed(uhd::wb_iface::sptr);
+//    static bool is_claimed(uhd::wb_iface::sptr);
 
     boost::mutex _transport_setup_mutex;
 

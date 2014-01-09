@@ -92,8 +92,7 @@ public:
     uhd::tx_streamer::sptr get_tx_stream(const uhd::stream_args_t &args);
     bool recv_async_msg(uhd::async_metadata_t &, double);
 
-    uhd::property_tree::sptr _tree;
-
+private:
     //controllers
     b200_iface::sptr _iface;
     radio_ctrl_core_3000::sptr _local_ctrl;
@@ -106,12 +105,6 @@ public:
     uhd::transport::zero_copy_if::sptr _data_transport;
     uhd::transport::zero_copy_if::sptr _ctrl_transport;
     uhd::usrp::recv_packet_demuxer_3000::sptr _demux;
-
-    //device properties interface
-    uhd::property_tree::sptr get_tree(void) const
-    {
-        return _tree;
-    }
 
     boost::weak_ptr<uhd::rx_streamer> _rx_streamer;
     boost::weak_ptr<uhd::tx_streamer> _tx_streamer;
