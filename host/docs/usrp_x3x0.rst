@@ -43,7 +43,7 @@ Installing the USRP X300/X310
 * Plug a 1 Gigabit SFP+ Transciever into Ethernet Port 0 on the USRP X300/x310 device.
 * Use the Ethernet cable to connect the SFP+ transciever on the device to the host computer. For maximum throughput, Ettus Research recommends that you connect each device to its own dedicated Gigabit Ethernet interface on the host computer.
 * Connect the AC/DC power supply to the device and plug the supply into a wall outlet.
-* The OS with automatically recognize the device.
+* The OS will automatically recognize the device.
 
 ^^^^^^^^^^^^^^^^^^^^
 Ten Gigabit Ethernet
@@ -59,7 +59,7 @@ Installing the USRP X300/X310
 * Prior to installing the module, the host PC can remain powered on.
 * Use a 10 Gigabit SFP+ cable to connect Ethernet Port 1 on the USRP X300/x310 device to the host computer. For maximum throughput, Ettus Research recommends that you connect the device to its own dedicated Ten Gigabit, Ettus Research recommended Ethernet interface on the host computer.
 * Connect the AC/DC power supply to the device and plug the supply into a wall outlet.
-* The OS with automatically recognize the device.
+* The OS will automatically recognize the device.
 
 The LEDs on the front panel can be useful in debugging hardware and software issues.
 The LEDs reveal the following about the state of the device:
@@ -135,6 +135,26 @@ the same way you would use any other, including:
 * `Xilinx Programming Tools (ISE, iMPACT) <http://www.xilinx.com/support/download/index.htm>`_
 * `Xilinx Chipscope <http://www.xilinx.com/tools/cspro.htm>`_
 * `Digilent ADEPT <https://www.digilentinc.com/Products/Detail.cfm?NavPath=2,66,828&Prod=ADEPT2>`_
+
+In order to use the JTAG programmer with the Xilinx tools, the Digilent drivers and plugin have to be installed first.
+Although recent versions of ISE ship with the driver, it has to still be manually installed.
+
+Note: Sometimes the ISE shipped versions are newer than the ones available via Digilent's website. It is therefore advisable to
+use the ISE provided plugin and drivers.
+
+To install first locate your ISE installation path (default is /opt/Xilinx/<Version>).
+
+**LINUX**
+::
+
+    sudo <ise install path>/ISE_DS/common/bin/lin64/digilent/install_digilent.sh
+
+Afterwards either reboot or force udev to reload its rules by:
+::
+
+    sudo udevadm control --reload
+
+The USRP-X series device should now be usable with all the tools mentioned above.
 
 --------------------------------
 Load FPGA Images onto the Device
@@ -286,26 +306,35 @@ device to enable communication, as shown in the following table:
 +---------------+-------------------------+----------------+----------------+---------------+
 
 
-On a Linux system, you can set a static IP address very easily by using the
-'ifconfig' command
+On a Linux system, you can add a static IP address very easily by using the
+'ip' command
 
 ::
 
-    sudo ifconfig <interface> 192.168.10.1
+    sudo ip addr add 192.168.10.1/24 dev <interface>
 
 Note that **<interface>** is usually something like **eth0**.  You can discover the
-names of the network interfaces in your computer by running **ifconfig** without
-any parameters:
+names of the network interfaces in your computer by running **ip addr show**:
 
 ::
 
-    ifconfig -a
+    ip addr show
 
 **Note:**
 When using UHD software, if an IP address for the USRP-X Series device is not specified,
 the software will use UDP broadcast packets to locate the USRP-X Series device.
 On some systems, the firewall will block UDP broadcast packets.
 It is recommended that you change or disable your firewall settings.
+
+^^^^^^^^^^^^^^^
+Setting the MTU
+^^^^^^^^^^^^^^^
+As UHD uses receive and transmit frames larger than the standard MTU,
+the NIC needs to be configured to use a larger MTU when used with the USRP X series devices.
+
+::
+
+    sudo ip link set mtu 9000 dev <interface>
 
 ^^^^^^^^^^^^^^^^^^^^^^^^^
 Multiple devices per host
