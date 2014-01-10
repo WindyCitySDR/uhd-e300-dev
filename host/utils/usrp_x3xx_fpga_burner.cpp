@@ -135,10 +135,10 @@ device_addr_t find_usrp_with_ethernet(std::string ip_addr){
     }
     else {
         std::cout << (boost::format("Found %s (%s).\n\n")
-                        % dev["product"]
-                        % dev["fpga"]);
+                        % found_devices[0]["product"]
+                        % found_devices[0]["fpga"]);
     }
-    return dev;
+    return found_devices[0];
 }
 
 device_addr_t find_usrp_with_pcie(std::string resource){
@@ -151,10 +151,10 @@ device_addr_t find_usrp_with_pcie(std::string resource){
     }
     else {
         std::cout << (boost::format("Found %s (%s).\n\n")
-                        % dev["product"]
-                        % dev["fpga"]);
+                        % found_devices[0]["product"]
+                        % found_devices[0]["fpga"]);
     }
-    return dev;
+    return found_devices[0];
 }
 
 std::string get_default_image_path(std::string model, std::string image_type){
@@ -331,10 +331,15 @@ void ethernet_burn(udp_simple::sptr udp_transport, std::string fpga_path, bool v
 
 void pcie_burn(std::string resource, std::string rpc_port, std::string fpga_path)
 {
+    std::cout << "Burning image: " << fpga_path << std::endl;
+    std::cout << "This will take a while." << std::endl;
+
     nirio_status status = NiRio_Status_Success;
 
     uhd::niusrprio::niusrprio_session fpga_session(resource, rpc_port);
     nirio_status_chain(fpga_session.download_bitstream_to_flash(fpga_path), status);
+
+    std::cout << status << std::endl;
 }
 
 bool configure_fpga(udp_simple::sptr udp_transport, std::string ip_addr){
