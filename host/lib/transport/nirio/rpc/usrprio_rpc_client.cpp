@@ -196,8 +196,9 @@ nirio_status usrprio_rpc_client::niusrprio_download_bitstream_to_fpga(NIUSRPRIO_
 
     in_args << resource;
 
+    static const boost::uint32_t DOWNLOAD_BITSTREAM_TIMEOUT = 1200000;
     status = _boost_error_to_nirio_status(
-        _rpc_client.call(NIUSRPRIO_DOWNLOAD_BITSTREAM_TO_FPGA, in_args, out_args, _timeout));
+        _rpc_client.call(NIUSRPRIO_DOWNLOAD_BITSTREAM_TO_FPGA, in_args, out_args, boost::posix_time::milliseconds(DOWNLOAD_BITSTREAM_TIMEOUT)));
 
     if (nirio_status_not_fatal(status)) {
         out_args >> status;
