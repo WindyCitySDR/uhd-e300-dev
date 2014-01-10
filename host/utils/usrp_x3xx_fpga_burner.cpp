@@ -1,5 +1,5 @@
 //
-// Copyright 2013 Ettus Research LLC
+// Copyright 2013-2014 Ettus Research LLC
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -396,8 +396,8 @@ int UHD_SAFE_MAIN(int argc, char *argv[]){
         ("rpc-port", po::value<std::string>(&rpc_port)->default_value("5444"), "Specify a port to communicate with the RPC server.")
         ("fpga-path", po::value<std::string>(&fpga_path), "Specify an FPGA path.")
         ("type", po::value<std::string>(&image_type), "Specify an image type (1G, HGS, XGS)")
-        ("configure", "Set FPGA image currently in flash (automatically done after downloading)")
-        ("verify", "Verify data downloaded to flash (download will take much longer)")
+        ("configure", "Set FPGA image currently in flash (Ethernet only, automatically done after downloading)")
+        ("verify", "Verify data downloaded to flash (Ethernet only, download will take much longer)")
         ("list", "List all available X3x0 devices.")
     ;
     po::variables_map vm;
