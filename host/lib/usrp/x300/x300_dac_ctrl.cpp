@@ -85,7 +85,13 @@ public:
         //write_ad9146_reg(0x16, 0x03); //720ps delay in DCI
  
         write_ad9146_reg(0x03, 0x00); // 2's comp, I first, byte wide interface
-        //this->set_iq_swap(false);
+
+        //fpga wants I,Q in the sample word:
+        //first transaction goes into low bits
+        //second transaction goes into high bits
+        //therefore, we want Q to go first (bit 6 == 1)
+        write_ad9146_reg(0x03, (1 << 6)); //2s comp, i first, byte mode
+
         write_ad9146_reg(0x10, 0x48); // Disable SYNC mode.
         write_ad9146_reg(0x17, 0x04); // FIFO write pointer offset
         write_ad9146_reg(0x18, 0x02); // Request soft FIFO align
@@ -125,18 +131,6 @@ public:
 	boost::this_thread::sleep(boost::posix_time::milliseconds(10));
       }
   }
-
-  // FIXME - Delete this method, obselete
-    void set_iq_swap(const bool swap)
-    {
-        //fpga wants I,Q in the sample word:
-        //first transaction goes into low bits
-        //second transaction goes into high bits
-        //therefore, we want Q to go first (bit 6 == 1)
-        const int bit = (swap)? 0 : (1 << 6);
-        write_ad9146_reg(0x03, 0x00 | bit); //2s comp, i first, byte mode
-    }
-
 
 private:
     uhd::spi_iface::sptr _iface;
