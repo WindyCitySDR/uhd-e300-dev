@@ -396,7 +396,7 @@ int UHD_SAFE_MAIN(int argc, char *argv[]){
         ("rpc-port", po::value<std::string>(&rpc_port)->default_value("5444"), "Specify a port to communicate with the RPC server.")
         ("fpga-path", po::value<std::string>(&fpga_path), "Specify an FPGA path.")
         ("type", po::value<std::string>(&image_type), "Specify an image type (1G, HGS, XGS)")
-        ("configure", "Set FPGA image currently in flash (Ethernet only, automatically done after downloading)")
+        ("configure", "Set FPGA image currently in flash without burning (Ethernet only)")
         ("verify", "Verify data downloaded to flash (Ethernet only, download will take much longer)")
         ("list", "List all available X3x0 devices.")
     ;
@@ -461,7 +461,9 @@ int UHD_SAFE_MAIN(int argc, char *argv[]){
 
     if(vm.count("addr")){
         udp_simple::sptr udp_transport = udp_simple::make_connected(ip_addr, BOOST_STRINGIZE(X300_FPGA_PROG_UDP_PORT));
-        ethernet_burn(udp_transport, fpga_path, vm.count("verify"));
+
+        //Don't burn image if --configure is set
+        if(!vm.count("configure")) ethernet_burn(udp_transport, fpga_path, vm.count("verify"));
 
         //If new image is burned, automatically configure
         if(configure_fpga(udp_transport, ip_addr)) std::cout << "Successfully configured FPGA!" << std::endl;
