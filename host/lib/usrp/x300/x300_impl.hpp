@@ -121,6 +121,8 @@ uhd::wb_iface::sptr x300_make_ctrl_iface_pcie(uhd::niusrprio::niriok_proxy& drv_
 class x300_impl : public uhd::device
 {
 public:
+    typedef uhd::transport::bounded_buffer<uhd::async_metadata_t> async_md_type;
+
     x300_impl(const uhd::device_addr_t &);
     void setup_mb(const size_t which, const uhd::device_addr_t &);
     ~x300_impl(void);
@@ -133,8 +135,6 @@ public:
     bool recv_async_msg(uhd::async_metadata_t &, double);
 
     static bool is_claimed(uhd::wb_iface::sptr);
-
-    typedef uhd::transport::bounded_buffer<uhd::async_metadata_t> async_md_type;
 
 private:
     boost::shared_ptr<async_md_type> _async_md;
@@ -203,7 +203,6 @@ private:
 
     //task for periodically reclaiming the device from others
     void claimer_loop(uhd::wb_iface::sptr);
-//    static bool is_claimed(uhd::wb_iface::sptr);
 
     boost::mutex _transport_setup_mutex;
 
