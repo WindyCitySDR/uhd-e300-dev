@@ -332,7 +332,7 @@ void ethernet_burn(udp_simple::sptr udp_transport, std::string fpga_path, bool v
 void pcie_burn(std::string resource, std::string rpc_port, std::string fpga_path)
 {
     std::cout << "Burning image: " << fpga_path << std::endl;
-    std::cout << "This will take a while." << std::endl;
+    std::cout << "This will take 3-10 minutes." << std::endl;
 
     nirio_status status = NiRio_Status_Success;
 
