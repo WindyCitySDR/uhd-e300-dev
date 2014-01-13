@@ -1066,10 +1066,7 @@ void x300_impl::update_atr_leds(gpio_core_200_32wo::sptr leds, const std::string
 void x300_impl::set_tick_rate(mboard_members_t &mb, const double rate)
 {
     BOOST_FOREACH(radio_perifs_t &perif, mb.radio_perifs)
-    {
         perif.time64->set_tick_rate(rate);
-        perif.time64->self_test();
-    }
 }
 
 void x300_impl::register_loopback_self_test(wb_iface::sptr iface)
