@@ -154,6 +154,11 @@ namespace uhd{ namespace transport{
         typedef boost::shared_ptr<zero_copy_if> sptr;
 
         /*!
+         * Clean up tasks before releasing the transport object.
+         */
+        virtual ~zero_copy_if() {};
+
+        /*!
          * Get a new receive buffer from this transport object.
          * \param timeout the timeout to get the buffer in seconds
          * \return a managed buffer, or null sptr on timeout/error
