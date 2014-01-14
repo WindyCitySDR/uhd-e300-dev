@@ -404,7 +404,7 @@ int UHD_SAFE_MAIN(int argc, char *argv[]){
 
     //Print help message
     if(vm.count("help")){
-        std::cout << "USRP X3x0 Net Burner - " << desc << std::endl;
+        std::cout << "USRP X3x0 FPGA Burner - " << desc << std::endl;
         return EXIT_SUCCESS;
     }
     
@@ -419,14 +419,6 @@ int UHD_SAFE_MAIN(int argc, char *argv[]){
      */
     if(not (vm.count("addr") xor vm.count("resource"))){
         throw std::runtime_error("You must specify addr or resource!");
-    }
-
-    /*
-     * If the user doesn't specify their own FPGA image, they must select a type (1G, HGS, XGS)
-     * so the utility can use the appropriate image from the default location.
-     */
-    if(not (vm.count("fpga-path") xor vm.count("type"))){
-        throw std::runtime_error("You must specify fpga-path OR type!");
     }
 
     /*
