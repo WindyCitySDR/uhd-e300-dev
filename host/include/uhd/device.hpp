@@ -84,10 +84,7 @@ public:
     virtual tx_streamer::sptr get_tx_stream(const stream_args_t &args) = 0;
 
     //! Get access to the underlying property structure
-    uhd::property_tree::sptr get_tree(void) const
-    {
-        return _tree;
-    }
+    uhd::property_tree::sptr get_tree(void) const;
 
     #include <uhd/device_deprecated.ipp>
 
