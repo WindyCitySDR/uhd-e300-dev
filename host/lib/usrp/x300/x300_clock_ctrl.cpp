@@ -6,25 +6,114 @@
 #include <boost/format.hpp>
 #include <lmk04816_regs.hpp>
 #include <stdexcept>
+#include <iostream> // jk debug
 
 using namespace uhd;
 struct x300_clock_ctrl_impl : x300_clock_ctrl	{
 
-	x300_clock_ctrl_impl(uhd::spi_iface::sptr spiface, const size_t slaveno, const double clock_rate, const int &revno, const double pll2ref):
-		_spiface(spiface), _slaveno(slaveno), _clock_rate(clock_rate), _revno(revno), _lmkpll2_ref(pll2ref)
+	x300_clock_ctrl_impl(uhd::spi_iface::sptr spiface, const size_t slaveno, const double clock_rate, const int &revno, const double pll2ref, const double refclk_rate):
+		_spiface(spiface), _slaveno(slaveno), _clock_rate(clock_rate), _revno(revno), _lmkpll2_ref(pll2ref), _refclk_rate(refclk_rate)
 	{
 		bool pll2ref96M = (pll2ref == 96e6);
+                //bool refclk10M = (refclk_rate == 10e6);
+		bool clkis_184_32 = (clock_rate == 184.32e6);
+
                 if (!pll2ref96M && pll2ref != 120e6) 
 		   throw uhd::runtime_error(str(boost::format("x300_clock_ctrl: unsupported pll2 reference %f") % pll2ref));
 
+                /* for non-CPRI clocking, the VCO is run at 2400 MHz, div is the required output divide 
+                   for the CPRI rate of 184.32 MHz, the VCO is run at 2580.48 MHz and div is 14
+                */
 		int div = 0;
+/*
 		if (clock_rate == 120e6) div = 20;
 		else if (clock_rate == 150e6) div = 16;
 		else if (clock_rate == 200e6) div = 12;
 		else throw uhd::runtime_error(str(boost::format("x300_clock_ctrl: can't handle rate %f") % clock_rate));
+*/
+std::cerr << "+++++++ jk clock settings debug  " << pll2ref << ' ' << refclk_rate << ' ' << clock_rate << std::endl;
+
+                typedef enum { m10M_200M_NOZD, m10M_200M_ZDEL, m30_72M_184_32M_ZDEL, m10M_184_32M_NOZD } opmode;
+
+                // HACK -- set fixed mode
+                //opmode mode = m10M_200M_NOZD; 
+                opmode mode = m10M_200M_ZDEL;
+                //opmode mode = m30_72M_184_32M_ZDEL; 
+                //opmode mode = m10M_184_32M_NOZD;
+std::cerr << "+++++++ jk clock for 200M, 10M ref  " << std::endl;
+
+
+		lmk04816_regs_t::MODE_t lmkmode;
+
+		int pll_1_n_div;
+                int pll_1_r_div = 1;
+                lmk04816_regs_t::PLL1_CP_GAIN_27_t pll_1_cp_gain;
+
+		int pll_2_n_div;
+                int pll_2_r_div; 
+                lmk04816_regs_t::PLL2_CP_GAIN_26_t pll_2_cp_gain;
+
+
+		// Note: PLL2 N2 prescaler is enabled for all cases
+                //       PLL2 reference doubler is enabled for all cases
+                switch (mode) {
+                case m10M_200M_NOZD: // 10 MHz reference, 200 MHz out, not zero-delay mode
+	           lmkmode  = lmk04816_regs_t::MODE_DUAL_INT;
+		   pll_1_n_div = 48; 
+                   pll_1_r_div = 5; 
+                   pll_1_cp_gain = lmk04816_regs_t::PLL1_CP_GAIN_27_100UA;
+		   pll_2_n_div = 25;
+                   pll_2_r_div = 4;  
+                   pll_2_cp_gain = lmk04816_regs_t::PLL2_CP_GAIN_26_3200UA;
+                   div = 12;
+                   break;
+                case m10M_200M_ZDEL: // 10 MHz reference, 200 MHz out
+		   lmkmode  = lmk04816_regs_t::MODE_DUAL_INT_ZER_DELAY;
+		   pll_1_n_div = 100; //int(clock_rate/refclk_rate);
+                   pll_1_r_div = 5;
+                   pll_1_cp_gain = lmk04816_regs_t::PLL1_CP_GAIN_27_100UA;
+		   pll_2_n_div = 25;
+                   pll_2_r_div = 4;  
+                   pll_2_cp_gain = lmk04816_regs_t::PLL2_CP_GAIN_26_3200UA;
+                   div = 12;
+                   break;
+                case m30_72M_184_32M_ZDEL: // CPRI reference, 184.32 MHz out
+		   lmkmode  = lmk04816_regs_t::MODE_DUAL_INT_ZER_DELAY;
+		   pll_1_n_div = 90; //int(clock_rate/refclk_rate);
+                   pll_1_r_div = 15;
+                   pll_1_cp_gain = lmk04816_regs_t::PLL1_CP_GAIN_27_100UA;
+		   pll_2_n_div = 168;
+                   pll_2_r_div = 25;  
+                   pll_2_cp_gain = lmk04816_regs_t::PLL2_CP_GAIN_26_3200UA;
+                   div=14;
+//  TODO: add these for the 184.23 cases only
+                _lmk04816_regs.PLL2_R3_LF=lmk04816_regs_t:: PLL2_R3_LF_1KILO_OHM;
+                _lmk04816_regs.PLL2_R4_LF=lmk04816_regs_t:: PLL2_R4_LF_1KILO_OHM;
+                _lmk04816_regs.PLL2_C3_LF=lmk04816_regs_t:: PLL2_C3_LF_39PF;
+                _lmk04816_regs.PLL2_C4_LF=lmk04816_regs_t:: PLL2_C4_LF_34PF;
+                   break;
+                case m10M_184_32M_NOZD: // 10 MHz reference, 184.32 MHz out
+	           lmkmode  = lmk04816_regs_t::MODE_DUAL_INT;
+		   pll_1_n_div = 48;
+                   pll_1_r_div = 5;
+                   pll_1_cp_gain = lmk04816_regs_t::PLL1_CP_GAIN_27_100UA;
+		   pll_2_n_div = 168;
+                   pll_2_r_div = 25;  
+                   pll_2_cp_gain = lmk04816_regs_t::PLL2_CP_GAIN_26_3200UA;
+                   div=14;
+//  TODO: add these for the 184.23 cases only
+                _lmk04816_regs.PLL2_R3_LF=lmk04816_regs_t:: PLL2_R3_LF_1KILO_OHM;
+                _lmk04816_regs.PLL2_R4_LF=lmk04816_regs_t:: PLL2_R4_LF_1KILO_OHM;
+                _lmk04816_regs.PLL2_C3_LF=lmk04816_regs_t:: PLL2_C3_LF_39PF;
+                _lmk04816_regs.PLL2_C4_LF=lmk04816_regs_t:: PLL2_C4_LF_34PF;
+                   break;
+                };
+                
 
 		//calculate N div -- ok as long as integer multiple of 10e6
-		const int pll_1_n_div = int(clock_rate/10e6);
+		//int pll_1_n_div = int(clock_rate/10e6);
+                
+std::cerr << "jk N1=" << pll_1_n_div << " R1=" << pll_1_r_div << " N2=" << pll_2_n_div << " R2=" << pll_2_r_div << " div=" << div << std::endl;
 
 /* Individual Clock Output Configurations */		
 //register 0
@@ -98,7 +187,8 @@ struct x300_clock_ctrl_impl : x300_clock_ctrl	{
 	}
 	else
 	{
-		_lmk04816_regs.CLKout10_11_DIV = int(((clock_rate*div)/10e6) + 0.5);
+		//_lmk04816_regs.CLKout10_11_DIV = int(((clock_rate*div)/10e6) + 0.5);
+		_lmk04816_regs.CLKout10_11_DIV = div; // jk
 	}
 
 	/////////////////////////////////////////////////////////////////////////
@@ -107,14 +197,18 @@ struct x300_clock_ctrl_impl : x300_clock_ctrl	{
 
 //register 10
 
-		_lmk04816_regs.EN_OSCout0 = lmk04816_regs_t::EN_OSCOUT0_DISABLED;
+		//_lmk04816_regs.EN_OSCout0 = lmk04816_regs_t::EN_OSCOUT0_DISABLED;
+		_lmk04816_regs.EN_OSCout0 = lmk04816_regs_t::EN_OSCOUT0_ENABLED;
+                //_lmk04816_regs.OSCout0_TTYPE = lmk04816_regs_t::OSCout0_TYPE_t::CLKOUT1_TYPE_LVPECL_700MVPP;
+std::cerr << "+++++++ jk CAUTION: OSCOUT is ENABLED!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!  " << std::endl;
 		_lmk04816_regs.FEEDBACK_MUX = 0; //use output 0 (FPGA clock) for feedback
 		_lmk04816_regs.EN_FEEDBACK_MUX = lmk04816_regs_t::EN_FEEDBACK_MUX_ENABLED;
 
 //register 11
 
 		//register 11 sync enabled
-		_lmk04816_regs.MODE = lmk04816_regs_t::MODE_DUAL_INT_ZER_DELAY;
+		//_lmk04816_regs.MODE = lmk04816_regs_t::MODE_DUAL_INT_ZER_DELAY;
+		_lmk04816_regs.MODE = lmkmode;
 		_lmk04816_regs.SYNC_QUAL = lmk04816_regs_t::SYNC_QUAL_FB_MUX;
 		_lmk04816_regs.EN_SYNC = lmk04816_regs_t::EN_SYNC_ENABLE;
 		_lmk04816_regs.NO_SYNC_CLKout0_1 = lmk04816_regs_t::NO_SYNC_CLKOUT0_1_CLOCK_XY_SYNC;
@@ -160,37 +254,50 @@ struct x300_clock_ctrl_impl : x300_clock_ctrl	{
 
 //Register 26
 
-		_lmk04816_regs.PLL2_CP_GAIN_26 = pll2ref96M ? lmk04816_regs_t::PLL2_CP_GAIN_26_400UA : lmk04816_regs_t::PLL2_CP_GAIN_26_1600UA;
+		//_lmk04816_regs.PLL2_CP_GAIN_26 = pll2ref96M ? lmk04816_regs_t::PLL2_CP_GAIN_26_400UA : lmk04816_regs_t::PLL2_CP_GAIN_26_1600UA;
+		_lmk04816_regs.PLL2_CP_GAIN_26 =  pll_2_cp_gain;
 		_lmk04816_regs.PLL2_CP_POL_26 = lmk04816_regs_t::PLL2_CP_POL_26_NEG_SLOPE;
+ //               if (clkis_184_32) 
+                _lmk04816_regs.EN_PLL2_REF_2X = lmk04816_regs_t::EN_PLL2_REF_2X_DOUBLED_FREQ_REF; // jk
+//else 
+ //               _lmk04816_regs.EN_PLL2_REF_2X = lmk04816_regs_t::EN_PLL2_REF_2X_NORMAL_FREQ_REF; // jk
+ 
 
 //register 27
 
-		_lmk04816_regs.PLL1_CP_GAIN_27 = lmk04816_regs_t::PLL1_CP_GAIN_27_100UA;
+		//_lmk04816_regs.PLL1_CP_GAIN_27 = lmk04816_regs_t::PLL1_CP_GAIN_27_100UA;
+		_lmk04816_regs.PLL1_CP_GAIN_27 = pll_1_cp_gain;
 		//_lmk04816_regs.CLKin1_PreR_DIV = 1;
 		//_lmk04816_regs.CLKin1_PreR_DIV = lmk04816_regs_t::CLKIN1_PRER_DIV_DIV2;
 		//sets PLL1_R value
-		_lmk04816_regs.PLL1_R_27 = 1;
+		//_lmk04816_regs.PLL1_R_27 = 1;
+		_lmk04816_regs.PLL1_R_27 = pll_1_r_div;
 		//_lmk04816_regs.CLKin2_PreR_DIV = 1;
 		//this->write_regs(27);
 //register 28
 		//set PLL_1_N value
-		_lmk04816_regs.PLL1_N_28 = pll_1_n_div*_lmk04816_regs.PLL1_R_27;
+		_lmk04816_regs.PLL1_N_28 = pll_1_n_div;
 		//set PLL_2_R value
-		_lmk04816_regs.PLL2_R_28 = pll2ref96M ? 2 : 1;
+		_lmk04816_regs.PLL2_R_28 = pll_2_r_div;
 		//this->write_regs(28);
 //register 29
 		//set the PLL_2_N value (calibration divider)
-		_lmk04816_regs.PLL2_N_CAL_29 = pll2ref96M ? 25 : 10;
-                if (pll2ref96M) _lmk04816_regs.OSCin_FREQ_29 = lmk04816_regs_t::OSCIN_FREQ_29_63_TO_127MHZ;
+		_lmk04816_regs.PLL2_N_CAL_29 = pll_2_n_div;
+                //if (pll2ref96M) _lmk04816_regs.OSCin_FREQ_29 = lmk04816_regs_t::OSCIN_FREQ_29_63_TO_127MHZ;
+                _lmk04816_regs.OSCin_FREQ_29 = lmk04816_regs_t::OSCIN_FREQ_29_63_TO_127MHZ;
 		//this->write_regs(29);
 //register 30
 		//sets PLL_2_N divider prescaler
 		_lmk04816_regs.PLL2_P_30 = lmk04816_regs_t::PLL2_P_30_DIV_2A;
 		//sets PLL2_N_divider
-		_lmk04816_regs.PLL2_N_30 = pll2ref96M ? 25 : 10;
+		_lmk04816_regs.PLL2_N_30 = pll_2_n_div;
 		//this->write_regs(30);
+
+
 		
 		for (size_t i = 1; i <= 16; ++i) { 
+if (i==10) 
+std::cerr << "        REG 10 is " << std::hex << this->_lmk04816_regs.get_reg(i) << std::endl;
 			this->write_regs(i);
 		}
 		for (size_t i = 24; i <= 31; ++i) {
@@ -254,6 +361,7 @@ struct x300_clock_ctrl_impl : x300_clock_ctrl	{
 	void write_regs(boost::uint8_t addr)	{
 
 		boost::uint32_t data = _lmk04816_regs.get_reg(addr);
+if (addr==10) data |= 0x03000000; // jk GIANT HACK enables OSCout LVPECL
 		_spiface->write_spi(_slaveno, spi_config_t::EDGE_RISE, data,32);
 		//for testing purposes
 		//printf("%u %08x\n", addr, data);
@@ -264,6 +372,7 @@ struct x300_clock_ctrl_impl : x300_clock_ctrl	{
 	const double _clock_rate;
 	const int _revno;
 	const double _lmkpll2_ref; 
+        const double _refclk_rate;
 	lmk04816_regs_t _lmk04816_regs;
 	//uhd::dict<x300_clock_which_t, bool> _enables;
 	//uhd::dict<x300_clock_which_t, double> _rates;
@@ -281,11 +390,63 @@ struct x300_clock_ctrl_impl : x300_clock_ctrl	{
 
 };
 
-x300_clock_ctrl::sptr x300_clock_ctrl::make(uhd::spi_iface::sptr spiface, const size_t slaveno, const double clock_rate, const int &revno, const double pll2ref)
+x300_clock_ctrl::sptr x300_clock_ctrl::make(uhd::spi_iface::sptr spiface, const size_t slaveno, const double clock_rate, const int &revno, const double pll2ref, const double refclk_freq)
 {
-    return sptr(new x300_clock_ctrl_impl(spiface, slaveno, clock_rate, revno, pll2ref));
+    return sptr(new x300_clock_ctrl_impl(spiface, slaveno, clock_rate, revno, pll2ref, refclk_freq));
 }
 
 
 
 
+/*
+    enum PLL2_R3_LF_t{
+        PLL2_R3_LF_200OHM = 0,
+        PLL2_R3_LF_1KILO_OHM = 1,
+        PLL2_R3_LF_2KILO_OHM = 2,
+        PLL2_R3_LF_4KILO_OHM = 3,
+        PLL2_R3_LF_16KILO_OHM = 4
+    };
+    PLL2_R3_LF_t PLL2_R3_LF;
+    boost::uint8_t Required_24_19;
+    enum PLL2_R4_LF_t{
+        PLL2_R4_LF_200OHM = 0,
+        PLL2_R4_LF_1KILO_OHM = 1,
+        PLL2_R4_LF_2KILO_OHM = 2,
+        PLL2_R4_LF_4KILO_OHM = 3,
+        PLL2_R4_LF_16KILO_OHM = 4
+    };
+    PLL2_R4_LF_t PLL2_R4_LF;
+    boost::uint8_t Required_24_23;
+    enum PLL2_C3_LF_t{
+        PLL2_C3_LF_10PF = 0,
+        PLL2_C3_LF_11PF = 1,
+        PLL2_C3_LF_15PF = 2,
+        PLL2_C3_LF_16PF = 3,
+        PLL2_C3_LF_19PF = 4,
+        PLL2_C3_LF_20PF = 5,
+        PLL2_C3_LF_24PF = 6,
+        PLL2_C3_LF_25PF = 7,
+        PLL2_C3_LF_29PF = 8,
+        PLL2_C3_LF_30PF = 9,
+        PLL2_C3_LF_33PF = 10,
+        PLL2_C3_LF_34PF = 11,
+        PLL2_C3_LF_38PF = 12,
+        PLL2_C3_LF_39PF = 13
+    };
+    PLL2_C3_LF_t PLL2_C3_LF;
+    enum PLL2_C4_LF_t{
+        PLL2_C4_LF_10PF = 0,
+        PLL2_C4_LF_15PF = 1,
+        PLL2_C4_LF_29PF = 2,
+        PLL2_C4_LF_34PF = 3,
+        PLL2_C4_LF_47PF = 4,
+        PLL2_C4_LF_52PF = 5,
+        PLL2_C4_LF_66PF = 6,
+        PLL2_C4_LF_71PF = 7,
+        PLL2_C4_LF_103PF = 8,
+        PLL2_C4_LF_108PF = 9,
+        PLL2_C4_LF_122PF = 10,
+        PLL2_C4_LF_126PF = 11,
+        PLL2_C4_LF_141PF = 12,
+        PLL2_C4_LF_146PF = 13
+    };*/

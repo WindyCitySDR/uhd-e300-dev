@@ -40,7 +40,7 @@ struct x300_clock_ctrl : boost::noncopyable
 {
     typedef boost::shared_ptr<x300_clock_ctrl> sptr;
 
-    static sptr make(uhd::spi_iface::sptr spiface, const size_t slaveno, const double clock_rate, const int &revno, const double pll2ref);
+    static sptr make(uhd::spi_iface::sptr spiface, const size_t slaveno, const double clock_rate, const int &revno, const double pll2ref, const double refclk_rate);
 
     /*!
      * Get the master clock frequency for the fpga.
