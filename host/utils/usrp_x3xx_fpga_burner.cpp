@@ -475,7 +475,7 @@ int UHD_SAFE_MAIN(int argc, char *argv[]){
     /*
      * Attempt to find USRP after burning
      */
-    std::cout << std::endl << "Attempting to find device...";
+    std::cout << std::endl << "Attempting to find device..." << std::flush;
     boost::this_thread::sleep(boost::posix_time::milliseconds(2000));
     device_addr_t found_usrp = (vm.count("addr")) ? find_usrp_with_ethernet(ip_addr, false)
                                                   : find_usrp_with_pcie(resource, false);
