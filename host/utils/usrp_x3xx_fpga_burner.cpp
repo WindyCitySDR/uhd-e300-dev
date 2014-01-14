@@ -338,8 +338,6 @@ void pcie_burn(std::string resource, std::string rpc_port, std::string fpga_path
 
     uhd::niusrprio::niusrprio_session fpga_session(resource, rpc_port);
     nirio_status_chain(fpga_session.download_bitstream_to_flash(fpga_path), status);
-
-    std::cout << status << std::endl;
 }
 
 bool configure_fpga(udp_simple::sptr udp_transport, std::string ip_addr){
