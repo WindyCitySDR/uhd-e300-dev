@@ -134,6 +134,7 @@ public:
     //support old async call
     bool recv_async_msg(uhd::async_metadata_t &, double);
 
+    // used by x300_find_with_addr to find X300 devices.
     static bool is_claimed(uhd::wb_iface::sptr);
 
 private:
