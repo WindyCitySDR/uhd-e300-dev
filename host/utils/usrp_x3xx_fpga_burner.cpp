@@ -392,8 +392,8 @@ int UHD_SAFE_MAIN(int argc, char *argv[]){
         ("addr", po::value<std::string>(&ip_addr), "Specify an IP address.")
         ("resource", po::value<std::string>(&resource), "Specify a resource.")
         ("rpc-port", po::value<std::string>(&rpc_port)->default_value("5444"), "Specify a port to communicate with the RPC server.")
-        ("fpga-path", po::value<std::string>(&fpga_path), "Specify an FPGA path.")
-        ("type", po::value<std::string>(&image_type), "Specify an image type (1G, HGS, XGS)")
+        ("type", po::value<std::string>(&image_type), "Specify an image type (1G, HGS, XGS), leave blank for current type")
+        ("fpga-path", po::value<std::string>(&fpga_path), "Specify an FPGA path (overrides --type option).")
         ("configure", "Set FPGA image currently in flash without burning (Ethernet only)")
         ("verify", "Verify data downloaded to flash (Ethernet only, download will take much longer)")
         ("list", "List all available X3x0 devices.")
@@ -435,19 +435,30 @@ int UHD_SAFE_MAIN(int argc, char *argv[]){
     device_addr_t dev = (vm.count("addr")) ? find_usrp_with_ethernet(ip_addr)
                                            : find_usrp_with_pcie(resource);
 
-    if(vm.count("type")){
-        //Make sure the specified type is 1G, HGS, or XGS
-        if((image_type != "1G") and (image_type != "HGS") and (image_type != "XGS")){
-            throw std::runtime_error("--type must be 1G, HGS, or XGS!");
-        }
-        else fpga_path = get_default_image_path(dev["product"], image_type);
-    }
-    else{
+    /*
+     * If custom FPGA path is given, ignore specified type and let FPGA
+     * figure it out.
+     */
+    if(vm.count("fpga-path")){
         //Expand tilde usage if applicable
         #ifndef UHD_PLATFORM_WIN32
             if(fpga_path.find("~/") == 0) fpga_path.replace(0,1,getenv("HOME"));
         #endif
     }
+    else{
+        if(vm.count("type")){
+            //Make sure the specified type is 1G, HGS, or XGS
+            if((image_type != "1G") and (image_type != "HGS") and (image_type != "XGS")){
+                throw std::runtime_error("--type must be 1G, HGS, or XGS!");
+            }
+            else fpga_path = get_default_image_path(dev["product"], image_type);
+        }
+        else{
+            //Use default image of currently present FPGA type
+            fpga_path = get_default_image_path(dev["product"], dev["fpga"]);
+        }
+    }
+
 
     /*
      * Check validity of image through extension
