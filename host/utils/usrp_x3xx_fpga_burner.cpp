@@ -122,8 +122,8 @@ void list_usrps(){
     }
 }
 
-device_addr_t find_usrp_with_ethernet(std::string ip_addr){
-    std::cout << "Attempting to find X3x0 with IP address: " << ip_addr << std::endl;
+device_addr_t find_usrp_with_ethernet(std::string ip_addr, bool output){
+    if(output) std::cout << "Attempting to find X3x0 with IP address: " << ip_addr << std::endl;
     const device_addr_t dev = device_addr_t(str(boost::format("addr=%s") % ip_addr));
     device_addrs_t found_devices = device::find(dev);
 
@@ -134,15 +134,15 @@ device_addr_t find_usrp_with_ethernet(std::string ip_addr){
         throw std::runtime_error("Found multiple X3x0 units with the specified address!");
     }
     else {
-        std::cout << (boost::format("Found %s (%s).\n\n")
-                        % found_devices[0]["product"]
-                        % found_devices[0]["fpga"]);
+        if(output) std::cout << (boost::format("Found %s (%s).\n\n")
+                                 % found_devices[0]["product"]
+                                 % found_devices[0]["fpga"]);
     }
     return found_devices[0];
 }
 
-device_addr_t find_usrp_with_pcie(std::string resource){
-    std::cout << "Attempting to find X3x0 with resource: " << resource << std::endl;
+device_addr_t find_usrp_with_pcie(std::string resource, bool output){
+    if(output) std::cout << "Attempting to find X3x0 with resource: " << resource << std::endl;
     const device_addr_t dev = device_addr_t(str(boost::format("resource=%s") % resource));
     device_addrs_t found_devices = device::find(dev);
 
@@ -150,9 +150,9 @@ device_addr_t find_usrp_with_pcie(std::string resource){
         throw std::runtime_error("Could not find X3x0 with the specified resource!");
     }
     else {
-        std::cout << (boost::format("Found %s (%s).\n\n")
-                        % found_devices[0]["product"]
-                        % found_devices[0]["fpga"]);
+        if(output) std::cout << (boost::format("Found %s (%s).\n\n")
+                                 % found_devices[0]["product"]
+                                 % found_devices[0]["fpga"]);
     }
     return found_devices[0];
 }
@@ -424,8 +424,8 @@ int UHD_SAFE_MAIN(int argc, char *argv[]){
     /*
      * With settings validated, find X3x0 with specified arguments.
      */
-    device_addr_t dev = (vm.count("addr")) ? find_usrp_with_ethernet(ip_addr)
-                                           : find_usrp_with_pcie(resource);
+    device_addr_t dev = (vm.count("addr")) ? find_usrp_with_ethernet(ip_addr, true)
+                                           : find_usrp_with_pcie(resource, true);
 
     /*
      * If custom FPGA path is given, ignore specified type and let FPGA
@@ -471,6 +471,16 @@ int UHD_SAFE_MAIN(int argc, char *argv[]){
         else throw std::runtime_error("FPGA configuring failed!");
     }
     else pcie_burn(resource, rpc_port, fpga_path);
+
+    /*
+     * Attempt to find USRP after burning
+     */
+    std::cout << std::endl << "Attempting to find device...";
+    device_addr_t found_usrp = (vm.count("addr")) ? find_usrp_with_ethernet(ip_addr, false)
+                                                  : find_usrp_with_pcie(resource, false);
+    std::cout << "found!" << std::endl; //If unsuccessful, runtime error would occur in find functions
+    std::cout << "Successfully burned FPGA image!" << std::endl;
+    
 
     return EXIT_SUCCESS;
 }
