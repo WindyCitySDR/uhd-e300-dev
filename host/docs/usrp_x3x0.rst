@@ -637,7 +637,7 @@ Debugging custom FPGA designs with Xilinx Chipscope
 Xilinx chipscope allows for debugging custom FPGA designs similar to a logic analyzer.
 USRP-X series devices can be used with Xilinx chipscope using the onboard USB JTAG connector.
 
-Further information on how to use Chipscope can be found in the Xilinx Chipscope Pro Software and Cores User Guide (UG0290).
+Further information on how to use Chipscope can be found in the Xilinx Chipscope Pro Software and Cores User Guide (UG029).
 
 -------------
 Miscellaneous
