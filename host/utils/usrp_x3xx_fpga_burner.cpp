@@ -390,11 +390,11 @@ int UHD_SAFE_MAIN(int argc, char *argv[]){
     desc.add_options()
         ("help", "Display this help message.")
         ("addr", po::value<std::string>(&ip_addr), "Specify an IP address.")
-        ("resource", po::value<std::string>(&resource), "Specify a resource.")
+        ("resource", po::value<std::string>(&resource), "Specify an NI-RIO resource.")
         ("rpc-port", po::value<std::string>(&rpc_port)->default_value("5444"), "Specify a port to communicate with the RPC server.")
-        ("type", po::value<std::string>(&image_type), "Specify an image type (1G, HGS, XGS), leave blank for current type")
+        ("type", po::value<std::string>(&image_type), "Specify an image type (1G, HGS, XGS), leave blank for current type.")
         ("fpga-path", po::value<std::string>(&fpga_path), "Specify an FPGA path (overrides --type option).")
-        ("configure", "Set FPGA image currently in flash without burning (Ethernet only)")
+        ("configure", "Initialize FPGA with image currently burned to flash (Ethernet only).")
         ("verify", "Verify data downloaded to flash (Ethernet only, download will take much longer)")
         ("list", "List all available X3x0 devices.")
     ;
@@ -404,10 +404,17 @@ int UHD_SAFE_MAIN(int argc, char *argv[]){
 
     //Print help message
     if(vm.count("help")){
-        std::cout << "USRP X3x0 FPGA Burner - " << desc << std::endl;
+        std::cout << "USRP X3x0 FPGA Burner" << std::endl << std::endl;
+
+        std::cout << "Burns an FPGA image onto a USRP X300/X310. To burn the image" << std::endl
+                  << "over Ethernet, specify an IP address with the --addr option," << std::endl
+                  << "or to burn over PCIe, specify an NI-RIO resource (ex. RIO0)" << std::endl
+                  << "with the --resource option." << std::endl << std::endl;
+
+        std::cout << desc << std::endl;
         return EXIT_SUCCESS;
     }
-    
+
     //List all available devices
     if(vm.count("list")){
         list_usrps();
@@ -418,7 +425,7 @@ int UHD_SAFE_MAIN(int argc, char *argv[]){
      * The user must specify whether to burn the image over Ethernet or PCI-e.
      */
     if(not (vm.count("addr") xor vm.count("resource"))){
-        throw std::runtime_error("You must specify addr or resource!");
+        throw std::runtime_error("You must specify addr OR resource!");
     }
 
     /*
@@ -464,11 +471,13 @@ int UHD_SAFE_MAIN(int argc, char *argv[]){
         udp_simple::sptr udp_transport = udp_simple::make_connected(ip_addr, BOOST_STRINGIZE(X300_FPGA_PROG_UDP_PORT));
 
         //Don't burn image if --configure is set
-        if(!vm.count("configure")) ethernet_burn(udp_transport, fpga_path, vm.count("verify"));
+        ethernet_burn(udp_transport, fpga_path, vm.count("verify"));
 
         //If new image is burned, automatically configure
-        if(configure_fpga(udp_transport, ip_addr)) std::cout << "Successfully configured FPGA!" << std::endl;
-        else throw std::runtime_error("FPGA configuring failed!");
+        if(vm.count("configure")){
+            if(configure_fpga(udp_transport, ip_addr)) std::cout << "Successfully configured FPGA!" << std::endl;
+            else throw std::runtime_error("FPGA configuring failed!");
+        }
     }
     else pcie_burn(resource, rpc_port, fpga_path);
 
@@ -480,8 +489,9 @@ int UHD_SAFE_MAIN(int argc, char *argv[]){
     device_addr_t found_usrp = (vm.count("addr")) ? find_usrp_with_ethernet(ip_addr, false)
                                                   : find_usrp_with_pcie(resource, false);
     std::cout << "found!" << std::endl; //If unsuccessful, runtime error would occur in find functions
-    std::cout << "Successfully burned FPGA image!" << std::endl;
-    
+    std::cout << "Successfully burned FPGA image!" << std::endl << std::endl;
+
+    std::cout << str(boost::format("Power-cycle the USRP %s to load the new image.") % found_usrp["product"]) << std::endl;
 
     return EXIT_SUCCESS;
 }
