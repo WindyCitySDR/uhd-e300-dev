@@ -40,12 +40,12 @@ struct x300_clock_ctrl_impl : x300_clock_ctrl    {
                            m30_72M_184_32M_ZDEL,
                            m10M_184_32M_NOZD };
 
-            opmode mode;
+            opmode mode = 0;
 
             std::string opmode_str = std::string(getenv("X300_OPMODE"));
             if(opmode_str == "m10M_200M_NOZD") {
                 mode = m10M_200M_NOZD;
-            } else if(opmode_str == "m10M_200M_ZD") {
+            } else if(opmode_str == "m10M_200M_ZDEL") {
                 mode = m10M_200M_ZDEL;
             } else if(opmode_str == "m30_72M_184_32M_ZDEL") {
                 mode = m30_72M_184_32M_ZDEL;
