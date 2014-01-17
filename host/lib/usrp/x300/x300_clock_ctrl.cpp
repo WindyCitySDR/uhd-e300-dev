@@ -145,7 +145,7 @@ public:
     //int pll_1_n_div = int(clock_rate/10e6);
 
     std::cerr << "jk N1=" << pll_1_n_div << " R1=" << pll_1_r_div
-        << " N2=" << pll_2_n_div << " R2=" << pll_2_r_div << " div=" 
+        << " N2=" << pll_2_n_div << " R2=" << pll_2_r_div << " div="
         << div << std::endl;
 
     /* Individual Clock Output Configurations */

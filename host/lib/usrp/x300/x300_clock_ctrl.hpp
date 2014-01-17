@@ -42,7 +42,9 @@ class x300_clock_ctrl : boost::noncopyable
 
     typedef boost::shared_ptr<x300_clock_ctrl> sptr;
 
-    static sptr make(uhd::spi_iface::sptr spiface, const size_t slaveno, const double clock_rate, const int &revno, const double pll2ref, const double refclk_rate);
+    static sptr make(uhd::spi_iface::sptr spiface, const size_t slaveno,
+            const double clock_rate, const int &revno,
+            const double pll2ref, const double refclk_rate);
 
     /*!
      * Get the master clock frequency for the fpga.
@@ -55,7 +57,7 @@ class x300_clock_ctrl : boost::noncopyable
      * \return the clock frequency in Hz
      */
     virtual double get_crystal_clock_rate(void) = 0;
- 
+
 
     //! enable/disable a particular clock
     virtual void enable_clock(const x300_clock_which_t which, const bool) = 0;
