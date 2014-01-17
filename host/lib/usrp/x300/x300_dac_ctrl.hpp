@@ -37,9 +37,6 @@ public:
 
     // ! Arm the sync feature in DAC
     virtual void arm_dac_sync(void) = 0;
-
-    //! Set the IQ data mode (swap means QI)
-    virtual void set_iq_swap(const bool swap) = 0;
 };
 
 #endif /* INCLUDED_X300_DAC_CTRL_HPP */

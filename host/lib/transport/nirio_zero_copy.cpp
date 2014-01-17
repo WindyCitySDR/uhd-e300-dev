@@ -120,7 +120,7 @@ public:
         uint32_t instance,
         const zero_copy_xport_params& xport_params
     ):
-        _reg_int(fpga_session->get_kernel_proxy()),
+        _fpga_session(fpga_session),
         _fifo_instance(instance),
         _xport_params(xport_params),
         _next_recv_buff_index(0), _next_send_buff_index(0)
@@ -140,29 +140,29 @@ public:
 
         //Configure frame width
         nirio_status_chain(
-            _reg_int.poke(PCIE_TX_DMA_REG(DMA_FRAME_SIZE_REG, _fifo_instance),
+            _proxy().poke(PCIE_TX_DMA_REG(DMA_FRAME_SIZE_REG, _fifo_instance),
                           static_cast<uint32_t>(_xport_params.send_frame_size/sizeof(fifo_data_t))),
             status);
         nirio_status_chain(
-            _reg_int.poke(PCIE_RX_DMA_REG(DMA_FRAME_SIZE_REG, _fifo_instance),
+            _proxy().poke(PCIE_RX_DMA_REG(DMA_FRAME_SIZE_REG, _fifo_instance),
                           static_cast<uint32_t>(_xport_params.recv_frame_size/sizeof(fifo_data_t))),
             status);
         //Config 32-bit word flipping and Reset DMA streams
         nirio_status_chain(
-            _reg_int.poke(PCIE_TX_DMA_REG(DMA_CTRL_STATUS_REG, _fifo_instance),
+            _proxy().poke(PCIE_TX_DMA_REG(DMA_CTRL_STATUS_REG, _fifo_instance),
                           DMA_CTRL_SW_BUF_U32 | DMA_CTRL_RESET),
             status);
         nirio_status_chain(
-            _reg_int.poke(PCIE_RX_DMA_REG(DMA_CTRL_STATUS_REG, _fifo_instance),
+            _proxy().poke(PCIE_RX_DMA_REG(DMA_CTRL_STATUS_REG, _fifo_instance),
                           DMA_CTRL_SW_BUF_U32 | DMA_CTRL_RESET),
             status);
 
         //Create FIFOs
         nirio_status_chain(
-            fpga_session->create_rx_fifo(_fifo_instance, _recv_fifo),
+            _fpga_session->create_rx_fifo(_fifo_instance, _recv_fifo),
             status);
         nirio_status_chain(
-            fpga_session->create_tx_fifo(_fifo_instance, _send_fifo),
+            _fpga_session->create_tx_fifo(_fifo_instance, _send_fifo),
             status);
 
         if ((_recv_fifo.get() != NULL) && (_send_fifo.get() != NULL)) {
@@ -180,6 +180,10 @@ public:
 
             nirio_status_chain(_recv_fifo->start(), status);
             nirio_status_chain(_send_fifo->start(), status);
+
+            //Flush RX kernel buffers in case some cruft was
+            //left behind from the last run
+            _flush_rx_buff();
 
             //allocate re-usable managed receive buffers
             for (size_t i = 0; i < get_num_recv_frames(); i++){
@@ -199,22 +203,26 @@ public:
         nirio_status_to_exception(status, "Could not create nirio_zero_copy transport.");
     }
 
-    virtual ~nirio_zero_copy_impl() {
-        //Reset DMA streams
-        nirio_status status = 0;
-        nirio_status_chain(
-            _reg_int.poke(PCIE_TX_DMA_REG(DMA_CTRL_STATUS_REG, _fifo_instance), DMA_CTRL_RESET),
-            status);
-        nirio_status_chain(
-            _reg_int.poke(PCIE_RX_DMA_REG(DMA_CTRL_STATUS_REG, _fifo_instance), DMA_CTRL_RESET),
-            status);
+    virtual ~nirio_zero_copy_impl()
+    {
+        _flush_rx_buff();
+
+        //Stop DMA channels. Stop is called in the fifo dtor but
+        //it doesn't hurt to do it here.
+        _send_fifo->stop();
+        _recv_fifo->stop();
+
+        //Reset DMA streams (Teardown, so don't status chain)
+        _proxy().poke(PCIE_TX_DMA_REG(DMA_CTRL_STATUS_REG, _fifo_instance), DMA_CTRL_RESET);
+        _proxy().poke(PCIE_RX_DMA_REG(DMA_CTRL_STATUS_REG, _fifo_instance), DMA_CTRL_RESET);
     }
 
     /*******************************************************************
      * Receive implementation:
      * Block on the managed buffer's get call and advance the index.
      ******************************************************************/
-    managed_recv_buffer::sptr get_recv_buff(double timeout){
+    managed_recv_buffer::sptr get_recv_buff(double timeout)
+    {
         if (_next_recv_buff_index == _xport_params.num_recv_frames) _next_recv_buff_index = 0;
         return _mrb_pool[_next_recv_buff_index]->get_new(timeout, _next_recv_buff_index);
     }
@@ -226,7 +234,8 @@ public:
      * Send implementation:
      * Block on the managed buffer's get call and advance the index.
      ******************************************************************/
-    managed_send_buffer::sptr get_send_buff(double timeout){
+    managed_send_buffer::sptr get_send_buff(double timeout)
+    {
         if (_next_send_buff_index == _xport_params.num_send_frames) _next_send_buff_index = 0;
         return _msb_pool[_next_send_buff_index]->get_new(timeout, _next_send_buff_index);
     }
@@ -235,8 +244,29 @@ public:
     size_t get_send_frame_size(void) const {return _xport_params.send_frame_size;}
 
 private:
+
+    UHD_INLINE niriok_proxy& _proxy() { return _fpga_session->get_kernel_proxy(); }
+
+    UHD_INLINE void _flush_rx_buff()
+    {
+        nirio_status flush_status = 0;
+        while (nirio_status_not_fatal(flush_status)) {
+            static const size_t NUM_ELEMS_TO_FLUSH = 1;
+            static const uint32_t FLUSH_TIMEOUT_IN_MS = 0;
+
+            fifo_data_t* flush_data_ptr = NULL;
+            size_t flush_elems_acquired = 0, flush_elems_remaining = 0;
+            flush_status = _recv_fifo->acquire(
+                flush_data_ptr, NUM_ELEMS_TO_FLUSH, FLUSH_TIMEOUT_IN_MS,
+                flush_elems_acquired, flush_elems_remaining);
+            if (nirio_status_not_fatal(flush_status)) {
+                _recv_fifo->release(flush_elems_acquired);
+            }
+        }
+    }
+
     //memory management -> buffers and fifos
-    niriok_proxy& _reg_int;
+    niusrprio::niusrprio_session::sptr _fpga_session;
     uint32_t _fifo_instance;
     nirio_fifo<fifo_data_t>::sptr _recv_fifo, _send_fifo;
     const zero_copy_xport_params _xport_params;
