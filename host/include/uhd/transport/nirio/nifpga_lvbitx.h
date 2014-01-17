@@ -1,5 +1,5 @@
 //
-// Copyright 2013 Ettus Research LLC
+// Copyright 2013-2014 Ettus Research LLC
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -28,6 +28,8 @@ class UHD_API nifpga_lvbitx {
 public:
     typedef boost::shared_ptr<nifpga_lvbitx> sptr;
 
+    virtual ~nifpga_lvbitx() {};
+
     virtual const char* get_bitfile_path() = 0;
     virtual const char* get_signature() = 0;
     virtual const char* get_bitstream_checksum() = 0;
@@ -46,6 +48,10 @@ public:
 
     virtual void init_register_info(nirio_register_info_vtr& vtr) = 0;
     virtual void init_fifo_info(nirio_fifo_info_vtr& vtr) = 0;
+
+protected:
+    std::string _get_bitstream_checksum(const std::string& file_path);
+    std::string _get_fpga_images_dir(const std::string search_paths);
 };
 }}
 

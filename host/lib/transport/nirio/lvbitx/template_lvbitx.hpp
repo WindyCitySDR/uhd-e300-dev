@@ -9,7 +9,9 @@ namespace uhd {{ namespace niusrprio {{
 
 class {lvbitx_classname}_lvbitx : public nifpga_lvbitx {{
 public:
-    explicit {lvbitx_classname}_lvbitx(const char* option);
+    {lvbitx_classname}_lvbitx(const std::string& option);
+
+    virtual ~{lvbitx_classname}_lvbitx() {{}};
 
     virtual const char* get_bitfile_path();
     virtual const char* get_signature();
