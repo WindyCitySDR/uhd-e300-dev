@@ -399,10 +399,12 @@ void x300_impl::setup_mb(const size_t mb_i, const uhd::device_addr_t &dev_addr)
 
     //create basic communication
     UHD_MSG(status) << "Setup basic communication..." << std::endl;
-    if (mb.xport_path == "nirio")
+    if (mb.xport_path == "nirio") {
         mb.zpu_ctrl = x300_make_ctrl_iface_pcie(mb.rio_fpga_interface->get_kernel_proxy());
-    else
-        mb.zpu_ctrl = x300_make_ctrl_iface_enet(udp_simple::make_connected(mb.addr, BOOST_STRINGIZE(X300_FW_COMMS_UDP_PORT)));
+    } else {
+        mb.zpu_ctrl = x300_make_ctrl_iface_enet(udp_simple::make_connected(mb.addr,
+                    BOOST_STRINGIZE(X300_FW_COMMS_UDP_PORT)));
+    }
 
     mb.claimer_task = uhd::task::make(boost::bind(&x300_impl::claimer_loop, this, mb.zpu_ctrl));
 
@@ -421,7 +423,8 @@ void x300_impl::setup_mb(const size_t mb_i, const uhd::device_addr_t &dev_addr)
     this->check_fpga_compat(mb_path, mb.zpu_ctrl);
 
     //low speed perif access
-    mb.zpu_spi = spi_core_3000::make(mb.zpu_ctrl, SR_ADDR(SET0_BASE, ZPU_SR_SPI), SR_ADDR(SET0_BASE, ZPU_RB_SPI));
+    mb.zpu_spi = spi_core_3000::make(mb.zpu_ctrl, SR_ADDR(SET0_BASE, ZPU_SR_SPI),
+            SR_ADDR(SET0_BASE, ZPU_RB_SPI));
     mb.zpu_i2c = i2c_core_100_wb32::make(mb.zpu_ctrl, I2C1_BASE);
     mb.zpu_i2c->set_clock_rate(X300_BUS_CLOCK_RATE);
 
@@ -445,7 +448,7 @@ void x300_impl::setup_mb(const size_t mb_i, const uhd::device_addr_t &dev_addr)
             << std::endl;
         }
     }
-    //*/
+    */
 
     ////////////////////////////////////////////////////////////////////
     // setup the mboard eeprom
