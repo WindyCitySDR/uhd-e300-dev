@@ -527,7 +527,6 @@ void x300_impl::setup_mb(const size_t mb_i, const uhd::device_addr_t &dev_addr)
     mb.clock = x300_clock_ctrl::make(mb.zpu_spi,
         1 /*slaveno*/,
         dev_addr.cast<double>("master_clock_rate", X300_DEFAULT_TICK_RATE),
-        dev_addr.cast<double>("lmk_pll_ref", X300_DEFAULT_PLL2REF_FREQ),
         dev_addr.cast<double>("refclk_rate", X300_DEFAULT_REFCLK_FREQ));
 
     ////////////////////////////////////////////////////////////////////

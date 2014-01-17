@@ -22,21 +22,12 @@ public:
     x300_clock_ctrl_impl(uhd::spi_iface::sptr spiface,
         const size_t slaveno,
         const double clock_rate,
-        const double pll2ref,
         const double refclk_rate):
         _spiface(spiface),
         _slaveno(slaveno),
         _clock_rate(clock_rate),
-        _lmkpll2_ref(pll2ref),
         _refclk_rate(refclk_rate)
 {
-    bool pll2ref96M = (pll2ref == 96e6);
-    //bool refclk10M = (refclk_rate == 10e6);
-    bool clkis_184_32 = (clock_rate == 184.32e6);
-
-    if (!pll2ref96M && pll2ref != 120e6)
-        throw uhd::runtime_error(str(boost::format("x300_clock_ctrl: unsupported pll2 reference %f") % pll2ref));
-
     /* for non-CPRI clocking, the VCO is run at 2400 MHz, div is the
         * required output divide for the CPRI rate of 184.32 MHz, the VCO is
         * run at 2580.48 MHz and div is 14 */
@@ -48,7 +39,7 @@ public:
     else if (clock_rate == 200e6) div = 12;
     else throw uhd::runtime_error(str(boost::format("x300_clock_ctrl: can't handle rate %f") % clock_rate));
     */
-    std::cerr << "+++++++ jk clock settings debug  " << pll2ref << ' '
+    std::cerr << "+++++++ jk clock settings debug  "
         << refclk_rate << ' ' << clock_rate << std::endl;
 
     enum opmode {  m10M_200M_NOZD,
@@ -405,7 +396,6 @@ private:
     const spi_iface::sptr _spiface;
     const size_t _slaveno;
     const double _clock_rate;
-    const double _lmkpll2_ref;
     const double _refclk_rate;
     lmk04816_regs_t _lmk04816_regs;
 };
@@ -413,8 +403,7 @@ private:
 x300_clock_ctrl::sptr x300_clock_ctrl::make(uhd::spi_iface::sptr spiface,
         const size_t slaveno,
         const double clock_rate,
-        const double pll2ref,
         const double refclk_freq) {
     return sptr(new x300_clock_ctrl_impl(spiface, slaveno, clock_rate,
-                pll2ref, refclk_freq));
+                refclk_freq));
 }
