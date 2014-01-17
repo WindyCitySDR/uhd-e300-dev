@@ -358,10 +358,6 @@ double get_crystal_clock_rate(void) {
     return _lmkpll2_ref;
 }
 
-void enable_clock(const x300_clock_which_t which, const bool enb) {
-    /* TODO */
-}
-
 void set_rate(const x300_clock_which_t which, double rate) {
     /* TODO */
 }

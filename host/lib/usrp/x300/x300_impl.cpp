@@ -511,7 +511,8 @@ void x300_impl::setup_mb(const size_t mb_i, const uhd::device_addr_t &dev_addr)
     ////////////////////////////////////////////////////////////////////
     UHD_MSG(status) << "Setup RF frontend clocking..." << std::endl;
 
-    //init shadow and clock source
+    // Init shadow and clock source; the device comes up with it's internal
+    // clock source before locking to something else (if requested).
     mb.clock_control_regs__clock_source = 0;
     mb.clock_control_regs__pps_select = 0;
     mb.clock_control_regs__pps_out_enb = 0;
@@ -528,8 +529,11 @@ void x300_impl::setup_mb(const size_t mb_i, const uhd::device_addr_t &dev_addr)
         dev_addr.cast<double>("lmk_pll_ref", X300_DEFAULT_PLL2REF_FREQ),
         dev_addr.cast<double>("refclk_rate", X300_DEFAULT_REFCLK_FREQ));
 
-        _tree->create<double>(mb_path / "tick_rate")
-        .publish(boost::bind(&x300_clock_ctrl::get_master_clock_rate, mb.clock));
+    ////////////////////////////////////////////////////////////////////
+    // create clock properties
+    ////////////////////////////////////////////////////////////////////
+    _tree->create<double>(mb_path / "tick_rate")
+    .publish(boost::bind(&x300_clock_ctrl::get_master_clock_rate, mb.clock));
 
     UHD_MSG(status) << "Radio 1x clock set to " << (mb.clock->get_master_clock_rate()/1e6) << std::dec << " MHz. Crystal is " <<
       (mb.clock->get_crystal_clock_rate()/1e6) << std::dec << " MHz" << std::endl;
@@ -604,20 +608,24 @@ void x300_impl::setup_mb(const size_t mb_i, const uhd::device_addr_t &dev_addr)
         .publish(boost::bind(&time_core_3000::get_time_last_pps, mb.radio_perifs[0].time64))
         .subscribe(boost::bind(&time_core_3000::set_time_next_pps, mb.radio_perifs[0].time64, _1))
         .subscribe(boost::bind(&time_core_3000::set_time_next_pps, mb.radio_perifs[1].time64, _1));
+
     //setup time source props
     _tree->create<std::string>(mb_path / "time_source" / "value")
         .subscribe(boost::bind(&x300_impl::update_time_source, this, boost::ref(mb), _1));
     _tree->create<bool>(mb_path / "time_source" / "output")
         .subscribe(boost::bind(&x300_impl::set_time_source_out, this, boost::ref(mb), _1))
         .set(true);
+
     static const std::vector<std::string> time_sources = boost::assign::list_of("internal")("external")("gpsdo");
     _tree->create<std::vector<std::string> >(mb_path / "time_source" / "options").set(time_sources);
+
     //setup reference source props
     _tree->create<std::string>(mb_path / "clock_source" / "value")
         .subscribe(boost::bind(&x300_impl::update_clock_source, this, boost::ref(mb), _1));
     _tree->create<bool>(mb_path / "clock_source" / "output")
         .subscribe(boost::bind(&x300_clock_ctrl::set_ref_out, mb.clock, _1))
         .set(true);
+
     static const std::vector<std::string> clock_sources = boost::assign::list_of("internal")("external")("gpsdo");
     _tree->create<std::vector<std::string> >(mb_path / "clock_source" / "options").set(clock_sources);
 

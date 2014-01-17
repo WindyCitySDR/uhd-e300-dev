@@ -38,7 +38,7 @@ enum x300_clock_which_t
 
 class x300_clock_ctrl : boost::noncopyable
 {
-    public:
+public:
 
     typedef boost::shared_ptr<x300_clock_ctrl> sptr;
 
@@ -46,36 +46,45 @@ class x300_clock_ctrl : boost::noncopyable
             const double clock_rate, const int &revno,
             const double pll2ref, const double refclk_rate);
 
-    /*!
-     * Get the master clock frequency for the fpga.
+    /*! Get the master clock rate of the device.
      * \return the clock frequency in Hz
      */
     virtual double get_master_clock_rate(void) = 0;
 
-     /*!
-     * Get the crystal clock frequency for the fpga.
+    /*! Get the system reference rate of the device.
      * \return the clock frequency in Hz
      */
-    virtual double get_crystal_clock_rate(void) = 0;
+    virtual double get_sysref_clock_rate(void) = 0;
 
+    /*! Get the current system reference source
+     * \return the clock frequency in Hz
+     */
+    virtual std::string get_sysref_source(void) = 0;
 
-    //! enable/disable a particular clock
-    virtual void enable_clock(const x300_clock_which_t which, const bool) = 0;
+    /*! Get the external reference rate
+     * \return the clock frequency in Hz
+     */
+    virtual double get_extref_clock_rate(void) = 0;
 
-    /*!
-     * Set the clock rate on the given clock.
+    /*! Get the current reference output rate
+     * \return the clock frequency in Hz
+     */
+    virtual double get_refout_clock_rate(void) = 0;
+
+    /*! Set the clock rate on the given clock.
      * \param rate the new clock rate
      * \throw exception when rate invalid
      */
     virtual void set_rate(const x300_clock_which_t which, double rate) = 0;
 
-    /*!
-     * Get a list of possible clock rates.
+    /*! Get a list of possible clock rates.
      * \return a list of clock rates in Hz
      */
     virtual std::vector<double> get_rates(const x300_clock_which_t which) = 0;
 
-    //! enable the reference output
+    /*! Turn the reference output on/off
+     * \param true = on, false = off
+     */
     virtual void set_ref_out(const bool) = 0;
 };
 
