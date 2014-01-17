@@ -385,13 +385,6 @@ void write_regs(boost::uint8_t addr) {
         //printf("%u %08x\n", addr, data);
     }
 
-    const spi_iface::sptr _spiface;
-    const size_t _slaveno;
-    const double _clock_rate;
-    const int _revno;
-    const double _lmkpll2_ref;
-    const double _refclk_rate;
-    lmk04816_regs_t _lmk04816_regs;
     //uhd::dict<x300_clock_which_t, bool> _enables;
     //uhd::dict<x300_clock_which_t, double> _rates;
 
@@ -405,6 +398,15 @@ void write_regs(boost::uint8_t addr) {
         }
     */
     //future implementations for modularity
+
+private:
+    const spi_iface::sptr _spiface;
+    const size_t _slaveno;
+    const double _clock_rate;
+    const int _revno;
+    const double _lmkpll2_ref;
+    const double _refclk_rate;
+    lmk04816_regs_t _lmk04816_regs;
 };
 
 x300_clock_ctrl::sptr x300_clock_ctrl::make(uhd::spi_iface::sptr spiface,
