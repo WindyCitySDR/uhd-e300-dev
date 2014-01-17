@@ -43,8 +43,9 @@ public:
     typedef boost::shared_ptr<x300_clock_ctrl> sptr;
 
     static sptr make(uhd::spi_iface::sptr spiface, const size_t slaveno,
-            const double clock_rate, const int &revno,
-            const double pll2ref, const double refclk_rate);
+            const double clock_rate,
+            const double pll2ref,
+            const double refclk_rate);
 
     /*! Get the master clock rate of the device.
      * \return the clock frequency in Hz

@@ -22,13 +22,11 @@ public:
     x300_clock_ctrl_impl(uhd::spi_iface::sptr spiface,
         const size_t slaveno,
         const double clock_rate,
-        const int &revno,
         const double pll2ref,
         const double refclk_rate):
         _spiface(spiface),
         _slaveno(slaveno),
         _clock_rate(clock_rate),
-        _revno(revno),
         _lmkpll2_ref(pll2ref),
         _refclk_rate(refclk_rate)
 {
@@ -213,13 +211,8 @@ public:
     //BEGIN CONDITIONAL DIVIDERS AND CLOCKOUT TYPES FOR REVISION DIFFERENCES
     /////////////////////////////////////////////////////////////////////////
 
-    if (_revno < 3) {
-        _lmk04816_regs.CLKout5_TYPE = lmk04816_regs_t::CLKOUT5_TYPE_LVDS; //REF_CLKOUT
-        _lmk04816_regs.CLKout10_TYPE = lmk04816_regs_t::CLKOUT10_TYPE_LVPECL_700MVPP; //DB_0_TX
-    } else {
         //_lmk04816_regs.CLKout10_11_DIV = int(((clock_rate*div)/10e6) + 0.5);
         _lmk04816_regs.CLKout10_11_DIV = div; // jk
-    }
 
     /////////////////////////////////////////////////////////////////////////
     //END CONDITIONAL DIVIDERS AND CLOCKOUT TYPES FOR REVISION DIFFERENCES
@@ -337,7 +330,6 @@ public:
     this->sync_clocks();
 }
 
-
 void sync_clocks(void) {
     //soft sync:
     //put the sync IO into output mode - FPGA must be input
@@ -353,9 +345,20 @@ double get_master_clock_rate(void) {
     return _clock_rate;
 }
 
-double get_crystal_clock_rate(void) {
+double get_sysref_clock_rate(void) {
+    // TODO
+}
 
-    return _lmkpll2_ref;
+std::string get_sysref_source(void) {
+    // TODO
+}
+
+double get_extref_clock_rate(void) {
+    // TODO
+}
+
+double get_refout_clock_rate(void) {
+    // TODO
 }
 
 void set_rate(const x300_clock_which_t which, double rate) {
@@ -370,7 +373,6 @@ std::vector<double> get_rates(const x300_clock_which_t) {
 
 
 void set_ref_out(const bool enb) {
-    if (_revno < 3) return; //not supported on this hardware
     if (enb) _lmk04816_regs.CLKout10_TYPE = lmk04816_regs_t::CLKOUT10_TYPE_LVDS; //REF_CLKOUT
     else _lmk04816_regs.CLKout10_TYPE = lmk04816_regs_t::CLKOUT10_TYPE_P_DOWN; //REF_CLKOUT
     this->write_regs(8);
@@ -403,7 +405,6 @@ private:
     const spi_iface::sptr _spiface;
     const size_t _slaveno;
     const double _clock_rate;
-    const int _revno;
     const double _lmkpll2_ref;
     const double _refclk_rate;
     lmk04816_regs_t _lmk04816_regs;
@@ -412,8 +413,8 @@ private:
 x300_clock_ctrl::sptr x300_clock_ctrl::make(uhd::spi_iface::sptr spiface,
         const size_t slaveno,
         const double clock_rate,
-        const int &revno,
         const double pll2ref,
         const double refclk_freq) {
-    return sptr(new x300_clock_ctrl_impl(spiface, slaveno, clock_rate, revno, pll2ref, refclk_freq));
+    return sptr(new x300_clock_ctrl_impl(spiface, slaveno, clock_rate,
+                pll2ref, refclk_freq));
 }
