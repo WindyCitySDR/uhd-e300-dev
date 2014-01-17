@@ -175,11 +175,11 @@ std::vector<double> x300_dboard_iface::get_clock_rates(unit_t unit)
 
 void x300_dboard_iface::set_clock_enabled(unit_t unit, bool enb)
 {
-    switch(unit)
-    {
-    case UNIT_RX: _config.clock->enable_clock(_config.which_rx_clk, enb); return;
-    case UNIT_TX: _config.clock->enable_clock(_config.which_tx_clk, enb); return;
-    }
+    // TODO LOL these functions didn't do anything to begin with! #wat
+    /* switch(unit) { */
+    /*     case UNIT_RX: _config.clock->enable_clock(_config.which_rx_clk, enb); return; */
+    /*     case UNIT_TX: _config.clock->enable_clock(_config.which_tx_clk, enb); return; */
+    /* } */
 }
 
 double x300_dboard_iface::get_codec_rate(unit_t)
