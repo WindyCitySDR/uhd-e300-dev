@@ -491,7 +491,8 @@ int UHD_SAFE_MAIN(int argc, char *argv[]){
     std::cout << "found!" << std::endl; //If unsuccessful, runtime error would occur in find functions
     std::cout << "Successfully burned FPGA image!" << std::endl << std::endl;
 
-    std::cout << str(boost::format("Power-cycle the USRP %s to load the new image.") % found_usrp["product"]) << std::endl;
+    if(vm.count("addr")) std::cout << str(boost::format("Power-cycle the USRP %s to use the new image.") % found_usrp["product"]) << std::endl;
+    else std::cout << str(boost::format("Power-cycle the USRP %s and reboot your machine to use the new image.") % found_usrp["product"]) << std::endl;
 
     return EXIT_SUCCESS;
 }
