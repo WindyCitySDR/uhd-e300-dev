@@ -652,10 +652,14 @@ void x300_impl::setup_mb(const size_t mb_i, const uhd::device_addr_t &dev_addr)
         .set(mb.clock->get_master_clock_rate());
 
     subdev_spec_t rx_fe_spec, tx_fe_spec;
-    rx_fe_spec.push_back(subdev_spec_pair_t("A", _tree->list(mb_path / "dboards" / "A" / "rx_frontends").at(0)));
-    rx_fe_spec.push_back(subdev_spec_pair_t("B", _tree->list(mb_path / "dboards" / "B" / "rx_frontends").at(0)));
-    tx_fe_spec.push_back(subdev_spec_pair_t("A", _tree->list(mb_path / "dboards" / "A" / "tx_frontends").at(0)));
-    tx_fe_spec.push_back(subdev_spec_pair_t("B", _tree->list(mb_path / "dboards" / "B" / "tx_frontends").at(0)));
+    rx_fe_spec.push_back(subdev_spec_pair_t("A",
+                _tree->list(mb_path / "dboards" / "A" / "rx_frontends").at(0)));
+    rx_fe_spec.push_back(subdev_spec_pair_t("B",
+                _tree->list(mb_path / "dboards" / "B" / "rx_frontends").at(0)));
+    tx_fe_spec.push_back(subdev_spec_pair_t("A",
+                _tree->list(mb_path / "dboards" / "A" / "tx_frontends").at(0)));
+    tx_fe_spec.push_back(subdev_spec_pair_t("B",
+                _tree->list(mb_path / "dboards" / "B" / "tx_frontends").at(0)));
 
     _tree->access<subdev_spec_t>(mb_path / "rx_subdev_spec").set(rx_fe_spec);
     _tree->access<subdev_spec_t>(mb_path / "tx_subdev_spec").set(tx_fe_spec);
