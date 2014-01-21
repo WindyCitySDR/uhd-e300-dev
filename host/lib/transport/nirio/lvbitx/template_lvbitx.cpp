@@ -5,10 +5,13 @@
 #include <iostream>
 #include <fstream>
 #include <streambuf>
+#include <boost/filesystem/path.hpp>
 #include <boost/algorithm/string.hpp>
 #include <boost/regex.hpp>
 
 namespace uhd {{ namespace niusrprio {{
+
+#define SEARCH_PATHS "{lvbitx_search_paths}"
 
 const char* {lvbitx_classname}_lvbitx::CONTROLS[] = {{{control_list}
 }};
@@ -22,26 +25,12 @@ const char* {lvbitx_classname}_lvbitx::OUTPUT_FIFOS[] = {{{out_fifo_list}
 const char* {lvbitx_classname}_lvbitx::INPUT_FIFOS[] = {{{in_fifo_list}
 }};
 
-{lvbitx_classname}_lvbitx::{lvbitx_classname}_lvbitx(const char* option) :
-    _fpga_file_name("{lvbitx_path}" + std::string(option) + ".lvbitx")
+{lvbitx_classname}_lvbitx::{lvbitx_classname}_lvbitx(const std::string& option)
 {{
-    std::ifstream lvbitx_stream(_fpga_file_name.c_str());
-    if (lvbitx_stream.is_open()) {{
-        std::string lvbitx_contents;
-        lvbitx_stream.seekg(0, std::ios::end);
-        lvbitx_contents.reserve(static_cast<size_t>(lvbitx_stream.tellg()));
-        lvbitx_stream.seekg(0, std::ios::beg);
-        lvbitx_contents.assign((std::istreambuf_iterator<char>(lvbitx_stream)), std::istreambuf_iterator<char>());
-        try {{
-            boost::smatch md5_match;
-            if (boost::regex_search(lvbitx_contents, md5_match, boost::regex("<BitstreamMD5>([a-zA-Z0-9]{{32}})<\\/BitstreamMD5>", boost::regex::icase))) {{
-                _bitstream_checksum = std::string(md5_match[1].first, md5_match[1].second);
-            }}
-        }} catch (boost::exception&) {{
-            _bitstream_checksum = "";
-        }}
-    }}
-    boost::to_upper(_bitstream_checksum);
+    boost::filesystem::path fpga_path(_get_fpga_images_dir(SEARCH_PATHS));
+    fpga_path /= "usrp_{lvbitx_classname}_fpga_" + option + ".lvbitx";
+    _fpga_file_name = fpga_path.string();
+    _bitstream_checksum = _get_bitstream_checksum(_fpga_file_name);
 }}
 
 const char* {lvbitx_classname}_lvbitx::get_bitfile_path() {{

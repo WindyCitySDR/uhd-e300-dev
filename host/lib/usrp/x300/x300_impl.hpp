@@ -118,8 +118,11 @@ uhd::uart_iface::sptr x300_make_uart_iface(uhd::wb_iface::sptr iface);
 uhd::wb_iface::sptr x300_make_ctrl_iface_enet(uhd::transport::udp_simple::sptr udp);
 uhd::wb_iface::sptr x300_make_ctrl_iface_pcie(uhd::niusrprio::niriok_proxy& drv_proxy);
 
-struct x300_impl : public uhd::device
+class x300_impl : public uhd::device
 {
+public:
+    typedef uhd::transport::bounded_buffer<uhd::async_metadata_t> async_md_type;
+
     x300_impl(const uhd::device_addr_t &);
     void setup_mb(const size_t which, const uhd::device_addr_t &);
     ~x300_impl(void);
@@ -129,16 +132,13 @@ struct x300_impl : public uhd::device
     uhd::tx_streamer::sptr get_tx_stream(const uhd::stream_args_t &);
 
     //support old async call
-    typedef uhd::transport::bounded_buffer<uhd::async_metadata_t> async_md_type;
-    boost::shared_ptr<async_md_type> _async_md;
     bool recv_async_msg(uhd::async_metadata_t &, double);
 
-    uhd::property_tree::sptr _tree;
-    //device properties interface
-    uhd::property_tree::sptr get_tree(void) const
-    {
-        return _tree;
-    }
+    // used by x300_find_with_addr to find X300 devices.
+    static bool is_claimed(uhd::wb_iface::sptr);
+
+private:
+    boost::shared_ptr<async_md_type> _async_md;
 
     //perifs in the radio core
     struct radio_perifs_t
@@ -204,7 +204,6 @@ struct x300_impl : public uhd::device
 
     //task for periodically reclaiming the device from others
     void claimer_loop(uhd::wb_iface::sptr);
-    static bool is_claimed(uhd::wb_iface::sptr);
 
     boost::mutex _transport_setup_mutex;
 

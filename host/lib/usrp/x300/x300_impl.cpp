@@ -377,9 +377,9 @@ void x300_impl::setup_mb(const size_t mb_i, const uhd::device_addr_t &dev_addr)
         //Instantiate the correct lvbitx object
         nifpga_lvbitx::sptr lvbitx;
         if (pid == X310_PCIE_SSID) {
-            lvbitx.reset(new x310_lvbitx(dev_addr["fpga"].c_str()));
+            lvbitx.reset(new x310_lvbitx(dev_addr["fpga"]));
         } else {
-            lvbitx.reset(new x300_lvbitx(dev_addr["fpga"].c_str()));
+            lvbitx.reset(new x300_lvbitx(dev_addr["fpga"]));
         }
 
         //Load the lvbitx onto the device
