@@ -55,6 +55,7 @@ extern "C" {
 #define X300_VITA_UDP_PORT 49153
 #define X300_GPSDO_UDP_PORT 49156
 #define X300_FPGA_PROG_UDP_PORT 49157
+#define X300_MTU_DETECT_UDP_PORT 49158
 
 #define X300_FW_COMMS_FLAGS_ACK        (1 << 0)
 #define X300_FW_COMMS_FLAGS_ERROR      (1 << 1)
@@ -69,6 +70,10 @@ extern "C" {
 #define X300_FPGA_PROG_FLAGS_VERIFY    (1 << 5)
 #define X300_FPGA_PROG_CONFIGURE       (1 << 6)
 #define X300_FPGA_PROG_CONFIG_STATUS   (1 << 7)
+
+#define X300_MTU_DETECT_ECHO_REQUEST (1 << 0)
+#define X300_MTU_DETECT_ECHO_REPLY (1 << 1)
+#define X300_MTU_DETECT_ERROR (1 << 2)
 
 typedef struct
 {
@@ -91,6 +96,12 @@ typedef struct
 {
     uint32_t flags;
 } x300_fpga_prog_flags_t;
+
+typedef struct
+{
+    uint32_t flags;
+    uint32_t size;
+} x300_mtu_t;
 
 #ifdef __cplusplus
 }

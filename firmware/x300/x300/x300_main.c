@@ -181,6 +181,33 @@ void handle_udp_fpga_prog(
 }
 
 /***********************************************************************
+ * Handler for MTU detection
+ **********************************************************************/
+void handle_mtu_detect(
+    const uint8_t ethno,
+    const struct ip_addr *src, const struct ip_addr *dst,
+    const uint16_t src_port, const uint16_t dst_port,
+    const void *buff, const size_t num_bytes
+)
+{
+    const x300_mtu_t *request = (const x300_mtu_t *) buff;
+    x300_mtu_t reply;
+
+    /*printf("Got MTU request of with len %lu and requested %lu\n", num_bytes, request->size);*/
+
+    if (!(request->flags & X300_MTU_DETECT_ECHO_REQUEST)) {
+        printf("DEBUG: MTU detect got unknown request\n");
+        reply.flags |= X300_MTU_DETECT_ERROR;
+    }
+
+    reply.flags |= X300_MTU_DETECT_ECHO_REPLY;
+    reply.size = num_bytes;
+
+    u3_net_stack_send_udp_pkt(ethno, src, dst_port, src_port, &reply, request->size);
+}
+
+
+/***********************************************************************
  * Deal with host claims and claim timeout
  **********************************************************************/
 static void handle_claim(void)
@@ -391,6 +418,7 @@ int main(void)
     u3_net_stack_register_udp_handler(X300_FW_COMMS_UDP_PORT, &handle_udp_fw_comms);
     u3_net_stack_register_udp_handler(X300_VITA_UDP_PORT, &handle_udp_prog_framer);
     u3_net_stack_register_udp_handler(X300_FPGA_PROG_UDP_PORT, &handle_udp_fpga_prog);
+    u3_net_stack_register_udp_handler(X300_MTU_DETECT_UDP_PORT, &handle_mtu_detect);
 
     uint32_t last_cronjob = 0;
 

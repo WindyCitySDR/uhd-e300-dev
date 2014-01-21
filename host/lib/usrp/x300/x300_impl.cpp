@@ -912,6 +912,7 @@ boost::uint32_t get_pcie_dma_channel(boost::uint8_t destination, boost::uint8_t 
     return ((radio_grp * RADIO_GRP_SIZE) + prefix);
 }
 
+
 x300_impl::both_xports_t x300_impl::make_transport(
     const size_t mb_index,
     const uint8_t& destination,
@@ -956,6 +957,22 @@ x300_impl::both_xports_t x300_impl::make_transport(
         xports.recv_buff_size = xports.recv->get_num_recv_frames() * xports.recv->get_recv_frame_size();
         xports.send_buff_size = xports.send->get_num_send_frames() * xports.send->get_send_frame_size();
     } else {
+
+        mtu_result_t user_set;
+        user_set.send_mtu = X300_ETH_DATA_FRAME_SIZE;
+        user_set.recv_mtu = X300_ETH_DATA_FRAME_SIZE;
+
+        // Detect the MTU on the path to the USRP
+        mtu_result_t result = determine_mtu(addr, user_set);
+
+        if(result.send_mtu < X300_ETH_DATA_FRAME_SIZE)
+            UHD_MSG(warning) << "The receive path contains entities that do not support MTUs >= 1 recv frame." << std::endl
+                             << "Please verify your NIC's MTU setting using 'ip link'" << std::endl;
+
+        if(result.send_mtu < X300_ETH_DATA_FRAME_SIZE)
+            UHD_MSG(warning) << "The send path contains entities that do not support MTUs >= 1 send frame." << std::endl
+                             << "Please verify your NIC's MTU setting using 'ip link'" << std::endl;
+
         default_buff_args.send_frame_size =
             (prefix == X300_RADIO_DEST_PREFIX_TX) ? X300_ETH_DATA_FRAME_SIZE : X300_ETH_MSG_FRAME_SIZE;
         default_buff_args.recv_frame_size =
@@ -1187,6 +1204,75 @@ bool x300_impl::is_claimed(wb_iface::sptr iface)
 
     //otherwise check claim src to determine if another thread with the same src has claimed the device
     return iface->peek32(SR_ADDR(X300_FW_SHMEM_BASE, X300_FW_SHMEM_CLAIM_SRC)) != get_process_hash();
+}
+
+/***********************************************************************
+ * MTU detection
+ **********************************************************************/
+x300_impl::mtu_result_t x300_impl::determine_mtu(const std::string &addr, const mtu_result_t &user_mtu)
+{
+    udp_simple::sptr udp = udp_simple::make_connected(addr, BOOST_STRINGIZE(X300_MTU_DETECT_UDP_PORT));
+
+    std::vector<boost::uint8_t> buffer(std::max(user_mtu.recv_mtu, user_mtu.send_mtu));
+    x300_mtu_t *request = reinterpret_cast<x300_mtu_t *>(&buffer.front());
+    static const double echo_timeout = 0.020; //20 ms
+
+    //test holler - check if its supported in this fw version
+    request->flags = uhd::htonx<boost::uint32_t>(X300_MTU_DETECT_ECHO_REQUEST);
+    request->size = uhd::htonx<boost::uint32_t>(sizeof(x300_mtu_t));
+    udp->send(boost::asio::buffer(buffer, sizeof(x300_mtu_t)));
+    udp->recv(boost::asio::buffer(buffer), echo_timeout);
+    if (!(uhd::ntohx<boost::uint32_t>(request->flags) & X300_MTU_DETECT_ECHO_REPLY))
+        throw uhd::not_implemented_error("Holler protocol not implemented");
+
+    size_t min_recv_mtu = sizeof(x300_mtu_t);
+    size_t max_recv_mtu = user_mtu.recv_mtu;
+    size_t min_send_mtu = sizeof(x300_mtu_t);
+    size_t max_send_mtu = user_mtu.send_mtu;
+
+    UHD_MSG(status) << "Determining receive MTU ... ";
+    while (min_recv_mtu < max_recv_mtu)
+    {
+       size_t test_mtu = (max_recv_mtu/2 + min_recv_mtu/2 + 3) & ~3;
+
+       request->flags = uhd::htonx<boost::uint32_t>(X300_MTU_DETECT_ECHO_REQUEST);
+       request->size = uhd::htonx<boost::uint32_t>(test_mtu);
+       udp->send(boost::asio::buffer(buffer, sizeof(x300_mtu_t)));
+
+       size_t len = udp->recv(boost::asio::buffer(buffer), echo_timeout);
+
+       if (len >= test_mtu)
+           min_recv_mtu = test_mtu;
+       else
+           max_recv_mtu = test_mtu - 4;
+
+    }
+    UHD_MSG(status) << min_recv_mtu << std::endl;
+
+    UHD_MSG(status) << "Determining send MTU ... ";
+    while (min_send_mtu < max_send_mtu)
+    {
+        size_t test_mtu = (max_send_mtu/2 + min_send_mtu/2 + 3) & ~3;
+
+        request->flags = uhd::htonx<boost::uint32_t>(X300_MTU_DETECT_ECHO_REQUEST);
+        request->size = uhd::htonx<boost::uint32_t>(sizeof(x300_mtu_t));
+        udp->send(boost::asio::buffer(buffer, test_mtu));
+
+        size_t len = udp->recv(boost::asio::buffer(buffer), echo_timeout);
+        if (len >= sizeof(x300_mtu_t))
+            len = uhd::ntohx<boost::uint32_t>(request->size);
+
+        if (len >= test_mtu)
+            min_send_mtu = test_mtu;
+        else
+            max_send_mtu = test_mtu - 4;
+    }
+    UHD_MSG(status) << min_send_mtu << std::endl;
+
+    mtu_result_t mtu;
+    mtu.recv_mtu = min_recv_mtu;
+    mtu.send_mtu = min_send_mtu;
+    return mtu;
 }
 
 /***********************************************************************
