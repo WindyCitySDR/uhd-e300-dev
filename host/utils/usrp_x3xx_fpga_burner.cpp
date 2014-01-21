@@ -1,5 +1,5 @@
 //
-// Copyright 2013 Ettus Research LLC
+// Copyright 2013-2014 Ettus Research LLC
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -39,6 +39,7 @@
 
 #include <uhd/exception.hpp>
 #include <uhd/transport/if_addrs.hpp>
+#include <uhd/transport/nirio/niusrprio_session.h>
 #include <uhd/transport/udp_simple.hpp>
 #include <uhd/device.hpp>
 #include <uhd/types/device_addr.hpp>
@@ -104,8 +105,56 @@ void list_usrps(){
 
     std::cout << "Available X3x0 devices:" << std::endl;
     BOOST_FOREACH(const device_addr_t &dev, found_devices){
-        std::cout << str(boost::format(" * %s (%s)") % dev["product"] % dev["addr"]) << std::endl;
+        std::string dev_string;
+        if(dev.has_key("addr")){
+            dev_string = str(boost::format(" * %s (%s, addr: %s)")
+                                           % dev["product"]
+                                           % dev["fpga"]
+                                           % dev["addr"]);
+        }
+        else{
+            dev_string = str(boost::format(" * %s (%s, resource: %s)")
+                                           % dev["product"]
+                                           % dev["fpga"]
+                                           % dev["resource"]);
+        }
+        std::cout << dev_string << std::endl;
     }
+}
+
+device_addr_t find_usrp_with_ethernet(std::string ip_addr, bool output){
+    if(output) std::cout << "Attempting to find X3x0 with IP address: " << ip_addr << std::endl;
+    const device_addr_t dev = device_addr_t(str(boost::format("addr=%s") % ip_addr));
+    device_addrs_t found_devices = device::find(dev);
+
+    if(found_devices.size() < 1) {
+        throw std::runtime_error("Could not find X3x0 with the specified address!");
+    }
+    else if(found_devices.size() > 1) {
+        throw std::runtime_error("Found multiple X3x0 units with the specified address!");
+    }
+    else {
+        if(output) std::cout << (boost::format("Found %s (%s).\n\n")
+                                 % found_devices[0]["product"]
+                                 % found_devices[0]["fpga"]);
+    }
+    return found_devices[0];
+}
+
+device_addr_t find_usrp_with_pcie(std::string resource, bool output){
+    if(output) std::cout << "Attempting to find X3x0 with resource: " << resource << std::endl;
+    const device_addr_t dev = device_addr_t(str(boost::format("resource=%s") % resource));
+    device_addrs_t found_devices = device::find(dev);
+
+    if(found_devices.size() < 1) {
+        throw std::runtime_error("Could not find X3x0 with the specified resource!");
+    }
+    else {
+        if(output) std::cout << (boost::format("Found %s (%s).\n\n")
+                                 % found_devices[0]["product"]
+                                 % found_devices[0]["fpga"]);
+    }
+    return found_devices[0];
 }
 
 std::string get_default_image_path(std::string model, std::string image_type){
@@ -133,7 +182,7 @@ void extract_from_lvbitx(std::string lvbitx_path, std::vector<char> &bitstream){
     bitstream.swap(decoded_bitstream);
 }
 
-void burn_fpga_image(udp_simple::sptr udp_transport, std::string fpga_path, bool verify){
+void ethernet_burn(udp_simple::sptr udp_transport, std::string fpga_path, bool verify){
     boost::uint32_t max_size;
     std::vector<char> bitstream;
 
@@ -280,6 +329,19 @@ void burn_fpga_image(udp_simple::sptr udp_transport, std::string fpga_path, bool
     std::cout << "100%" << std::endl;
 }
 
+void pcie_burn(std::string resource, std::string rpc_port, std::string fpga_path)
+{
+    std::cout << "Burning image: " << fpga_path << std::endl;
+    std::cout << "This will take 3-10 minutes." << std::endl;
+
+    nirio_status status = NiRio_Status_Success;
+
+    uhd::niusrprio::niusrprio_session fpga_session(resource, rpc_port);
+    nirio_status_chain(fpga_session.download_bitstream_to_flash(fpga_path), status);
+
+    if(nirio_status_fatal(status)) throw std::runtime_error("Failed to burn FPGA image!");
+}
+
 bool configure_fpga(udp_simple::sptr udp_transport, std::string ip_addr){
     x300_fpga_update_data_t configure_packet;
     configure_packet.flags = htonx<boost::uint32_t>(X300_FPGA_PROG_CONFIGURE | X300_FPGA_PROG_FLAGS_ACK);
@@ -324,16 +386,18 @@ bool configure_fpga(udp_simple::sptr udp_transport, std::string ip_addr){
 
 int UHD_SAFE_MAIN(int argc, char *argv[]){
     memset(intermediary_packet_data, 0, X300_PACKET_SIZE_BYTES);
-    std::string ip_addr, fpga_path, image_type;
+    std::string ip_addr, resource, fpga_path, image_type, rpc_port;
 
     po::options_description desc("Allowed options");
     desc.add_options()
         ("help", "Display this help message.")
-        ("addr", po::value<std::string>(&ip_addr)->default_value("192.168.10.2"), "Specify an IP address.")
-        ("fpga-path", po::value<std::string>(&fpga_path), "Specify an FPGA path.")
-        ("type", po::value<std::string>(&image_type), "Specify an image type (1G, HGS, XGS)")
-        ("configure", "Set FPGA image currently in flash (automatically done after downloading)")
-        ("verify", "Verify data downloaded to flash (download will take much longer)")
+        ("addr", po::value<std::string>(&ip_addr), "Specify an IP address.")
+        ("resource", po::value<std::string>(&resource), "Specify an NI-RIO resource.")
+        ("rpc-port", po::value<std::string>(&rpc_port)->default_value("5444"), "Specify a port to communicate with the RPC server.")
+        ("type", po::value<std::string>(&image_type), "Specify an image type (1G, HGS, XGS), leave blank for current type.")
+        ("fpga-path", po::value<std::string>(&fpga_path), "Specify an FPGA path (overrides --type option).")
+        ("configure", "Initialize FPGA with image currently burned to flash (Ethernet only).")
+        ("verify", "Verify data downloaded to flash (Ethernet only, download will take much longer)")
         ("list", "List all available X3x0 devices.")
     ;
     po::variables_map vm;
@@ -342,10 +406,17 @@ int UHD_SAFE_MAIN(int argc, char *argv[]){
 
     //Print help message
     if(vm.count("help")){
-        std::cout << "USRP X3x0 Net Burner - " << desc << std::endl;
+        std::cout << "USRP X3x0 FPGA Burner" << std::endl << std::endl;
+
+        std::cout << "Burns an FPGA image onto a USRP X300/X310. To burn the image" << std::endl
+                  << "over Ethernet, specify an IP address with the --addr option," << std::endl
+                  << "or to burn over PCIe, specify an NI-RIO resource (ex. RIO0)" << std::endl
+                  << "with the --resource option." << std::endl << std::endl;
+
+        std::cout << desc << std::endl;
         return EXIT_SUCCESS;
     }
-    
+
     //List all available devices
     if(vm.count("list")){
         list_usrps();
@@ -353,58 +424,75 @@ int UHD_SAFE_MAIN(int argc, char *argv[]){
     }
 
     /*
-     * If the user doesn't specify their own FPGA image, they must select a type (1G, HGS, XGS)
-     * so the utility can use the appropriate image from the default location.
+     * The user must specify whether to burn the image over Ethernet or PCI-e.
      */
-    if(not (vm.count("fpga-path") xor vm.count("type"))){
-        throw std::runtime_error("You must specify fpga-path OR type!");
+    if(not (vm.count("addr") xor vm.count("resource"))){
+        throw std::runtime_error("You must specify addr OR resource!");
     }
 
-    //Find X3x0 with specified arguments
-    std::cout << "Attempting to find X3x0 with IP address: " << ip_addr << std::endl;
-    const device_addr_t dev = device_addr_t(str(boost::format("addr=%s") % ip_addr));
-    device_addrs_t found_devices = device::find(dev);
+    /*
+     * With settings validated, find X3x0 with specified arguments.
+     */
+    device_addr_t dev = (vm.count("addr")) ? find_usrp_with_ethernet(ip_addr, true)
+                                           : find_usrp_with_pcie(resource, true);
 
-    if(found_devices.size() < 1) {
-        throw std::runtime_error("Could not find X3x0 with the specified address!");
-    }
-    else if(found_devices.size() > 1) {
-        throw std::runtime_error("Found multiple X3x0 units with the specified address!");
-    }
-    else {
-        std::cout << (boost::format("Found %s.") % found_devices[0]["product"]) << std::endl << std::endl;
-    }
-
-    if(vm.count("type")){
-        //Make sure the specified type is 1G, HGS, or XGS
-        if((image_type != "1G") and (image_type != "HGS") and (image_type != "XGS")){
-            throw std::runtime_error("--type must be 1G, HGS, or XGS!");
-        }
-        else
-        {
-            fpga_path = get_default_image_path(found_devices[0]["product"], image_type);
-        }
-    }
-    else{
+    /*
+     * If custom FPGA path is given, ignore specified type and let FPGA
+     * figure it out.
+     */
+    if(vm.count("fpga-path")){
         //Expand tilde usage if applicable
         #ifndef UHD_PLATFORM_WIN32
             if(fpga_path.find("~/") == 0) fpga_path.replace(0,1,getenv("HOME"));
         #endif
-
-        //Check for proper file type
-        std::string ext = fs::extension(fpga_path.c_str());
-        if(ext != ".bin" and ext != ".bit" and ext != ".lvbitx"){
-            throw std::runtime_error("The image filename must end in .bin, .bit, or .lvbitx.");
+    }
+    else{
+        if(vm.count("type")){
+            //Make sure the specified type is 1G, HGS, or XGS
+            if((image_type != "1G") and (image_type != "HGS") and (image_type != "XGS")){
+                throw std::runtime_error("--type must be 1G, HGS, or XGS!");
+            }
+            else fpga_path = get_default_image_path(dev["product"], image_type);
+        }
+        else{
+            //Use default image of currently present FPGA type
+            fpga_path = get_default_image_path(dev["product"], dev["fpga"]);
         }
     }
 
-    udp_simple::sptr udp_transport = udp_simple::make_connected(ip_addr, BOOST_STRINGIZE(X300_FPGA_PROG_UDP_PORT));
-    burn_fpga_image(udp_transport, fpga_path, vm.count("verify"));
 
-    //If new image is burned, automatically configure
-    //If not, user needs to specify
-    if(configure_fpga(udp_transport, ip_addr)) std::cout << "Successfully configured FPGA!" << std::endl;
-    else throw std::runtime_error("FPGA configuring failed!");
+    /*
+     * Check validity of image through extension
+     */
+    std::string ext = fs::extension(fpga_path.c_str());
+    if(ext != ".bin" and ext != ".bit" and ext != ".lvbitx"){
+        throw std::runtime_error("The image filename must end in .bin, .bit, or .lvbitx.");
+    }
+
+    if(vm.count("addr")){
+        udp_simple::sptr udp_transport = udp_simple::make_connected(ip_addr, BOOST_STRINGIZE(X300_FPGA_PROG_UDP_PORT));
+
+        ethernet_burn(udp_transport, fpga_path, vm.count("verify"));
+
+        if(vm.count("configure")){
+            if(configure_fpga(udp_transport, ip_addr)) std::cout << "Successfully configured FPGA!" << std::endl;
+            else throw std::runtime_error("FPGA configuring failed!");
+        }
+    }
+    else pcie_burn(resource, rpc_port, fpga_path);
+
+    /*
+     * Attempt to find USRP after burning
+     */
+    std::cout << std::endl << "Attempting to find device..." << std::flush;
+    boost::this_thread::sleep(boost::posix_time::milliseconds(2000)); //Sometimes needed for Ethernet to reconnect
+    device_addr_t found_usrp = (vm.count("addr")) ? find_usrp_with_ethernet(ip_addr, false)
+                                                  : find_usrp_with_pcie(resource, false);
+    std::cout << "found!" << std::endl; //If unsuccessful, runtime error would occur in find functions
+    std::cout << "Successfully burned FPGA image!" << std::endl << std::endl;
+
+    if(vm.count("addr")) std::cout << str(boost::format("Power-cycle the USRP %s to use the new image.") % found_usrp["product"]) << std::endl;
+    else std::cout << str(boost::format("Power-cycle the USRP %s and reboot your machine to use the new image.") % found_usrp["product"]) << std::endl;
 
     return EXIT_SUCCESS;
 }

@@ -139,6 +139,7 @@ SET(man_page_sources
     uhd_images_downloader.1
     uhd_usrp_probe.1
     usrp_n2xx_simple_net_burner.1
+    usrp_x3xx_fpga_burner.1
     usrp2_card_burner.1
 )
 

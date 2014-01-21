@@ -197,13 +197,13 @@ To get the latest images, simply use the uhd_images_downloader script:
 
 ::
 
-    <install-path>/share/uhd/utils/uhd_images_downloader.py
+    <install-path>/lib/uhd/utils/uhd_images_downloader.py
 
 **Windows:**
 
 ::
 
-    <path_to_python.exe> <install-path>/share/uhd/utils/uhd_images_downloader.py
+    <path_to_python.exe> <install-path>/lib/uhd/utils/uhd_images_downloader.py
 
 
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -247,13 +247,13 @@ Use the burner tool over Ethernet
 
 ::
 
-    <install-path>/share/uhd/utils/usrp_x3xx_burner --addr=<ip address> --fpga-path=<path to FPGA image>
+    <install-path>/lib/uhd/utils/usrp_x3xx_fpga_burner --addr=<ip address> --fpga-path=<path to FPGA image>
 
 **Windows:**
 
 ::
 
-    <install-path>\share\uhd\utils\usrp_x3xx_burner.exe --addr=<ip address> --fpga-path=<path to FPGA image>
+    <install-path>\lib\uhd\utils\usrp_x3xx_fpga_burner.exe --addr=<ip address> --fpga-path=<path to FPGA image>
 
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Use the burner tool over PCI Express
@@ -262,13 +262,13 @@ Use the burner tool over PCI Express
 
 ::
 
-    <install-path>/share/uhd/utils/usrp_x3xx_burner --resource=<device resource name> --fpga-path=<path to FPGA image>
+    <install-path>/lib/uhd/utils/usrp_x3xx_fpga_burner --resource=<device resource name> --fpga-path=<path to FPGA image>
 
 **Windows:**
 
 ::
 
-    <install-path>\share\uhd\utils\usrp_x3xx_burner.exe --resource=<device resource name> --fpga-path=<path to FPGA image>
+    <install-path>\lib\uhd\utils\usrp_x3xx_fpga_burner.exe --resource=<device resource name> --fpga-path=<path to FPGA image>
 
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Device recovery and bricking
@@ -375,14 +375,14 @@ Run the following commands:
 
 ::
 
-    cd <install-path>/share/uhd/utils
+    cd <install-path>/lib/uhd/utils
     ./usrp_burn_mb_eeprom --args=<optional device args> --key=ip-addr --val=192.168.10.3
 
 **Windows:**
 
 ::
 
-    cd <install-path>\share\uhd\utils
+    cd <install-path>\lib\uhd\utils
     usrp_burn_mb_eeprom.exe --args=<optional device args> --key=ip-addr --val=192.168.10.3
 
 ---------------------

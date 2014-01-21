@@ -31,7 +31,7 @@ SET(util_runtime_sources
 )
 
 SET(x3xx_burner_sources
-    usrp_x3xx_net_burner.cpp
+    usrp_x3xx_fpga_burner.cpp
     cdecode.c
 )
 
@@ -43,9 +43,9 @@ FOREACH(util_source ${util_runtime_sources})
     UHD_INSTALL(TARGETS ${util_name} RUNTIME DESTINATION ${RUNTIME_DIR} COMPONENT utilities)
 ENDFOREACH(util_source)
 
-ADD_EXECUTABLE(usrp_x3xx_net_burner ${x3xx_burner_sources})
-TARGET_LINK_LIBRARIES(usrp_x3xx_net_burner uhd ${Boost_LIBRARIES})
-UHD_INSTALL(TARGETS usrp_x3xx_net_burner RUNTIME DESTINATION ${RUNTIME_DIR} COMPONENT utilities)
+ADD_EXECUTABLE(usrp_x3xx_fpga_burner ${x3xx_burner_sources})
+TARGET_LINK_LIBRARIES(usrp_x3xx_fpga_burner uhd ${Boost_LIBRARIES})
+UHD_INSTALL(TARGETS usrp_x3xx_fpga_burner RUNTIME DESTINATION ${RUNTIME_DIR} COMPONENT utilities)
 
 ########################################################################
 # Utilities that get installed into the share path
@@ -82,7 +82,7 @@ FOREACH(util_source ${util_share_sources})
 ENDFOREACH(util_source)
 
 UHD_INSTALL(TARGETS usrp_n2xx_simple_net_burner RUNTIME DESTINATION ${PKG_LIB_DIR}/utils COMPONENT utilities)
-UHD_INSTALL(TARGETS usrp_x3xx_net_burner RUNTIME DESTINATION ${PKG_LIB_DIR}/utils COMPONENT utilities)
+UHD_INSTALL(TARGETS usrp_x3xx_fpga_burner RUNTIME DESTINATION ${PKG_LIB_DIR}/utils COMPONENT utilities)
 
 #UHD images downloader configuration
 CONFIGURE_FILE(
