@@ -21,10 +21,12 @@ public:
 
     x300_clock_ctrl_impl(uhd::spi_iface::sptr spiface,
         const size_t slaveno,
+        const size_t hw_rev,
         const double clock_rate,
         const double refclk_rate):
         _spiface(spiface),
         _slaveno(slaveno),
+        _hw_rev(hw_rev),
         _clock_rate(clock_rate),
         _refclk_rate(refclk_rate)
 {
@@ -332,8 +334,11 @@ void sync_clocks(void) {
 }
 
 double get_master_clock_rate(void) {
-
     return _clock_rate;
+}
+
+void set_master_clock_rate(double rate) {
+    // TODO
 }
 
 double get_sysref_clock_rate(void) {
@@ -395,6 +400,7 @@ void write_regs(boost::uint8_t addr) {
 private:
     const spi_iface::sptr _spiface;
     const size_t _slaveno;
+    const size_t _hw_rev;
     const double _clock_rate;
     const double _refclk_rate;
     lmk04816_regs_t _lmk04816_regs;
@@ -402,8 +408,9 @@ private:
 
 x300_clock_ctrl::sptr x300_clock_ctrl::make(uhd::spi_iface::sptr spiface,
         const size_t slaveno,
+        const size_t hw_rev,
         const double clock_rate,
         const double refclk_freq) {
-    return sptr(new x300_clock_ctrl_impl(spiface, slaveno, clock_rate,
+    return sptr(new x300_clock_ctrl_impl(spiface, slaveno, hw_rev, clock_rate,
                 refclk_freq));
 }

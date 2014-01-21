@@ -522,10 +522,10 @@ void x300_impl::setup_mb(const size_t mb_i, const uhd::device_addr_t &dev_addr)
     this->update_clock_control(mb);
 
     // TODO This should be stored as something else useful, probably.
-    //const std::string rev = mb_eeprom["revision"];
-
+    const size_t hw_rev = boost::lexical_cast<size_t>(mb_eeprom["revision"]);
     mb.clock = x300_clock_ctrl::make(mb.zpu_spi,
         1 /*slaveno*/,
+        hw_rev,
         dev_addr.cast<double>("master_clock_rate", X300_DEFAULT_TICK_RATE),
         dev_addr.cast<double>("refclk_rate", X300_DEFAULT_REFCLK_FREQ));
 
