@@ -401,8 +401,31 @@ void x300_impl::setup_mb(const size_t mb_i, const uhd::device_addr_t &dev_addr)
     UHD_MSG(status) << "Setup basic communication..." << std::endl;
     if (mb.xport_path == "nirio")
         mb.zpu_ctrl = x300_make_ctrl_iface_pcie(mb.rio_fpga_interface->get_kernel_proxy());
-    else
+    else {
         mb.zpu_ctrl = x300_make_ctrl_iface_enet(udp_simple::make_connected(mb.addr, BOOST_STRINGIZE(X300_FW_COMMS_UDP_PORT)));
+
+        mtu_result_t user_set;
+        user_set.recv_mtu = dev_addr.has_key("recv_frame_size") ? boost::lexical_cast<size_t>(dev_addr["recv_frame_size"]) : X300_ETH_DATA_FRAME_SIZE;
+        user_set.send_mtu = dev_addr.has_key("send_frame_size") ? boost::lexical_cast<size_t>(dev_addr["send_frame_size"]) : X300_ETH_DATA_FRAME_SIZE;
+
+        // Detect the MTU on the path to the USRP
+        mtu_result_t result;
+        try {
+            result = determine_mtu(mb.addr, user_set);
+        } catch(std::exception &e)
+        {
+            UHD_MSG(error) << e.what() << std::endl;
+        }
+
+        if(result.recv_mtu < user_set.recv_mtu)
+            UHD_MSG(warning) << boost::format("The receive path contains entities that do not support MTUs >= one recv frame's size (%lu).") % user_set.recv_mtu << std::endl
+                             << "Please verify your NIC's MTU setting using 'ip link' or set the recv_frame_size argument." << std::endl;
+
+        if(result.send_mtu < user_set.send_mtu)
+            UHD_MSG(warning) << boost::format("The send path contains entities that do not support MTUs >= one send frame's size (%lu).") % user_set.send_mtu << std::endl
+                             << "Please verify your NIC's MTU setting using 'ip link' or set the send_frame_size argument." << std::endl;
+    }
+
 
     mb.claimer_task = uhd::task::make(boost::bind(&x300_impl::claimer_loop, this, mb.zpu_ctrl));
 
@@ -520,12 +543,12 @@ void x300_impl::setup_mb(const size_t mb_i, const uhd::device_addr_t &dev_addr)
     const std::string rev = mb_eeprom["revision"];
     mb.clock = x300_clock_ctrl::make(mb.zpu_spi, 1/*slaveno*/,
         dev_addr.cast<double>("master_clock_rate", X300_DEFAULT_TICK_RATE),
-        (rev.empty()? 0 : boost::lexical_cast<int>(rev)), 
-	dev_addr.cast<double>("lmk_pll_ref", X300_DEFAULT_PLL2REF_FREQ));
+        (rev.empty()? 0 : boost::lexical_cast<int>(rev)),
+        dev_addr.cast<double>("lmk_pll_ref", X300_DEFAULT_PLL2REF_FREQ));
     _tree->create<double>(mb_path / "tick_rate")
         .publish(boost::bind(&x300_clock_ctrl::get_master_clock_rate, mb.clock));
 
-    UHD_MSG(status) << "Radio 1x clock set to " << (mb.clock->get_master_clock_rate()/1e6) << std::dec << " MHz. Crystal is " << 
+    UHD_MSG(status) << "Radio 1x clock set to " << (mb.clock->get_master_clock_rate()/1e6) << std::dec << " MHz. Crystal is " <<
       (mb.clock->get_crystal_clock_rate()/1e6) << std::dec << " MHz" << std::endl;
 
     ////////////////////////////////////////////////////////////////////
@@ -564,8 +587,8 @@ void x300_impl::setup_mb(const size_t mb_i, const uhd::device_addr_t &dev_addr)
     ////////////////////////////////////////////////////////////////////
     //clear router?
     ////////////////////////////////////////////////////////////////////
-    for (size_t i = 0; i < 512; i++) mb.zpu_ctrl->poke32(SR_ADDR(SETXB_BASE, i), 0);
-  
+    for (size_t i = 0; i < 512; i++)
+        mb.zpu_ctrl->poke32(SR_ADDR(SETXB_BASE, i), 0);
     ////////////////////////////////////////////////////////////////////
     // setup radios
     ////////////////////////////////////////////////////////////////////
@@ -957,21 +980,6 @@ x300_impl::both_xports_t x300_impl::make_transport(
         xports.recv_buff_size = xports.recv->get_num_recv_frames() * xports.recv->get_recv_frame_size();
         xports.send_buff_size = xports.send->get_num_send_frames() * xports.send->get_send_frame_size();
     } else {
-
-        mtu_result_t user_set;
-        user_set.send_mtu = X300_ETH_DATA_FRAME_SIZE;
-        user_set.recv_mtu = X300_ETH_DATA_FRAME_SIZE;
-
-        // Detect the MTU on the path to the USRP
-        mtu_result_t result = determine_mtu(addr, user_set);
-
-        if(result.send_mtu < X300_ETH_DATA_FRAME_SIZE)
-            UHD_MSG(warning) << "The receive path contains entities that do not support MTUs >= 1 recv frame." << std::endl
-                             << "Please verify your NIC's MTU setting using 'ip link'" << std::endl;
-
-        if(result.send_mtu < X300_ETH_DATA_FRAME_SIZE)
-            UHD_MSG(warning) << "The send path contains entities that do not support MTUs >= 1 send frame." << std::endl
-                             << "Please verify your NIC's MTU setting using 'ip link'" << std::endl;
 
         default_buff_args.send_frame_size =
             (prefix == X300_RADIO_DEST_PREFIX_TX) ? X300_ETH_DATA_FRAME_SIZE : X300_ETH_MSG_FRAME_SIZE;

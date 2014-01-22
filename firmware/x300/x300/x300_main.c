@@ -193,8 +193,6 @@ void handle_mtu_detect(
     const x300_mtu_t *request = (const x300_mtu_t *) buff;
     x300_mtu_t reply;
 
-    /*printf("Got MTU request of with len %lu and requested %lu\n", num_bytes, request->size);*/
-
     if (!(request->flags & X300_MTU_DETECT_ECHO_REQUEST)) {
         printf("DEBUG: MTU detect got unknown request\n");
         reply.flags |= X300_MTU_DETECT_ERROR;
