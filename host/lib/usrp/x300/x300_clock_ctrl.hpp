@@ -45,8 +45,8 @@ public:
     static sptr make(uhd::spi_iface::sptr spiface,
             const size_t slaveno,
             const size_t hw_rev,
-            const double clock_rate,
-            const double refclk_rate);
+            const double master_clock_rate,
+            const double system_ref_rate);
 
     /*! Get the master clock rate of the device.
      * \return the clock frequency in Hz

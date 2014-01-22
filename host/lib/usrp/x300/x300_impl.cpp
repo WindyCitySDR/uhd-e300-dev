@@ -523,17 +523,18 @@ void x300_impl::setup_mb(const size_t mb_i, const uhd::device_addr_t &dev_addr)
 
     // TODO This should be stored as something else useful, probably.
     const size_t hw_rev = boost::lexical_cast<size_t>(mb_eeprom["revision"]);
+
     mb.clock = x300_clock_ctrl::make(mb.zpu_spi,
         1 /*slaveno*/,
         hw_rev,
         dev_addr.cast<double>("master_clock_rate", X300_DEFAULT_TICK_RATE),
-        dev_addr.cast<double>("refclk_rate", X300_DEFAULT_REFCLK_FREQ));
+        dev_addr.cast<double>("system_ref_rate", X300_DEFAULT_SYSREF_RATE));
 
     ////////////////////////////////////////////////////////////////////
     // create clock properties
     ////////////////////////////////////////////////////////////////////
     _tree->create<double>(mb_path / "tick_rate")
-    .publish(boost::bind(&x300_clock_ctrl::get_master_clock_rate, mb.clock));
+        .publish(boost::bind(&x300_clock_ctrl::get_master_clock_rate, mb.clock));
 
     UHD_MSG(status) << "Radio 1x clock:" << (mb.clock->get_master_clock_rate()/1e6)
         << std::endl;
