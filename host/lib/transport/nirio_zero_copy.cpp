@@ -1,5 +1,5 @@
 //
-// Copyright 2010-2013 Ettus Research LLC
+// Copyright 2013-2014 Ettus Research LLC
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -62,6 +62,9 @@ public:
         if (nirio_status_not_fatal(status)) {
             index++;        //Advances the caller's buffer
             return make(this, _buffer, _length);
+        } else if (status == NiRio_Status_CommunicationTimeout) {
+            nirio_status_to_exception(status, "NI-RIO PCIe data transfer failed.");
+            return sptr();
         } else {
             return sptr();  //NULL for timeout or error.
         }
@@ -99,6 +102,9 @@ public:
         if (nirio_status_not_fatal(status)) {
             index++;        //Advances the caller's buffer
             return make(this, _buffer, _length);
+        } else if (status == NiRio_Status_CommunicationTimeout) {
+            nirio_status_to_exception(status, "NI-RIO PCIe data transfer failed.");
+            return sptr();
         } else {
             return sptr();  //NULL for timeout or error.
         }
@@ -178,23 +184,27 @@ public:
                     actual_depth, actual_size),
                 status);
 
+            _proxy().get_rio_quirks().add_tx_fifo(_fifo_instance);
+
             nirio_status_chain(_recv_fifo->start(), status);
             nirio_status_chain(_send_fifo->start(), status);
 
-            //Flush RX kernel buffers in case some cruft was
-            //left behind from the last run
-            _flush_rx_buff();
+            if (nirio_status_not_fatal(status)) {
+                //Flush RX kernel buffers in case some cruft was
+                //left behind from the last run
+                _flush_rx_buff();
 
-            //allocate re-usable managed receive buffers
-            for (size_t i = 0; i < get_num_recv_frames(); i++){
-                _mrb_pool.push_back(boost::shared_ptr<nirio_zero_copy_mrb>(new nirio_zero_copy_mrb(
-                    *_recv_fifo, get_recv_frame_size())));
-            }
+                //allocate re-usable managed receive buffers
+                for (size_t i = 0; i < get_num_recv_frames(); i++){
+                    _mrb_pool.push_back(boost::shared_ptr<nirio_zero_copy_mrb>(new nirio_zero_copy_mrb(
+                        *_recv_fifo, get_recv_frame_size())));
+                }
 
-            //allocate re-usable managed send buffers
-            for (size_t i = 0; i < get_num_send_frames(); i++){
-                _msb_pool.push_back(boost::shared_ptr<nirio_zero_copy_msb>(new nirio_zero_copy_msb(
-                    *_send_fifo, get_send_frame_size())));
+                //allocate re-usable managed send buffers
+                for (size_t i = 0; i < get_num_send_frames(); i++){
+                    _msb_pool.push_back(boost::shared_ptr<nirio_zero_copy_msb>(new nirio_zero_copy_msb(
+                        *_send_fifo, get_send_frame_size())));
+                }
             }
         } else {
             nirio_status_chain(NiRio_Status_ResourceNotInitialized, status);
@@ -205,16 +215,18 @@ public:
 
     virtual ~nirio_zero_copy_impl()
     {
+        _proxy().get_rio_quirks().remove_tx_fifo(_fifo_instance);
+
+        //Reset DMA streams (Teardown, so don't status chain)
+        _proxy().poke(PCIE_TX_DMA_REG(DMA_CTRL_STATUS_REG, _fifo_instance), DMA_CTRL_RESET);
+        _proxy().poke(PCIE_RX_DMA_REG(DMA_CTRL_STATUS_REG, _fifo_instance), DMA_CTRL_RESET);
+
         _flush_rx_buff();
 
         //Stop DMA channels. Stop is called in the fifo dtor but
         //it doesn't hurt to do it here.
         _send_fifo->stop();
         _recv_fifo->stop();
-
-        //Reset DMA streams (Teardown, so don't status chain)
-        _proxy().poke(PCIE_TX_DMA_REG(DMA_CTRL_STATUS_REG, _fifo_instance), DMA_CTRL_RESET);
-        _proxy().poke(PCIE_RX_DMA_REG(DMA_CTRL_STATUS_REG, _fifo_instance), DMA_CTRL_RESET);
     }
 
     /*******************************************************************

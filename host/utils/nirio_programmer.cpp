@@ -223,7 +223,7 @@ int main(int argc, char *argv[])
         printf("------------------------------------------------------------------------------------------------");
         printf("\nChannel =>       |");
         for (uint32_t i = 0; i < 6; i++) {
-            printf("%11d |", i);
+            printf("%11u |", i);
         }
         printf("\n------------------------------------------------------------------------------------------------");
         printf("\nTX Status        |");
@@ -239,32 +239,32 @@ int main(int argc, char *argv[])
         printf("\nTX Frm Size      |");
         for (uint32_t i = 0; i < 6; i++) {
             nirio_status_chain(dev_proxy.peek(0x40204 + (i * 16), reg_val), status);
-            printf("%11d |", reg_val);
+            printf("%11u |", reg_val);
         }
         printf("\nRX Frm Size      |");
         for (uint32_t i = 0; i < 6; i++) {
             nirio_status_chain(dev_proxy.peek(0x40404 + (i * 16), reg_val), status);
-            printf("%11d |", reg_val);
+            printf("%11u |", reg_val);
         }
         printf("\nTX Pkt Count     |");
         for (uint32_t i = 0; i < 6; i++) {
             nirio_status_chain(dev_proxy.peek(0x4020C + (i * 16), reg_val), status);
-            printf("%11d |", reg_val);
+            printf("%11u |", reg_val);
         }
         printf("\nTX Samp Count    |");
         for (uint32_t i = 0; i < 6; i++) {
             nirio_status_chain(dev_proxy.peek(0x40208 + (i * 16), reg_val), status);
-            printf("%11d |", reg_val);
+            printf("%11u |", reg_val);
         }
         printf("\nRX Pkt Count     |");
         for (uint32_t i = 0; i < 6; i++) {
             nirio_status_chain(dev_proxy.peek(0x4040C + (i * 16), reg_val), status);
-            printf("%11d |", reg_val);
+            printf("%11u |", reg_val);
         }
         printf("\nRX Samp Count    |");
         for (uint32_t i = 0; i < 6; i++) {
             nirio_status_chain(dev_proxy.peek(0x40408 + (i * 16), reg_val), status);
-            printf("%11d |", reg_val);
+            printf("%11u |", reg_val);
         }
         printf("\n------------------------------------------------------------------------------------------------\n");
     }

@@ -1,5 +1,5 @@
 //
-// Copyright 2013 Ettus Research LLC
+// Copyright 2013-2014 Ettus Research LLC
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -387,6 +387,10 @@ void x300_impl::setup_mb(const size_t mb_i, const uhd::device_addr_t &dev_addr)
         mb.rio_fpga_interface.reset(new niusrprio_session(dev_addr["resource"], rpc_port_name));
         nirio_status_chain(mb.rio_fpga_interface->open(lvbitx, dev_addr.has_key("download-fpga")), status);
         nirio_status_to_exception(status, "x300_impl: Could not initialize RIO session.");
+
+        //Tell the quirks object which FIFOs carry TX stream data
+        const uint32_t tx_data_fifos[2] = {X300_RADIO_DEST_PREFIX_TX, X300_RADIO_DEST_PREFIX_TX + 3};
+        mb.rio_fpga_interface->get_kernel_proxy().get_rio_quirks().register_tx_streams(tx_data_fifos);
     }
 
     BOOST_FOREACH(const std::string &key, dev_addr.keys())

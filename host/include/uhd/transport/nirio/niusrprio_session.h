@@ -50,7 +50,7 @@ public:
         nifpga_lvbitx::sptr lvbitx,
         bool force_download = false);
 
-	void close(bool reset_fpga = false);
+	void close(bool skip_reset = false);
 
 	nirio_status reset();
 

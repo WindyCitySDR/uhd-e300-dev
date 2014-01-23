@@ -1,5 +1,5 @@
 //
-// Copyright 2013 Ettus Research LLC
+// Copyright 2013-2014 Ettus Research LLC
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -21,6 +21,7 @@
 #include <boost/smart_ptr.hpp>
 #include <boost/noncopyable.hpp>
 #include <uhd/transport/nirio/nirio_driver_iface.h>
+#include <uhd/transport/nirio/nirio_quirks.h>
 
 namespace uhd { namespace niusrprio
 {
@@ -125,9 +126,14 @@ namespace uhd { namespace niusrprio
         nirio_status unmap_fifo_memory(
             nirio_driver_iface::rio_mmap_t& map);
 
+        nirio_quirks& get_rio_quirks() {
+            return _rio_quirks;
+        }
+
     private:    //Members
         nirio_driver_iface::rio_dev_handle_t    _device_handle;
         uint32_t                                _interface_num;
+        nirio_quirks                            _rio_quirks;
     };
 
     class niriok_scoped_addr_space : public boost::noncopyable {
