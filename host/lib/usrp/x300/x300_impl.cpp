@@ -522,7 +522,13 @@ void x300_impl::setup_mb(const size_t mb_i, const uhd::device_addr_t &dev_addr)
     this->update_clock_control(mb);
 
     // TODO This should be stored as something else useful, probably.
-    const size_t hw_rev = boost::lexical_cast<size_t>(mb_eeprom["revision"]);
+    size_t hw_rev = 4;  // default
+    if (mb_eeprom.has_key("revision") and not mb_eeprom["revision"].empty())
+    {
+        hw_rev = boost::lexical_cast<size_t>(mb_eeprom["revision"]);
+    } else {
+        UHD_MSG(warning) << "No revsion detected -- defaulting to sub-optimal clock settings.  MB EEPROM must be reprogrammed!" << std::endl;
+    }
 
     mb.clock = x300_clock_ctrl::make(mb.zpu_spi,
         1 /*slaveno*/,
