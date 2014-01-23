@@ -65,7 +65,6 @@ std::vector<double> get_dboard_rates(const x300_clock_which_t) {
     return rates;
 }
 
-
 void set_ref_out(const bool enb) {
     if (enb)
         _lmk04816_regs.CLKout10_TYPE = lmk04816_regs_t::CLKOUT10_TYPE_LVDS;
@@ -73,7 +72,6 @@ void set_ref_out(const bool enb) {
         _lmk04816_regs.CLKout10_TYPE = lmk04816_regs_t::CLKOUT10_TYPE_P_DOWN;
     this->write_regs(8);
 }
-
 
 void write_regs(boost::uint8_t addr) {
     boost::uint32_t data = _lmk04816_regs.get_reg(addr);

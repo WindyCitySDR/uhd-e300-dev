@@ -640,7 +640,8 @@ void x300_impl::setup_mb(const size_t mb_i, const uhd::device_addr_t &dev_addr)
     _tree->create<std::vector<double> >(mb_path / "clock_source" / "external" / "options")
         .set(external_freqs);
     _tree->create<double>(mb_path / "clock_source" / "external" / "value")
-        .set(10e6);
+        .set(mb.clock->get_sysref_clock_rate());
+    // FIXME the external clock source settings need to be more robust
 
     //setup the clock output, default to ON
     _tree->create<bool>(mb_path / "clock_source" / "output")
@@ -1151,21 +1152,33 @@ void x300_impl::update_clock_control(mboard_members_t &mb)
 void x300_impl::update_clock_source(mboard_members_t &mb, const std::string &source)
 {
     mb.clock_control_regs__clock_source = 0;
-    if (source == "internal") mb.clock_control_regs__clock_source = 0x2;
-    else if (source == "external") mb.clock_control_regs__clock_source = 0x0;
-    else if (source == "gpsdo") mb.clock_control_regs__clock_source = 0x3;
-    else throw uhd::key_error("update_clock_source: unknown source: " + source);
-    mb.clock_control_regs__tcxo_enb = (source == "internal")? 1 : 0;
+    if (source == "internal") {
+        mb.clock_control_regs__clock_source = 0x2;
+
+        mb.clock_control_regs__tcxo_enb = (source == "internal")? 1 : 0;
+    } else if (source == "external") {
+        mb.clock_control_regs__clock_source = 0x0;
+    } else if (source == "gpsdo") {
+        mb.clock_control_regs__clock_source = 0x3;
+    } else {
+        throw uhd::key_error("update_clock_source: unknown source: " + source);
+    }
+
     this->update_clock_control(mb);
 }
 
 void x300_impl::update_time_source(mboard_members_t &mb, const std::string &source)
 {
-    if (source == "internal"){}
-    else if (source == "external"){}
-    else if (source == "gpsdo"){}
-    else throw uhd::key_error("update_time_source: unknown source: " + source);
-    mb.clock_control_regs__pps_select = (source == "external")? 1 : 0;
+    if (source == "internal") {
+        // no action needed
+    } else if (source == "external") {
+        mb.clock_control_regs__pps_select = (source == "external")? 1 : 0;
+    } else if (source == "gpsdo") {
+        // no action needed
+    } else {
+        throw uhd::key_error("update_time_source: unknown source: " + source);
+    }
+
     this->update_clock_control(mb);
 }
 
