@@ -314,7 +314,7 @@ On a Linux system, you can add a static IP address very easily by using the
     sudo ip addr add 192.168.10.1/24 dev <interface>
 
 Note that **<interface>** is usually something like **eth0**.  You can discover the
-names of the network interfaces in your computer by running **ip addr show**:
+names of the network interfaces in your computer by running:
 
 ::
 
@@ -329,12 +329,25 @@ It is recommended that you change or disable your firewall settings.
 ^^^^^^^^^^^^^^^
 Setting the MTU
 ^^^^^^^^^^^^^^^
-As UHD uses receive and transmit frames larger than the standard MTU,
+As UHD by default uses receive and transmit frames larger than the standard MTU of 1500 Bytes,
 the NIC needs to be configured to use a larger MTU when used with the USRP X series devices.
 
 ::
 
-    sudo ip link set mtu 9000 dev <interface>
+    sudo ip link set mtu 8192 dev <interface>
+
+Upon initialization UHD will probe for the maximum possible path MTU along the path between the USRP X series device
+and the host, both in receive and transmit direction.
+
+If the network hardware does not support MTUs as large as 8000 Bytes, passing the **send_frame_size** and **receive_frame_size**
+arguments will make UHD use smaller MTUs:
+
+::
+
+    uhd_usrp_probe --args='send_frame_size=<max send MTU> recv_frame_size=<max receive MTU>'
+
+**Note:** This will most likely have a severe performance penalty.
+
 
 ^^^^^^^^^^^^^^^^^^^^^^^^^
 Multiple devices per host
