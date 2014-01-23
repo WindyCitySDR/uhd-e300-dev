@@ -1,5 +1,5 @@
 //
-// Copyright 2013 Ettus Research LLC
+// Copyright 2013-2014 Ettus Research LLC
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -26,6 +26,7 @@
 #include <boost/smart_ptr.hpp>
 #include <string>
 #include <boost/thread/recursive_mutex.hpp>
+#include <boost/thread/thread.hpp>
 
 namespace uhd { namespace niusrprio {
 
@@ -105,6 +106,8 @@ public:
 private:    //Methods
     bool _is_initialized();
     datatype_info_t _get_datatype_info();
+    nirio_status _get_transfer_count(uint64_t& transfer_count);
+    nirio_status _ensure_transfer_completed();
 
 private:    //Members
     std::string                    _name;
@@ -114,8 +117,10 @@ private:    //Members
     size_t                         _acquired_pending;
     nirio_driver_iface::rio_mmap_t _mem_map;
     boost::recursive_mutex         _mutex;
-
     niriok_proxy*                  _riok_proxy_ptr;
+
+    uint64_t                       _expected_xfer_count;
+    uint32_t                       _dma_base_addr;
 
     static const uint32_t FIFO_LOCK_TIMEOUT_IN_MS = 5000;
 };

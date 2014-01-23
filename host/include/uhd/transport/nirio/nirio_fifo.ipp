@@ -1,5 +1,5 @@
 //
-// Copyright 2013 Ettus Research LLC
+// Copyright 2013-2014 Ettus Research LLC
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -33,8 +33,16 @@ nirio_fifo<data_t>::nirio_fifo(
     _datatype_info(_get_datatype_info()),
     _acquired_pending(0),
     _mem_map(),
-    _riok_proxy_ptr(&riok_proxy)
+    _riok_proxy_ptr(&riok_proxy),
+    _expected_xfer_count(0),
+    _dma_base_addr(0)
 {
+    nirio_status status = 0;
+    nirio_status_chain(_riok_proxy_ptr->set_attribute(ADDRESS_SPACE, BUS_INTERFACE), status);
+    uint32_t base_addr, addr_space_word;
+    nirio_status_chain(_riok_proxy_ptr->peek(0x1C, base_addr), status);
+    nirio_status_chain(_riok_proxy_ptr->peek(0xC, addr_space_word), status);
+    _dma_base_addr = base_addr + (_fifo_channel * (1<<((addr_space_word>>16)&0xF)));
 }
 
 template <typename data_t>
@@ -103,8 +111,10 @@ nirio_status nirio_fifo<data_t>::start()
     in.subfunction = nirio_driver_iface::NIRIO_FIFO::START;
 
     status = _riok_proxy_ptr->sync_operation(&in, sizeof(in), &out, sizeof(out));
-    _acquired_pending = 0;
-
+    if (nirio_status_not_fatal(status)) {
+        _acquired_pending = 0;
+        _expected_xfer_count = 0;
+    }
     return status;
 }
 
@@ -163,6 +173,14 @@ nirio_status nirio_fifo<data_t>::acquire(
         elements_acquired = stuffed[0];
         elements_remaining = stuffed[1];
         _acquired_pending = elements_acquired;
+
+        if (UHD_NIRIO_RX_FIFO_XFER_CHECK_EN &&
+            _riok_proxy_ptr->get_rio_quirks().rx_fifo_xfer_check_en() &&
+            get_direction() == INPUT_FIFO
+        ) {
+            _expected_xfer_count += static_cast<uint64_t>(elements_requested * sizeof(data_t));
+            status = _ensure_transfer_completed();
+        }
     }
 
     return status;
@@ -254,6 +272,54 @@ nirio_status nirio_fifo<data_t>::write(
 
     if (nirio_status_not_fatal(status) || status == NiRio_Status_FifoTimeout) {
         num_remaining = out.params.fifo.op.write.numberRemaining;
+    }
+
+    return status;
+}
+
+template <typename data_t>
+nirio_status nirio_fifo<data_t>::_get_transfer_count(uint64_t& transfer_count)
+{
+    //_riok_proxy_ptr must be valid and _mutex must be locked
+
+    nirio_status status = NiRio_Status_Success;
+    uint32_t lower_half = 0, upper_half = 0;
+    nirio_status_chain(_riok_proxy_ptr->peek(_dma_base_addr + 0xA8, lower_half), status);  //Latches both halves
+    nirio_status_chain(_riok_proxy_ptr->peek(_dma_base_addr + 0xAC, upper_half), status);
+
+    if (nirio_status_not_fatal(status)) {
+        transfer_count = lower_half | (((uint64_t)upper_half) << 32);
+    }
+    return status;
+}
+
+template <typename data_t>
+nirio_status nirio_fifo<data_t>::_ensure_transfer_completed()
+{
+    //_riok_proxy_ptr must be valid and _mutex must be locked
+
+    static const size_t APPROX_TIMEOUT_IN_US = 1000;
+
+    nirio_status status = NiRio_Status_Success;
+    uint64_t actual_xfer_count = 0;
+    nirio_status_chain(_get_transfer_count(actual_xfer_count), status);
+
+    //We count the elapsed time using a simple counter instead of the high
+    //resolution timebase for efficieny reasons. The call to fetch the time
+    //requires a user-kernel transition which has a large overhead compared
+    //to a simple mem read. As a tradeoff, we deal with a less precise timeout.
+    size_t approx_us_elapsed = 0;
+    while (
+        nirio_status_not_fatal(status) &&
+        (_expected_xfer_count > actual_xfer_count) &&
+        approx_us_elapsed++ < APPROX_TIMEOUT_IN_US
+    ) {
+        boost::this_thread::sleep(boost::posix_time::microseconds(1));
+        nirio_status_chain(_get_transfer_count(actual_xfer_count), status);
+    }
+
+    if (_expected_xfer_count > actual_xfer_count) {
+        nirio_status_chain(NiRio_Status_CommunicationTimeout, status);
     }
 
     return status;
