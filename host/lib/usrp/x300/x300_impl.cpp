@@ -417,13 +417,25 @@ void x300_impl::setup_mb(const size_t mb_i, const uhd::device_addr_t &dev_addr)
             UHD_MSG(error) << e.what() << std::endl;
         }
 
+        #if defined UHD_PLATFORM_LINUX
+          const std::string mtu_tool("ip link");
+        #elif defined UHD_PLATFORM_WIN32
+          const std::string mtu_tool("netsh");
+        #else
+          const std::string mtu_tool("ifconfig");
+        #endif
+
         if(result.recv_mtu < user_set.recv_mtu)
-            UHD_MSG(warning) << boost::format("The receive path contains entities that do not support MTUs >= one recv frame's size (%lu).") % user_set.recv_mtu << std::endl
-                             << "Please verify your NIC's MTU setting using 'ip link' or set the recv_frame_size argument." << std::endl;
+            UHD_MSG(warning) << boost::format("The receive path contains entities that do not support MTUs >= one recv frame's size (%lu).") % user_set.recv_mtu
+                             << std::endl
+                             << boost::format("Please verify your NIC's MTU setting using '%s' or set the recv_frame_size argument.") % mtu_tool
+                             << std::endl;
 
         if(result.send_mtu < user_set.send_mtu)
-            UHD_MSG(warning) << boost::format("The send path contains entities that do not support MTUs >= one send frame's size (%lu).") % user_set.send_mtu << std::endl
-                             << "Please verify your NIC's MTU setting using 'ip link' or set the send_frame_size argument." << std::endl;
+            UHD_MSG(warning) << boost::format("The send path contains entities that do not support MTUs >= one send frame's size (%lu).") % user_set.send_mtu
+                             << std::endl
+                             << boost::format("Please verify your NIC's MTU setting using '%s' or set the send_frame_size argument.") % mtu_tool
+                             << std::endl;
     }
 
 
