@@ -75,14 +75,8 @@ void set_ref_out(const bool enb) {
 
 void write_regs(boost::uint8_t addr) {
     boost::uint32_t data = _lmk04816_regs.get_reg(addr);
-    if (addr==10) data |= 0x03000000; // jk GIANT HACK enables OSCout LVPECL
-        _spiface->write_spi(_slaveno, spi_config_t::EDGE_RISE, data,32);
-        //for testing purposes
-        //printf("%u %08x\n", addr, data);
-    }
-
-    //uhd::dict<x300_clock_which_t, bool> _enables;
-    //uhd::dict<x300_clock_which_t, double> _rates;
+    _spiface->write_spi(_slaveno, spi_config_t::EDGE_RISE, data,32);
+}
 
     /*
     //read_reg: read a single register to the spi regs.
@@ -98,9 +92,9 @@ void write_regs(boost::uint8_t addr) {
 private:
 
 void set_master_clock_rate(double clock_rate) {
-    /* The X3xx, internall, has two primary rates. The first is the
+    /* The X3xx has two primary rates. The first is the
      * _system_ref_rate, which is sourced from the "clock_source"/"value" field
-     * of the property tree, and whose value can be 100e6, 30.72e6, or 200e6.
+     * of the property tree, and whose value can be 10e6, 30.72e6, or 200e6.
      * The _system_ref_rate is the input to the clocking system, and
      * what comes out is a disciplined master clock running at the
      * _master_clock_rate. As such, only certain combinations of
@@ -237,21 +231,23 @@ void set_master_clock_rate(double clock_rate) {
 
     // Register 6
     _lmk04816_regs.CLKout0_TYPE = lmk04816_regs_t::CLKOUT0_TYPE_LVDS; //FPGA
+    _lmk04816_regs.CLKout0_TYPE = lmk04816_regs_t::CLKOUT1_TYPE_P_DOWN; //CPRI feedback clock, use LVDS
     _lmk04816_regs.CLKout2_TYPE = lmk04816_regs_t::CLKOUT2_TYPE_LVPECL_700MVPP; //DB_0_RX
     _lmk04816_regs.CLKout3_TYPE = lmk04816_regs_t::CLKOUT3_TYPE_LVPECL_700MVPP; //DB_1_RX
     // Register 7
     _lmk04816_regs.CLKout4_TYPE = lmk04816_regs_t::CLKOUT4_TYPE_LVPECL_700MVPP; //DB_1_TX
-    _lmk04816_regs.CLKout5_TYPE = lmk04816_regs_t::CLKOUT5_TYPE_LVPECL_700MVPP; //DB_1_TX
-    _lmk04816_regs.CLKout6_TYPE = lmk04816_regs_t::CLKOUT6_TYPE_LVPECL_700MVPP; // DB1_DAC
-    _lmk04816_regs.CLKout7_TYPE = lmk04816_regs_t::CLKOUT7_TYPE_LVPECL_700MVPP; // DB1_DAC
-    _lmk04816_regs.CLKout8_TYPE = lmk04816_regs_t::CLKOUT8_TYPE_LVPECL_700MVPP; // DB0_ADC
+    _lmk04816_regs.CLKout5_TYPE = lmk04816_regs_t::CLKOUT5_TYPE_LVPECL_700MVPP; //DB_0_TX
+    _lmk04816_regs.CLKout6_TYPE = lmk04816_regs_t::CLKOUT6_TYPE_LVPECL_700MVPP; //DB0_DAC
+    _lmk04816_regs.CLKout7_TYPE = lmk04816_regs_t::CLKOUT7_TYPE_LVPECL_700MVPP; //DB1_DAC
+    _lmk04816_regs.CLKout8_TYPE = lmk04816_regs_t::CLKOUT8_TYPE_LVPECL_700MVPP; //DB0_ADC
     // Register 8
     _lmk04816_regs.CLKout9_TYPE = lmk04816_regs_t::CLKOUT9_TYPE_LVPECL_700MVPP; //DB1_ADC
     _lmk04816_regs.CLKout10_TYPE = lmk04816_regs_t::CLKOUT10_TYPE_LVDS; //REF_CLKOUT
+    _lmk04816_regs.CLKout11_TYPE = lmk04816_regs_t::CLKOUT11_TYPE_P_DOWN; //Debug header, use LVPECL
 
 
     // Register 10
-    _lmk04816_regs.EN_OSCout0 = lmk04816_regs_t::EN_OSCOUT0_ENABLED;
+    _lmk04816_regs.EN_OSCout0 = lmk04816_regs_t::EN_OSCOUT0_DISABLED; //Debug header
     _lmk04816_regs.FEEDBACK_MUX = 0; //use output 0 (FPGA clock) for feedback
     _lmk04816_regs.EN_FEEDBACK_MUX = lmk04816_regs_t::EN_FEEDBACK_MUX_ENABLED;
 
