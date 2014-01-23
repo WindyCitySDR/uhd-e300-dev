@@ -153,8 +153,12 @@ void x300_dboard_iface::set_clock_rate(unit_t unit, double rate)
     _clock_rates[unit] = rate; //set to shadow
     switch(unit)
     {
-    case UNIT_RX: _config.clock->set_rate(_config.which_rx_clk, rate); return;
-    case UNIT_TX: _config.clock->set_rate(_config.which_tx_clk, rate); return;
+        case UNIT_RX:
+            _config.clock->set_dboard_rate(_config.which_rx_clk, rate);
+            return;
+        case UNIT_TX:
+            _config.clock->set_dboard_rate(_config.which_tx_clk, rate);
+            return;
     }
 }
 
@@ -167,9 +171,12 @@ std::vector<double> x300_dboard_iface::get_clock_rates(unit_t unit)
 {
     switch(unit)
     {
-    case UNIT_RX: return _config.clock->get_rates(_config.which_rx_clk);
-    case UNIT_TX: return _config.clock->get_rates(_config.which_tx_clk);
-    default: UHD_THROW_INVALID_CODE_PATH();
+        case UNIT_RX:
+            return _config.clock->get_dboard_rates(_config.which_rx_clk);
+        case UNIT_TX:
+            return _config.clock->get_dboard_rates(_config.which_tx_clk);
+        default:
+            UHD_THROW_INVALID_CODE_PATH();
     }
 }
 
