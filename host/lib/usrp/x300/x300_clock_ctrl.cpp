@@ -102,10 +102,10 @@ void set_master_clock_rate(double clock_rate) {
      * system reference rates and master clock rates are supported.
      * Additionally, a subset of these will operate in "zero delay" mode. */
 
-    enum opmode {m10M_200M_NOZDEL, // used for debug purposes only
-                 m10M_200M_ZDEL,
-                 m30_72M_184_32M_ZDEL,
-                 m10M_184_32M_NOZDEL };
+    enum opmode {m10M_200M_NOZDEL,      // used for debug purposes only
+                 m10M_200M_ZDEL,        // Normal mode
+                 m30_72M_184_32M_ZDEL,  // LTE with external ref, aka CPRI Mode
+                 m10M_184_32M_NOZDEL }; // LTE with 10 MHz ref
     opmode clocking_mode = m10M_200M_ZDEL;
 
     bool valid_rates = false;
@@ -151,11 +151,14 @@ void set_master_clock_rate(double clock_rate) {
             vco_div = 12;
 	    _lmk04816_regs.MODE = lmk04816_regs_t::MODE_DUAL_INT;
 
+	    // PLL1 - 2 MHz compare frequency
 	    _lmk04816_regs.PLL1_N_28 = 48;
 	    _lmk04816_regs.PLL1_R_27 = 5;
 	    _lmk04816_regs.PLL1_CP_GAIN_27 = lmk04816_regs_t::PLL1_CP_GAIN_27_100UA;
 
+	    // PLL2 - 48 MHz compare frequency
 	    _lmk04816_regs.PLL2_N_30 = 25;
+	    _lmk04816_regs.PLL2_P_30 = lmk04816_regs_t::PLL2_P_30_DIV_2A;
 	    _lmk04816_regs.PLL2_R_28 = 4;
 	    _lmk04816_regs.PLL2_CP_GAIN_26 = lmk04816_regs_t::PLL2_CP_GAIN_26_3200UA;
             break;
@@ -164,24 +167,33 @@ void set_master_clock_rate(double clock_rate) {
             vco_div = 12;
 	    _lmk04816_regs.MODE = lmk04816_regs_t::MODE_DUAL_INT_ZER_DELAY;
 
+	    // PLL1 - 2 MHz compare frequency	
 	    _lmk04816_regs.PLL1_N_28 = 100;
 	    _lmk04816_regs.PLL1_R_27 = 5;
 	    _lmk04816_regs.PLL1_CP_GAIN_27 = lmk04816_regs_t::PLL1_CP_GAIN_27_100UA;
 
-	    _lmk04816_regs.PLL2_N_30 = 25;
-	    _lmk04816_regs.PLL2_R_28 = 4;
-	    _lmk04816_regs.PLL2_CP_GAIN_26 = lmk04816_regs_t::PLL2_CP_GAIN_26_3200UA;
+	    // PLL2 - 96 MHz compare frequency
+	    _lmk04816_regs.PLL2_N_30 = 5;
+	    _lmk04816_regs.PLL2_P_30 = lmk04816_regs_t::PLL2_P_30_DIV_5;
+	    _lmk04816_regs.PLL2_R_28 = 2;
+	    if(_hw_rev <= 4)
+	      _lmk04816_regs.PLL2_CP_GAIN_26 = lmk04816_regs_t::PLL2_CP_GAIN_26_1600UA;
+	    else
+	      _lmk04816_regs.PLL2_CP_GAIN_26 = lmk04816_regs_t::PLL2_CP_GAIN_26_400UA;
             break;
 
         case m30_72M_184_32M_ZDEL:
             vco_div=14;
 	    _lmk04816_regs.MODE = lmk04816_regs_t::MODE_DUAL_INT_ZER_DELAY;
 
+	    // PLL1 - 2.048 MHz compare frequency
 	    _lmk04816_regs.PLL1_N_28 = 90;
 	    _lmk04816_regs.PLL1_R_27 = 15;
 	    _lmk04816_regs.PLL1_CP_GAIN_27 = lmk04816_regs_t::PLL1_CP_GAIN_27_100UA;
 
+	    // PLL2 - 7.68 MHz compare frequency
 	    _lmk04816_regs.PLL2_N_30 = 168;
+	    _lmk04816_regs.PLL2_P_30 = lmk04816_regs_t::PLL2_P_30_DIV_2A;
 	    _lmk04816_regs.PLL2_R_28 = 25;
 	    _lmk04816_regs.PLL2_CP_GAIN_26 = lmk04816_regs_t::PLL2_CP_GAIN_26_3200UA;
 
@@ -196,19 +208,22 @@ void set_master_clock_rate(double clock_rate) {
             vco_div=14;
 	    _lmk04816_regs.MODE = lmk04816_regs_t::MODE_DUAL_INT;
 
+	    // PLL1 - 2 MHz compare frequency
 	    _lmk04816_regs.PLL1_N_28 = 48;
 	    _lmk04816_regs.PLL1_R_27 = 5;
 	    _lmk04816_regs.PLL1_CP_GAIN_27 = lmk04816_regs_t::PLL1_CP_GAIN_27_100UA;
 
+	    // PLL2 - 7.68 MHz compare frequency
 	    _lmk04816_regs.PLL2_N_30 = 168;
+	    _lmk04816_regs.PLL2_P_30 = lmk04816_regs_t::PLL2_P_30_DIV_2A;
 	    _lmk04816_regs.PLL2_R_28 = 25;
 	    _lmk04816_regs.PLL2_CP_GAIN_26 = lmk04816_regs_t::PLL2_CP_GAIN_26_3200UA;
 
-            _lmk04816_regs.PLL2_R3_LF = lmk04816_regs_t::PLL2_R3_LF_1KILO_OHM;
+            _lmk04816_regs.PLL2_R3_LF = lmk04816_regs_t::PLL2_R3_LF_4KILO_OHM;
             _lmk04816_regs.PLL2_C3_LF = lmk04816_regs_t::PLL2_C3_LF_39PF;
 
             _lmk04816_regs.PLL2_R4_LF = lmk04816_regs_t::PLL2_R4_LF_1KILO_OHM;
-            _lmk04816_regs.PLL2_C4_LF = lmk04816_regs_t::PLL2_C4_LF_34PF;
+            _lmk04816_regs.PLL2_C4_LF = lmk04816_regs_t::PLL2_C4_LF_71PF;
             break;
     };
 
@@ -305,7 +320,7 @@ void set_master_clock_rate(double clock_rate) {
     _lmk04816_regs.OSCin_FREQ_29 = lmk04816_regs_t::OSCIN_FREQ_29_63_TO_127MHZ;
 
     // Register 30
-    _lmk04816_regs.PLL2_P_30 = lmk04816_regs_t::PLL2_P_30_DIV_2A;
+    // PLL2_P_30 set in individual cases above
     // PLL2_N_30 set in individual cases above
 
     /* Write the configuration values into the LMK */
