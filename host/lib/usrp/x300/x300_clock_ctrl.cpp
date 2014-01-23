@@ -55,8 +55,7 @@ void set_master_clock_rate(double clock_rate) {
      * what comes out is a disciplined master clock running at the
      * _master_clock_rate. As such, only certain combinations of
      * system reference rates and master clock rates are supported.
-     * Additionally, a subset of these will operate in "zero delay" mode.
-     * A master clock rate of 184.32e6 is referred to as "CPRI mode". */
+     * Additionally, a subset of these will operate in "zero delay" mode. */
 
     enum opmode {m10M_200M_NOZDEL, // used for debug purposes only
                  m10M_200M_ZDEL,
@@ -94,10 +93,8 @@ void set_master_clock_rate(double clock_rate) {
         throw uhd::runtime_error(str(boost::format("A master clock rate of %f cannot be derived from a system reference rate of %f") % clock_rate % _system_ref_rate));
     }
 
-
-    /* For non-CPRI clocking, the VCO is run at 2400 MHz, `vco_div` is the
-     * required output divide for the CPRI rate of 184.32 MHz, the VCO is
-     * run at 2580.48 MHz and div is 14 */
+    /* For any rate other than 184.32e6, the VCO is run at 2400 MHz.
+     * For the LTE/CPRI rate of 184.32 MHz, the VCO run at 2580.48 MHz. */
     int vco_div = 0;
 
     lmk04816_regs_t::MODE_t lmkmode;

@@ -536,6 +536,8 @@ void x300_impl::setup_mb(const size_t mb_i, const uhd::device_addr_t &dev_addr)
     _tree->create<double>(mb_path / "tick_rate")
         .publish(boost::bind(&x300_clock_ctrl::get_master_clock_rate, mb.clock));
 
+    _tree->create<time_spec_t>(mb_path / "time" / "cmd");
+
     UHD_MSG(status) << "Radio 1x clock:" << (mb.clock->get_master_clock_rate()/1e6)
         << std::endl;
 
@@ -610,25 +612,40 @@ void x300_impl::setup_mb(const size_t mb_i, const uhd::device_addr_t &dev_addr)
         .subscribe(boost::bind(&time_core_3000::set_time_next_pps, mb.radio_perifs[0].time64, _1))
         .subscribe(boost::bind(&time_core_3000::set_time_next_pps, mb.radio_perifs[1].time64, _1));
 
-    //setup time source props
+    ////////////////////////////////////////////////////////////////////
+    // setup time sources and properties
+    ////////////////////////////////////////////////////////////////////
     _tree->create<std::string>(mb_path / "time_source" / "value")
         .subscribe(boost::bind(&x300_impl::update_time_source, this, boost::ref(mb), _1));
+    static const std::vector<std::string> time_sources = boost::assign::list_of("internal")("external")("gpsdo");
+    _tree->create<std::vector<std::string> >(mb_path / "time_source" / "options").set(time_sources);
+
+    //setup the time output, default to ON
     _tree->create<bool>(mb_path / "time_source" / "output")
         .subscribe(boost::bind(&x300_impl::set_time_source_out, this, boost::ref(mb), _1))
         .set(true);
 
-    static const std::vector<std::string> time_sources = boost::assign::list_of("internal")("external")("gpsdo");
-    _tree->create<std::vector<std::string> >(mb_path / "time_source" / "options").set(time_sources);
-
-    //setup reference source props
+    ////////////////////////////////////////////////////////////////////
+    // setup clock sources and properties
+    ////////////////////////////////////////////////////////////////////
     _tree->create<std::string>(mb_path / "clock_source" / "value")
         .subscribe(boost::bind(&x300_impl::update_clock_source, this, boost::ref(mb), _1));
-    _tree->create<bool>(mb_path / "clock_source" / "output")
-        .subscribe(boost::bind(&x300_clock_ctrl::set_ref_out, mb.clock, _1))
-        .set(true);
 
     static const std::vector<std::string> clock_sources = boost::assign::list_of("internal")("external")("gpsdo");
     _tree->create<std::vector<std::string> >(mb_path / "clock_source" / "options").set(clock_sources);
+
+    //setup external reference options. default to 10 MHz input reference
+    _tree->create<std::string>(mb_path / "clock_source" / "external");
+    static const std::vector<double> external_freqs = boost::assign::list_of(10e6)(30.72e6)(200e6);
+    _tree->create<std::vector<double> >(mb_path / "clock_source" / "external" / "options")
+        .set(external_freqs);
+    _tree->create<double>(mb_path / "clock_source" / "external" / "value")
+        .set(10e6);
+
+    //setup the clock output, default to ON
+    _tree->create<bool>(mb_path / "clock_source" / "output")
+        .subscribe(boost::bind(&x300_clock_ctrl::set_ref_out, mb.clock, _1));
+
 
     ////////////////////////////////////////////////////////////////////
     // create frontend mapping
@@ -645,13 +662,16 @@ void x300_impl::setup_mb(const size_t mb_i, const uhd::device_addr_t &dev_addr)
         .publish(boost::bind(&x300_impl::get_ref_locked, this, mb.zpu_ctrl));
 
     ////////////////////////////////////////////////////////////////////
-    // do some post-init tasks
+    // create clock properties
     ////////////////////////////////////////////////////////////////////
-    _tree->access<double>(mb_path / "tick_rate") //now subscribe the clock rate setter
+    _tree->access<double>(mb_path / "tick_rate")
         .subscribe(boost::bind(&x300_impl::set_tick_rate, this, boost::ref(mb), _1))
         .subscribe(boost::bind(&x300_impl::update_tick_rate, this, boost::ref(mb), _1))
         .set(mb.clock->get_master_clock_rate());
 
+    ////////////////////////////////////////////////////////////////////
+    // do some post-init tasks
+    ////////////////////////////////////////////////////////////////////
     subdev_spec_t rx_fe_spec, tx_fe_spec;
     rx_fe_spec.push_back(subdev_spec_pair_t("A",
                 _tree->list(mb_path / "dboards" / "A" / "rx_frontends").at(0)));
@@ -745,6 +765,11 @@ void x300_impl::setup_radio(const size_t mb_i, const size_t i, const std::string
     perif.adc = x300_adc_ctrl::make(perif.spi, DB_ADC_SEN);
     perif.dac = x300_dac_ctrl::make(perif.spi, DB_DAC_SEN, mb.clock->get_master_clock_rate());
     perif.leds = gpio_core_200_32wo::make(perif.ctrl, TOREG(SR_LEDS));
+
+    _tree->access<time_spec_t>(mb_path / "time" / "cmd")
+        .subscribe(boost::bind(&radio_ctrl_core_3000::set_time, perif.ctrl, _1));
+    _tree->access<double>(mb_path / "tick_rate")
+        .subscribe(boost::bind(&radio_ctrl_core_3000::set_tick_rate, perif.ctrl, _1));
 
     ////////////////////////////////////////////////////////////////
     // ADC self test
