@@ -47,6 +47,58 @@ double get_master_clock_rate(void) {
     return _master_clock_rate;
 }
 
+double get_sysref_clock_rate(void) {
+    return _system_ref_rate;
+}
+
+double get_refout_clock_rate(void) {
+    // TODO
+}
+
+void set_dboard_rate(const x300_clock_which_t which, double rate) {
+    /* TODO */
+}
+
+std::vector<double> get_dboard_rates(const x300_clock_which_t) {
+    std::vector<double> rates;
+    rates.push_back(get_master_clock_rate());
+    return rates;
+}
+
+
+void set_ref_out(const bool enb) {
+    if (enb)
+        _lmk04816_regs.CLKout10_TYPE = lmk04816_regs_t::CLKOUT10_TYPE_LVDS;
+    else
+        _lmk04816_regs.CLKout10_TYPE = lmk04816_regs_t::CLKOUT10_TYPE_P_DOWN;
+    this->write_regs(8);
+}
+
+
+void write_regs(boost::uint8_t addr) {
+    boost::uint32_t data = _lmk04816_regs.get_reg(addr);
+    if (addr==10) data |= 0x03000000; // jk GIANT HACK enables OSCout LVPECL
+        _spiface->write_spi(_slaveno, spi_config_t::EDGE_RISE, data,32);
+        //for testing purposes
+        //printf("%u %08x\n", addr, data);
+    }
+
+    //uhd::dict<x300_clock_which_t, bool> _enables;
+    //uhd::dict<x300_clock_which_t, double> _rates;
+
+    /*
+    //read_reg: read a single register to the spi regs.
+
+        void read_reg(boost::uint8_t addr)    {
+
+            boost::unint32_t data = _lmk04816_regs.get_read_reg(addr);
+            _spiface->read_spi(_slaveno, spi_config_t::EDGE_RISE, data , 32);
+        }
+    */
+    //future implementations for modularity
+
+private:
+
 void set_master_clock_rate(double clock_rate) {
     /* The X3xx, internall, has two primary rates. The first is the
      * _system_ref_rate, which is sourced from the "clock_source"/"value" field
@@ -261,69 +313,12 @@ void set_master_clock_rate(double clock_rate) {
     this->sync_clocks();
 }
 
-double get_sysref_clock_rate(void) {
-    // TODO
-}
-
-std::string get_sysref_source(void) {
-    // TODO
-}
-
-double get_extref_clock_rate(void) {
-    // TODO
-}
-
-double get_refout_clock_rate(void) {
-    // TODO
-}
-
-void set_rate(const x300_clock_which_t which, double rate) {
-    /* TODO */
-}
-
-std::vector<double> get_rates(const x300_clock_which_t) {
-    std::vector<double> rates;
-    rates.push_back(get_master_clock_rate());
-    return rates;
-}
-
-
-void set_ref_out(const bool enb) {
-    if (enb) _lmk04816_regs.CLKout10_TYPE = lmk04816_regs_t::CLKOUT10_TYPE_LVDS; //REF_CLKOUT
-    else _lmk04816_regs.CLKout10_TYPE = lmk04816_regs_t::CLKOUT10_TYPE_P_DOWN; //REF_CLKOUT
-    this->write_regs(8);
-}
-
-
-void write_regs(boost::uint8_t addr) {
-    boost::uint32_t data = _lmk04816_regs.get_reg(addr);
-    if (addr==10) data |= 0x03000000; // jk GIANT HACK enables OSCout LVPECL
-        _spiface->write_spi(_slaveno, spi_config_t::EDGE_RISE, data,32);
-        //for testing purposes
-        //printf("%u %08x\n", addr, data);
-    }
-
-    //uhd::dict<x300_clock_which_t, bool> _enables;
-    //uhd::dict<x300_clock_which_t, double> _rates;
-
-    /*
-    //read_reg: read a single register to the spi regs.
-
-        void read_reg(boost::uint8_t addr)    {
-
-            boost::unint32_t data = _lmk04816_regs.get_read_reg(addr);
-            _spiface->read_spi(_slaveno, spi_config_t::EDGE_RISE, data , 32);
-        }
-    */
-    //future implementations for modularity
-
-private:
-    const spi_iface::sptr _spiface;
-    const size_t _slaveno;
-    const size_t _hw_rev;
-    const double _master_clock_rate;
-    const double _system_ref_rate;
-    lmk04816_regs_t _lmk04816_regs;
+const spi_iface::sptr _spiface;
+const size_t _slaveno;
+const size_t _hw_rev;
+const double _master_clock_rate;
+const double _system_ref_rate;
+lmk04816_regs_t _lmk04816_regs;
 };
 
 x300_clock_ctrl::sptr x300_clock_ctrl::make(uhd::spi_iface::sptr spiface,

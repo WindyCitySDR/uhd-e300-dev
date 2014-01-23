@@ -53,41 +53,26 @@ public:
      */
     virtual double get_master_clock_rate(void) = 0;
 
-    /*! Set the master clock rate of the device.
-     * \param the requested master clock rate
-     */
-    virtual void set_master_clock_rate(double rate) = 0;
-
     /*! Get the system reference rate of the device.
      * \return the clock frequency in Hz
      */
     virtual double get_sysref_clock_rate(void) = 0;
-
-    /*! Get the current system reference source
-     * \return the clock frequency in Hz
-     */
-    virtual std::string get_sysref_source(void) = 0;
-
-    /*! Get the external reference rate
-     * \return the clock frequency in Hz
-     */
-    virtual double get_extref_clock_rate(void) = 0;
 
     /*! Get the current reference output rate
      * \return the clock frequency in Hz
      */
     virtual double get_refout_clock_rate(void) = 0;
 
-    /*! Set the clock rate on the given clock.
+    /*! Set the clock rate on the given daughterboard clock.
      * \param rate the new clock rate
      * \throw exception when rate invalid
      */
-    virtual void set_rate(const x300_clock_which_t which, double rate) = 0;
+    virtual void set_dboard_rate(const x300_clock_which_t which, double rate) = 0;
 
-    /*! Get a list of possible clock rates.
+    /*! Get a list of possible daughterboard clock rates.
      * \return a list of clock rates in Hz
      */
-    virtual std::vector<double> get_rates(const x300_clock_which_t which) = 0;
+    virtual std::vector<double> get_dboard_rates(const x300_clock_which_t which) = 0;
 
     /*! Turn the reference output on/off
      * \param true = on, false = off
