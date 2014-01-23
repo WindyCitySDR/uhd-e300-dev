@@ -235,6 +235,14 @@ private:
         const uhd::device_addr_t& args,
         boost::uint32_t& sid);
 
+    struct mtu_result_t
+    {
+        size_t recv_mtu;
+        size_t send_mtu;
+    };
+
+    mtu_result_t determine_mtu(const std::string &addr, const mtu_result_t &user_mtu);
+
     ////////////////////////////////////////////////////////////////////
     //
     //Caching for transport interface re-use -- like sharing a DMA.
