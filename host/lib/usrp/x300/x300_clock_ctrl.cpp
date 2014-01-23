@@ -66,6 +66,7 @@ std::vector<double> get_dboard_rates(const x300_clock_which_t) {
 }
 
 void set_ref_out(const bool enb) {
+  // TODO  How do we set divider?
     if (enb)
         _lmk04816_regs.CLKout10_TYPE = lmk04816_regs_t::CLKOUT10_TYPE_LVDS;
     else
@@ -137,68 +138,77 @@ void set_master_clock_rate(double clock_rate) {
         throw uhd::runtime_error(str(boost::format("A master clock rate of %f cannot be derived from a system reference rate of %f") % clock_rate % _system_ref_rate));
     }
 
-    /* For any rate other than 184.32e6, the VCO is run at 2400 MHz.
-     * For the LTE/CPRI rate of 184.32 MHz, the VCO run at 2580.48 MHz. */
-    int vco_div = 0;
+    // For 200 MHz output, the VCO is run at 2400 MHz
+    // For the LTE/CPRI rate of 184.32 MHz, the VCO runs at 2580.48 MHz
 
-    lmk04816_regs_t::MODE_t lmkmode;
-    int pll_1_n_div = 0; //int(clock_rate/refclk_rate);
-    int pll_1_r_div = 0;
-    int pll_2_n_div = 0;
-    int pll_2_r_div = 0;
-    lmk04816_regs_t::PLL1_CP_GAIN_27_t pll_1_cp_gain;
-    lmk04816_regs_t::PLL2_CP_GAIN_26_t pll_2_cp_gain;
+    int vco_div = 0;
 
     // Note: PLL2 N2 prescaler is enabled for all cases
     //       PLL2 reference doubler is enabled for all cases
+
     switch (clocking_mode) {
         case m10M_200M_NOZDEL:
-            lmkmode  = lmk04816_regs_t::MODE_DUAL_INT;
-            pll_1_n_div = 48;
-            pll_1_r_div = 5;
-            pll_1_cp_gain = lmk04816_regs_t::PLL1_CP_GAIN_27_100UA;
-            pll_2_n_div = 25;
-            pll_2_r_div = 4;
-            pll_2_cp_gain = lmk04816_regs_t::PLL2_CP_GAIN_26_3200UA;
             vco_div = 12;
+	    _lmk04816_regs.MODE = lmk04816_regs_t::MODE_DUAL_INT;
+
+	    _lmk04816_regs.PLL1_N_28 = 48;
+	    _lmk04816_regs.PLL1_R_27 = 5;
+	    _lmk04816_regs.PLL1_CP_GAIN_27 = lmk04816_regs_t::PLL1_CP_GAIN_27_100UA;
+
+	    _lmk04816_regs.PLL2_N_30 = 25;
+	    _lmk04816_regs.PLL2_R_28 = 4;
+	    _lmk04816_regs.PLL2_CP_GAIN_26 = lmk04816_regs_t::PLL2_CP_GAIN_26_3200UA;
             break;
+
         case m10M_200M_ZDEL:
-            lmkmode  = lmk04816_regs_t::MODE_DUAL_INT_ZER_DELAY;
-            pll_1_n_div = 100;
-            pll_1_r_div = 5;
-            pll_1_cp_gain = lmk04816_regs_t::PLL1_CP_GAIN_27_100UA;
-            pll_2_n_div = 25;
-            pll_2_r_div = 4;
-            pll_2_cp_gain = lmk04816_regs_t::PLL2_CP_GAIN_26_3200UA;
             vco_div = 12;
+	    _lmk04816_regs.MODE = lmk04816_regs_t::MODE_DUAL_INT_ZER_DELAY;
+
+	    _lmk04816_regs.PLL1_N_28 = 100;
+	    _lmk04816_regs.PLL1_R_27 = 5;
+	    _lmk04816_regs.PLL1_CP_GAIN_27 = lmk04816_regs_t::PLL1_CP_GAIN_27_100UA;
+
+	    _lmk04816_regs.PLL2_N_30 = 25;
+	    _lmk04816_regs.PLL2_R_28 = 4;
+	    _lmk04816_regs.PLL2_CP_GAIN_26 = lmk04816_regs_t::PLL2_CP_GAIN_26_3200UA;
             break;
+
         case m30_72M_184_32M_ZDEL:
-            lmkmode  = lmk04816_regs_t::MODE_DUAL_INT_ZER_DELAY;
-            pll_1_n_div = 90;
-            pll_1_r_div = 15;
-            pll_1_cp_gain = lmk04816_regs_t::PLL1_CP_GAIN_27_100UA;
-            pll_2_n_div = 168;
-            pll_2_r_div = 25;
-            pll_2_cp_gain = lmk04816_regs_t::PLL2_CP_GAIN_26_3200UA;
             vco_div=14;
-            _lmk04816_regs.PLL2_R3_LF=lmk04816_regs_t:: PLL2_R3_LF_1KILO_OHM;
-            _lmk04816_regs.PLL2_R4_LF=lmk04816_regs_t:: PLL2_R4_LF_1KILO_OHM;
-            _lmk04816_regs.PLL2_C3_LF=lmk04816_regs_t:: PLL2_C3_LF_39PF;
-            _lmk04816_regs.PLL2_C4_LF=lmk04816_regs_t:: PLL2_C4_LF_34PF;
+	    _lmk04816_regs.MODE = lmk04816_regs_t::MODE_DUAL_INT_ZER_DELAY;
+
+	    _lmk04816_regs.PLL1_N_28 = 90;
+	    _lmk04816_regs.PLL1_R_27 = 15;
+	    _lmk04816_regs.PLL1_CP_GAIN_27 = lmk04816_regs_t::PLL1_CP_GAIN_27_100UA;
+
+	    _lmk04816_regs.PLL2_N_30 = 168;
+	    _lmk04816_regs.PLL2_R_28 = 25;
+	    _lmk04816_regs.PLL2_CP_GAIN_26 = lmk04816_regs_t::PLL2_CP_GAIN_26_3200UA;
+
+            _lmk04816_regs.PLL2_R3_LF = lmk04816_regs_t::PLL2_R3_LF_1KILO_OHM;
+            _lmk04816_regs.PLL2_C3_LF = lmk04816_regs_t::PLL2_C3_LF_39PF;
+
+            _lmk04816_regs.PLL2_R4_LF = lmk04816_regs_t::PLL2_R4_LF_1KILO_OHM;
+            _lmk04816_regs.PLL2_C4_LF = lmk04816_regs_t::PLL2_C4_LF_34PF;
             break;
+
         case m10M_184_32M_NOZDEL:
-            lmkmode  = lmk04816_regs_t::MODE_DUAL_INT;
-            pll_1_n_div = 48;
-            pll_1_r_div = 5;
-            pll_1_cp_gain = lmk04816_regs_t::PLL1_CP_GAIN_27_100UA;
-            pll_2_n_div = 168;
-            pll_2_r_div = 25;
-            pll_2_cp_gain = lmk04816_regs_t::PLL2_CP_GAIN_26_3200UA;
             vco_div=14;
-            _lmk04816_regs.PLL2_R3_LF=lmk04816_regs_t:: PLL2_R3_LF_1KILO_OHM;
-            _lmk04816_regs.PLL2_R4_LF=lmk04816_regs_t:: PLL2_R4_LF_1KILO_OHM;
-            _lmk04816_regs.PLL2_C3_LF=lmk04816_regs_t:: PLL2_C3_LF_39PF;
-            _lmk04816_regs.PLL2_C4_LF=lmk04816_regs_t:: PLL2_C4_LF_34PF;
+	    _lmk04816_regs.MODE = lmk04816_regs_t::MODE_DUAL_INT;
+
+	    _lmk04816_regs.PLL1_N_28 = 48;
+	    _lmk04816_regs.PLL1_R_27 = 5;
+	    _lmk04816_regs.PLL1_CP_GAIN_27 = lmk04816_regs_t::PLL1_CP_GAIN_27_100UA;
+
+	    _lmk04816_regs.PLL2_N_30 = 168;
+	    _lmk04816_regs.PLL2_R_28 = 25;
+	    _lmk04816_regs.PLL2_CP_GAIN_26 = lmk04816_regs_t::PLL2_CP_GAIN_26_3200UA;
+
+            _lmk04816_regs.PLL2_R3_LF = lmk04816_regs_t::PLL2_R3_LF_1KILO_OHM;
+            _lmk04816_regs.PLL2_C3_LF = lmk04816_regs_t::PLL2_C3_LF_39PF;
+
+            _lmk04816_regs.PLL2_R4_LF = lmk04816_regs_t::PLL2_R4_LF_1KILO_OHM;
+            _lmk04816_regs.PLL2_C4_LF = lmk04816_regs_t::PLL2_C4_LF_34PF;
             break;
     };
 
@@ -231,7 +241,7 @@ void set_master_clock_rate(double clock_rate) {
 
     // Register 6
     _lmk04816_regs.CLKout0_TYPE = lmk04816_regs_t::CLKOUT0_TYPE_LVDS; //FPGA
-    _lmk04816_regs.CLKout0_TYPE = lmk04816_regs_t::CLKOUT1_TYPE_P_DOWN; //CPRI feedback clock, use LVDS
+    _lmk04816_regs.CLKout1_TYPE = lmk04816_regs_t::CLKOUT1_TYPE_P_DOWN; //CPRI feedback clock, use LVDS
     _lmk04816_regs.CLKout2_TYPE = lmk04816_regs_t::CLKOUT2_TYPE_LVPECL_700MVPP; //DB_0_RX
     _lmk04816_regs.CLKout3_TYPE = lmk04816_regs_t::CLKOUT3_TYPE_LVPECL_700MVPP; //DB_1_RX
     // Register 7
@@ -252,7 +262,7 @@ void set_master_clock_rate(double clock_rate) {
     _lmk04816_regs.EN_FEEDBACK_MUX = lmk04816_regs_t::EN_FEEDBACK_MUX_ENABLED;
 
     // Register 11
-    _lmk04816_regs.MODE = lmkmode;
+    // MODE set in individual cases above
     _lmk04816_regs.SYNC_QUAL = lmk04816_regs_t::SYNC_QUAL_FB_MUX;
     _lmk04816_regs.EN_SYNC = lmk04816_regs_t::EN_SYNC_ENABLE;
     _lmk04816_regs.NO_SYNC_CLKout0_1 = lmk04816_regs_t::NO_SYNC_CLKOUT0_1_CLOCK_XY_SYNC;
@@ -269,8 +279,8 @@ void set_master_clock_rate(double clock_rate) {
 
     /* Input Clock Configurations */
     // Register 13
-    _lmk04816_regs.EN_CLKin0 = lmk04816_regs_t::EN_CLKIN0_NO_VALID_USE;
-    _lmk04816_regs.EN_CLKin2 = lmk04816_regs_t::EN_CLKIN2_NO_VALID_USE;
+    _lmk04816_regs.EN_CLKin0 = lmk04816_regs_t::EN_CLKIN0_NO_VALID_USE;  // This is not connected
+    _lmk04816_regs.EN_CLKin2 = lmk04816_regs_t::EN_CLKIN2_NO_VALID_USE;  // Used only for CPRI
     _lmk04816_regs.Status_CLKin1_MUX = lmk04816_regs_t::STATUS_CLKIN1_MUX_UWIRE_RB;
     _lmk04816_regs.CLKin_Select_MODE = lmk04816_regs_t::CLKIN_SELECT_MODE_CLKIN1_MAN;
     _lmk04816_regs.HOLDOVER_MUX = lmk04816_regs_t::HOLDOVER_MUX_PLL1_R;
@@ -279,22 +289,24 @@ void set_master_clock_rate(double clock_rate) {
     _lmk04816_regs.Status_CLKin0_TYPE = lmk04816_regs_t::STATUS_CLKIN0_TYPE_OUT_PUSH_PULL;
 
     // Register 26
-    _lmk04816_regs.PLL2_CP_GAIN_26 =  pll_2_cp_gain;
+    // PLL2_CP_GAIN_26 set above in individual cases
     _lmk04816_regs.PLL2_CP_POL_26 = lmk04816_regs_t::PLL2_CP_POL_26_NEG_SLOPE;
     _lmk04816_regs.EN_PLL2_REF_2X = lmk04816_regs_t::EN_PLL2_REF_2X_DOUBLED_FREQ_REF;
 
     // Register 27
-    _lmk04816_regs.PLL1_CP_GAIN_27 = pll_1_cp_gain;
-    _lmk04816_regs.PLL1_R_27 = pll_1_r_div;
+    // PLL1_CP_GAIN_27 set in individual cases above
+    // PLL1_R_27 set in the individual cases above
+
     // Register 28
-    _lmk04816_regs.PLL1_N_28 = pll_1_n_div;
-    _lmk04816_regs.PLL2_R_28 = pll_2_r_div;
+    // PLL1_N_28 and PLL2_R_28 are set in the individual cases above
+
     // Register 29
-    _lmk04816_regs.PLL2_N_CAL_29 = pll_2_n_div;
+    _lmk04816_regs.PLL2_N_CAL_29 = _lmk04816_regs.PLL2_N_30;  // N_CAL should always match N
     _lmk04816_regs.OSCin_FREQ_29 = lmk04816_regs_t::OSCIN_FREQ_29_63_TO_127MHZ;
+
     // Register 30
     _lmk04816_regs.PLL2_P_30 = lmk04816_regs_t::PLL2_P_30_DIV_2A;
-    _lmk04816_regs.PLL2_N_30 = pll_2_n_div;
+    // PLL2_N_30 set in individual cases above
 
     /* Write the configuration values into the LMK */
     for (size_t i = 1; i <= 16; ++i) {
