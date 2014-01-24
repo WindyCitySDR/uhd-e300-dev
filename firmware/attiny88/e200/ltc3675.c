@@ -19,7 +19,6 @@
 #include "debug.h"
 #include "global.h"
 #include "error.h"
-#include "power.h"
 
 #ifndef I2C_REWORK
 #include "power.h"
@@ -47,8 +46,8 @@ static io_pin_t PWR_EN4     = IO_PB(6);	// Instead of FTDI_BCD
 static io_pin_t PWR_EN5     = IO_PB(7);	// Instead of FTDI_PWREN2
 #endif // HARDWIRE_ENABLE
 
-static io_pin_t PWR_SDA     = IO_PC(4);
-static io_pin_t PWR_SCL     = IO_PC(5);
+//static io_pin_t PWR_SDA     = IO_PC(4);
+//static io_pin_t PWR_SCL     = IO_PC(5);
 
 #else
 

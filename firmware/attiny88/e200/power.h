@@ -3,7 +3,6 @@
 
 #include <stdbool.h>
 #include <stdint.h>
-#include "io.h"
 
 void tps54478_init(bool enable);
 void tps54478_set_power(bool on);   // Zynq core power (1.0V for FPGA)

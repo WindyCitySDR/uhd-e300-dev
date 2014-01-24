@@ -19,7 +19,6 @@
 #include "debug.h"
 #include "global.h"
 #include "error.h"
-#include "i2c.h"
 
 #define BLINK_ERROR_DELAY		250  // ms
 
