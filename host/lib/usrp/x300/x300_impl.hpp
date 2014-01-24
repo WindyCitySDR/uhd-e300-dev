@@ -44,6 +44,7 @@
 #include "gpio_core_200.hpp"
 #include <boost/weak_ptr.hpp>
 #include <uhd/usrp/gps_ctrl.hpp>
+#include <uhd/usrp/mboard_eeprom.hpp>
 #include <uhd/transport/bounded_buffer.hpp>
 #include <uhd/transport/nirio/niusrprio_session.h>
 #include <uhd/transport/vrt_if_packet.hpp>
@@ -136,6 +137,12 @@ public:
 
     // used by x300_find_with_addr to find X300 devices.
     static bool is_claimed(uhd::wb_iface::sptr);
+
+    enum x300_mboard_t {
+        USRP_X300_MB, USRP_X310_MB, UNKNOWN
+    };
+    static x300_mboard_t get_mb_type_from_pcie(const std::string& resource, const std::string& rpc_port);
+    static x300_mboard_t get_mb_type_from_eeprom(const uhd::usrp::mboard_eeprom_t& mb_eeprom);
 
 private:
     boost::shared_ptr<async_md_type> _async_md;

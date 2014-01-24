@@ -101,15 +101,15 @@ static device_addrs_t x300_find_with_addr(const device_addr_t &hint)
             const mboard_eeprom_t mb_eeprom(*eeprom16, "X300");
             new_addr["name"] = mb_eeprom["name"];
             new_addr["serial"] = mb_eeprom["serial"];
-            switch (boost::lexical_cast<boost::uint16_t>(mb_eeprom["product"]))
-            {
-                case X300_PCIE_SSID:
+            switch (x300_impl::get_mb_type_from_eeprom(mb_eeprom)) {
+                case x300_impl::USRP_X300_MB:
                     new_addr["product"] = "X300";
                     break;
-                case X310_PCIE_SSID:
+                case x300_impl::USRP_X310_MB:
                     new_addr["product"] = "X310";
                     break;
-                default: UHD_MSG(error) << "X300 unknown product code: " << mb_eeprom["product"] << std::endl;
+                default:
+                    UHD_MSG(warning) << "X300 unknown product type in EEPROM." << std::endl;
             }
         }
         catch(const std::exception &)
@@ -152,6 +152,17 @@ static device_addrs_t x300_find_pcie(const device_addr_t &hint, bool explicit_qu
         std::string resource_d(dev_info.resource_name);
         boost::to_upper(resource_d);
 
+        switch (x300_impl::get_mb_type_from_pcie(resource_d, rpc_port_name)) {
+            case x300_impl::USRP_X300_MB:
+                new_addr["product"] = "X300";
+                break;
+            case x300_impl::USRP_X310_MB:
+                new_addr["product"] = "X310";
+                break;
+            default:
+                continue;
+        }
+
         niriok_proxy kernel_proxy;
         kernel_proxy.open(dev_info.interface_path);
 
@@ -176,16 +187,6 @@ static device_addrs_t x300_find_pcie(const device_addr_t &hint, bool explicit_qu
             const mboard_eeprom_t mb_eeprom(*eeprom16, "X300");
             new_addr["name"] = mb_eeprom["name"];
             new_addr["serial"] = mb_eeprom["serial"];
-            switch (boost::lexical_cast<boost::uint16_t>(mb_eeprom["product"]))
-            {
-                case X300_PCIE_SSID:
-                    new_addr["product"] = "X300";
-                    break;
-                case X310_PCIE_SSID:
-                    new_addr["product"] = "X310";
-                    break;
-                default: UHD_MSG(error) << "X300 unknown product code: " << mb_eeprom["product"] << std::endl;
-            }
         }
         catch(const std::exception &)
         {
@@ -364,22 +365,19 @@ void x300_impl::setup_mb(const size_t mb_i, const uhd::device_addr_t &dev_addr)
         }
         UHD_MSG(status) << boost::format("Connecting to niusrpriorpc at localhost:%s...\n") % rpc_port_name;
 
-        //Detect the PCIe product ID to distinguish between X300 and X310
-        boost::uint32_t pid;
-        niriok_proxy::sptr discovery_proxy =
-            niusrprio_session::create_kernel_proxy(dev_addr["resource"], rpc_port_name);
-        if (discovery_proxy) {
-            nirio_status_chain(discovery_proxy->get_attribute(PRODUCT_NUMBER, pid), status);
-            discovery_proxy->close();
-        }
-        nirio_status_to_exception(status, "x300_impl: Could not detect device type. Please ensure that that x300 device drivers are loaded and the device has a valid FPGA bitstream.");
-
         //Instantiate the correct lvbitx object
         nifpga_lvbitx::sptr lvbitx;
-        if (pid == X310_PCIE_SSID) {
-            lvbitx.reset(new x310_lvbitx(dev_addr["fpga"]));
-        } else {
-            lvbitx.reset(new x300_lvbitx(dev_addr["fpga"]));
+        switch (get_mb_type_from_pcie(dev_addr["resource"], rpc_port_name)) {
+            case USRP_X300_MB:
+                lvbitx.reset(new x300_lvbitx(dev_addr["fpga"]));
+                break;
+            case USRP_X310_MB:
+                lvbitx.reset(new x310_lvbitx(dev_addr["fpga"]));
+                break;
+            default:
+                nirio_status_to_exception(status, "Motherboard detection error. Please ensure that you \
+                    have a valid USRP-X3x0, NI USRP-294xR or NI USRP-295xR device and that all the device \
+                    driver have been loaded.");
         }
 
         //Load the lvbitx onto the device
@@ -505,18 +503,16 @@ void x300_impl::setup_mb(const size_t mb_i, const uhd::device_addr_t &dev_addr)
     // parse the product number
     ////////////////////////////////////////////////////////////////////
     std::string product_name = "X300?";
-    if (not mb_eeprom["product"].empty())
-    {
-        switch (boost::lexical_cast<boost::uint16_t>(mb_eeprom["product"]))
-        {
-        case X300_PCIE_SSID:
+    switch (get_mb_type_from_eeprom(mb_eeprom)) {
+        case USRP_X300_MB:
             product_name = "X300";
             break;
-        case X310_PCIE_SSID:
+        case USRP_X310_MB:
             product_name = "X310";
             break;
-        default: UHD_MSG(error) << "X300 unknown product code: " << mb_eeprom["product"] << std::endl;
-        }
+        default:
+            UHD_MSG(error) << "X300 unknown product code: " << mb_eeprom["product"] << std::endl;
+            break;
     }
     _tree->create<std::string>(mb_path / "name").set(product_name);
     _tree->create<std::string>(mb_path / "codename").set("Yetti");
@@ -1337,3 +1333,64 @@ void x300_impl::check_fpga_compat(const fs_path &mb_path, wb_iface::sptr iface)
     _tree->create<std::string>(mb_path / "fpga_version").set(str(boost::format("%u.%u")
                 % compat_major % compat_minor));
 }
+
+x300_impl::x300_mboard_t x300_impl::get_mb_type_from_pcie(const std::string& resource, const std::string& rpc_port)
+{
+    x300_mboard_t mb_type = UNKNOWN;
+
+    //Detect the PCIe product ID to distinguish between X300 and X310
+    nirio_status status = NiRio_Status_Success;
+    boost::uint32_t pid;
+    niriok_proxy::sptr discovery_proxy =
+        niusrprio_session::create_kernel_proxy(resource, rpc_port);
+    if (discovery_proxy) {
+        nirio_status_chain(discovery_proxy->get_attribute(PRODUCT_NUMBER, pid), status);
+        discovery_proxy->close();
+        if (nirio_status_not_fatal(status)) {
+            switch (pid) {
+                case X300_USRP_PCIE_SSID:
+                    mb_type = USRP_X300_MB; break;
+                case X310_USRP_PCIE_SSID:
+                case X310_2940R_PCIE_SSID:
+                case X310_2942R_PCIE_SSID:
+                case X310_2943R_PCIE_SSID:
+                case X310_2944R_PCIE_SSID:
+                case X310_2950R_PCIE_SSID:
+                case X310_2952R_PCIE_SSID:
+                case X310_2953R_PCIE_SSID:
+                case X310_2954R_PCIE_SSID:
+                    mb_type = USRP_X310_MB; break;
+                default:
+                    mb_type = UNKNOWN;      break;
+            }
+        }
+    }
+
+    return mb_type;
+}
+
+x300_impl::x300_mboard_t x300_impl::get_mb_type_from_eeprom(const uhd::usrp::mboard_eeprom_t& mb_eeprom)
+{
+    x300_mboard_t mb_type = UNKNOWN;
+    std::string product_number_str;
+    if (not mb_eeprom["product"].empty())
+    {
+        boost::uint16_t product_num = 0;
+        try {
+            product_num = boost::lexical_cast<boost::uint16_t>(mb_eeprom["product"]);
+        } catch (const boost::bad_lexical_cast &) {
+            product_num = 0;
+        }
+
+        switch (product_num) {
+            case X300_USRP_PCIE_SSID:
+                mb_type = USRP_X300_MB; break;
+            case X310_USRP_PCIE_SSID:
+                mb_type = USRP_X310_MB; break;
+            default:
+                mb_type = UNKNOWN;      break;
+        }
+    }
+    return mb_type;
+}
+
