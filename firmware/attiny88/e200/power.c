@@ -19,6 +19,7 @@
 #include "debug.h"
 #include "global.h"
 #include "error.h"
+#include "i2c.h"
 
 #define BLINK_ERROR_DELAY		250  // ms
 
@@ -165,12 +166,42 @@ bool tps54478_is_power_good(void)
 
 static io_pin_t CHARGE      = IO_PD(1);
 
+#if !defined(ATTINY88_DIP) && defined(LED_POLARITY)
+static io_pin_t POWER_LED	= IO_PC(7);
+
+void power_set_led(bool on)
+{
+	if ((on == false) && (io_is_pin_set(CHARGE)))	// If charging and turning off, don't change charge light
+		return;
+	
+	io_clear_pin(CHARGE);
+	io_enable_pin(POWER_LED, on);
+}
+#endif // !ATTINY88_DIP && LED_POLARITY
+
 void charge_set_led(bool on)
 {
 #ifdef ATTINY88_DIP
-	on = !on;
-#endif // DEBUG
+	//
+#else
+
+#ifdef LED_POLARITY
+	io_clear_pin(POWER_LED);
+#endif // LED_POLARITY
+
+#endif // ATTINY88_DIP
+
+#ifdef ATTINY88_DIP
+	io_enable_pin(CHARGE, !on);
+#else
     io_enable_pin(CHARGE, on);
+
+#ifdef LED_POLARITY
+	if ((on == false) && (_state.powered))	// If no longer charging, turn power light back on
+		power_set_led(true);
+#endif // LED_POLARITY
+
+#endif // ATTINY88_DIP
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -379,8 +410,11 @@ bool power_is_subsys_on(int8_t index)
 */
 bool power_init(void)
 {
-    io_output_pin(CHARGE);
-	
+	io_output_pin(CHARGE);
+#ifdef LED_POLARITY
+    io_output_pin(POWER_LED);
+#endif // LED_POLARITY
+
 	charge_set_led(true);
 	
 	battery_init();
@@ -562,6 +596,8 @@ bool power_on(void)
 //debug_blink_rev(1);
 //_delay_ms(1000);	// Wait for FPGA PGOOD to stabilise
 	pmc_mask_irqs(false);
+	
+	power_set_led(true);
 
     return true;
 }
@@ -633,6 +669,8 @@ uint8_t power_off(void)
 	_state.powered = false;
 	
 	pmc_mask_irqs(false);
+	
+	power_set_led(false);
 	
 	return 0;
 }

@@ -33,7 +33,7 @@
       </OverrideVtorValue>
       <Channel>
         <host>127.0.0.1</host>
-        <port>50407</port>
+        <port>64208</port>
         <ssl>False</ssl>
       </Channel>
       <ToolOptions>
@@ -179,10 +179,11 @@
   <avrgcc.compiler.general.ChangeDefaultBitFieldUnsigned>True</avrgcc.compiler.general.ChangeDefaultBitFieldUnsigned>
   <avrgcc.compiler.symbols.DefSymbols>
     <ListValues>
-      <Value>I2C_REWORK</Value>
-      <Value>ENABLE_SERIAL</Value>
+      <Value>I2C_REWORK_disabled</Value>
       <Value>DDR3L</Value>
       <Value>CHARGER_TI</Value>
+      <Value>ENABLE_SERIAL</Value>
+      <Value>LED_POLARITY</Value>
     </ListValues>
   </avrgcc.compiler.symbols.DefSymbols>
   <avrgcc.compiler.optimization.level>Optimize for size (-Os)</avrgcc.compiler.optimization.level>

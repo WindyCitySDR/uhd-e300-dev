@@ -19,6 +19,7 @@
 #include "debug.h"
 #include "global.h"
 #include "error.h"
+#include "power.h"
 
 #ifndef I2C_REWORK
 #include "power.h"
