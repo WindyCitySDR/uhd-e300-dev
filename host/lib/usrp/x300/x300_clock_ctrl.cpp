@@ -1,3 +1,19 @@
+//
+// Copyright 2013-2014 Ettus Research LLC
+//
+// This program is free software: you can redistribute it and/or modify
+// it under the terms of the GNU General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// This program is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU General Public License for more details.
+//
+// You should have received a copy of the GNU General Public License
+// along with this program.  If not, see <http://www.gnu.org/licenses/>.
+//
 
 #include "lmk04816_regs.hpp"
 #include "x300_clock_ctrl.hpp"
@@ -6,10 +22,6 @@
 #include <boost/format.hpp>
 #include <stdexcept>
 #include <cstdlib>
-
-// FIXME These are here for debug purposes only.
-#include <cstdio>
-#include <iostream>
 
 using namespace uhd;
 
@@ -56,7 +68,7 @@ double get_refout_clock_rate(void) {
 }
 
 void set_dboard_rate(const x300_clock_which_t which, double rate) {
-    /* TODO */
+    // TODO
 }
 
 std::vector<double> get_dboard_rates(const x300_clock_which_t) {
@@ -66,7 +78,7 @@ std::vector<double> get_dboard_rates(const x300_clock_which_t) {
 }
 
 void set_ref_out(const bool enb) {
-  // TODO  How do we set divider?
+    // TODO  How do we set divider?
     if (enb)
         _lmk04816_regs.CLKout10_TYPE = lmk04816_regs_t::CLKOUT10_TYPE_LVDS;
     else
@@ -79,16 +91,6 @@ void write_regs(boost::uint8_t addr) {
     _spiface->write_spi(_slaveno, spi_config_t::EDGE_RISE, data,32);
 }
 
-    /*
-    //read_reg: read a single register to the spi regs.
-
-        void read_reg(boost::uint8_t addr)    {
-
-            boost::unint32_t data = _lmk04816_regs.get_read_reg(addr);
-            _spiface->read_spi(_slaveno, spi_config_t::EDGE_RISE, data , 32);
-        }
-    */
-    //future implementations for modularity
 
 private:
 
@@ -106,21 +108,22 @@ void set_master_clock_rate(double clock_rate) {
                  m10M_200M_ZDEL,        // Normal mode
                  m30_72M_184_32M_ZDEL,  // LTE with external ref, aka CPRI Mode
                  m10M_184_32M_NOZDEL }; // LTE with 10 MHz ref
+
+    /* The default clocking mode is 10MHz reference generating a 200 MHz master
+     * clock, in zero-delay mode. */
     opmode clocking_mode = m10M_200M_ZDEL;
 
     bool valid_rates = false;
-    bool zero_delay_mode = false;
 
     if(_system_ref_rate == 10e6) {
         if(clock_rate == 184.32e6) {
-            /* 10MHz reference, 184.32 MHz master clock out */
+            /* 10MHz reference, 184.32 MHz master clock out, NOT Zero Delay. */
             valid_rates = true;
 
             clocking_mode = m10M_184_32M_NOZDEL;
         } else if(clock_rate == 200e6) {
             /* 10MHz reference, 200 MHz master clock out, Zero Delay */
             valid_rates = true;
-            zero_delay_mode = true;
 
             clocking_mode = m10M_200M_ZDEL;
         }
@@ -128,7 +131,6 @@ void set_master_clock_rate(double clock_rate) {
         if(clock_rate == 184.32e6) {
             /* 30.72MHz reference, 184.32 MHz master clock out, Zero Delay */
             valid_rates = true;
-            zero_delay_mode = true;
 
             clocking_mode = m30_72M_184_32M_ZDEL;
         }
@@ -149,81 +151,86 @@ void set_master_clock_rate(double clock_rate) {
     switch (clocking_mode) {
         case m10M_200M_NOZDEL:
             vco_div = 12;
-	    _lmk04816_regs.MODE = lmk04816_regs_t::MODE_DUAL_INT;
+            _lmk04816_regs.MODE = lmk04816_regs_t::MODE_DUAL_INT;
 
-	    // PLL1 - 2 MHz compare frequency
-	    _lmk04816_regs.PLL1_N_28 = 48;
-	    _lmk04816_regs.PLL1_R_27 = 5;
-	    _lmk04816_regs.PLL1_CP_GAIN_27 = lmk04816_regs_t::PLL1_CP_GAIN_27_100UA;
+            // PLL1 - 2 MHz compare frequency
+            _lmk04816_regs.PLL1_N_28 = 48;
+            _lmk04816_regs.PLL1_R_27 = 5;
+            _lmk04816_regs.PLL1_CP_GAIN_27 = lmk04816_regs_t::PLL1_CP_GAIN_27_100UA;
 
-	    // PLL2 - 48 MHz compare frequency
-	    _lmk04816_regs.PLL2_N_30 = 25;
-	    _lmk04816_regs.PLL2_P_30 = lmk04816_regs_t::PLL2_P_30_DIV_2A;
-	    _lmk04816_regs.PLL2_R_28 = 4;
-	    _lmk04816_regs.PLL2_CP_GAIN_26 = lmk04816_regs_t::PLL2_CP_GAIN_26_3200UA;
+            // PLL2 - 48 MHz compare frequency
+            _lmk04816_regs.PLL2_N_30 = 25;
+            _lmk04816_regs.PLL2_P_30 = lmk04816_regs_t::PLL2_P_30_DIV_2A;
+            _lmk04816_regs.PLL2_R_28 = 4;
+            _lmk04816_regs.PLL2_CP_GAIN_26 = lmk04816_regs_t::PLL2_CP_GAIN_26_3200UA;
+
             break;
 
         case m10M_200M_ZDEL:
             vco_div = 12;
-	    _lmk04816_regs.MODE = lmk04816_regs_t::MODE_DUAL_INT_ZER_DELAY;
+            _lmk04816_regs.MODE = lmk04816_regs_t::MODE_DUAL_INT_ZER_DELAY;
 
-	    // PLL1 - 2 MHz compare frequency	
-	    _lmk04816_regs.PLL1_N_28 = 100;
-	    _lmk04816_regs.PLL1_R_27 = 5;
-	    _lmk04816_regs.PLL1_CP_GAIN_27 = lmk04816_regs_t::PLL1_CP_GAIN_27_100UA;
+            // PLL1 - 2 MHz compare frequency
+            _lmk04816_regs.PLL1_N_28 = 100;
+            _lmk04816_regs.PLL1_R_27 = 5;
+            _lmk04816_regs.PLL1_CP_GAIN_27 = lmk04816_regs_t::PLL1_CP_GAIN_27_100UA;
 
-	    // PLL2 - 96 MHz compare frequency
-	    _lmk04816_regs.PLL2_N_30 = 5;
-	    _lmk04816_regs.PLL2_P_30 = lmk04816_regs_t::PLL2_P_30_DIV_5;
-	    _lmk04816_regs.PLL2_R_28 = 2;
-	    if(_hw_rev <= 4)
-	      _lmk04816_regs.PLL2_CP_GAIN_26 = lmk04816_regs_t::PLL2_CP_GAIN_26_1600UA;
-	    else
-	      _lmk04816_regs.PLL2_CP_GAIN_26 = lmk04816_regs_t::PLL2_CP_GAIN_26_400UA;
+            // PLL2 - 96 MHz compare frequency
+            _lmk04816_regs.PLL2_N_30 = 5;
+            _lmk04816_regs.PLL2_P_30 = lmk04816_regs_t::PLL2_P_30_DIV_5;
+            _lmk04816_regs.PLL2_R_28 = 2;
+
+            if(_hw_rev <= 4)
+                _lmk04816_regs.PLL2_CP_GAIN_26 = lmk04816_regs_t::PLL2_CP_GAIN_26_1600UA;
+            else
+                _lmk04816_regs.PLL2_CP_GAIN_26 = lmk04816_regs_t::PLL2_CP_GAIN_26_400UA;
+
             break;
 
         case m30_72M_184_32M_ZDEL:
             vco_div=14;
-	    _lmk04816_regs.MODE = lmk04816_regs_t::MODE_DUAL_INT_ZER_DELAY;
+            _lmk04816_regs.MODE = lmk04816_regs_t::MODE_DUAL_INT_ZER_DELAY;
 
-	    // PLL1 - 2.048 MHz compare frequency
-	    _lmk04816_regs.PLL1_N_28 = 90;
-	    _lmk04816_regs.PLL1_R_27 = 15;
-	    _lmk04816_regs.PLL1_CP_GAIN_27 = lmk04816_regs_t::PLL1_CP_GAIN_27_100UA;
+            // PLL1 - 2.048 MHz compare frequency
+            _lmk04816_regs.PLL1_N_28 = 90;
+            _lmk04816_regs.PLL1_R_27 = 15;
+            _lmk04816_regs.PLL1_CP_GAIN_27 = lmk04816_regs_t::PLL1_CP_GAIN_27_100UA;
 
-	    // PLL2 - 7.68 MHz compare frequency
-	    _lmk04816_regs.PLL2_N_30 = 168;
-	    _lmk04816_regs.PLL2_P_30 = lmk04816_regs_t::PLL2_P_30_DIV_2A;
-	    _lmk04816_regs.PLL2_R_28 = 25;
-	    _lmk04816_regs.PLL2_CP_GAIN_26 = lmk04816_regs_t::PLL2_CP_GAIN_26_3200UA;
+            // PLL2 - 7.68 MHz compare frequency
+            _lmk04816_regs.PLL2_N_30 = 168;
+            _lmk04816_regs.PLL2_P_30 = lmk04816_regs_t::PLL2_P_30_DIV_2A;
+            _lmk04816_regs.PLL2_R_28 = 25;
+            _lmk04816_regs.PLL2_CP_GAIN_26 = lmk04816_regs_t::PLL2_CP_GAIN_26_3200UA;
 
             _lmk04816_regs.PLL2_R3_LF = lmk04816_regs_t::PLL2_R3_LF_1KILO_OHM;
             _lmk04816_regs.PLL2_C3_LF = lmk04816_regs_t::PLL2_C3_LF_39PF;
 
             _lmk04816_regs.PLL2_R4_LF = lmk04816_regs_t::PLL2_R4_LF_1KILO_OHM;
             _lmk04816_regs.PLL2_C4_LF = lmk04816_regs_t::PLL2_C4_LF_34PF;
+
             break;
 
         case m10M_184_32M_NOZDEL:
             vco_div=14;
-	    _lmk04816_regs.MODE = lmk04816_regs_t::MODE_DUAL_INT;
+            _lmk04816_regs.MODE = lmk04816_regs_t::MODE_DUAL_INT;
 
-	    // PLL1 - 2 MHz compare frequency
-	    _lmk04816_regs.PLL1_N_28 = 48;
-	    _lmk04816_regs.PLL1_R_27 = 5;
-	    _lmk04816_regs.PLL1_CP_GAIN_27 = lmk04816_regs_t::PLL1_CP_GAIN_27_100UA;
+            // PLL1 - 2 MHz compare frequency
+            _lmk04816_regs.PLL1_N_28 = 48;
+            _lmk04816_regs.PLL1_R_27 = 5;
+            _lmk04816_regs.PLL1_CP_GAIN_27 = lmk04816_regs_t::PLL1_CP_GAIN_27_100UA;
 
-	    // PLL2 - 7.68 MHz compare frequency
-	    _lmk04816_regs.PLL2_N_30 = 168;
-	    _lmk04816_regs.PLL2_P_30 = lmk04816_regs_t::PLL2_P_30_DIV_2A;
-	    _lmk04816_regs.PLL2_R_28 = 25;
-	    _lmk04816_regs.PLL2_CP_GAIN_26 = lmk04816_regs_t::PLL2_CP_GAIN_26_3200UA;
+            // PLL2 - 7.68 MHz compare frequency
+            _lmk04816_regs.PLL2_N_30 = 168;
+            _lmk04816_regs.PLL2_P_30 = lmk04816_regs_t::PLL2_P_30_DIV_2A;
+            _lmk04816_regs.PLL2_R_28 = 25;
+            _lmk04816_regs.PLL2_CP_GAIN_26 = lmk04816_regs_t::PLL2_CP_GAIN_26_3200UA;
 
             _lmk04816_regs.PLL2_R3_LF = lmk04816_regs_t::PLL2_R3_LF_4KILO_OHM;
             _lmk04816_regs.PLL2_C3_LF = lmk04816_regs_t::PLL2_C3_LF_39PF;
 
             _lmk04816_regs.PLL2_R4_LF = lmk04816_regs_t::PLL2_R4_LF_1KILO_OHM;
             _lmk04816_regs.PLL2_C4_LF = lmk04816_regs_t::PLL2_C4_LF_71PF;
+
             break;
     };
 
