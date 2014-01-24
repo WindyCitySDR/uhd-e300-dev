@@ -109,7 +109,7 @@ static device_addrs_t x300_find_with_addr(const device_addr_t &hint)
                     new_addr["product"] = "X310";
                     break;
                 default:
-                    UHD_MSG(warning) << "X300 unknown product type in EEPROM." << std::endl;
+                    break;
             }
         }
         catch(const std::exception &)
@@ -376,7 +376,7 @@ void x300_impl::setup_mb(const size_t mb_i, const uhd::device_addr_t &dev_addr)
                 break;
             default:
                 nirio_status_to_exception(status, "Motherboard detection error. Please ensure that you \
-                    have a valid USRP-X3x0, NI USRP-294xR or NI USRP-295xR device and that all the device \
+                    have a valid USRP X3x0, NI USRP-294xR or NI USRP-295xR device and that all the device \
                     driver have been loaded.");
         }
 
@@ -511,7 +511,6 @@ void x300_impl::setup_mb(const size_t mb_i, const uhd::device_addr_t &dev_addr)
             product_name = "X310";
             break;
         default:
-            UHD_MSG(error) << "X300 unknown product code: " << mb_eeprom["product"] << std::endl;
             break;
     }
     _tree->create<std::string>(mb_path / "name").set(product_name);
@@ -1347,6 +1346,7 @@ x300_impl::x300_mboard_t x300_impl::get_mb_type_from_pcie(const std::string& res
         nirio_status_chain(discovery_proxy->get_attribute(PRODUCT_NUMBER, pid), status);
         discovery_proxy->close();
         if (nirio_status_not_fatal(status)) {
+            //The PCIe ID -> MB mapping may be different from the EEPROM -> MB mapping
             switch (pid) {
                 case X300_USRP_PCIE_SSID:
                     mb_type = USRP_X300_MB; break;
@@ -1372,7 +1372,6 @@ x300_impl::x300_mboard_t x300_impl::get_mb_type_from_pcie(const std::string& res
 x300_impl::x300_mboard_t x300_impl::get_mb_type_from_eeprom(const uhd::usrp::mboard_eeprom_t& mb_eeprom)
 {
     x300_mboard_t mb_type = UNKNOWN;
-    std::string product_number_str;
     if (not mb_eeprom["product"].empty())
     {
         boost::uint16_t product_num = 0;
@@ -1383,11 +1382,21 @@ x300_impl::x300_mboard_t x300_impl::get_mb_type_from_eeprom(const uhd::usrp::mbo
         }
 
         switch (product_num) {
+            //The PCIe ID -> MB mapping may be different from the EEPROM -> MB mapping
             case X300_USRP_PCIE_SSID:
                 mb_type = USRP_X300_MB; break;
             case X310_USRP_PCIE_SSID:
+            case X310_2940R_PCIE_SSID:
+            case X310_2942R_PCIE_SSID:
+            case X310_2943R_PCIE_SSID:
+            case X310_2944R_PCIE_SSID:
+            case X310_2950R_PCIE_SSID:
+            case X310_2952R_PCIE_SSID:
+            case X310_2953R_PCIE_SSID:
+            case X310_2954R_PCIE_SSID:
                 mb_type = USRP_X310_MB; break;
             default:
+                UHD_MSG(warning) << "X300 unknown product code in EEPROM: " << product_num << std::endl;
                 mb_type = UNKNOWN;      break;
         }
     }
