@@ -1,5 +1,5 @@
 #
-# Copyright 2013 Ettus Research LLC
+# Copyright 2013-2014 Ettus Research LLC
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -30,6 +30,7 @@ INCLUDE_SUBDIRECTORY(rpc)
 ########################################################################
 
 LIBUHD_APPEND_SOURCES(
+    ${CMAKE_CURRENT_SOURCE_DIR}/nifpga_lvbitx.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/niusrprio_session.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/niriok_proxy.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/nirio_resource_manager.cpp

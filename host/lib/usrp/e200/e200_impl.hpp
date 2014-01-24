@@ -52,8 +52,9 @@ static const double E200_RX_SW_BUFF_FULLNESS = 0.5;        //Buffer should be ha
  * The implementation details are encapsulated here.
  * Handles properties on the mboard, dboard, dsps...
  */
-struct e200_impl : public uhd::device
+class e200_impl : public uhd::device
 {
+public:
     //structors
     e200_impl(const uhd::device_addr_t &);
     ~e200_impl(void);
@@ -64,14 +65,8 @@ struct e200_impl : public uhd::device
     uhd::tx_streamer::sptr get_tx_stream(const uhd::stream_args_t &);
     bool recv_async_msg(uhd::async_metadata_t &, double);
 
+private:
     bool _network_mode;
-
-    //device properties interface
-    uhd::property_tree::sptr _tree;
-    uhd::property_tree::sptr get_tree(void) const
-    {
-        return _tree;
-    }
 
     void load_fpga_image(const std::string &path);
 

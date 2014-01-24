@@ -96,13 +96,13 @@ nirio_status niusrprio_session::open(
     return status;
 }
 
-void niusrprio_session::close(bool reset_fpga)
+void niusrprio_session::close(bool skip_reset)
 {
     boost::unique_lock<boost::recursive_mutex> lock(_session_mutex);
 
     if (_session_open) {
         nirio_status status = NiRio_Status_Success;
-        if (reset_fpga) reset();
+        if (!skip_reset) reset();
         nirio_status_chain(_rpc_client.niusrprio_close_session(_resource_name), status);
         _session_open = false;
     }

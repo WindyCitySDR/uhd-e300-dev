@@ -45,6 +45,7 @@ INCLUDE_DIRECTORIES(
 # misc flags for the gcc compiler
 ########################################################################
 SET(CMAKE_C_FLAGS -phi) #always needed compile time and link time
+SET(CMAKE_C_FLAGS_DEBUG -DX300_DEBUG_UART)
 ADD_DEFINITIONS(-Os)
 ADD_DEFINITIONS(--std=gnu99)
 ADD_DEFINITIONS(-Wall)

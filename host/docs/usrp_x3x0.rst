@@ -197,13 +197,13 @@ To get the latest images, simply use the uhd_images_downloader script:
 
 ::
 
-    <install-path>/share/uhd/utils/uhd_images_downloader.py
+    <install-path>/lib/uhd/utils/uhd_images_downloader.py
 
 **Windows:**
 
 ::
 
-    <path_to_python.exe> <install-path>/share/uhd/utils/uhd_images_downloader.py
+    <path_to_python.exe> <install-path>/lib/uhd/utils/uhd_images_downloader.py
 
 
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -247,13 +247,13 @@ Use the burner tool over Ethernet
 
 ::
 
-    <install-path>/share/uhd/utils/usrp_x3xx_burner --addr=<ip address> --fpga-path=<path to FPGA image>
+    <install-path>/lib/uhd/utils/usrp_x3xx_fpga_burner --addr=<ip address> --fpga-path=<path to FPGA image>
 
 **Windows:**
 
 ::
 
-    <install-path>\share\uhd\utils\usrp_x3xx_burner.exe --addr=<ip address> --fpga-path=<path to FPGA image>
+    <install-path>\lib\uhd\utils\usrp_x3xx_fpga_burner.exe --addr=<ip address> --fpga-path=<path to FPGA image>
 
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Use the burner tool over PCI Express
@@ -262,13 +262,13 @@ Use the burner tool over PCI Express
 
 ::
 
-    <install-path>/share/uhd/utils/usrp_x3xx_burner --resource=<device resource name> --fpga-path=<path to FPGA image>
+    <install-path>/lib/uhd/utils/usrp_x3xx_fpga_burner --resource=<device resource name> --fpga-path=<path to FPGA image>
 
 **Windows:**
 
 ::
 
-    <install-path>\share\uhd\utils\usrp_x3xx_burner.exe --resource=<device resource name> --fpga-path=<path to FPGA image>
+    <install-path>\lib\uhd\utils\usrp_x3xx_fpga_burner.exe --resource=<device resource name> --fpga-path=<path to FPGA image>
 
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Device recovery and bricking
@@ -314,7 +314,7 @@ On a Linux system, you can add a static IP address very easily by using the
     sudo ip addr add 192.168.10.1/24 dev <interface>
 
 Note that **<interface>** is usually something like **eth0**.  You can discover the
-names of the network interfaces in your computer by running **ip addr show**:
+names of the network interfaces in your computer by running:
 
 ::
 
@@ -329,12 +329,25 @@ It is recommended that you change or disable your firewall settings.
 ^^^^^^^^^^^^^^^
 Setting the MTU
 ^^^^^^^^^^^^^^^
-As UHD uses receive and transmit frames larger than the standard MTU,
+As UHD by default uses receive and transmit frames larger than the standard MTU of 1500 Bytes,
 the NIC needs to be configured to use a larger MTU when used with the USRP X series devices.
 
 ::
 
-    sudo ip link set mtu 9000 dev <interface>
+    sudo ip link set mtu 8192 dev <interface>
+
+Upon initialization UHD will probe for the maximum possible path MTU along the path between the USRP X series device
+and the host, both in receive and transmit direction.
+
+If the network hardware does not support MTUs as large as 8000 Bytes, passing the **send_frame_size** and **receive_frame_size**
+arguments will make UHD use smaller MTUs:
+
+::
+
+    uhd_usrp_probe --args='send_frame_size=<max send MTU> recv_frame_size=<max receive MTU>'
+
+**Note:** This will most likely have a severe performance penalty.
+
 
 ^^^^^^^^^^^^^^^^^^^^^^^^^
 Multiple devices per host
@@ -375,14 +388,14 @@ Run the following commands:
 
 ::
 
-    cd <install-path>/share/uhd/utils
+    cd <install-path>/lib/uhd/utils
     ./usrp_burn_mb_eeprom --args=<optional device args> --key=ip-addr --val=192.168.10.3
 
 **Windows:**
 
 ::
 
-    cd <install-path>\share\uhd\utils
+    cd <install-path>\lib\uhd\utils
     usrp_burn_mb_eeprom.exe --args=<optional device args> --key=ip-addr --val=192.168.10.3
 
 ---------------------
@@ -637,7 +650,7 @@ Debugging custom FPGA designs with Xilinx Chipscope
 Xilinx chipscope allows for debugging custom FPGA designs similar to a logic analyzer.
 USRP-X series devices can be used with Xilinx chipscope using the onboard USB JTAG connector.
 
-Further information on how to use Chipscope can be found in the Xilinx Chipscope Pro Software and Cores User Guide (UG0290).
+Further information on how to use Chipscope can be found in the Xilinx Chipscope Pro Software and Cores User Guide (UG029).
 
 -------------
 Miscellaneous

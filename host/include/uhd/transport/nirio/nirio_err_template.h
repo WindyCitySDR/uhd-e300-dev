@@ -1,5 +1,5 @@
 //
-// Copyright 2013 Ettus Research LLC
+// Copyright 2013-2014 Ettus Research LLC
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -30,7 +30,7 @@ NIRIO_ERR_INFO(NiRio_Status_ResourceNotFound, -52006, "A required resource was n
 NIRIO_ERR_INFO(NiRio_Status_ResourceNotInitialized, -52010, "A required resource was not properly initialized. This could occur if NiFpga_Initialize was not called or a required NiFpga_IrqContext was not reserved.")
 NIRIO_ERR_INFO(NiRio_Status_FpgaAlreadyRunning, -61003, "The FPGA is already running.")
 NIRIO_ERR_INFO(NiRio_Status_DeviceTypeMismatch, -61024, "The bitfile was not compiled for the specified resource's device type.")
-NIRIO_ERR_INFO(NiRio_Status_CommunicationTimeout, -61046, "An error was detected in the communication between the host computer and the FPGA target.")
+NIRIO_ERR_INFO(NiRio_Status_CommunicationTimeout, -61046, "An error was detected in the communication between the host computer and the USRP device. This could be due to a hardware failure on the bus.")
 NIRIO_ERR_INFO(NiRio_Status_IrqTimeout, -61060, "The timeout expired before any of the IRQs were asserted.")
 NIRIO_ERR_INFO(NiRio_Status_CorruptBitfile, -61070, "The LVBITX configuration bitstream seems to be corrupt.")
 NIRIO_ERR_INFO(NiRio_Status_BadDepth, -61072, "The requested FIFO depth is invalid. It is either 0 or an amount not supported by the hardware.")
