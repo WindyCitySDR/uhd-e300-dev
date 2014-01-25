@@ -86,48 +86,42 @@ void handle_udp_fw_comms(
     const void *buff, const size_t num_bytes
 )
 {
-  if (buff == NULL) {
-    /* We got here from ICMP_DUR undeliverable packet */
+    if (buff == NULL) {
+     /* We got here from ICMP_DUR undeliverable packet */
     /* Future space for hooks to tear down streaming radios etc */
-  }
-  else {
-    const x300_fw_comms_t *request = (const x300_fw_comms_t *)buff;
-    x300_fw_comms_t reply; memcpy(&reply, buff, sizeof(reply));
+    } else {
+        const x300_fw_comms_t *request = (const x300_fw_comms_t *)buff;
+        x300_fw_comms_t reply; memcpy(&reply, buff, sizeof(reply));
 
-    //check for error and set error flag
-    if (num_bytes < sizeof(x300_fw_comms_t))
-      {
-        reply.flags |= X300_FW_COMMS_FLAGS_ERROR;
-      }
-
-    //otherwise, run the actions set by the flags
-    else
-      {
-        if (request->flags & X300_FW_COMMS_FLAGS_PEEK32)
-	  {
-            if (request->addr & 0x00100000) {
-	      chinch_peek32(request->addr & 0x000FFFFF, &reply.data);
-            } else {
-	      reply.data = wb_peek32(request->addr);
+        //check for error and set error flag
+        if (num_bytes < sizeof(x300_fw_comms_t)) {
+           reply.flags |= X300_FW_COMMS_FLAGS_ERROR;
+        }
+        //otherwise, run the actions set by the flags
+        else {
+            if (request->flags & X300_FW_COMMS_FLAGS_PEEK32)
+            {
+                if (request->addr & 0x00100000) {
+                    chinch_peek32(request->addr & 0x000FFFFF, &reply.data);
+                } else {
+                    reply.data = wb_peek32(request->addr);
+                }
             }
-	  }
-
-        if (request->flags & X300_FW_COMMS_FLAGS_POKE32)
-	  {
-            if (request->addr & 0x00100000) {
-	      chinch_poke32(request->addr & 0x000FFFFF, request->data);
-            } else {
-	      wb_poke32(request->addr, request->data);
+            if (request->flags & X300_FW_COMMS_FLAGS_POKE32)
+            {
+                if (request->addr & 0x00100000) {
+                    chinch_poke32(request->addr & 0x000FFFFF, request->data);
+                } else {
+                    wb_poke32(request->addr, request->data);
+                }
             }
-	  }
-      }
+        }
 
-    //send a reply if ack requested
-    if (request->flags & X300_FW_COMMS_FLAGS_ACK)
-      {
-        u3_net_stack_send_udp_pkt(ethno, src, dst_port, src_port, &reply, sizeof(reply));
-      }
-  }
+        //send a reply if ack requested
+        if (request->flags & X300_FW_COMMS_FLAGS_ACK) {
+            u3_net_stack_send_udp_pkt(ethno, src, dst_port, src_port, &reply, sizeof(reply));
+        }
+    }
 }
 
 /***********************************************************************
