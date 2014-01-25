@@ -12,7 +12,17 @@ OBJDUMP = avr-objdump
 SREC = srec_cat
 CFLAGS = -O2 -std=gnu99 -Wall -fshort-enums -pedantic-errors \
 	-Wstrict-prototypes -Wmissing-prototypes -Wcast-align -Wshadow \
-	-DENABLE_SERIAL -DCHARGER_TI -DDEBUG_VOID
+	-DENABLE_SERIAL -DCHARGER_TI -DLED_POLARITY -DDDR3L
+# -DENABLE_SERIAL	: Output serial debug
+# -DCHARGER_TI		: Use TI charger (rev B) instead of LTC (rev A)
+# -DLED_POLARITY	: Dual-polarity LED on rev B
+# -DDDR3L			: Lower DDR voltage
+# -DDEBUG_VOID		: Use (void) debug function replacements instead of inline NOOP
+# -DI2C_REWORK		: Rev A only
+# -DDEBUG			: Enable debug routines (LED blinks, etc)
+# -DDEBUG_SAFETY	: Extra debug prints
+# -DATTINY88_DIP	: ATTINY88 DIP testing on STK600
+# -DHARDWIRE_ENABLE : LTC3675 dedicated enable lines - don't use
 
 #-Werror
 #-D IO_DEBUG
