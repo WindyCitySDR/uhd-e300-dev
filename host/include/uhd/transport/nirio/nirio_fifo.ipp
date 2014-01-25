@@ -179,7 +179,7 @@ nirio_status nirio_fifo<data_t>::acquire(
             get_direction() == INPUT_FIFO
         ) {
             _expected_xfer_count += static_cast<uint64_t>(elements_requested * sizeof(data_t));
-            status = _ensure_transfer_completed();
+            status = _ensure_transfer_completed(timeout);
         }
     }
 
@@ -294,11 +294,11 @@ nirio_status nirio_fifo<data_t>::_get_transfer_count(uint64_t& transfer_count)
 }
 
 template <typename data_t>
-nirio_status nirio_fifo<data_t>::_ensure_transfer_completed()
+nirio_status nirio_fifo<data_t>::_ensure_transfer_completed(uint32_t timeout_ms)
 {
     //_riok_proxy_ptr must be valid and _mutex must be locked
 
-    static const size_t APPROX_TIMEOUT_IN_US = 1000;
+    static const size_t MIN_TIMEOUT_IN_US = 2000;
 
     nirio_status status = NiRio_Status_Success;
     uint64_t actual_xfer_count = 0;
@@ -312,7 +312,7 @@ nirio_status nirio_fifo<data_t>::_ensure_transfer_completed()
     while (
         nirio_status_not_fatal(status) &&
         (_expected_xfer_count > actual_xfer_count) &&
-        approx_us_elapsed++ < APPROX_TIMEOUT_IN_US
+        approx_us_elapsed++ < std::max<size_t>(MIN_TIMEOUT_IN_US, timeout_ms * 1000)
     ) {
         boost::this_thread::sleep(boost::posix_time::microseconds(1));
         nirio_status_chain(_get_transfer_count(actual_xfer_count), status);
