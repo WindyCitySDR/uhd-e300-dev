@@ -529,10 +529,15 @@ void x300_impl::setup_mb(const size_t mb_i, const uhd::device_addr_t &dev_addr)
         mb.router_dst_here = X300_XB_DST_PCI;
     } else {
         if (mb.addr == mb_eeprom["ip-addr0"]) mb.router_dst_here = X300_XB_DST_E0;
-        if (mb.addr == mb_eeprom["ip-addr1"]) mb.router_dst_here = X300_XB_DST_E1;
-        if (mb.addr == mb_eeprom["ip-addr2"]) mb.router_dst_here = X300_XB_DST_E0;
-        if (mb.addr == mb_eeprom["ip-addr3"]) mb.router_dst_here = X300_XB_DST_E1;
+        else if (mb.addr == mb_eeprom["ip-addr1"]) mb.router_dst_here = X300_XB_DST_E1;
+        else if (mb.addr == mb_eeprom["ip-addr2"]) mb.router_dst_here = X300_XB_DST_E0;
+        else if (mb.addr == mb_eeprom["ip-addr3"]) mb.router_dst_here = X300_XB_DST_E1;
+        else if (mb.addr == "192.168.10.2") mb.router_dst_here = X300_XB_DST_E0;
+        else if (mb.addr == "192.168.20.2") mb.router_dst_here = X300_XB_DST_E1;
+        else if (mb.addr == "192.168.30.2") mb.router_dst_here = X300_XB_DST_E0;
+        else if (mb.addr == "192.168.40.2") mb.router_dst_here = X300_XB_DST_E1;
     }
+
     ////////////////////////////////////////////////////////////////////
     // read dboard eeproms
     ////////////////////////////////////////////////////////////////////
