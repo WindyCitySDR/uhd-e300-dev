@@ -925,8 +925,9 @@ public:
     {
         if (_tree->exists(mb_root(mboard) / "gpio" / bank))
         {
-            const boost::uint64_t setting = boost::uint64_t(value) | (boost::uint64_t(mask) << 32);
-            _tree->access<boost::uint64_t>(mb_root(mboard) / "gpio" / bank / attr).set(setting);
+            const boost::uint32_t current = _tree->access<boost::uint32_t>(mb_root(mboard) / "gpio" / bank / attr).get();
+            const boost::uint32_t new_value = (current & ~mask) | (value & mask);
+            _tree->access<boost::uint64_t>(mb_root(mboard) / "gpio" / bank / attr).set(new_value);
             return;
         }
         if (bank.size() > 2 and bank[1] == 'X')

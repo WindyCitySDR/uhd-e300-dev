@@ -130,6 +130,7 @@ int UHD_SAFE_MAIN(int argc, char *argv[]){
     uint32_t atr_rx = 0;
     uint32_t atr_tx = 0;
     uint32_t atr_duplex = 0;
+    uint32_t mask = 0x7ff;
 
     //set up FPGPIO outputs:
     //FPGPIO[0] = ATR output 1 at idle
@@ -156,16 +157,16 @@ int UHD_SAFE_MAIN(int argc, char *argv[]){
     ddr |= FPGPIO_BIT(4);
 
     //set data direction register (DDR)
-    usrp->set_gpio_attr(fpgpio, std::string("DDR"), ddr);
+    usrp->set_gpio_attr(fpgpio, std::string("DDR"), ddr, mask);
 
     //set ATR registers
-    usrp->set_gpio_attr(fpgpio, std::string("ATR_0X"), atr_idle);
-    usrp->set_gpio_attr(fpgpio, std::string("ATR_RX"), atr_rx);
-    usrp->set_gpio_attr(fpgpio, std::string("ATR_TX"), atr_tx);
-    usrp->set_gpio_attr(fpgpio, std::string("ATR_XX"), atr_duplex);
+    usrp->set_gpio_attr(fpgpio, std::string("ATR_0X"), atr_idle, mask);
+    usrp->set_gpio_attr(fpgpio, std::string("ATR_RX"), atr_rx, mask);
+    usrp->set_gpio_attr(fpgpio, std::string("ATR_TX"), atr_tx, mask);
+    usrp->set_gpio_attr(fpgpio, std::string("ATR_XX"), atr_duplex, mask);
 
     //set control register
-    usrp->set_gpio_attr(fpgpio, std::string("CTRL"), ctrl);
+    usrp->set_gpio_attr(fpgpio, std::string("CTRL"), ctrl, mask);
 
     //print out initial state of FP GPIO
     std::cout << "\nConfigured GPIO values:" << std::endl;
@@ -205,6 +206,21 @@ int UHD_SAFE_MAIN(int argc, char *argv[]){
 
     //register singal handler
     std::signal(SIGINT, &sig_int_handler);
+
+    //Test the mask - only need to test once with no dwell time
+    std::cout << "\nTesting mask..." << std::flush;
+    //send a value of all 1's to the DDR with a mask for only bit 10
+    usrp->set_gpio_attr(fpgpio, std::string("DDR"), ~0, FPGPIO_BIT(10));
+    //bit 10 should now be 1, but all the other bits should be unchanged
+    rb = usrp->get_gpio_attr(fpgpio, std::string("DDR")) & mask;
+    expected = ddr | FPGPIO_BIT(10);
+    if (rb == expected)
+        std::cout << "pass" << std::endl;
+    else
+        std::cout << "fail" << std::endl;
+    std::cout << std::endl;
+    output_reg_values(fpgpio, usrp);
+    usrp->set_gpio_attr(fpgpio, std::string("DDR"), ddr, mask);
 
     while (not stop_signal_called)
     {
