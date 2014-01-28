@@ -1,5 +1,5 @@
 //
-// Copyright 2013 Ettus Research LLC
+// Copyright 2013-2014 Ettus Research LLC
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -460,19 +460,35 @@ rx_streamer::sptr x300_impl::get_rx_stream(const uhd::stream_args_t &args_)
         perif.framer->configure_flow_control(fc_window);
 
         boost::shared_ptr<boost::uint32_t> seq32(new boost::uint32_t(0));
-        my_streamer->set_xport_chan_get_buff(stream_i, boost::bind(
-            &zero_copy_if::get_recv_buff, xport.recv, _1
-        ), true /*flush*/);
-        my_streamer->set_overflow_handler(stream_i, boost::bind(
-            &x300_impl::handle_overflow, this, boost::ref(perif), my_streamer
-        ));
-        my_streamer->set_xport_handle_flowctrl(stream_i, boost::bind(
-            &handle_rx_flowctrl, data_sid, xport.send, mb.if_pkt_is_big_endian, seq32, _1
-        ), fc_handle_window, true/*init*/);
-        my_streamer->set_issue_stream_cmd(stream_i, boost::bind(
-            &rx_vita_core_3000::issue_stream_command, perif.framer, _1
-        ));
-        mb.rx_streamers[mb_chan] = my_streamer; //store weak pointer
+        //Give the streamer a functor to get the recv_buffer
+        //bind requires a zero_copy_if::sptr to add a streamer->xport lifetime dependency
+        my_streamer->set_xport_chan_get_buff(
+            stream_i,
+            boost::bind(&zero_copy_if::get_recv_buff, xport.recv, _1),
+            true /*flush*/
+        );
+        //Give the streamer a functor to handle overflows
+        //bind requires a weak_ptr to break the a streamer->streamer circular dependency
+        //Using "this" is OK because we know that x300_impl will outlive the streamer
+        my_streamer->set_overflow_handler(
+            stream_i,
+            boost::bind(&x300_impl::handle_overflow, this, boost::ref(perif), boost::weak_ptr<uhd::rx_streamer>(my_streamer))
+        );
+        //Give the streamer a functor to send flow control messages
+        //handle_rx_flowctrl is static and has no lifetime issues
+        my_streamer->set_xport_handle_flowctrl(
+            stream_i, boost::bind(&handle_rx_flowctrl, data_sid, xport.send, mb.if_pkt_is_big_endian, seq32, _1),
+            fc_handle_window,
+            true/*init*/
+        );
+        //Give the streamer a functor issue stream cmd
+        //bind requires a rx_vita_core_3000::sptr to add a streamer->framer lifetime dependency
+        my_streamer->set_issue_stream_cmd(
+            stream_i, boost::bind(&rx_vita_core_3000::issue_stream_command, perif.framer, _1)
+        );
+
+        //Store a weak pointer to prevent a streamer->x300_impl->streamer circular dependency
+        mb.rx_streamers[mb_chan] = boost::weak_ptr<sph::recv_packet_streamer>(my_streamer);
 
         //sets all tick and samp rates on this streamer
         const fs_path mb_path = "/mboards/"+boost::lexical_cast<std::string>(mb_index);
@@ -487,6 +503,8 @@ void x300_impl::handle_overflow(x300_impl::radio_perifs_t &perif, boost::weak_pt
 {
     boost::shared_ptr<sph::recv_packet_streamer> my_streamer =
             boost::dynamic_pointer_cast<sph::recv_packet_streamer>(streamer.lock());
+    if (not my_streamer) return; //If the rx_streamer has expired then overflow handling makes no sense.
+
     if (my_streamer->get_num_channels() == 1)
     {
         perif.framer->handle_overflow();
@@ -606,15 +624,23 @@ tx_streamer::sptr x300_impl::get_tx_stream(const uhd::stream_args_t &args_)
         guts->old_async_queue = _async_md;
         task::sptr task = task::make(boost::bind(&handle_tx_async_msgs, guts, xport.recv, mb.if_pkt_is_big_endian, mb.clock));
 
-        my_streamer->set_xport_chan_get_buff(stream_i, boost::bind(
-            &get_tx_buff_with_flowctrl, task, guts, xport.send, fc_window, _1
-        ));
-        my_streamer->set_async_receiver(boost::bind(
-            &async_md_type::pop_with_timed_wait, async_md, _1, _2
-        ));
+        //Give the streamer a functor to get the send buffer
+        //get_tx_buff_with_flowctrl is static so bind has no lifetime issues
+        //xport.send (sptr) is required to add streamer->data-transport lifetime dependency
+        //task (sptr) is required to add  a streamer->async-handler lifetime dependency
+        my_streamer->set_xport_chan_get_buff(
+            stream_i,
+            boost::bind(&get_tx_buff_with_flowctrl, task, guts, xport.send, fc_window, _1)
+        );
+        //Give the streamer a functor handled received async messages
+        my_streamer->set_async_receiver(
+            boost::bind(&async_md_type::pop_with_timed_wait, async_md, _1, _2)
+        );
         my_streamer->set_xport_chan_sid(stream_i, true, data_sid);
         my_streamer->set_enable_trailer(false); //TODO not implemented trailer support yet
-        mb.tx_streamers[mb_chan] = my_streamer; //store weak pointer
+
+        //Store a weak pointer to prevent a streamer->x300_impl->streamer circular dependency
+        mb.tx_streamers[mb_chan] = boost::weak_ptr<sph::send_packet_streamer>(my_streamer);
 
         //sets all tick and samp rates on this streamer
         const fs_path mb_path = "/mboards/"+boost::lexical_cast<std::string>(mb_index);
