@@ -581,7 +581,6 @@ void x300_impl::setup_mb(const size_t mb_i, const uhd::device_addr_t &dev_addr)
         }
         if (mb.gps and mb.gps->gps_detected())
         {
-            UHD_MSG(status) << "found" << std::endl;
             BOOST_FOREACH(const std::string &name, mb.gps->get_sensors())
             {
                 _tree->create<sensor_value_t>(mb_path / "sensors" / name)
@@ -590,7 +589,6 @@ void x300_impl::setup_mb(const size_t mb_i, const uhd::device_addr_t &dev_addr)
         }
         else
         {
-            UHD_MSG(status) << "not found" << std::endl;
             mb.zpu_ctrl->poke32(SR_ADDR(X300_FW_SHMEM_BASE, X300_FW_SHMEM_GPSDO_STATUS), dont_look_for_gpsdo);
         }
     }
