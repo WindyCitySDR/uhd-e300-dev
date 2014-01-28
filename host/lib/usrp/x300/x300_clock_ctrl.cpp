@@ -21,6 +21,7 @@
 #include <boost/cstdint.hpp>
 #include <boost/format.hpp>
 #include <stdexcept>
+#include <cmath>
 #include <cstdlib>
 
 using namespace uhd;
@@ -64,22 +65,29 @@ double get_sysref_clock_rate(void) {
 }
 
 double get_refout_clock_rate(void) {
-    // TODO
+    throw uhd::not_implemented_error("x3xx get refout rate not implemented");
+
+    return 0.0;
 }
 
 void set_dboard_rate(const x300_clock_which_t which, double rate) {
-    // TODO
+    throw uhd::not_implemented_error("x3xx set dboard clock rate not implemented");
 }
 
 std::vector<double> get_dboard_rates(const x300_clock_which_t) {
+    /* Right now, the only supported daughterboard clock rate is the master clock
+    * rate. TODO Implement divider settings for lower clock rates for legacy
+    * daughterboard support. */
+
     std::vector<double> rates;
     rates.push_back(get_master_clock_rate());
     return rates;
 }
 
-void set_ref_out(const bool enb) {
-    // TODO  How do we set divider?
-    if (enb)
+void set_ref_out(const bool enable) {
+    // TODO  Implement divider configuration to allow for configurable output
+    // rates
+    if (enable)
         _lmk04816_regs.CLKout10_TYPE = lmk04816_regs_t::CLKOUT10_TYPE_LVDS;
     else
         _lmk04816_regs.CLKout10_TYPE = lmk04816_regs_t::CLKOUT10_TYPE_P_DOWN;
@@ -104,31 +112,31 @@ void set_master_clock_rate(double clock_rate) {
      * system reference rates and master clock rates are supported.
      * Additionally, a subset of these will operate in "zero delay" mode. */
 
-    enum opmode {m10M_200M_NOZDEL,      // used for debug purposes only
-                 m10M_200M_ZDEL,        // Normal mode
-                 m30_72M_184_32M_ZDEL,  // LTE with external ref, aka CPRI Mode
-                 m10M_184_32M_NOZDEL }; // LTE with 10 MHz ref
+    enum opmode_t { m10M_200M_NOZDEL,      // used for debug purposes only
+                    m10M_200M_ZDEL,        // Normal mode
+                    m30_72M_184_32M_ZDEL,  // LTE with external ref, aka CPRI Mode
+                    m10M_184_32M_NOZDEL }; // LTE with 10 MHz ref
 
     /* The default clocking mode is 10MHz reference generating a 200 MHz master
      * clock, in zero-delay mode. */
-    opmode clocking_mode = m10M_200M_ZDEL;
+    opmode_t clocking_mode = m10M_200M_ZDEL;
 
     bool valid_rates = false;
 
-    if(_system_ref_rate == 10e6) {
-        if(clock_rate == 184.32e6) {
+    if(doubles_are_equal(_system_ref_rate, 10e6)) {
+        if(doubles_are_equal(clock_rate, 184.32e6)) {
             /* 10MHz reference, 184.32 MHz master clock out, NOT Zero Delay. */
             valid_rates = true;
 
             clocking_mode = m10M_184_32M_NOZDEL;
-        } else if(clock_rate == 200e6) {
+        } else if(doubles_are_equal(clock_rate, 200e6)) {
             /* 10MHz reference, 200 MHz master clock out, Zero Delay */
             valid_rates = true;
 
             clocking_mode = m10M_200M_ZDEL;
         }
-    } else if(_system_ref_rate == 30.72e6) {
-        if(clock_rate == 184.32e6) {
+    } else if(doubles_are_equal(_system_ref_rate, 30.72e6)) {
+        if(doubles_are_equal(clock_rate, 184.32e6)) {
             /* 30.72MHz reference, 184.32 MHz master clock out, Zero Delay */
             valid_rates = true;
 
@@ -148,6 +156,8 @@ void set_master_clock_rate(double clock_rate) {
     // Note: PLL2 N2 prescaler is enabled for all cases
     //       PLL2 reference doubler is enabled for all cases
 
+    /* All LMK04816 settings are from the LMK datasheet for our clocking
+     * architecture. Please refer to the datasheet for more information. */
     switch (clocking_mode) {
         case m10M_200M_NOZDEL:
             vco_div = 12;
@@ -339,6 +349,10 @@ void set_master_clock_rate(double clock_rate) {
     }
 
     this->sync_clocks();
+}
+
+bool doubles_are_equal(double a, double b) {
+    return  (std::fabs(a - b) < std::numeric_limits<double>::epsilon());
 }
 
 const spi_iface::sptr _spiface;

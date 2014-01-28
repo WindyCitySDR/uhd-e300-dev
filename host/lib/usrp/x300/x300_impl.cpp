@@ -40,6 +40,8 @@
 
 #define NIUSRPRIO_DEFAULT_RPC_PORT "5444"
 
+#define X300_REV(x) (x - "A")
+
 using namespace uhd;
 using namespace uhd::usrp;
 using namespace uhd::transport;
@@ -565,13 +567,15 @@ void x300_impl::setup_mb(const size_t mb_i, const uhd::device_addr_t &dev_addr)
     this->update_clock_source(mb, "internal");
     this->update_clock_control(mb);
 
-    // TODO This should be stored as something else useful, probably.
-    size_t hw_rev = 4;  // default
-    if (mb_eeprom.has_key("revision") and not mb_eeprom["revision"].empty())
-    {
+    size_t hw_rev = X300_REV("D"); // Default to RevD settings
+    if(mb_eeprom.has_key("revision") and not mb_eeprom["revision"].empty()) {
         hw_rev = boost::lexical_cast<size_t>(mb_eeprom["revision"]);
     } else {
-        UHD_MSG(warning) << "No revsion detected -- defaulting to sub-optimal clock settings.  MB EEPROM must be reprogrammed!" << std::endl;
+        UHD_MSG(warning) << "No revision detected MB EEPROM must be reprogrammed!" << std::endl;
+    }
+
+    if(hw_rev == X300_REV("D")) {
+        UHD_MSG(warning) << "Loading X300 RevD Settings. This will result in non-optimal lock times." << std::endl;
     }
 
     mb.clock = x300_clock_ctrl::make(mb.zpu_spi,
@@ -683,14 +687,14 @@ void x300_impl::setup_mb(const size_t mb_i, const uhd::device_addr_t &dev_addr)
     _tree->create<std::string>(mb_path / "clock_source" / "value")
         .subscribe(boost::bind(&x300_impl::update_clock_source, this, boost::ref(mb), _1));
 
-    static const std::vector<std::string> clock_sources = boost::assign::list_of("internal")("external")("gpsdo");
-    _tree->create<std::vector<std::string> >(mb_path / "clock_source" / "options").set(clock_sources);
+    static const std::vector<std::string> clock_source_options = boost::assign::list_of("internal")("external")("gpsdo");
+    _tree->create<std::vector<std::string> >(mb_path / "clock_source" / "options").set(clock_source_options);
 
     //setup external reference options. default to 10 MHz input reference
     _tree->create<std::string>(mb_path / "clock_source" / "external");
-    static const std::vector<double> external_freqs = boost::assign::list_of(10e6)(30.72e6)(200e6);
-    _tree->create<std::vector<double> >(mb_path / "clock_source" / "external" / "options")
-        .set(external_freqs);
+    static const std::vector<double> external_freq_options = boost::assign::list_of(10e6)(30.72e6)(200e6);
+    _tree->create<std::vector<double> >(mb_path / "clock_source" / "external" / "freq" / "options")
+        .set(external_freq_options);
     _tree->create<double>(mb_path / "clock_source" / "external" / "value")
         .set(mb.clock->get_sysref_clock_rate());
     // FIXME the external clock source settings need to be more robust
