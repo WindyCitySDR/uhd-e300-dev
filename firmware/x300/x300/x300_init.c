@@ -38,20 +38,20 @@ struct x300_eeprom_map
 };
 
 static struct x300_eeprom_map default_map = {
-    .mac_addr0 = {0x00, 0x50, 0xC2, 0x85, 0x3f, 0xff},
-    .mac_addr1 = {0x00, 0x50, 0xC2, 0x85, 0x3f, 0x33},
-    .gateway = (192 << 24 | 168 << 16 | 10  << 8  | 1 << 0),
+    .mac_addr0 = X300_DEFAULT_MAC_ADDR_0,
+    .mac_addr1 = X300_DEFAULT_MAC_ADDR_1,
+    .gateway = X300_DEFAULT_GATEWAY,
     .subnet = {
-        (255 << 24 | 255 << 16 | 255  << 8  | 0 << 0),
-        (255 << 24 | 255 << 16 | 255  << 8  | 0 << 0),
-        (255 << 24 | 255 << 16 | 255  << 8  | 0 << 0),
-        (255 << 24 | 255 << 16 | 255  << 8  | 0 << 0),
+        X300_DEFAULT_NETMASK_ETH0_1G,
+        X300_DEFAULT_NETMASK_ETH1_1G,
+        X300_DEFAULT_NETMASK_ETH0_10G,
+        X300_DEFAULT_NETMASK_ETH1_10G
     },
     .ip_addr = {
-        (192 << 24 | 168 << 16 | 10  << 8  | 2 << 0),
-        (192 << 24 | 168 << 16 | 20  << 8  | 2 << 0),
-        (192 << 24 | 168 << 16 | 30  << 8  | 2 << 0),
-        (192 << 24 | 168 << 16 | 40  << 8  | 2 << 0),
+        X300_DEFAULT_IP_ETH0_1G,
+        X300_DEFAULT_IP_ETH1_1G,
+        X300_DEFAULT_IP_ETH0_10G,
+        X300_DEFAULT_IP_ETH1_10G
     },
 };
 

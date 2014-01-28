@@ -527,10 +527,10 @@ void x300_impl::setup_mb(const size_t mb_i, const uhd::device_addr_t &dev_addr)
         else if (mb.addr == mb_eeprom["ip-addr1"]) mb.router_dst_here = X300_XB_DST_E1;
         else if (mb.addr == mb_eeprom["ip-addr2"]) mb.router_dst_here = X300_XB_DST_E0;
         else if (mb.addr == mb_eeprom["ip-addr3"]) mb.router_dst_here = X300_XB_DST_E1;
-        else if (mb.addr == X300_DEFAULT_IP_ETH0_1G) mb.router_dst_here = X300_XB_DST_E0;
-        else if (mb.addr == X300_DEFAULT_IP_ETH1_1G) mb.router_dst_here = X300_XB_DST_E1;
-        else if (mb.addr == X300_DEFAULT_IP_ETH0_10G) mb.router_dst_here = X300_XB_DST_E0;
-        else if (mb.addr == X300_DEFAULT_IP_ETH1_10G) mb.router_dst_here = X300_XB_DST_E1;
+        else if (mb.addr == boost::asio::ip::address_v4(boost::uint32_t(X300_DEFAULT_IP_ETH0_1G)).to_string()) mb.router_dst_here = X300_XB_DST_E0;
+        else if (mb.addr == boost::asio::ip::address_v4(boost::uint32_t(X300_DEFAULT_IP_ETH1_1G)).to_string()) mb.router_dst_here = X300_XB_DST_E1;
+        else if (mb.addr == boost::asio::ip::address_v4(boost::uint32_t(X300_DEFAULT_IP_ETH0_10G)).to_string()) mb.router_dst_here = X300_XB_DST_E0;
+        else if (mb.addr == boost::asio::ip::address_v4(boost::uint32_t(X300_DEFAULT_IP_ETH1_10G)).to_string()) mb.router_dst_here = X300_XB_DST_E1;
     }
 
     ////////////////////////////////////////////////////////////////////
