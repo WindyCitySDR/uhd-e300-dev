@@ -37,6 +37,7 @@
 #include <uhd/convert.hpp>
 #include <boost/program_options.hpp>
 #include <boost/format.hpp>
+#include <boost/thread.hpp>
 #include <csignal>
 #include <iostream>
 
@@ -46,6 +47,7 @@
 #define FPGPIO_DEFAULT_TX_RATE      1e6
 #define FPGPIO_DEFAULT_DWELL_TIME   2.0
 #define FPGPIO_NUM_BITS             11
+#define FPGPIO_BIT(x)               (1 << x)
 
 namespace po = boost::program_options;
 
@@ -131,27 +133,27 @@ int UHD_SAFE_MAIN(int argc, char *argv[]){
 
     //set up FPGPIO outputs:
     //FPGPIO[0] = ATR output 1 at idle
-    ctrl |= 1 << 0;
-    atr_idle |= 1 << 0;
-    ddr |= 1 << 0;
+    ctrl |= FPGPIO_BIT(0);
+    atr_idle |= FPGPIO_BIT(0);
+    ddr |= FPGPIO_BIT(0);
 
     //FPGPIO[1] = ATR output 1 during RX
-    ctrl |= 1 << 1;
-    ddr |= 1 << 1;
-    atr_rx |= 1 << 1;
+    ctrl |= FPGPIO_BIT(1);
+    ddr |= FPGPIO_BIT(1);
+    atr_rx |= FPGPIO_BIT(1);
 
     //FPGPIO[2] = ATR output 1 during TX
-    ctrl |= 1 << 2;
-    ddr |= 1 << 2;
-    atr_tx |= 1 << 2;
+    ctrl |= FPGPIO_BIT(2);
+    ddr |= FPGPIO_BIT(2);
+    atr_tx |= FPGPIO_BIT(2);
 
     //FPGPIO[3] = ATR output 1 during full duplex
-    ctrl |= 1 << 3;
-    ddr |= 1 << 3;
-    atr_duplex |= 1 << 3;
+    ctrl |= FPGPIO_BIT(3);
+    ddr |= FPGPIO_BIT(3);
+    atr_duplex |= FPGPIO_BIT(3);
 
     //FPGPIO[4] = output
-    ddr |= 1 << 4;
+    ddr |= FPGPIO_BIT(4);
 
     //set data direction register (DDR)
     usrp->set_gpio_attr(fpgpio, std::string("DDR"), ddr);
@@ -168,6 +170,7 @@ int UHD_SAFE_MAIN(int argc, char *argv[]){
     //print out initial state of FP GPIO
     std::cout << "\nConfigured GPIO values:" << std::endl;
     output_reg_values(fpgpio, usrp);
+    std::cout << std::endl;
 
     //set up streams
     uhd::stream_args_t rx_args(cpu, otw);
@@ -207,7 +210,8 @@ int UHD_SAFE_MAIN(int argc, char *argv[]){
     {
         int failures = 0;
 
-        std::cout << "Press Ctrl + C to quit..." << std::endl;
+        if (vm.count("repeat"))
+            std::cout << "Press Ctrl + C to quit..." << std::endl;
 
         // test user controlled GPIO and ATR idle by setting bit 4 high for 1 second
         std::cout << "\nTesting user controlled GPIO and ATR idle output..." << std::flush;
@@ -215,24 +219,24 @@ int UHD_SAFE_MAIN(int argc, char *argv[]){
         stop_time = usrp->get_time_now() + dwell_time;
         while (not stop_signal_called and usrp->get_time_now() < stop_time)
         {
-            usleep(10000);
+            boost::this_thread::sleep(boost::posix_time::milliseconds(100));
         }
         rb = usrp->get_gpio_attr(fpgpio, "READBACK");
-        expected = 1 << 4 | 1 << 0;
+        expected = FPGPIO_BIT(4) | FPGPIO_BIT(0);
         if ((rb & expected) != expected)
         {
             ++failures;
             std::cout << "fail" << std::endl;
-            if ((rb & (1 << 0)) == 0)
+            if ((rb & FPGPIO_BIT(0)) == 0)
                 std::cout << "Bit 0 should be set, but is not" << std::endl;
-            if ((rb & (1 << 4)) == 0)
+            if ((rb & FPGPIO_BIT(4)) == 0)
                 std::cout << "Bit 4 should be set, but is not" << std::endl;
         } else {
             std::cout << "pass" << std::endl;
         }
         std::cout << std::endl;
         output_reg_values(fpgpio, usrp);
-        usrp->set_gpio_attr(fpgpio, "OUT", 0, 1 << 4);
+        usrp->set_gpio_attr(fpgpio, "OUT", 0, FPGPIO_BIT(4));
         if (stop_signal_called)
             break;
 
@@ -248,7 +252,7 @@ int UHD_SAFE_MAIN(int argc, char *argv[]){
             } catch(...){}
         }
         rb = usrp->get_gpio_attr(fpgpio, "READBACK");
-        expected = 1 << 1;
+        expected = FPGPIO_BIT(1);
         if ((rb & expected) != expected)
         {
             ++failures;
@@ -280,7 +284,7 @@ int UHD_SAFE_MAIN(int argc, char *argv[]){
             } catch(...){}
         }
         rb = usrp->get_gpio_attr(fpgpio, "READBACK");
-        expected = 1 << 2;
+        expected = FPGPIO_BIT(2);
         if ((rb & expected) != expected)
         {
             ++failures;
@@ -314,7 +318,7 @@ int UHD_SAFE_MAIN(int argc, char *argv[]){
             } catch(...){}
         }
         rb = usrp->get_gpio_attr(fpgpio, "READBACK");
-        expected = 1 << 3;
+        expected = FPGPIO_BIT(3);
         if ((rb & expected) != expected)
         {
             ++failures;
