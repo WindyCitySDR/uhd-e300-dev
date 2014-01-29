@@ -9,17 +9,18 @@ Comparative features list - B200
 ------------------------------------------------------------------------
 
 **Hardware Capabilities:**
-* Integrated RF frontend (70 MHz - 6 GHz)
-* External PPS reference input
-* External 10MHz reference input
-* Configurable clock rate
-* Internal GPSDO option
-* B210 Only:
-  * MICTOR Debug Connector
-  * JTAG Connector
+ * Integrated RF frontend (70 MHz - 6 GHz)
+ * External PPS reference input
+ * External 10MHz reference input
+ * Configurable clock rate
+ * Internal GPSDO option
+ * B210 Only:
+ 
+   * MICTOR Debug Connector
+   * JTAG Connector
 **FPGA Capabilities:**
-* Timed commands in FPGA
-* Timed sampling in FPGA
+ * Timed commands in FPGA
+ * Timed sampling in FPGA
 
 ------------------------------------------------------------------------
 Specify a Non-standard Image
