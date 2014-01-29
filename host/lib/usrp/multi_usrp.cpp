@@ -927,7 +927,7 @@ public:
         {
             const boost::uint32_t current = _tree->access<boost::uint32_t>(mb_root(mboard) / "gpio" / bank / attr).get();
             const boost::uint32_t new_value = (current & ~mask) | (value & mask);
-            _tree->access<boost::uint64_t>(mb_root(mboard) / "gpio" / bank / attr).set(new_value);
+            _tree->access<boost::uint32_t>(mb_root(mboard) / "gpio" / bank / attr).set(new_value);
             return;
         }
         if (bank.size() > 2 and bank[1] == 'X')
