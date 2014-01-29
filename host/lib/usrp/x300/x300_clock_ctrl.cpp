@@ -112,39 +112,36 @@ void set_master_clock_rate(double clock_rate) {
      * system reference rates and master clock rates are supported.
      * Additionally, a subset of these will operate in "zero delay" mode. */
 
-    enum opmode_t { m10M_200M_NOZDEL,      // used for debug purposes only
+    enum opmode_t { INVALID,
+                    m10M_200M_NOZDEL,      // used for debug purposes only
                     m10M_200M_ZDEL,        // Normal mode
                     m30_72M_184_32M_ZDEL,  // LTE with external ref, aka CPRI Mode
-                    m10M_184_32M_NOZDEL }; // LTE with 10 MHz ref
+                    m10M_184_32M_NOZDEL,   // LTE with 10 MHz ref
+                    m10M_120M_ZDEL };       // NI USRP 120 MHz Clocking
 
     /* The default clocking mode is 10MHz reference generating a 200 MHz master
      * clock, in zero-delay mode. */
-    opmode_t clocking_mode = m10M_200M_ZDEL;
-
-    bool valid_rates = false;
+    opmode_t clocking_mode = INVALID;
 
     if(doubles_are_equal(_system_ref_rate, 10e6)) {
         if(doubles_are_equal(clock_rate, 184.32e6)) {
             /* 10MHz reference, 184.32 MHz master clock out, NOT Zero Delay. */
-            valid_rates = true;
-
             clocking_mode = m10M_184_32M_NOZDEL;
         } else if(doubles_are_equal(clock_rate, 200e6)) {
             /* 10MHz reference, 200 MHz master clock out, Zero Delay */
-            valid_rates = true;
-
             clocking_mode = m10M_200M_ZDEL;
+        } else if(doubles_are_equal(clock_rate, 120e6)) {
+            /* 10MHz reference, 120 MHz master clock rate, Zero Delay */
+            clocking_mode = m10M_120M_ZDEL;
         }
     } else if(doubles_are_equal(_system_ref_rate, 30.72e6)) {
         if(doubles_are_equal(clock_rate, 184.32e6)) {
             /* 30.72MHz reference, 184.32 MHz master clock out, Zero Delay */
-            valid_rates = true;
-
             clocking_mode = m30_72M_184_32M_ZDEL;
         }
     }
 
-    if(!valid_rates) {
+    if(clocking_mode == INVALID) {
         throw uhd::runtime_error(str(boost::format("A master clock rate of %f cannot be derived from a system reference rate of %f") % clock_rate % _system_ref_rate));
     }
 
@@ -241,6 +238,31 @@ void set_master_clock_rate(double clock_rate) {
             _lmk04816_regs.PLL2_R4_LF = lmk04816_regs_t::PLL2_R4_LF_1KILO_OHM;
             _lmk04816_regs.PLL2_C4_LF = lmk04816_regs_t::PLL2_C4_LF_71PF;
 
+            break;
+
+        case m10M_120M_ZDEL:
+            vco_div = 20;
+            _lmk04816_regs.MODE = lmk04816_regs_t::MODE_DUAL_INT_ZER_DELAY;
+
+            // PLL1 - 2 MHz compare frequency
+            _lmk04816_regs.PLL1_N_28 = 60;
+            _lmk04816_regs.PLL1_R_27 = 5;
+            _lmk04816_regs.PLL1_CP_GAIN_27 = lmk04816_regs_t::PLL1_CP_GAIN_27_100UA;
+
+            // PLL2 - 96 MHz compare frequency
+            _lmk04816_regs.PLL2_N_30 = 5;
+            _lmk04816_regs.PLL2_P_30 = lmk04816_regs_t::PLL2_P_30_DIV_5;
+            _lmk04816_regs.PLL2_R_28 = 2;
+
+            if(_hw_rev <= 4)
+                _lmk04816_regs.PLL2_CP_GAIN_26 = lmk04816_regs_t::PLL2_CP_GAIN_26_1600UA;
+            else
+                _lmk04816_regs.PLL2_CP_GAIN_26 = lmk04816_regs_t::PLL2_CP_GAIN_26_400UA;
+
+            break;
+
+        default:
+            UHD_THROW_INVALID_CODE_PATH();
             break;
     };
 

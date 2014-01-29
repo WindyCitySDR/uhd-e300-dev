@@ -40,7 +40,7 @@
 
 #define NIUSRPRIO_DEFAULT_RPC_PORT "5444"
 
-#define X300_REV(x) (x - "A")
+#define X300_REV(x) (x - "A" + 1)
 
 using namespace uhd;
 using namespace uhd::usrp;
@@ -567,15 +567,20 @@ void x300_impl::setup_mb(const size_t mb_i, const uhd::device_addr_t &dev_addr)
     this->update_clock_source(mb, "internal");
     this->update_clock_control(mb);
 
-    size_t hw_rev = X300_REV("D"); // Default to RevD settings
+    size_t hw_rev = 0;
     if(mb_eeprom.has_key("revision") and not mb_eeprom["revision"].empty()) {
-        hw_rev = boost::lexical_cast<size_t>(mb_eeprom["revision"]);
+        try {
+            hw_rev = boost::lexical_cast<size_t>(mb_eeprom["revision"]);
+        } catch(...) {
+            UHD_MSG(warning) << "Revision in EEPROM is invalid! Please reprogram your EEPROM." << std::endl;
+        }
     } else {
         UHD_MSG(warning) << "No revision detected MB EEPROM must be reprogrammed!" << std::endl;
     }
 
-    if(hw_rev == X300_REV("D")) {
-        UHD_MSG(warning) << "Loading X300 RevD Settings. This will result in non-optimal lock times." << std::endl;
+    if(hw_rev == 0) {
+        UHD_MSG(warning) << "Defaulting to X300 RevD Clock Settings. This will result in non-optimal lock times." << std::endl;
+        hw_rev = X300_REV("D");
     }
 
     mb.clock = x300_clock_ctrl::make(mb.zpu_spi,
