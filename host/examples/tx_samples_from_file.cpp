@@ -1,5 +1,5 @@
 //
-// Copyright 2011-2012 Ettus Research LLC
+// Copyright 2011-2012,2014 Ettus Research LLC
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -15,6 +15,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 //
 
+#include <uhd/types/tune_request.hpp>
 #include <uhd/utils/thread_priority.hpp>
 #include <uhd/utils/safe_main.hpp>
 #include <uhd/usrp/multi_usrp.hpp>
@@ -91,6 +92,7 @@ int UHD_SAFE_MAIN(int argc, char *argv[]){
         ("wirefmt", po::value<std::string>(&wirefmt)->default_value("sc16"), "wire format (sc8 or sc16)")
         ("delay", po::value<double>(&delay)->default_value(0.0), "specify a delay between repeated transmission of file")
         ("repeat", "repeatedly transmit file")
+        ("int-n", "tune USRP with integer-n tuning")
     ;
     po::variables_map vm;
     po::store(po::parse_command_line(argc, argv, desc), vm);
@@ -132,8 +134,11 @@ int UHD_SAFE_MAIN(int argc, char *argv[]){
         return ~0;
     }
     std::cout << boost::format("Setting TX Freq: %f MHz...") % (freq/1e6) << std::endl;
-    if (vm.count("lo_off")) usrp->set_tx_freq(uhd::tune_request_t(freq, lo_off));
-    else usrp->set_tx_freq(freq);
+    uhd::tune_request_t tune_request;
+    if(vm.count("lo_off")) tune_request = uhd::tune_request_t(freq, lo_off);
+    else tune_request = uhd::tune_request_t(freq);
+    if(vm.count("int-n")) tune_request.args = uhd::device_addr_t("mode_n=int-n");
+    usrp->set_tx_freq(tune_request);
     std::cout << boost::format("Actual TX Freq: %f MHz...") % (usrp->get_tx_freq()/1e6) << std::endl << std::endl;
 
     //set the rf gain

@@ -4,14 +4,13 @@ UHD - Internal GPSDO Application Notes (USRP-N2x0/E1X0 Models)
 
 .. contents:: Table of Contents
 
-This application note describes the use of integrated GPS-disciplined
-oscillators with Ettus Research USRP devices. It pertains specifically
-to the Jackson Labs Firefly-1A device unless noted otherwise.   For 
-information regarding the GPSDO that is compatible with the USRP N3xx 
-please see:
+This application note describes the use of integrated GPS-disciplined oscillators for
+the USRP N-Series and E1xx. For information regarding the GPSDO that is compatible with
+the USRP X-Series, please see:
 
 `USRP-X3x0 Internal GPSDO Device Manual <./gpsdo_x3x0.html>`_
 
+=======
 
 ------------------------------------------------------------------------
 Specifications
