@@ -373,7 +373,7 @@ void set_master_clock_rate(double clock_rate) {
     this->sync_clocks();
 }
 
-bool doubles_are_equal(double a, double b) {
+UHD_INLINE bool doubles_are_equal(double a, double b) {
     return  (std::fabs(a - b) < std::numeric_limits<double>::epsilon());
 }
 
