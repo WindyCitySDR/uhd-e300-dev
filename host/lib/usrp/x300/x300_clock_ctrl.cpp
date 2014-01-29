@@ -65,13 +65,14 @@ double get_sysref_clock_rate(void) {
 }
 
 double get_refout_clock_rate(void) {
-    throw uhd::not_implemented_error("x3xx get refout rate not implemented");
-
-    return 0.0;
+    //We support only one reference output rate
+    return 10e6;
 }
 
-void set_dboard_rate(const x300_clock_which_t which, double rate) {
-    throw uhd::not_implemented_error("x3xx set dboard clock rate not implemented");
+void set_dboard_rate(const x300_clock_which_t, double rate) {
+    if(not doubles_are_equal(rate, get_master_clock_rate())) {
+        throw uhd::not_implemented_error("x3xx set dboard clock rate does not support setting an arbitrary clock rate");
+    }
 }
 
 std::vector<double> get_dboard_rates(const x300_clock_which_t) {
