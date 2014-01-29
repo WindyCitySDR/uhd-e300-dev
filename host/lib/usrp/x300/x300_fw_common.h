@@ -57,6 +57,21 @@ extern "C" {
 #define X300_FPGA_PROG_UDP_PORT 49157
 #define X300_MTU_DETECT_UDP_PORT 49158
 
+#define X300_DEFAULT_MAC_ADDR_0         {0x00, 0x50, 0xC2, 0x85, 0x3f, 0xff}
+#define X300_DEFAULT_MAC_ADDR_1         {0x00, 0x50, 0xC2, 0x85, 0x3f, 0x33}
+
+#define X300_DEFAULT_GATEWAY            (192 << 24 | 168 << 16 | 10  << 8  | 1 << 0)
+
+#define X300_DEFAULT_IP_ETH0_1G         (192 << 24 | 168 << 16 | 10  << 8  | 2 << 0)
+#define X300_DEFAULT_IP_ETH1_1G         (192 << 24 | 168 << 16 | 20  << 8  | 2 << 0)
+#define X300_DEFAULT_IP_ETH0_10G        (192 << 24 | 168 << 16 | 30  << 8  | 2 << 0)
+#define X300_DEFAULT_IP_ETH1_10G        (192 << 24 | 168 << 16 | 40  << 8  | 2 << 0)
+
+#define X300_DEFAULT_NETMASK_ETH0_1G    (255 << 24 | 255 << 16 | 255  << 8  | 0 << 0)
+#define X300_DEFAULT_NETMASK_ETH1_1G    (255 << 24 | 255 << 16 | 255  << 8  | 0 << 0)
+#define X300_DEFAULT_NETMASK_ETH0_10G   (255 << 24 | 255 << 16 | 255  << 8  | 0 << 0)
+#define X300_DEFAULT_NETMASK_ETH1_10G   (255 << 24 | 255 << 16 | 255  << 8  | 0 << 0)
+
 #define X300_FW_COMMS_FLAGS_ACK        (1 << 0)
 #define X300_FW_COMMS_FLAGS_ERROR      (1 << 1)
 #define X300_FW_COMMS_FLAGS_POKE32     (1 << 2)
