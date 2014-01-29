@@ -90,8 +90,17 @@ localparam ZPU_RB_ETH_TYPE1  = 5;
 
 static const uint32_t X300_PCIE_VID         = 0x1093;
 static const uint32_t X300_PCIE_PID         = 0xC4C4;
-static const uint32_t X300_PCIE_SSID        = 0x7736;
-static const uint32_t X310_PCIE_SSID        = 0x76CA;
+static const uint32_t X300_USRP_PCIE_SSID   = 0x7736;
+static const uint32_t X310_USRP_PCIE_SSID   = 0x76CA;
+static const uint32_t X310_2940R_PCIE_SSID  = 0x772B;
+static const uint32_t X310_2942R_PCIE_SSID  = 0x772C;
+static const uint32_t X310_2943R_PCIE_SSID  = 0x772D;
+static const uint32_t X310_2944R_PCIE_SSID  = 0x772E;
+static const uint32_t X310_2950R_PCIE_SSID  = 0x772F;
+static const uint32_t X310_2952R_PCIE_SSID  = 0x7730;
+static const uint32_t X310_2953R_PCIE_SSID  = 0x7731;
+static const uint32_t X310_2954R_PCIE_SSID  = 0x7732;
+
 static const uint32_t FPGA_X3xx_SIG_VALUE   = 0x58333030;
 
 static const uint32_t PCIE_FPGA_ADDR_BASE   = 0xC0000;

@@ -107,7 +107,7 @@ private:    //Methods
     bool _is_initialized();
     datatype_info_t _get_datatype_info();
     nirio_status _get_transfer_count(uint64_t& transfer_count);
-    nirio_status _ensure_transfer_completed();
+    nirio_status _ensure_transfer_completed(uint32_t timeout_ms);
 
 private:    //Members
     std::string                    _name;
