@@ -652,11 +652,11 @@ void x300_impl::setup_mb(const size_t mb_i, const uhd::device_addr_t &dev_addr)
     const std::vector<std::string> GPIO_ATTRS = boost::assign::list_of("CTRL")("DDR")("OUT")("ATR_0X")("ATR_RX")("ATR_TX")("ATR_XX");
     BOOST_FOREACH(const std::string &attr, GPIO_ATTRS)
     {
-        _tree->create<boost::uint64_t>(mb_path / "gpio" / "FP0" / attr)
+        _tree->create<boost::uint32_t>(mb_path / "gpio" / "FP0" / attr)
             .set(0)
-            .subscribe(boost::bind(&x300_impl::set_fp_gpio, this, mb_path, mb.fp_gpio, attr, _1));
+            .subscribe(boost::bind(&x300_impl::set_fp_gpio, this, mb.fp_gpio, attr, _1));
     }
-    _tree->create<boost::uint64_t>(mb_path / "gpio" / "FP0" / "READBACK")
+    _tree->create<boost::uint32_t>(mb_path / "gpio" / "FP0" / "READBACK")
         .publish(boost::bind(&x300_impl::get_fp_gpio, this, mb.fp_gpio, "READBACK"));
 
     ////////////////////////////////////////////////////////////////////
@@ -1257,30 +1257,20 @@ void x300_impl::set_mb_eeprom(i2c_iface::sptr i2c, const mboard_eeprom_t &mb_eep
     mb_eeprom.commit(*eeprom16, "X300");
 }
 
-boost::uint64_t x300_impl::get_fp_gpio(gpio_core_200::sptr gpio, const std::string &)
+boost::uint32_t x300_impl::get_fp_gpio(gpio_core_200::sptr gpio, const std::string &)
 {
-    return boost::uint64_t(gpio->read_gpio(dboard_iface::UNIT_RX));
+    return boost::uint32_t(gpio->read_gpio(dboard_iface::UNIT_RX));
 }
 
-template <typename T>
-static T shadow_it(const T &shadow, const T &value, const T &mask)
+void x300_impl::set_fp_gpio(gpio_core_200::sptr gpio, const std::string &attr, const boost::uint32_t value)
 {
-    return (shadow & ~mask) | (value & mask);
-}
-
-void x300_impl::set_fp_gpio(const uhd::fs_path &mb_path, gpio_core_200::sptr gpio, const std::string &attr, const boost::uint64_t setting)
-{
-    const boost::uint32_t value = boost::uint32_t(setting >> 0);
-    const boost::uint32_t mask = boost::uint32_t(setting >> 32);
-    const boost::uint32_t shadow = boost::uint32_t(_tree->access<boost::uint64_t>(mb_path / "gpio" / "FP0" / attr).get());
-    const boost::uint32_t new_value = shadow_it(shadow, value, mask);
-    if (attr == "CTRL") return gpio->set_pin_ctrl(dboard_iface::UNIT_RX, new_value);
-    if (attr == "DDR") return gpio->set_gpio_ddr(dboard_iface::UNIT_RX, new_value);
-    if (attr == "OUT") return gpio->set_gpio_out(dboard_iface::UNIT_RX, new_value);
-    if (attr == "ATR_0X") return gpio->set_atr_reg(dboard_iface::UNIT_RX, dboard_iface::ATR_REG_IDLE, new_value);
-    if (attr == "ATR_RX") return gpio->set_atr_reg(dboard_iface::UNIT_RX, dboard_iface::ATR_REG_RX_ONLY, new_value);
-    if (attr == "ATR_TX") return gpio->set_atr_reg(dboard_iface::UNIT_RX, dboard_iface::ATR_REG_TX_ONLY, new_value);
-    if (attr == "ATR_XX") return gpio->set_atr_reg(dboard_iface::UNIT_RX, dboard_iface::ATR_REG_FULL_DUPLEX, new_value);
+    if (attr == "CTRL") return gpio->set_pin_ctrl(dboard_iface::UNIT_RX, value);
+    if (attr == "DDR") return gpio->set_gpio_ddr(dboard_iface::UNIT_RX, value);
+    if (attr == "OUT") return gpio->set_gpio_out(dboard_iface::UNIT_RX, value);
+    if (attr == "ATR_0X") return gpio->set_atr_reg(dboard_iface::UNIT_RX, dboard_iface::ATR_REG_IDLE, value);
+    if (attr == "ATR_RX") return gpio->set_atr_reg(dboard_iface::UNIT_RX, dboard_iface::ATR_REG_RX_ONLY, value);
+    if (attr == "ATR_TX") return gpio->set_atr_reg(dboard_iface::UNIT_RX, dboard_iface::ATR_REG_TX_ONLY, value);
+    if (attr == "ATR_XX") return gpio->set_atr_reg(dboard_iface::UNIT_RX, dboard_iface::ATR_REG_FULL_DUPLEX, value);
 }
 
 /***********************************************************************

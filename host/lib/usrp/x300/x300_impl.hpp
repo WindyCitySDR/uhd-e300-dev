@@ -298,8 +298,8 @@ private:
     void check_fpga_compat(const uhd::fs_path &mb_path, uhd::wb_iface::sptr iface);
 
     void update_atr_leds(gpio_core_200_32wo::sptr, const std::string &ant);
-    boost::uint64_t get_fp_gpio(gpio_core_200::sptr, const std::string &);
-    void set_fp_gpio(const uhd::fs_path &mb_path, gpio_core_200::sptr, const std::string &, const boost::uint64_t);
+    boost::uint32_t get_fp_gpio(gpio_core_200::sptr, const std::string &);
+    void set_fp_gpio(gpio_core_200::sptr, const std::string &, const boost::uint32_t);
 };
 
 #endif /* INCLUDED_X300_IMPL_HPP */
