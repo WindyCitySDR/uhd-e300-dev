@@ -17,7 +17,7 @@
 
 ########################################################################
 
-add_library(usrpfw STATIC
+add_library(usrp3fw STATIC
     udp_uart.c
     wb_uart.c
     wb_i2c.c
