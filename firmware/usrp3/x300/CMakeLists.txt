@@ -23,6 +23,7 @@ list(APPEND x300_sources x300_init.c x300_main.c)
 
 ########################################################################
 set(GEN_OUTPUTS_BIN_SIZE 0x7fff)
+SET(CMAKE_C_FLAGS_DEBUG -DX300_DEBUG_UART)
 
 add_executable(x300_main.elf ${x300_sources})
 target_link_libraries(x300_main.elf usrp3fw)

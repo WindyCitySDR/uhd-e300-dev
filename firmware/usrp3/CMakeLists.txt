@@ -23,7 +23,7 @@ CMAKE_MINIMUM_REQUIRED(VERSION 2.6)
 INCLUDE(CMakeForceCompiler)
 SET(CMAKE_SYSTEM_NAME Generic)
 CMAKE_FORCE_C_COMPILER(zpu-elf-gcc GNU)
-PROJECT(X300_FW C)
+PROJECT(USRP3_FW C)
 
 INCLUDE_DIRECTORIES(include)
 
@@ -45,7 +45,6 @@ INCLUDE_DIRECTORIES(
 # misc flags for the gcc compiler
 ########################################################################
 SET(CMAKE_C_FLAGS -phi) #always needed compile time and link time
-SET(CMAKE_C_FLAGS_DEBUG -DX300_DEBUG_UART)
 ADD_DEFINITIONS(-Os)
 ADD_DEFINITIONS(--std=gnu99)
 ADD_DEFINITIONS(-Wall)
