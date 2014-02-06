@@ -68,6 +68,8 @@ a conservative amount of time (perhaps a second).
 Pseudo-code for dealing with settling time after tuning on receive:
 :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 
+::
+
     usrp->set_rx_freq(...);
     sleep(1);
     usrp->issue_stream_command(...);
@@ -79,6 +81,7 @@ Pseudo-code for dealing with settling time after tuning on receive:
         //sleep for a short time in milliseconds
     }
     usrp->issue_stream_command(...);
+
 
 -------------------------------
 Specifying the Subdevice to Use
