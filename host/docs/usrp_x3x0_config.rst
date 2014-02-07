@@ -181,7 +181,7 @@ Real-Time Scheduling in your Application
 ----------------------------------------
 Please note that turning on real-time scheduling in your application **may lock
 up your computer** if the processor cannot keep up with the application. You
-should, in general, do not use real-time scheduling unless you need to.
+should generally avoid using real-time scheduling unless you need to.
 
 Real-time scheduling is enabled via different methods depending on your
 application and operating system. In GNU Radio Companion, it can be turned on in
