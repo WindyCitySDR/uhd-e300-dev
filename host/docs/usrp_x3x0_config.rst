@@ -61,15 +61,15 @@ Either restart the system or issue the following commands:
 
 ::
 
-    sudo sysctl net.core.rmem_max=33554432
-    sudo sysctl net.core.wmem_max=33554432
+    sudo sysctl -w net.core.rmem_max=33554432
+    sudo sysctl -w net.core.wmem_max=33554432
 
 
 Configuring the MTU
 -------------------------------------
 UHD uses large frame sizes over UDP, which requires a larger than normal MTU
 size.  The default MTU size for most Ethernet cards is 1500.  UHD uses an MTU
-size of 9000 by default.  Nework hardware may or may not support higher MTU
+size of 9000 by default.  Network hardware may or may not support higher MTU
 sizes, so the manufacturer's documentation for any network hardware should be
 consulted to see if it supports larger MTU sizes.  To set the MTU size of the
 interface to 9000:
@@ -129,7 +129,7 @@ Power Management
 Power management on the host system attempts to save power by reducing clock
 frequencies or even powering off devices while not in use.  This can lead to
 significant performance issues when trying to operate at high sample rates.
-Ettus strongly recommends disabling all power management.
+Ettus Research strongly recommends disabling all power management.
 
 
 Setting the CPU Governors
@@ -181,10 +181,10 @@ Real-Time Scheduling in your Application
 ----------------------------------------
 Please note that turning on real-time scheduling in your application **may lock
 up your computer** if the processor cannot keep up with the application. You
-should, in general, not use real-time scheduling unless you nede to.
+should, in general, do not use real-time scheduling unless you need to.
 
 Real-time scheduling is enabled via different methods depending on your
-application and operating system. In GNURadio-Companion, it can be turned on in
+application and operating system. In GNU Radio Companion, it can be turned on in
 each individual flowgraph.
 
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -192,7 +192,7 @@ Building with ORC & Volk
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Especially when running high-performance applications, processing performance
 can be dramatically improved by SIMD instructions. UHD uses ORC to provide SIMD
-capability, and GNURadio includes a SIMD library called "Volk". These should
+capability, and GNU Radio includes a SIMD library called "Volk". These should
 both be used to guarantee optimum performance.
 
 Compiling UHD with ORC
@@ -248,7 +248,7 @@ cards that will be connected to the X3x0 device.
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 10GbE NIC
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Intel or Myricom 10GbE NICs are recommeded.  Mellanox, SolarFlare, and Chelsio
+Intel or Myricom 10GbE NICs are recommended.  Mellanox, SolarFlare, and Chelsio
 10GbE NICs are not currently recommended.  The Ethernet card should be plugged
 into the slot that has the most direct connection with the CPU (PCIe lanes are
 not shared with another slot).  Refer to the motherboard manual for more
