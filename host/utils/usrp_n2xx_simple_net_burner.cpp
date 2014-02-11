@@ -55,7 +55,8 @@ void sig_int_handler(int){
     num_ctrl_c++;
     if(num_ctrl_c == 1){
         std::cout << std::endl << "Are you sure you want to abort the image burning? If you do, your "
-                                  "USRP-N Series unit will be bricked!" << std::endl << std::endl;
+                                  "USRP-N Series unit will be bricked!" << std::endl
+                               << "Press Ctrl+C again to abort the image burning procedure." << std::endl << std::endl;
     }
     else{
         std::cout << std::endl << "Aborting. Your USRP-N Series unit will be bricked." << std::endl
