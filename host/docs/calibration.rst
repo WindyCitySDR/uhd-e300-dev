@@ -55,7 +55,7 @@ may not have a serial number. If this is the case, run the following command to 
 into the daughterboard's EEPROM:
 ::
 
-    <install dir>/share/uhd/utils/usrp_burn_db_eeprom --ser=<desired serial> --args=<optional device args>
+    <install dir>/lib/uhd/utils/usrp_burn_db_eeprom --ser=<desired serial> --args=<optional device args>
 
 ********************************************
 Calibration Data

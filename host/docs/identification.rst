@@ -18,19 +18,19 @@ Common device identifiers
 ^^^^^^^^^^^^^^^^^^^^^^^^^
 Every device has several ways of identifying it on the host system:
 
-+------------+----------+-----------------------------------------------------------+
-| Identifier | Key      | Notes                                                     |
-+============+==========+===========================================================+
-| Serial     | serial   | globally unique identifier                                |
-+------------+----------+-----------------------------------------------------------+
-| Address    | addr     | unique identifier on a network                            |
-+------------+----------+-----------------------------------------------------------+
-| Resource   | resource | unique identifier for USRP RIO devices (over PCI Express) |
-+------------+----------+-----------------------------------------------------------+
-| Name       | name     | optional user-set identifier                              |
-+------------+----------+-----------------------------------------------------------+
-| Type       | type     | hardware series identifier                                |
-+------------+----------+-----------------------------------------------------------+
++------------+----------+-----------------------------------------------------------+-------------------------------
+| Identifier | Key      | Notes                                                     | Example
++============+==========+===========================================================+===============================
+| Serial     | serial   | globally unique identifier                                | 12345678
++------------+----------+-----------------------------------------------------------+----------------------------
+| Address    | addr     | unique identifier on a network                            | 192.168.10.2
++------------+----------+-----------------------------------------------------------+-------------------------------
+| Resource   | resource | unique identifier for USRP RIO devices (over PCI Express) | RIO0
++------------+----------+-----------------------------------------------------------+-------------------------------
+| Name       | name     | optional user-set identifier                              | my_usrp1 (User-defined value)
++------------+----------+-----------------------------------------------------------+----------------------------
+| Type       | type     | hardware series identifier                                | usrp1, usrp2, 
++------------+----------+-----------------------------------------------------------+----------------------------
 
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Device discovery via command line
@@ -108,9 +108,10 @@ Set a custom name
 ^^^^^^^^^^^^^^^^^
 
 Run the following commands:
-:::::::::::::::::::::::::::
 
-    cd <install-path>/share/uhd/utils
+::
+
+    cd <install-path>/lib/uhd/utils
     ./usrp_burn_mb_eeprom --args=<optional device args> --key=name --val=lab1_xcvr
 
 ^^^^^^^^^^^^^^^^^^
@@ -119,7 +120,8 @@ Discovery via name
 
 The keyword **name** can be used to narrow the scope of the search.
 Example with the find devices utility:
-::::::::::::::::::::::::::::::::::::::
+
+::
 
     uhd_find_devices --args="name=lab1_xcvr"
 

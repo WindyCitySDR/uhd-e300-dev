@@ -37,11 +37,10 @@ The pre-built images come in two forms:
 UHD Images Downloader
 ^^^^^^^^^^^^^^^^^^^^^^
 
-The UHD Images Downloader was added in UHD 003.005.000. This script downloads
-UHD images that are guaranteed to be compatible with the host code and places
-them in the default images directory.
+The UHD images downloader downloads UHD images compatible with the host code
+and places them in the default images directory.
 
-By default, it can be found at: **<install-path>/share/uhd/utils/uhd_images_downloader.py**
+By default, it can be found at: **<install-path>/lib/uhd/utils/uhd_images_downloader.py**
 
 By default, it installs images to: **<install-path>/share/uhd/images**
 

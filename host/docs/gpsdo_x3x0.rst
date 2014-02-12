@@ -14,7 +14,7 @@ compatible with the USRP N2xx or E1xx, please see:
 Specifications
 ------------------------------------------------------------------------
 * **Receiver type**: 50 channel with WAAS, EGNOS, MSAS
-* **10MHz ADEV**: 5e-11 over >24h
+* **10 MHz ADEV**: 5e-11 over >24h
 * **1PPS RMS jitter**: <50ns 1-sigma
 * **Holdover**: <20us over 3h
 

@@ -232,21 +232,16 @@ void ethernet_burn(udp_simple::sptr udp_transport, std::string fpga_path, bool v
         throw std::runtime_error("Failed to start image burning! Did you specify the correct IP address? If so, power-cycle the device and try again.");
     }
 
-    std::cout << "Progress: " << std::flush;
-
-    int percentage = -1;
-    int last_percentage = -1;
     size_t current_pos = 0;
+    size_t sectors = fpga_image_size / X300_FLASH_SECTOR_SIZE;
 
     //Each sector
     for(size_t i = 0; i < fpga_image_size; i += X300_FLASH_SECTOR_SIZE){
 
-        //Print percentage at beginning of first sector after each 10%
-        percentage = int(double(i)/double(fpga_image_size)*100);
-        if((percentage != last_percentage) and (percentage % 10 == 0)){ //Don't print same percentage twice
-            std::cout << percentage << "%..." << std::flush;
-        }
-        last_percentage = percentage;
+        //Print progress percentage at beginning of each sector
+        std::cout   << "\rProgress: " << int(double(i)/double(fpga_image_size)*100)
+                    << "% (" << (i / X300_FLASH_SECTOR_SIZE) << "/"
+                    << sectors << " sectors)" << std::flush;
 
         //Each packet
         for(size_t j = i; (j < fpga_image_size and j < (i+X300_FLASH_SECTOR_SIZE)); j += X300_PACKET_SIZE_BYTES){
@@ -256,7 +251,7 @@ void ethernet_burn(udp_simple::sptr udp_transport, std::string fpga_path, bool v
             if(verify) send_packet.flags |= X300_FPGA_PROG_FLAGS_VERIFY;
             if(j == i) send_packet.flags |= X300_FPGA_PROG_FLAGS_ERASE; //Erase the sector before writing
             send_packet.flags = htonx<boost::uint32_t>(send_packet.flags);
-            
+
             send_packet.sector = htonx<boost::uint32_t>(X300_FPGA_SECTOR_START + (i/X300_FLASH_SECTOR_SIZE));
             send_packet.index = htonx<boost::uint32_t>((j % X300_FLASH_SECTOR_SIZE) / 2);
             send_packet.size = htonx<boost::uint32_t>(X300_PACKET_SIZE_BYTES / 2);
@@ -297,10 +292,12 @@ void ethernet_burn(udp_simple::sptr udp_transport, std::string fpga_path, bool v
             for(size_t k = 0; k < (X300_PACKET_SIZE_BYTES/2); k++){
                 send_packet.data[k] = htonx<boost::uint16_t>(send_packet.data[k]);
             }
-           
+
             udp_transport->send(boost::asio::buffer(&send_packet, sizeof(send_packet)));
 
-            udp_transport->recv(boost::asio::buffer(x300_data_in_mem), UDP_TIMEOUT);
+            if (udp_transport->recv(boost::asio::buffer(x300_data_in_mem), UDP_TIMEOUT) == 0)
+                throw std::runtime_error("Timed out waiting for ACK!");
+
             const x300_fpga_update_data_t *update_data_in = reinterpret_cast<const x300_fpga_update_data_t *>(x300_data_in_mem);
 
             if((ntohl(update_data_in->flags) & X300_FPGA_PROG_FLAGS_ERROR) == X300_FPGA_PROG_FLAGS_ERROR){
@@ -319,14 +316,15 @@ void ethernet_burn(udp_simple::sptr udp_transport, std::string fpga_path, bool v
     memset(cleanup_packet.data, 0, sizeof(cleanup_packet.data));
     udp_transport->send(boost::asio::buffer(&cleanup_packet, sizeof(cleanup_packet)));
 
-    udp_transport->recv(boost::asio::buffer(x300_data_in_mem), UDP_TIMEOUT);
+    if (udp_transport->recv(boost::asio::buffer(x300_data_in_mem), UDP_TIMEOUT) == 0)
+            throw std::runtime_error("Timed out waiting for ACK!");
     const x300_fpga_update_data_t *cleanup_data_in = reinterpret_cast<const x300_fpga_update_data_t *>(x300_data_in_mem);
 
     if((ntohl(cleanup_data_in->flags) & X300_FPGA_PROG_FLAGS_ERROR) == X300_FPGA_PROG_FLAGS_ERROR){
         throw std::runtime_error("Transfer or data verification failed!");
     }
 
-    std::cout << "100%" << std::endl;
+    std::cout   << "\rProgress: " << "100% (" << sectors << "/" << sectors << " sectors)" << std::endl;
 }
 
 void pcie_burn(std::string resource, std::string rpc_port, std::string fpga_path)

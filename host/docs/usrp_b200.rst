@@ -11,13 +11,14 @@ Comparative features list - B200
 **Hardware Capabilities:**
  * Integrated RF frontend (70 MHz - 6 GHz)
  * External PPS reference input
- * External 10MHz reference input
+ * External 10 MHz reference input
  * Configurable clock rate
  * Internal GPSDO option
  * B210 Only:
- 
+
    * MICTOR Debug Connector
    * JTAG Connector
+
 **FPGA Capabilities:**
  * Timed commands in FPGA
  * Timed sampling in FPGA
@@ -26,7 +27,7 @@ Comparative features list - B200
 Specify a Non-standard Image
 ------------------------------------------------------------------------
 UHD software will automatically select the USRP B2X0 images from the installed images package.
-The image selection can be overridden with the **--fpga=** and **--fw=** device address parameters.
+The image selection can be overridden with the **fpga** and **fw** device address parameters.
 
 Example device address string representations to specify non-standard images:
 
@@ -73,5 +74,5 @@ All frontends have individual analog gain controls.
 The receive frontends have 73 dB of available gain;
 and the transmit frontends have 89.5 dB of available gain.
 Gain settings are application specific,
-but its recommended that users consider using at least
+but it is recommended that users consider using at least
 half of the available gain to get reasonable dynamic range.

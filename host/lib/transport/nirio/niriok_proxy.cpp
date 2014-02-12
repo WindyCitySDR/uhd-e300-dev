@@ -1,5 +1,5 @@
 //
-// Copyright 2013 Ettus Research LLC
+// Copyright 2013-2014 Ettus Research LLC
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -19,7 +19,6 @@
 #include <uhd/transport/nirio/niriok_proxy.h>
 #include <cstring>
 
-#define PATH_MAX        4096
 #define NI_VENDOR_NUM   0x1093
 
 #define VERSION_BUILD_SHIFT     0

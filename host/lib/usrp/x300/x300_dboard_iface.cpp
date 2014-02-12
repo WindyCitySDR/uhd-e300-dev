@@ -38,7 +38,7 @@ public:
     {
         special_props_t props;
         props.soft_clock_divider = false;
-        props.mangle_i2c_addrs = false;
+        props.mangle_i2c_addrs = (_config.dboard_slot == 1);
         return props;
     }
 

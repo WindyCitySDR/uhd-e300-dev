@@ -40,6 +40,7 @@ SET(manual_sources
     usrp_b200.rst
     usrp_e1x0.rst
     usrp_x3x0.rst
+    usrp_x3x0_config.rst
 )
 
 ########################################################################
@@ -149,7 +150,12 @@ SET(man_page_sources
 MESSAGE(STATUS "")
 FIND_PACKAGE(GZip)
 
-LIBUHD_REGISTER_COMPONENT("Man Pages" ENABLE_MAN_PAGES ON "GZIP_FOUND;LINUX" OFF)
+# No elegant way in CMake to reverse a boolean
+IF(NOT WIN32)
+    SET(NOT_WIN32 TRUE)
+ENDIF(NOT WIN32)
+
+LIBUHD_REGISTER_COMPONENT("Man Pages" ENABLE_MAN_PAGES ON "GZIP_FOUND;NOT_WIN32" OFF)
 
 IF(ENABLE_MAN_PAGES)
     #Generate man pages

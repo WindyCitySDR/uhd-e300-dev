@@ -9,11 +9,11 @@ Comparative features list
 -------------------------
 
 **Hardware Capabilities:**
- * 2 transceiver card slots
+ * 2 transceiver card slots (can do 2x2 MIMO out of the box)
  * Dual SFP+ Transceivers (can be used with 1 GigE, 10 GigE)
  * PCI Express over cable (MXI) gen1 x4
  * External PPS input & output
- * External 10MHz input & output
+ * External 10 MHz input & output
  * Expandable via 2nd SFP+ interface
  * Supported master clock rates: 200 MHz, 184.32 MHz
  * External GPIO Connector with UHD API control
@@ -26,28 +26,111 @@ Comparative features list
  * 2 TX DUC chain in FPGA
  * Timed commands in FPGA
  * Timed sampling in FPGA
- * sc8 and sc16 sample modes
- * Up to 120 MHz of RF BW with 16-bit samples
+ * 16-bit and 8-bit sample modes (sc8 and sc16)
+ * Up to 120 MHz of RF bandwidth with 16-bit samples
+
+---------------
+Getting started
+---------------
+
+This will run you through the first steps relevant to get your USRP X300/X310
+up and running. Here, we assume you will connect your USRP using Gigabit Ethernet (1GigE),
+as this interface is readily available in most computers. For 10 Gigabit Ethernet (10GigE) or
+PCI Express (PCIe), see the corresponding sections in this manual page.
+
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Assembling the X300/X310 kit
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+Before you can start using your USRP, you might have to assemble the hardware,
+if this has not yet happened. Make sure you are grounded (e.g. by touching a radiator)
+in order not to damage sensitive electronics through static discharge!
+
+1. Unscrew the top of your X300/X310 (there are 2 screws which can be easily loosened
+   using a small Phillips screwdriver).
+2. Insert the daughterboards by inserting them into the slots and optionally screwing
+   them onto the motherboard.
+3. Connect the RF connectors on the daughterboards to the front panel. In order to avoid
+   confusion, make sure the internal connections match the labels on the front panel (i.e.
+   TX/RX is connected to TX/RX).
+4. If you have purchased an internal GPSDO, follow the instructions on
+   `the internal GPSDO manual page <./gpsdo_x3x0.html>`_ to insert the GPSDO. Note that you
+   will need an external GPS antenna connected to the rear GPS ANT connector in order to
+   make use of GPS, although your USRP will still be usable without.
+5. Connect the 1 GigE SFP+ transceiver into the Ethernet port 0 and connect the X300/X310 with
+   your computer.
+6. Connect the power supply and switch on the USRP.
+
+^^^^^^^^^^^^^^^^^^^^
+Network Connectivity
+^^^^^^^^^^^^^^^^^^^^
+
+The next step is to make sure your computer can talk to the USRP. An otherwise unconfigured
+USRP device will have the IP address 192.168.10.2 when using 1GigE.
+It is recommended to directly connect your USRP to the computer at first,
+and to set the IP address on your machine to 192.168.10.1.
+See Section `Setup the host interface`_ on details how to change your machine's IP address.
+
+**Note**: If you are running an automatic IP configuration service such as Network Manager, make
+sure it is either deactivated or configured to not change the network device! This can, in extreme cases,
+lead to you bricking the USRP!
+
+If your network configuration is correct, running ``uhd_find_devices`` will find your USRP
+and print some information about it. You will also be able to ping the USRP by running::
+
+  ping 192.168.10.2
+
+on the command line. At this point, you should also run::
+
+  uhd_usrp_probe --args addr=192.168.10.2
+
+to make sure all of your components (daughterboards, GPSDO) are correctly detected and usable.
+
+^^^^^^^^^^^^^^^^^^^^^
+Updating the firmware
+^^^^^^^^^^^^^^^^^^^^^
+
+If the output from ``uhd_find_devices`` and ``uhd_usrp_probe`` didn't show any warnings, you
+can skip this step. However, if there were warnings regarding version incompatibility, you will
+have to upate the FPGA image before you can start using your USRP.
+
+1. Download the current UHD images. You can use the ``uhd_images_downloader`` script provided
+   with UHD (see also `FPGA Image Flavors`_).
+2. Use the ``usrp_x3xx_fpga_burner`` utility to update the FPGA image. On the command line, run::
+
+          usrp_x3xx_fpga_burner --addr=192.168.10.2 --type=HGS # Since we are using 1GigE, type is HGS
+
+  If you have installed the images to a non-standard location, you might need to run (change the filename according to your device)::
+
+          usrp_x3xx_fpga_burner --addr=192.168.10.2 --fpga-path <path_to_images>/usrp_x310_fpga_HGS.bit
+
+  The process of updating the firmware will take several minutes. Make sure the process of flashing the image does not get interrupted.
+
+See `Load the Images onto the On-board Flash`_ for more details.
+
+When your firmware is up to date, power-cycle the device and re-run ``uhd_usrp_probe``. There should
+be no more warnings at this point, and all components should be correctly detected. Your USRP is now
+ready for development!
 
 --------------
 Hardware Setup
 --------------
 
-^^^^^^^^^^^^^^^^
-Gigabit Ethernet
-^^^^^^^^^^^^^^^^
+^^^^^^^^^^^^^^^^^^^^^^^^^
+Gigabit Ethernet (1 GigE)
+^^^^^^^^^^^^^^^^^^^^^^^^^
 
 Installing the USRP X300/X310
 :::::::::::::::::::::::::::::
 * Prior to installing the module, the host PC can remain powered on.
-* Plug a 1 Gigabit SFP+ Transciever into Ethernet Port 0 on the USRP X300/x310 device.
+* Plug a 1 Gigabit SFP Transceiver into Ethernet Port 0 on the USRP X300/X310 device.
 * Use the Ethernet cable to connect the SFP+ transciever on the device to the host computer. For maximum throughput, Ettus Research recommends that you connect each device to its own dedicated Gigabit Ethernet interface on the host computer.
 * Connect the AC/DC power supply to the device and plug the supply into a wall outlet.
-* The OS will automatically recognize the device.
+* The OS will automatically recognize the device (e.g. when running uhd_find_devices).
 
-^^^^^^^^^^^^^^^^^^^^
-Ten Gigabit Ethernet
-^^^^^^^^^^^^^^^^^^^^
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Ten Gigabit Ethernet (10 GigE)
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 Installing the Host Ethernet Interface
 ::::::::::::::::::::::::::::::::::::::
@@ -57,12 +140,11 @@ Installation instructions for this interface are available on the official Intel
 Installing the USRP X300/X310
 :::::::::::::::::::::::::::::
 * Prior to installing the module, the host PC can remain powered on.
-* Use a 10 Gigabit SFP+ cable to connect Ethernet Port 1 on the USRP X300/x310 device to the host computer. For maximum throughput, Ettus Research recommends that you connect the device to its own dedicated Ten Gigabit, Ettus Research recommended Ethernet interface on the host computer.
+* Use a 10 Gigabit SFP+ cable to connect Ethernet Port 1 on the USRP X300/X310 device to the host computer. For maximum throughput, Ettus Research recommends that you connect the device to its own dedicated Ten Gigabit, Ettus Research recommended Ethernet interface on the host computer.
 * Connect the AC/DC power supply to the device and plug the supply into a wall outlet.
-* The OS will automatically recognize the device.
+* The OS will automatically recognize the device (e.g. when running uhd_find_devices).
 
-The LEDs on the front panel can be useful in debugging hardware and software issues.
-The LEDs reveal the following about the state of the device:
+The LEDs on the front panel can be useful in debugging hardware and software issues (see Section "Front Panel")
 
 ^^^^^^^^^^^^^^^^^^^^^
 PCI Express (Desktop)
@@ -90,9 +172,9 @@ Troubleshooting
 :::::::::::::::
 Two possible failure modes are your computer not booting when connected to your
 USRP device through MXI-Express, and Windows not properly discovering your
-devices (i.e., for example, there is a yellow exclamation point on a PCI to PCI
+devices (for example, there is a yellow exclamation point on a PCI to PCI
 bridge in Windows Device Manager, despite drivers for all devices being
-installed.) These situations often are due to programming errors in PCI Express
+installed). These situations often are due to programming errors in PCI Express
 device configuration of the BIOS. To use this software, you need a MXI-Express
 device that supports Mode 1 operation. 
 Refer to `NI MXI-Express BIOS Compatibility Software Readme <http://download.ni.com/support/softlib//PXI/MXIe%20Compatibility%20Software/1.5.0/readme.html#SupportedHardware>`_ 
@@ -117,7 +199,7 @@ Installing the USRP X300/X310
 Because a laptop computer is not grounded, follow this procedure to safely connect a laptop
 computer to your USRP device.
 
-* Connect the AC/DC power supply to the device and plug the supply into a wall outlet. Ensure that the USRP device is powered off
+* Connect the AC/DC power supply to the device and plug the supply into a wall outlet. Ensure that the USRP device is powered off.
 * Touch the NI ExpressCard-8360B and a metal part of the USRP device simultaneously. Do not install the NI ExpressCard-8360B into the laptop computer yet.
 * Connect the cable to the NI ExpressCard-8360B and USRP.
 * Plug the NI ExpressCard-8360B into an available ExpressCard slot. If your laptop computer is already running (or hibernating, suspended, etc) when you install an NI ExpressCard-8360B, you must reboot to detect the USRP. Otherwise, the USRP is detected when you start your computer.
@@ -172,9 +254,9 @@ device is reset.
 ^^^^^^^^^^^^^^^^^^
 FPGA Image Flavors
 ^^^^^^^^^^^^^^^^^^
-The USRP-X Series devices contains two SFP+ port for the two Ethernet channels.
+The USRP-X Series devices contains two SFP+ ports for the two Ethernet channels.
 Because the SFP+ ports support both 1 Gigabit (SFP) and 10 Gigabit (SFP+)
-transcievers, multiple the FPGA images are shipped with UHD to determine the
+transceivers, several FPGA images are shipped with UHD to determine the
 behavior of the above interfaces.
 
 +---------------------+------------------------+------------------------+
@@ -189,7 +271,6 @@ FPGA images are shipped in 2 formats:
 
 * **LVBITX**: LabVIEW FPGA configuration bitstream format (for use over PCI Express and Ethernet)
 * **BIT**: Xilinx configuration bitstream format (for use over Ethernet and JTAG)
-* **BIN**: Xilinx configuration binary format (for use over Ethernet)
 
 To get the latest images, simply use the uhd_images_downloader script:
 
@@ -197,13 +278,13 @@ To get the latest images, simply use the uhd_images_downloader script:
 
 ::
 
-    <install-path>/lib/uhd/utils/uhd_images_downloader.py
+    sudo uhd_images_downloader
 
 **Windows:**
 
 ::
 
-    <path_to_python.exe> <install-path>/lib/uhd/utils/uhd_images_downloader.py
+    <path_to_python.exe> <install-path>/bin/uhd_images_downloader.py
 
 
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -225,56 +306,66 @@ Use JTAG to load FPGA images
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 The USRP-X Series device features an on-board USB-JTAG programmer that can be accessed on the front-panel
 of the device. The iMPACT tool in the `Xilinx Programming Tools <http://www.xilinx.com/support/download/index.htm>`_ package can be used to load an image over
-the JTAG interface.
+the JTAG interface. This can be useful for unbricking devices.
+
+If you have iMPACT installed, you can use the impact_jtag_programmer.sh tool to install images. Make sure your X3x0 is powered on and connected to your computer using the front panel USB JTAG connector (USB 2.0 is fine for this). Then run the tool:
+
+::
+    <path_to_uhd_tools>/impact_jtag_programmer.sh --fpga-path=<fpga_image_path>
 
 ---------------------------------------
 Load the Images onto the On-board Flash
 ---------------------------------------
 To change the FPGA image stored in the on-board flash, the USRP-X Series device
-can be reprogramed over the network or PCI Express. Once you have programmed an
+can be reprogrammed over the network or PCI Express. Once you have programmed an
 image into the flash, that image will be automatically loaded on the FPGA
 during the device boot-up sequence.
 
 **Note:**
 Different hardware revisions require different FPGA images.
 Determine the revision number from the sticker on the rear of the device.
-Use this number to select the correct FPGA image for your device.
+If you are manually specifying an FPGA path, the utility will not try to
+detect your device information, and you will need to use this number to
+select which image to burn.
+
+**Note:**
+The burner utility will default to using the appropriate BIT file if no custom
+FPGA image path is specified, but it is compatible with BIN, BIT, and LVBITX
+images.
 
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Use the burner tool over Ethernet
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-**UNIX:**
-
 ::
 
-    <install-path>/lib/uhd/utils/usrp_x3xx_fpga_burner --addr=<ip address> --fpga-path=<path to FPGA image>
+    Automatic FPGA path, detect image type:
+    usrp_x3xx_fpga_burner --addr=<IP address>
 
-**Windows:**
+    Automatic FPGA path, select image type:
+    usrp_x3xx_fpga_burner --addr=<IP address> --type=<HGS or XGS>
 
-::
-
-    <install-path>\lib\uhd\utils\usrp_x3xx_fpga_burner.exe --addr=<ip address> --fpga-path=<path to FPGA image>
+    Manual FPGA path:
+    usrp_x3xx_fpga_burner --addr=<IP address> --fpga-path=<path to FPGA image>
 
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Use the burner tool over PCI Express
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-**UNIX:**
-
 ::
 
-    <install-path>/lib/uhd/utils/usrp_x3xx_fpga_burner --resource=<device resource name> --fpga-path=<path to FPGA image>
+    Automatic FPGA path, detect image type:
+    usrp_x3xx_fpga_burner --resource=<NI-RIO resource>
 
-**Windows:**
+    Automatic FPGA path, select image type:
+    usrp_x3xx_fpga_burner --resource=<NI-RIO resource> --type=<HGS or XGS>
 
-::
-
-    <install-path>\lib\uhd\utils\usrp_x3xx_fpga_burner.exe --resource=<device resource name> --fpga-path=<path to FPGA image>
+    Manual FPGA path:
+    usrp_x3xx_fpga_burner --resource=<NI-RIO resource> --fpga-path=<path to FPGA image>
 
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Device recovery and bricking
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Its possible to put the device into an unusable state by loading bad images.
-Fortunately, the USRP-X Series device can be loaded with a good image temporarily using the USB-JTAG interface. 
+It is possible to put the device into an unusable state by loading bad images ("bricking").
+Fortunately, the USRP-X Series device can be loaded with a good image temporarily using the USB-JTAG interface.
 Once booted into the safe image, the user can once again load images onto the device over Ethernet or PCI Express.
 
 ----------------
@@ -326,6 +417,9 @@ the software will use UDP broadcast packets to locate the USRP-X Series device.
 On some systems, the firewall will block UDP broadcast packets.
 It is recommended that you change or disable your firewall settings.
 
+On many Linux distributions, NetworkManager or similar tools may control the network interface.
+It is important to deactivate these tools for your device before continuing!
+
 ^^^^^^^^^^^^^^^
 Setting the MTU
 ^^^^^^^^^^^^^^^
@@ -344,7 +438,7 @@ arguments will make UHD use smaller MTUs:
 
 ::
 
-    uhd_usrp_probe --args='send_frame_size=<max send MTU> recv_frame_size=<max receive MTU>'
+    uhd_usrp_probe --args='send_frame_size=<max send MTU>, recv_frame_size=<max receive MTU>'
 
 **Note:** This will most likely have a severe performance penalty.
 
@@ -466,7 +560,7 @@ previous section of this documentation.
 Firewall issues
 ^^^^^^^^^^^^^^^
 When the IP address is not specified,
-the device discovery broadcasts UDP packets from each ethernet interface.
+the device discovery broadcasts UDP packets from each Ethernet interface.
 Many firewalls will block the replies to these broadcast packets.
 If disabling your system's firewall
 or specifying the IP address yields a discovered device,
@@ -477,7 +571,7 @@ or create a rule to allow all incoming packets with UDP source port **49152**.
 ^^^^^^^^^^^^^^^
 Ping the device
 ^^^^^^^^^^^^^^^
-The USRP device will reply to ICMP echo requests.
+The USRP device will reply to ICMP echo requests ("ping").
 A successful ping response means that the device has booted properly
 and that it is using the expected IP address.
 
@@ -496,7 +590,7 @@ run the following command:
 
 ::
 
-    sudo /etc/init.d/niusrpriorpc start
+    sudo niusrprio_pcie start
 
 If the device still does not enumerate after starting the device manager, make sure that the host computer
 has successfully detected it. You can do so by running the following command:
@@ -525,15 +619,22 @@ communicate with an X-Series USRP over PCIe.
 This service is installed as a part of the USRP RIO (or NI-USRP) installer. On Windows, it can be found in
 the **Services** section in the Control Panel and it is started at system boot time. To ensure that the 
 service is indeed started, navigate to the Services tag in the Windows Task Manager and ensure that the 
-status of **niusrpriorpc** is "Running" 
+status of **niusrpriorpc** is "Running".
 
 If the device still does not enumerate after starting the device manager, make sure that the host computer
-has successfully detected it. You can do so by checking if your device shows up in the Windows Device Manager
+has successfully detected it. You can do so by checking if your device shows up in the Windows Device Manager.
 
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Monitor the host network traffic
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Use Wireshark to monitor packets sent to and received from the device.
+
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Observe Ethernet port LEDs
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+When there is network traffic arriving at the Ethernet port, LEDs will light up.
+You can use this to make sure the network connection is correctly set up, e.g.
+by pinging the USRP and making sure the LEDs start to blink.
 
 --------------
 Hardware Notes
@@ -550,19 +651,19 @@ Front Panel
 * **JTAG**: USB connector for the on-board USB-JTAG programmer
 * **RF A Group**
 
-  * **TX/RX LED**: Indicates that data is streaming on the TX/RX channel on daughter board A
-  * **RX2 LED**: Indicates that data is streaming on the RX2 channel on daughter board A
+  * **TX/RX LED**: Indicates that data is streaming on the TX/RX channel on daughterboard A
+  * **RX2 LED**: Indicates that data is streaming on the RX2 channel on daughterboard A
 
 * **REF**: Indicates that the external Reference Clock is locked
 * **PPS**: Indicates a valid PPS signal by pulsing once per second
-* **AUX IO**: Front panel GPIO connector.
+* **AUX I/O**: Front panel GPIO connector.
 * **GPS**: Indicates that GPS reference is locked
 * **LINK**: Indicates that the host computer is communicating with the device (Activity)
 
 * **RF B Group**
 
-  * **TX/RX LED**: Indicates that data is streaming on the TX/RX channel on daughter board B
-  * **RX2 LED**: Indicates that data is streaming on the RX2 channel on daughter board B
+  * **TX/RX LED**: Indicates that data is streaming on the TX/RX channel on daughterboard B
+  * **RX2 LED**: Indicates that data is streaming on the RX2 channel on daughterboard B
 
 * **PWR**: Power switch
 
@@ -584,24 +685,24 @@ Rear Panel
 * **PPS/TRIG IN**: Input port for the PPS signal 
 * **GPS**: Connection for the GPS antenna
 
-^^^^^^^^^^^^^^^^^
-Ref Clock - 10MHz
-^^^^^^^^^^^^^^^^^
-Using an external 10MHz reference clock, a square wave will offer the best phase
-noise performance, but a sinusoid is acceptable.  The power level of the reference clock cannot exceed +15dBm.
+^^^^^^^^^^^^^^^^^^
+Ref Clock - 10 MHz
+^^^^^^^^^^^^^^^^^^
+Using an external 10 MHz reference clock, a square wave will offer the best phase
+noise performance, but a sinusoid is acceptable.  The power level of the reference clock cannot exceed +15 dBm.
 
 ^^^^^^^^^^^^^^^^^^^^^^
 PPS - Pulse Per Second
 ^^^^^^^^^^^^^^^^^^^^^^
 Using a PPS signal for timestamp synchronization requires a square wave signal with the following a 5Vpp amplitude.
 
-Test the PPS input with the following app:
+To test the PPS input, you can use the following tool from the UHD examples:
 
 * **<args>** are device address arguments (optional if only one USRP device is on your machine)
 
 ::
 
-    cd <install-path>/share/uhd/examples
+    cd <install-path>/lib/uhd/examples
     ./test_pps_input --args=<args>
 
 ^^^^^^^^^^^^^^
@@ -665,7 +766,7 @@ subdevice specification.
 
 In the following example, a TVRX2 is installed.
 Channel 0 is sourced from subdevice **RX1**,
-and channel 1 is sourced from subdevice **RX2**:
+and channel 1 is sourced from subdevice **RX2** (**RX1** and **RX2** are antenna connectors on the TVRX2 daughterboard).
 
 ::
 

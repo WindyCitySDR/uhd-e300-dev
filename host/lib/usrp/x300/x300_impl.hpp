@@ -111,6 +111,7 @@ struct x300_dboard_iface_config_t
     x300_clock_ctrl::sptr clock;
     x300_clock_which_t which_rx_clk;
     x300_clock_which_t which_tx_clk;
+    boost::uint8_t dboard_slot;
 };
 
 uhd::usrp::dboard_iface::sptr x300_make_dboard_iface(const x300_dboard_iface_config_t &);

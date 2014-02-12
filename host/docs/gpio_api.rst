@@ -97,10 +97,10 @@ code:
     #define ATR_MASKS       (AMP_GPIO_MASK | MAN_GPIO_MASK)
 
     // set up our values for ATR control: 1 for ATR, 0 for manual
-    #define ATR_CONTROL     ((1 << AMP_GPIO_MASK) | (0 << MAN_GPIO_MASK))
+    #define ATR_CONTROL     (AMP_GPIO_MASK & ~MAN_GPIO_MASK)
 
     // set up the GPIO directions: 1 for output, 0 for input
-    #define GPIO_DDR        ((1 << AMP_GPIO_MASK) | (0 << MAN_GPIO_MASK))
+    #define GPIO_DDR        (AMP_GPIO_MASK & ~MAN_GPIO_MASK)
 
     // assume an existing USRP device handle, called "usrp_x300"
 

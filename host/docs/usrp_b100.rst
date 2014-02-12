@@ -11,7 +11,7 @@ Comparative features list
 **Hardware Capabilities:**
  * 1 transceiver card slot
  * External PPS reference input
- * External 10MHz reference input
+ * External 10 MHz reference input
  * Configurable clock rate (defaults 64 MHz)
 
 **FPGA Capabilities:**
@@ -44,17 +44,17 @@ Example device address string representations to specify non-standard images:
 Changing the Master Clock Rate
 ------------------------------------------------------------------------
 The master clock rate of the B100 feeds both the FPGA DSP and the codec chip.
-Hundreds of rates between 32MHz and 64MHz are available.
+Hundreds of rates between 32 MHz and 64 MHz are available.
 A few notable rates are:
 
-* **64MHz:** maximum rate of the codec chip
-* **61.44MHz:** good for UMTS/WCDMA applications
-* **52Mhz:** good for GSM applications
+* **64 MHz:** maximum rate of the codec chip
+* **61.44 MHz:** good for UMTS/WCDMA applications
+* **52 MHz:** good for GSM applications
 
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Set 61.44MHz - uses external VCXO
+Set 61.44 MHz - uses external VCXO
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-To use the 61.44MHz clock rate, the USRP embedded will require one jumper to be moved,
+To use the 61.44 MHz clock rate, the USRP embedded will require one jumper to be moved,
 and X4 must be populated with a 61.44 MHz oscillator.
 
 * **J15** is a three pin header, move the jumper to (pin1, pin2)
@@ -70,7 +70,7 @@ To use other clock rates, the jumper will need to be in the default position.
 * **J15** is a three pin header, move the jumper to (pin2, pin3)
 
 To communicate the desired clock rate into UHD software,
-specify the a special device address argument,
+specify the special device address argument,
 where the key is **master_clock_rate** and the value is a rate in Hz.
 Example:
 ::
@@ -88,9 +88,9 @@ The LEDs on the front panel can be useful in debugging hardware and software iss
 The LEDs reveal the following about the state of the device:
 
 * **LED A:** transmitting
-* **LED B:** fpga loaded
+* **LED B:** FPGA loaded
 * **LED C:** receiving
-* **LED D:** fpga loaded
+* **LED D:** FPGA loaded
 * **LED E:** reference lock
 * **LED F:** board power
 
