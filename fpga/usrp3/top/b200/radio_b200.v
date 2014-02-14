@@ -35,6 +35,10 @@ module radio_b200
 
    output [63:0] debug
    );
+<<<<<<< HEAD
+=======
+   
+>>>>>>> 95e4217de21c069a7d6c8e6ee343134aa3072721
 
    // ///////////////////////////////////////////////////////////////////////////////
    // FIFO Interfacing to the bus clk domain
@@ -73,7 +77,15 @@ module radio_b200
 
    wire [63:0] 	 rmux_tdata_r;
    wire 	 rmux_tlast_r, rmux_tvalid_r, rmux_tready_r;
+<<<<<<< HEAD
    
+=======
+
+   wire [63:0] 	 rx_tdata_int;
+   wire 	 rx_tready_int, rx_tvalid_int;
+   wire 	 rx_tlast_int;
+
+>>>>>>> 95e4217de21c069a7d6c8e6ee343134aa3072721
    axi_fifo_2clk #(.WIDTH(65), .SIZE(0/*minimal*/)) ctrl_fifo
      (.reset(bus_rst),
       .i_aclk(bus_clk), .i_tvalid(ctrl_tvalid), .i_tready(ctrl_tready), .i_tdata({ctrl_tlast, ctrl_tdata}), 
@@ -89,10 +101,24 @@ module radio_b200
       .i_aclk(radio_clk), .i_tvalid(rmux_tvalid_r), .i_tready(rmux_tready_r), .i_tdata({rmux_tlast_r, rmux_tdata_r}), 
       .o_aclk(bus_clk), .o_tvalid(resp_tvalid), .o_tready(resp_tready), .o_tdata({resp_tlast, resp_tdata}));
    
+<<<<<<< HEAD
    axi_fifo_2clk #(.WIDTH(65), .SIZE(RADIO_FIFO_SIZE)) rx_fifo
      (.reset(radio_rst),
       .i_aclk(radio_clk), .i_tvalid(rx_mux_tvalid_r), .i_tready(rx_mux_tready_r), .i_tdata({rx_mux_tlast_r, rx_mux_tdata_r}),
       .o_aclk(bus_clk), .o_tvalid(rx_tvalid), .o_tready(rx_tready), .o_tdata({rx_tlast, rx_tdata}));
+=======
+   axi_fifo_2clk #(.WIDTH(65), .SIZE(0)) rx_fifo
+     (.reset(radio_rst),
+      .i_aclk(radio_clk), .i_tvalid(rx_mux_tvalid_r), .i_tready(rx_mux_tready_r), .i_tdata({rx_mux_tlast_r, rx_mux_tdata_r}),
+      .o_aclk(bus_clk), .o_tvalid(rx_tvalid_int), .o_tready(rx_tready_int), .o_tdata({rx_tlast_int, rx_tdata_int}));
+   
+   axi_packet_gate #(.WIDTH(64), .SIZE(RADIO_FIFO_SIZE)) buffer_whole_pkt
+     (
+      .clk(bus_clk), .reset(bus_rst), .clear(1'b0),
+      .i_tdata(rx_tdata_int), .i_tlast(rx_tlast_int), .i_terror(1'b0), .i_tvalid(rx_tvalid_int), .i_tready(rx_tready_int),
+      .o_tdata(rx_tdata), .o_tlast(rx_tlast), .o_tvalid(rx_tvalid), .o_tready(rx_tready)
+      );
+>>>>>>> 95e4217de21c069a7d6c8e6ee343134aa3072721
    
    // /////////////////////////////////////////////////////////////////////////////////////
    // Setting bus and controls
@@ -227,7 +253,11 @@ module radio_b200
    wire [31:0] 	  rx_sid;
    wire [11:0] 	  rx_seqnum;
    wire [63:0] rx_tdata_i; wire rx_tlast_i, rx_tvalid_i, rx_tready_i;
+<<<<<<< HEAD
 
+=======
+   
+>>>>>>> 95e4217de21c069a7d6c8e6ee343134aa3072721
    new_rx_framer #(.BASE(SR_RX_CTRL+4),.SAMPLE_FIFO_SIZE(SAMPLE_FIFO_SIZE)) new_rx_framer
      (.clk(radio_clk), .reset(radio_rst), .clear(1'b0),
       .set_stb(set_stb), .set_addr(set_addr), .set_data(set_data),
@@ -281,6 +311,16 @@ module radio_b200
       .i3_tdata(), .i3_tlast(), .i3_tvalid(1'b0), .i3_tready(),
       .o_tdata(rmux_tdata_r), .o_tlast(rmux_tlast_r), .o_tvalid(rmux_tvalid_r), .o_tready(rmux_tready_r));
 
+<<<<<<< HEAD
 
    
+=======
+   // DEBUG LOGIC - NOT FOR PRODUCTION
+
+   
+   assign debug = 0;
+
+   
+   
+>>>>>>> 95e4217de21c069a7d6c8e6ee343134aa3072721
 endmodule // radio_b200
