@@ -67,20 +67,22 @@ Either restart the system or issue the following commands:
 
 Configuring the MTU
 -------------------------------------
-UHD uses large frame sizes over UDP, which requires a larger than normal MTU
-size.  The default MTU size for most Ethernet cards is 1500.  UHD uses an MTU
-size of 9000 by default.  Network hardware may or may not support higher MTU
-sizes, so the manufacturer's documentation for any network hardware should be
-consulted to see if it supports larger MTU sizes.  To set the MTU size of the
-interface to 9000:
+In order to achieve maximum performance, we recommend setting the MTU size to
+9000 for 10 GigE and 1500 for 1 GigE. It is possible to use smaller MTUs, but this
+can affect performance. With some NICs, setting the MTU too high can also cause issues,
+though. To set the MTU to 9000, you can use the following command:
 
 ::
 
-    sudo ifconfig <interface> mtu 9000
+    sudo ifconfig <interface> mtu 9000 # For 10 GigE
 
-If your network hardware is limited to an MTU of 1500, the UHD frame size can
-be reduced by adding the argument "<send/recv>_frame_size=1472".  However,
-higher sample rates will not be possible.
+Using these MTUs will set the frame sizes for UHD communication to 8000 and 1472,
+respectively.
+
+In some cases, specifying the frame size manually by adding the argument
+"<send/recv>_frame_size=1472" can solve issues. Note that a frame size of 1472 will limit
+the available sampling rate, although this is likely not a problem issue on 1 GigE.
+
 
 Configuring the Firewall
 -------------------------------------
@@ -269,12 +271,14 @@ O         Overflow on RX         - Data is not being consumed by user's applicat
 D         Dropped packet on RX   - Network hardware failure.  (Check host NIC, cable, switch, etc...)
                                  - PCIe bus on host cannot sustain throughput. (Check ethtool -S <interface>).
                                  - CPU governor or other power management not configured correctly.
+                                 - Frame size might not work with the current NIC's MTU.
 U         Underflow on TX        - Samples are not being produced by user's application fast enough.
                                  - CPU governor or other power management not configured correctly.
 L         Late packet            - Samples are not being produced by user's application fast enough.
           (usually on MIMO TX)   - CPU governor or other power management not configured correctly.
                                  - Incorrect/invalid time_spec provided.
 S         Sequence error on TX   - Network hardware failure.  (Check host NIC, cable, switch, etc...)
+                                 - Frame size might not work with the current NIC's MTU.
 ========= ====================== ====================================================================
 
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
