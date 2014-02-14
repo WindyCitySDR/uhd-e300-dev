@@ -311,6 +311,7 @@ the JTAG interface. This can be useful for unbricking devices.
 If you have iMPACT installed, you can use the impact_jtag_programmer.sh tool to install images. Make sure your X3x0 is powered on and connected to your computer using the front panel USB JTAG connector (USB 2.0 is fine for this). Then run the tool:
 
 ::
+
     <path_to_uhd_tools>/impact_jtag_programmer.sh --fpga-path=<fpga_image_path>
 
 ---------------------------------------

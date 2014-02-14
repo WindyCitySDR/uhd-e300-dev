@@ -15,6 +15,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 //
 
+#include <csignal>
 #include <iostream>
 #include <map>
 #include <fstream>
@@ -80,6 +81,22 @@ namespace po = boost::program_options;
 
 using namespace uhd;
 using namespace uhd::transport;
+
+static int num_ctrl_c = 0;
+void sig_int_handler(int){
+    num_ctrl_c++;
+    if(num_ctrl_c == 1){
+        std::cout << std::endl << "Are you sure you want to abort the image burning? If you do, your "
+                                  "USRP-X series device will be bricked!" << std::endl
+                               << "Press Ctrl+C again to abort the image burning procedure." << std::endl << std::endl;
+    }
+    else{
+        std::cout << std::endl << "Aborting. Your USRP X-Series device will be bricked." << std::endl
+                  << "Refer to http://files.ettus.com/uhd_docs/manual/html/usrp_x3x0.html#use-jtag-to-load-fpga-images" << std::endl
+                  << "for details on restoring your device." << std::endl;
+        exit(EXIT_FAILURE);
+    }
+}
 
 typedef struct {
     boost::uint32_t flags;
@@ -458,7 +475,6 @@ int UHD_SAFE_MAIN(int argc, char *argv[]){
         }
     }
 
-
     /*
      * Check validity of image through extension
      */
@@ -467,6 +483,7 @@ int UHD_SAFE_MAIN(int argc, char *argv[]){
         throw std::runtime_error("The image filename must end in .bin, .bit, or .lvbitx.");
     }
 
+    std::signal(SIGINT, &sig_int_handler);
     if(vm.count("addr")){
         udp_simple::sptr udp_transport = udp_simple::make_connected(ip_addr, BOOST_STRINGIZE(X300_FPGA_PROG_UDP_PORT));
 
