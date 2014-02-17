@@ -8,7 +8,8 @@ void tps54478_init(bool enable);
 void tps54478_set_power(bool on);   // Zynq core power (1.0V for FPGA)
 bool tps54478_is_power_good(void);
 
-void charge_set_led(bool on);
+void charge_set_led(bool on);		// Here for error blink codes
+void charge_notify(bool charging);
 
 void power_signal_interrupt(void);
 
@@ -44,6 +45,8 @@ uint8_t power_off(void);
 bool power_is_subsys_on(power_subsystem_t index);
 //int8_t power_get_regulator_index(uint8_t device, uint8_t address);
 //bool ltc3675_reg_helper(uint8_t address);
+
+void usbhub_reset(void);
 
 #ifndef I2C_REWORK
 #include "io.h"

@@ -33,6 +33,8 @@
 #ifndef I2C_REWORK
 io_pin_t PWR_SDA     = IO_PC(4);
 io_pin_t PWR_SCL     = IO_PC(5);
+
+io_pin_t USBHUB_RESET= IO_PA(2);
 #endif // I2C_REWORK
 
 //volatile bool powered = false;
@@ -168,17 +170,28 @@ static io_pin_t CHARGE      = IO_PD(1);
 #if !defined(ATTINY88_DIP) && defined(LED_POLARITY)
 static io_pin_t POWER_LED	= IO_PC(7);
 
-void power_set_led(bool on)
+void power_set_led_ex(bool on, bool swap)
 {
-	if ((on == false) && (io_is_pin_set(CHARGE)))	// If charging and turning off, don't change charge light
-		return;
+	if (swap)
+	{
+		if ((on == false) && (/*io_is_pin_set(CHARGE)*/_state.battery_charging))	// If charging and turning off, don't change charge light
+		{
+			charge_set_led(true);	// Force it again just in case
+			return;
+		}
+	}		
 	
 	io_clear_pin(CHARGE);
 	io_enable_pin(POWER_LED, on);
 }
+
+void power_set_led(bool on)
+{
+	power_set_led_ex(on, true);
+}
 #endif // !ATTINY88_DIP && LED_POLARITY
 
-void charge_set_led(bool on)
+void charge_set_led_ex(bool on, bool swap)
 {
 #ifdef ATTINY88_DIP
 	//
@@ -196,11 +209,39 @@ void charge_set_led(bool on)
     io_enable_pin(CHARGE, on);
 
 #ifdef LED_POLARITY
-	if ((on == false) && (_state.powered))	// If no longer charging, turn power light back on
-		power_set_led(true);
+	if (swap)
+	{
+		if ((on == false) && (_state.powered))	// If no longer charging, turn power light back on
+			power_set_led(true);
+	}			
 #endif // LED_POLARITY
 
 #endif // ATTINY88_DIP
+}
+
+void charge_set_led(bool on)
+{
+	charge_set_led_ex(on, true);
+}
+
+void charge_notify(bool charging)
+{
+	_state.battery_charging = charging;
+	
+	charge_set_led(charging);
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+void usbhub_reset(void)
+{
+#ifndef I2C_REWORK
+	io_clear_pin(USBHUB_RESET);
+	
+	_delay_us(1 * 10);	// Minimum active low pulse is 1us
+	
+	io_set_pin(USBHUB_RESET);
+#endif // I2C_REWORK
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -421,6 +462,8 @@ bool power_init(void)
     tps54478_init(true);	// Will keep EN float (keep power on)
 #ifndef I2C_REWORK
 	i2c_init(PWR_SDA, PWR_SCL);
+	
+	io_output_pin(USBHUB_RESET);
 #endif // I2C_REWORK
 #ifdef CHARGER_TI
 	if (bq24190_init(true) == false)
@@ -513,10 +556,20 @@ bool power_on(void)
 	pmc_mask_irqs(true);
 	
     //charge_set_led(false);
-
+	
+	bool last_power_led_state = /*true*/false;
+	
+	//if ((ARRAY_SIZE(boot_steps) % 2) == 0)	// Should end with 'true'
+	//	last_power_led_state = false;
+	
+	power_set_led(last_power_led_state);
+	
 	uint8_t step_count, retry;
 	for (step_count = 0; step_count < ARRAY_SIZE(boot_steps); step_count++)
 	{
+		last_power_led_state = !last_power_led_state;
+		power_set_led(last_power_led_state);
+		
 //		debug_blink(step_count);
 //		debug_blink(3 + (step_count * 2) + 0);
 //		debug_blink_rev(7 + (step_count * 2) + 0);
@@ -582,6 +635,16 @@ bool power_on(void)
 	
 	///////////////////////////////////
 	
+	//bool was_hub_in_reset = (io_is_pin_set(USBHUB_RESET) == false);
+	
+	usbhub_reset();
+	
+	/*if (was_hub_in_reset)
+	{
+		_delay_ms(10);
+		usbhub_reset();
+	}*/
+	
 	fpga_reset(false);  // Power has been brought up, so let FPGA run
 	
 	///////////////////////////////////
@@ -597,7 +660,13 @@ bool power_on(void)
 	pmc_mask_irqs(false);
 	
 	power_set_led(true);
-
+	
+	if (_state.battery_charging)
+	{
+		_delay_ms(500*2);
+		charge_set_led(true);
+	}		
+	
     return true;
 }
 
@@ -607,11 +676,21 @@ uint8_t power_off(void)
 	
 	io_clear_pin(PS_SRST);	// FIXME: Hold it low to stop FPGA running
 	
+	bool last_power_led_state = /*false*/true;
+	
+	//if ((ARRAY_SIZE(boot_steps) % 2) == 0)	// Should end with 'false'
+	//	last_power_led_state = true;
+	
+	//power_set_led(last_power_led_state);
+	
 	///////////////////////////////////
 	
 	int8_t step_count, retry;
 	for (step_count = ARRAY_SIZE(boot_steps) - 1; step_count >= 0; step_count--)
 	{
+		last_power_led_state = !last_power_led_state;
+		power_set_led(last_power_led_state);
+		
 //		debug_blink(step_count);
 		
 	    struct boot_step* step = boot_steps + step_count;
@@ -669,7 +748,10 @@ uint8_t power_off(void)
 	
 	pmc_mask_irqs(false);
 	
-	power_set_led(false);
+	power_set_led_ex(false, false);
+	_delay_ms(500*2);
+	
+	power_set_led(false);	// Will turn on charger LED if battery is charging
 	
 	return 0;
 }

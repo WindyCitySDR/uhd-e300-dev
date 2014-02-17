@@ -21,7 +21,7 @@
     <OverrideVtorValue />
     <eraseonlaunchrule>0</eraseonlaunchrule>
     <AsfVersion>3.1.3</AsfVersion>
-    <avrtool>com.atmel.avrdbg.tool.ispmk2</avrtool>
+    <avrtool>com.atmel.avrdbg.tool.stk600</avrtool>
     <avrtoolinterface>ISP</avrtoolinterface>
     <com_atmel_avrdbg_tool_stk600>
       <ToolType>com.atmel.avrdbg.tool.stk600</ToolType>
@@ -33,7 +33,7 @@
       </OverrideVtorValue>
       <Channel>
         <host>127.0.0.1</host>
-        <port>64208</port>
+        <port>49172</port>
         <ssl>False</ssl>
       </Channel>
       <ToolOptions>
@@ -41,7 +41,7 @@
         <InterfaceProperties>
           <JtagDbgClock>249000</JtagDbgClock>
           <JtagProgClock>1000000</JtagProgClock>
-          <IspClock>150000</IspClock>
+          <IspClock>25000</IspClock>
           <JtagInChain>false</JtagInChain>
           <JtagEnableExtResetOnStartSession>false</JtagEnableExtResetOnStartSession>
           <JtagDevicesBefore>0</JtagDevicesBefore>
@@ -200,31 +200,31 @@
   <PropertyGroup Condition=" '$(Configuration)' == 'Release (DDR3L, Ti)' ">
     <ToolchainSettings>
       <AvrGcc>
-        <avrgcc.common.outputfiles.hex>True</avrgcc.common.outputfiles.hex>
-        <avrgcc.common.outputfiles.lss>True</avrgcc.common.outputfiles.lss>
-        <avrgcc.common.outputfiles.eep>True</avrgcc.common.outputfiles.eep>
-        <avrgcc.compiler.general.ChangeDefaultCharTypeUnsigned>True</avrgcc.compiler.general.ChangeDefaultCharTypeUnsigned>
-        <avrgcc.compiler.general.ChangeDefaultBitFieldUnsigned>True</avrgcc.compiler.general.ChangeDefaultBitFieldUnsigned>
-        <avrgcc.compiler.symbols.DefSymbols>
-          <ListValues>
-            <Value>I2C_REWORK_disabled</Value>
-            <Value>DDR3L</Value>
-            <Value>CHARGER_TI</Value>
-            <Value>ENABLE_SERIAL</Value>
-            <Value>LED_POLARITY</Value>
-          </ListValues>
-        </avrgcc.compiler.symbols.DefSymbols>
-        <avrgcc.compiler.optimization.level>Optimize for size (-Os)</avrgcc.compiler.optimization.level>
-        <avrgcc.compiler.optimization.PackStructureMembers>True</avrgcc.compiler.optimization.PackStructureMembers>
-        <avrgcc.compiler.optimization.AllocateBytesNeededForEnum>True</avrgcc.compiler.optimization.AllocateBytesNeededForEnum>
-        <avrgcc.compiler.warnings.AllWarnings>True</avrgcc.compiler.warnings.AllWarnings>
-        <avrgcc.compiler.warnings.WarningsAsErrors>True</avrgcc.compiler.warnings.WarningsAsErrors>
-        <avrgcc.linker.libraries.Libraries>
-          <ListValues>
-            <Value>m</Value>
-          </ListValues>
-        </avrgcc.linker.libraries.Libraries>
-      </AvrGcc>
+  <avrgcc.common.outputfiles.hex>True</avrgcc.common.outputfiles.hex>
+  <avrgcc.common.outputfiles.lss>True</avrgcc.common.outputfiles.lss>
+  <avrgcc.common.outputfiles.eep>True</avrgcc.common.outputfiles.eep>
+  <avrgcc.compiler.general.ChangeDefaultCharTypeUnsigned>True</avrgcc.compiler.general.ChangeDefaultCharTypeUnsigned>
+  <avrgcc.compiler.general.ChangeDefaultBitFieldUnsigned>True</avrgcc.compiler.general.ChangeDefaultBitFieldUnsigned>
+  <avrgcc.compiler.symbols.DefSymbols>
+    <ListValues>
+      <Value>I2C_REWORK_disabled</Value>
+      <Value>DDR3L_disabled_revB_R_FB_network_changed</Value>
+      <Value>CHARGER_TI</Value>
+      <Value>ENABLE_SERIAL_disabled</Value>
+      <Value>LED_POLARITY</Value>
+    </ListValues>
+  </avrgcc.compiler.symbols.DefSymbols>
+  <avrgcc.compiler.optimization.level>Optimize for size (-Os)</avrgcc.compiler.optimization.level>
+  <avrgcc.compiler.optimization.PackStructureMembers>True</avrgcc.compiler.optimization.PackStructureMembers>
+  <avrgcc.compiler.optimization.AllocateBytesNeededForEnum>True</avrgcc.compiler.optimization.AllocateBytesNeededForEnum>
+  <avrgcc.compiler.warnings.AllWarnings>True</avrgcc.compiler.warnings.AllWarnings>
+  <avrgcc.compiler.warnings.WarningsAsErrors>True</avrgcc.compiler.warnings.WarningsAsErrors>
+  <avrgcc.linker.libraries.Libraries>
+    <ListValues>
+      <Value>m</Value>
+    </ListValues>
+  </avrgcc.linker.libraries.Libraries>
+</AvrGcc>
     </ToolchainSettings>
     <OutputPath>bin\Release (DDR3L, Ti)\</OutputPath>
   </PropertyGroup>

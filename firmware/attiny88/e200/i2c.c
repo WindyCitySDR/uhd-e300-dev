@@ -75,7 +75,7 @@ debug_log_hex(scl);
 	return true;
 }
 
-static void _i2c_stop_ex(io_pin_t sda, io_pin_t scl, bool pull_up)
+static bool _i2c_stop_ex(io_pin_t sda, io_pin_t scl, bool pull_up)
 {
 	// Assumes:
 	//	SCL is output & LOW
@@ -84,6 +84,8 @@ static void _i2c_stop_ex(io_pin_t sda, io_pin_t scl, bool pull_up)
 	// Assuming pull-up already enabled
 	//if (pull_up)
 	//	io_set_pin(sda);
+	
+	bool result = true;
 	
 	// SDA should be HIGH after ACK has been clocked away
 //	bool skip_drive = false;
@@ -97,6 +99,7 @@ static void _i2c_stop_ex(io_pin_t sda, io_pin_t scl, bool pull_up)
 			debug_blink_rev(4);
 			
 //			skip_drive = true;
+			result = false;
 			break;	// SDA is being held low?!
 		}
 
@@ -130,6 +133,8 @@ static void _i2c_stop_ex(io_pin_t sda, io_pin_t scl, bool pull_up)
 //	if ((pull_up) && (skip_drive))
 		io_set_pin(sda);
 	I2C_DELAY(I2C_DEFAULT_BUS_FREE_TIME);
+	
+	return result;
 }
 /*
 static void _i2c_stop(io_pin_t sda, io_pin_t scl)
@@ -307,7 +312,7 @@ static bool _i2c_write_byte_ex(io_pin_t sda, io_pin_t scl, uint8_t value, bool p
 			debug_log_hex(value);
 			debug_blink_rev(3);
             return false;	// Will abort and not release bus - done by caller
-		}			
+		}
 
         ++retries;
         I2C_DELAY(I2C_DEFAULT_RETRY_DELAY);
@@ -386,10 +391,24 @@ bool i2c_read2_ex(io_pin_t sda, io_pin_t scl, uint8_t addr, uint8_t subaddr, uin
 		return false;
 
 	if (_i2c_write_byte_ex(sda, scl, addr & ~0x01, pull_up) == false)
+	{
+#ifdef I2C_EXTRA_DEBUGGING
+		//debug_log_ex("R21:", false);
+		debug_log("R21");
+		//debug_log_hex(addr);
+#endif // I2C_EXTRA_DEBUGGING
 		goto i2c_read2_fail;
+	}
 
 	if (_i2c_write_byte_ex(sda, scl, subaddr, pull_up) == false)
+	{
+#ifdef I2C_EXTRA_DEBUGGING
+		//debug_log_ex("R22:", false);
+		debug_log("R22");
+		//debug_log_hex(subaddr);
+#endif // I2C_EXTRA_DEBUGGING
 		goto i2c_read2_fail;
+	}
 	
 	io_input_pin(scl);
 	if (pull_up)
@@ -397,15 +416,36 @@ bool i2c_read2_ex(io_pin_t sda, io_pin_t scl, uint8_t addr, uint8_t subaddr, uin
 	I2C_DELAY(I2C_DEFAULT_BUS_WAIT);
 	
 	if (_i2c_start_ex(sda, scl, pull_up) == false)
+	{
 		return false;
+	}
 	
 	if (_i2c_write_byte_ex(sda, scl, addr | 0x01, pull_up) == false)
+	{
+#ifdef I2C_EXTRA_DEBUGGING
+		//debug_log_ex("R23:", false);
+		debug_log("R23");
+		//debug_log_hex(addr);
+#endif // I2C_EXTRA_DEBUGGING
 		goto i2c_read2_fail;
+	}
 
 	if (_i2c_read_byte_ex(sda, scl, value, pull_up) == false)
+	{
+#ifdef I2C_EXTRA_DEBUGGING
+		//debug_log_ex("R24:", false);
+		debug_log("R24");
+		//debug_log_hex(*value);
+#endif // I2C_EXTRA_DEBUGGING
 		goto i2c_read2_fail;
-
-	_i2c_stop_ex(sda, scl, pull_up);
+	}
+	
+	if (_i2c_stop_ex(sda, scl, pull_up) == false)
+	{
+#ifdef I2C_EXTRA_DEBUGGING
+		debug_log("R25");
+#endif // I2C_EXTRA_DEBUGGING
+	}
 
 	return true;
 i2c_read2_fail:

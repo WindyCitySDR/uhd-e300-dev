@@ -219,7 +219,8 @@ bool _ltc4155_handle_irq(void)
 				if ((_state.battery_not_present == false) &&
 					(_ltc4155_last_good & (LTC4155_WALLSNS_GOOD | LTC4155_USBSNS_GOOD)))
 				{
-					charge_set_led(true);
+					//charge_set_led(true);
+					charge_notify(true);
 					break;
 				}						
 			}
@@ -230,7 +231,8 @@ bool _ltc4155_handle_irq(void)
 			//	break;
 			//case LTC4155_CHARGER_OFF:
 			default:
-				charge_set_led(false);
+				//charge_set_led(false);
+				charge_notify(false);
 		}
 	}
 	

@@ -293,13 +293,15 @@ bool _bq24190_handle_irq(void)
 				if ((_state.battery_not_present == false)/* &&
 					(_ltc4155_last_good & (LTC4155_WALLSNS_GOOD | LTC4155_USBSNS_GOOD))*/)
 				{
-					charge_set_led(true);
+					//charge_set_led(true);
+					charge_notify(true);
 					break;
 				}
 			}
 			//case BQ24190_CHRG_STAT_NOT_CHARGING:
 			default:
-				charge_set_led(false);
+				//charge_set_led(false);
+				charge_notify(false);
 		}
 	}
 	
