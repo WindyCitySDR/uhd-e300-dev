@@ -35,13 +35,19 @@ using namespace uhd::usrp;
 
 const std::string multi_usrp::ALL_GAINS = "";
 
-UHD_INLINE std::string string_vector_to_string(std::vector<std::string> values, std::string delimeter = std::string(" "))
+UHD_INLINE std::string string_vector_to_string(std::vector<std::string> values, std::string delimiter = std::string(" "))
 {
     std::string out = "";
     for (std::vector<std::string>::iterator iter = values.begin(); iter != values.end(); iter++)
-        out += delimeter + *iter;
+    {
+        out += (iter != values.begin() ? delimiter : "") + *iter;
+    }
     return out;
 }
+
+#define THROW_GAIN_NAME_ERROR(name,chan,dir) throw uhd::exception::runtime_error( \
+            (boost::format("%s: gain \"%s\" not found for channel %d.\nAvailable gains: %s\n") % \
+            __FUNCTION__ % name % chan % string_vector_to_string(get_##dir##_gain_names(chan))).str());
 
 /***********************************************************************
  * Helper methods
@@ -671,10 +677,7 @@ public:
         try {
             return rx_gain_group(chan)->set_value(gain, name);
         } catch (uhd::key_error &e) {
-            std::stringstream err;
-            err << __FUNCTION__ << "(\"" << name << "\"): gain not found.\n" <<
-                "Available gains: " << string_vector_to_string(get_rx_gain_names(chan)) << std::endl;
-            throw uhd::exception::runtime_error(err.str());
+            THROW_GAIN_NAME_ERROR(name,chan,rx);
         }
     }
 
@@ -682,10 +685,7 @@ public:
         try {
             return rx_gain_group(chan)->get_value(name);
         } catch (uhd::key_error &e) {
-            std::stringstream err;
-            err << __FUNCTION__ << "(\"" << name << "\"): gain not found.\n" <<
-                "Available gains: " << string_vector_to_string(get_rx_gain_names(chan)) << std::endl;
-            throw uhd::exception::runtime_error(err.str());
+            THROW_GAIN_NAME_ERROR(name,chan,rx);
         }
     }
 
@@ -693,10 +693,7 @@ public:
         try {
             return rx_gain_group(chan)->get_range(name);
         } catch (uhd::key_error &e) {
-            std::stringstream err;
-            err << __FUNCTION__ << "(\"" << name << "\"): gain not found.\n" <<
-                "Available gains: " << string_vector_to_string(get_rx_gain_names(chan)) << std::endl;
-            throw uhd::exception::runtime_error(err.str());
+            THROW_GAIN_NAME_ERROR(name,chan,rx);
         }
     }
 
@@ -861,10 +858,7 @@ public:
         try {
             return tx_gain_group(chan)->set_value(gain, name);
         } catch (uhd::key_error &e) {
-            std::stringstream err;
-            err << __FUNCTION__ << "(\"" << name << "\"): gain not found.\n" <<
-                "Available gains: " << string_vector_to_string(get_rx_gain_names(chan)) << std::endl;
-            throw uhd::exception::runtime_error(err.str());
+            THROW_GAIN_NAME_ERROR(name,chan,tx);
         }
     }
 
@@ -872,10 +866,7 @@ public:
         try {
             return tx_gain_group(chan)->get_value(name);
         } catch (uhd::key_error &e) {
-            std::stringstream err;
-            err << __FUNCTION__ << "(\"" << name << "\"): gain not found.\n" <<
-                "Available gains: " << string_vector_to_string(get_rx_gain_names(chan)) << std::endl;
-            throw uhd::exception::runtime_error(err.str());
+            THROW_GAIN_NAME_ERROR(name,chan,tx);
         }
     }
 
@@ -883,10 +874,7 @@ public:
         try {
             return tx_gain_group(chan)->get_range(name);
         } catch (uhd::key_error &e) {
-            std::stringstream err;
-            err << __FUNCTION__ << "(\"" << name << "\"): gain not found.\n" <<
-                "Available gains: " << string_vector_to_string(get_rx_gain_names(chan)) << std::endl;
-            throw uhd::exception::runtime_error(err.str());
+            THROW_GAIN_NAME_ERROR(name,chan,tx);
         }
     }
 
@@ -1073,6 +1061,12 @@ private:
     fs_path rx_dsp_root(const size_t chan)
     {
         mboard_chan_pair mcp = rx_chan_to_mcp(chan);
+        if (_tree->exists(mb_root(mcp.mboard) / "rx_chan_dsp_mapping")) {
+            std::vector<size_t> map = _tree->access<std::vector<size_t> >(mb_root(mcp.mboard) / "rx_chan_dsp_mapping").get();
+            UHD_ASSERT_THROW(map.size() > mcp.chan);
+            mcp.chan = map[mcp.chan];
+        }
+
         try
         {
             const std::string name = _tree->list(mb_root(mcp.mboard) / "rx_dsps").at(mcp.chan);
@@ -1087,6 +1081,11 @@ private:
     fs_path tx_dsp_root(const size_t chan)
     {
         mboard_chan_pair mcp = tx_chan_to_mcp(chan);
+        if (_tree->exists(mb_root(mcp.mboard) / "tx_chan_dsp_mapping")) {
+            std::vector<size_t> map = _tree->access<std::vector<size_t> >(mb_root(mcp.mboard) / "tx_chan_dsp_mapping").get();
+            UHD_ASSERT_THROW(map.size() > mcp.chan);
+            mcp.chan = map[mcp.chan];
+        }
         try
         {
             const std::string name = _tree->list(mb_root(mcp.mboard) / "tx_dsps").at(mcp.chan);
