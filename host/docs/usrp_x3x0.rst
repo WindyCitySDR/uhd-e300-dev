@@ -65,15 +65,18 @@ in order not to damage sensitive electronics through static discharge!
 Network Connectivity
 ^^^^^^^^^^^^^^^^^^^^
 
-The next step is to make sure your computer can talk to the USRP. An otherwise unconfigured
-USRP device will have the IP address 192.168.10.2 when using 1GigE.
-It is recommended to directly connect your USRP to the computer at first,
-and to set the IP address on your machine to 192.168.10.1.
-See Section `Setup the host interface`_ on details how to change your machine's IP address.
+The next step is to make sure your computer can talk to the USRP. An otherwise
+unconfigured USRP device will have the IP address 192.168.10.2 when using
+1GigE.  It is recommended to directly connect your USRP to the computer at
+first, and to set the IP address on your machine to 192.168.10.1.
 
-**Note**: If you are running an automatic IP configuration service such as Network Manager, make
-sure it is either deactivated or configured to not change the network device! This can, in extreme cases,
-lead to you bricking the USRP!
+See the `system configuration manual <./usrp_x3x0_config.html>`_ on details how
+to change your machine's IP address.
+
+**Note**: If you are running an automatic IP configuration service such as
+Network Manager, make sure it is either deactivated or configured to not manage
+the network interface! This can, in extreme cases, lead to you bricking the
+USRP!
 
 If your network configuration is correct, running ``uhd_find_devices`` will find your USRP
 and print some information about it. You will also be able to ping the USRP by running::
@@ -86,31 +89,32 @@ on the command line. At this point, you should also run::
 
 to make sure all of your components (daughterboards, GPSDO) are correctly detected and usable.
 
-^^^^^^^^^^^^^^^^^^^^^
-Updating the firmware
-^^^^^^^^^^^^^^^^^^^^^
+^^^^^^^^^^^^^^^^^^^^^^^^^
+Updating the FPGA Image
+^^^^^^^^^^^^^^^^^^^^^^^^^
 
-If the output from ``uhd_find_devices`` and ``uhd_usrp_probe`` didn't show any warnings, you
-can skip this step. However, if there were warnings regarding version incompatibility, you will
-have to upate the FPGA image before you can start using your USRP.
+If the output from ``uhd_find_devices`` and ``uhd_usrp_probe`` didn't show any
+warnings, you can skip this step. However, if there were errors regarding the
+FPGA version compatibility number (compat number), you will have to upate the
+FPGA image before you can start using your USRP.
 
 1. Download the current UHD images. You can use the ``uhd_images_downloader`` script provided
    with UHD (see also `FPGA Image Flavors`_).
 2. Use the ``usrp_x3xx_fpga_burner`` utility to update the FPGA image. On the command line, run::
 
-          usrp_x3xx_fpga_burner --addr=192.168.10.2 --type=HGS # Since we are using 1GigE, type is HGS
+          usrp_x3xx_fpga_burner --addr=192.168.10.2 --type=HGS
 
   If you have installed the images to a non-standard location, you might need to run (change the filename according to your device)::
 
           usrp_x3xx_fpga_burner --addr=192.168.10.2 --fpga-path <path_to_images>/usrp_x310_fpga_HGS.bit
 
-  The process of updating the firmware will take several minutes. Make sure the process of flashing the image does not get interrupted.
+  The process of updating the FPGA image will take several minutes. Make sure the process of flashing the image does not get interrupted.
 
 See `Load the Images onto the On-board Flash`_ for more details.
 
-When your firmware is up to date, power-cycle the device and re-run ``uhd_usrp_probe``. There should
-be no more warnings at this point, and all components should be correctly detected. Your USRP is now
-ready for development!
+When your FPGA image is up to date, power-cycle the device and re-run
+``uhd_usrp_probe``. There should be no errors at this point, and all components
+should be correctly detected. Your USRP is now ready for development!
 
 --------------
 Hardware Setup
@@ -386,63 +390,21 @@ The default IP address for the USRP X300/X310 device depends on the Ethernet Por
 You must configure the host Ethernet interface with a static IP address on the same subnet as the connected 
 device to enable communication, as shown in the following table:
 
-+---------------+-------------------------+----------------+----------------+---------------+
-|  Ethernet     | USRP                    |  Default USRP  |  Host Static   | Host Static   |
-| Interface     | Ethernet Port           | IP Address     | IP Address     | Subnet Mask   |
-+===============+=========================+================+================+===============+
-|  Gigabit      |  Port 0 (HGS Image)     |  192.168.10.2  | 192.168.10.1   | 255.255.255.0 |
-+---------------+-------------------------+----------------+----------------+---------------+
-|  Ten Gigabit  |  Port 1 (HGS/XGS Image) |  192.168.40.2  | 192.168.40.1   | 255.255.255.0 |
-+---------------+-------------------------+----------------+----------------+---------------+
-|  Ten Gigabit  |  Port 0 (XGS Image)     |  192.168.30.2  | 192.168.30.1   | 255.255.255.0 |
-+---------------+-------------------------+----------------+----------------+---------------+
++---------------+-------------------------+----------------+----------------+---------------+---------------+
+|  Ethernet     | USRP                    |  Default USRP  |  Host Static   | Host Static   | Address       |
+| Interface     | Ethernet Port           | IP Address     | IP Address     | Subnet Mask   | EEPROM key    |
++===============+=========================+================+================+===============+===============+
+|  Gigabit      |  Port 0 (HGS Image)     |  192.168.10.2  | 192.168.10.1   | 255.255.255.0 | ``ip-addr0``  |
++---------------+-------------------------+----------------+----------------+---------------+---------------+
+|  Ten Gigabit  |  Port 0 (XGS Image)     |  192.168.30.2  | 192.168.30.1   | 255.255.255.0 | ``ip-addr2``  |
++---------------+-------------------------+----------------+----------------+---------------+---------------+
+|  Ten Gigabit  |  Port 1 (HGS/XGS Image) |  192.168.40.2  | 192.168.40.1   | 255.255.255.0 | ``ip-addr3``  |
++---------------+-------------------------+----------------+----------------+---------------+---------------+
 
+As you can see, the X300/X310 actually stores different IP addresses, which all address the device differently: Each combination of Ethernet port and interface type (i.e., Gigabit or Ten Gigabit) has its own IP address. As an example, when addressing the device through 1 Gigabit Ethernet on its first port (Port 0), the relevant IP address is the one stored in the EEPROM with key ``ip-addr0``, or 192.168.10.2 by default.
 
-On a Linux system, you can add a static IP address very easily by using the
-'ip' command
-
-::
-
-    sudo ip addr add 192.168.10.1/24 dev <interface>
-
-Note that **<interface>** is usually something like **eth0**.  You can discover the
-names of the network interfaces in your computer by running:
-
-::
-
-    ip addr show
-
-**Note:**
-When using UHD software, if an IP address for the USRP-X Series device is not specified,
-the software will use UDP broadcast packets to locate the USRP-X Series device.
-On some systems, the firewall will block UDP broadcast packets.
-It is recommended that you change or disable your firewall settings.
-
-On many Linux distributions, NetworkManager or similar tools may control the network interface.
-It is important to deactivate these tools for your device before continuing!
-
-^^^^^^^^^^^^^^^
-Setting the MTU
-^^^^^^^^^^^^^^^
-As UHD by default uses receive and transmit frames larger than the standard MTU of 1500 Bytes,
-the NIC needs to be configured to use a larger MTU when used with the USRP X series devices.
-
-::
-
-    sudo ip link set mtu 8192 dev <interface>
-
-Upon initialization UHD will probe for the maximum possible path MTU along the path between the USRP X series device
-and the host, both in receive and transmit direction.
-
-If the network hardware does not support MTUs as large as 8000 Bytes, passing the **send_frame_size** and **receive_frame_size**
-arguments will make UHD use smaller MTUs:
-
-::
-
-    uhd_usrp_probe --args='send_frame_size=<max send MTU>, recv_frame_size=<max receive MTU>'
-
-**Note:** This will most likely have a severe performance penalty.
-
+See the `system configuration manual <./usrp_x3x0_config.html>`_ on details
+how to change your machine's IP address and MTU size to work well with the X300.
 
 ^^^^^^^^^^^^^^^^^^^^^^^^^
 Multiple devices per host
@@ -477,6 +439,7 @@ You may need to change the USRP's IP address for several reasons:
 To change the USRP's IP address,
 you must know the current address of the USRP,
 and the network must be setup properly as described above.
+You must also know which IP address of the X300 you want to change, as identified by their address EEPROM key (e.g. ``ip-addr0``, see the table above).
 Run the following commands:
 
 **UNIX:**
@@ -484,14 +447,14 @@ Run the following commands:
 ::
 
     cd <install-path>/lib/uhd/utils
-    ./usrp_burn_mb_eeprom --args=<optional device args> --key=ip-addr --val=192.168.10.3
+    ./usrp_burn_mb_eeprom --args=<optional device args> --key=ip-addr0 --val=192.168.10.3
 
 **Windows:**
 
 ::
 
     cd <install-path>\lib\uhd\utils
-    usrp_burn_mb_eeprom.exe --args=<optional device args> --key=ip-addr --val=192.168.10.3
+    usrp_burn_mb_eeprom.exe --args=<optional device args> --key=ip-addr0 --val=192.168.10.3
 
 ---------------------
 Addressing the Device

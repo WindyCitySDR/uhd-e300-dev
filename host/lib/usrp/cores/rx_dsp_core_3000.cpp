@@ -91,8 +91,10 @@ public:
 
     uhd::meta_range_t get_host_rates(void){
         meta_range_t range;
-	for (int rate = 1024; rate > 512; rate -= 8){
-            range.push_back(range_t(_tick_rate/rate));
+        if (!_is_b200) {
+            for (int rate = 1024; rate > 512; rate -= 8){
+                range.push_back(range_t(_tick_rate/rate));
+            }
         }
         for (int rate = 512; rate > 256; rate -= 4){
             range.push_back(range_t(_tick_rate/rate));
