@@ -147,31 +147,45 @@ e200_impl::e200_impl(const uhd::device_addr_t &device_addr)
     ////////////////////////////////////////////////////////////////////
     // setup fifo xports
     ////////////////////////////////////////////////////////////////////
+    uhd::transport::zero_copy_xport_params ctrl_xport_params;
+    ctrl_xport_params.recv_frame_size = 64;
+    ctrl_xport_params.num_recv_frames = 32;
+    ctrl_xport_params.send_frame_size = 64;
+    ctrl_xport_params.num_send_frames = 32;
+    
+    uhd::transport::zero_copy_xport_params data_xport_params;
+    data_xport_params.recv_frame_size = 2048;
+    data_xport_params.num_recv_frames = 128;
+    data_xport_params.send_frame_size = 2048;
+    data_xport_params.num_send_frames = 128;
+    
     uhd::device_addr_t ctrl_xport_args;
-    ctrl_xport_args["recv_frame_size"] = "64";
-    ctrl_xport_args["num_recv_frames"] = "32";
-    ctrl_xport_args["send_frame_size"] = "64";
-    ctrl_xport_args["num_send_frames"] = "32";
+    ctrl_xport_args["recv_frame_size"] = str(boost::format("%d") % ctrl_xport_params.recv_frame_size);
+    ctrl_xport_args["num_recv_frames"] = str(boost::format("%d") % ctrl_xport_params.num_recv_frames);
+    ctrl_xport_args["send_frame_size"] = str(boost::format("%d") % ctrl_xport_params.send_frame_size);
+    ctrl_xport_args["num_send_frames"] = str(boost::format("%d") % ctrl_xport_params.num_send_frames);
 
     uhd::device_addr_t data_xport_args;
-    data_xport_args["recv_frame_size"] = "2048";
-    data_xport_args["num_recv_frames"] = "128";
-    data_xport_args["send_frame_size"] = "2048";
-    data_xport_args["num_send_frames"] = "128";
+    data_xport_args["recv_frame_size"] = str(boost::format("%d") % data_xport_params.recv_frame_size);
+    data_xport_args["num_recv_frames"] = str(boost::format("%d") % data_xport_params.num_recv_frames);
+    data_xport_args["send_frame_size"] = str(boost::format("%d") % data_xport_params.send_frame_size);
+    data_xport_args["num_send_frames"] = str(boost::format("%d") % data_xport_params.num_send_frames);
 
     _network_mode = device_addr.has_key("addr");
+
+    udp_zero_copy::buff_params dummy_buff_params_out;
 
     if (_network_mode)
     {
         radio_perifs_t &perif = _radio_perifs[0];
-        perif.send_ctrl_xport = udp_zero_copy::make(device_addr["addr"], E200_SERVER_CTRL_PORT);
+        perif.send_ctrl_xport = udp_zero_copy::make(device_addr["addr"], E200_SERVER_CTRL_PORT, ctrl_xport_params, dummy_buff_params_out, device_addr);
         perif.recv_ctrl_xport = perif.send_ctrl_xport;
-        perif.tx_data_xport = udp_zero_copy::make(device_addr["addr"], E200_SERVER_TX_PORT);
+        perif.tx_data_xport = udp_zero_copy::make(device_addr["addr"], E200_SERVER_TX_PORT, data_xport_params, dummy_buff_params_out, device_addr);
         perif.tx_flow_xport = perif.tx_data_xport;
-        perif.rx_data_xport = udp_zero_copy::make(device_addr["addr"], E200_SERVER_RX_PORT);
+        perif.rx_data_xport = udp_zero_copy::make(device_addr["addr"], E200_SERVER_RX_PORT, data_xport_params, dummy_buff_params_out, device_addr);
         perif.rx_flow_xport = perif.rx_data_xport;
         zero_copy_if::sptr codec_xport;
-        codec_xport = udp_zero_copy::make(device_addr["addr"], E200_SERVER_CODEC_PORT);
+        codec_xport = udp_zero_copy::make(device_addr["addr"], E200_SERVER_CODEC_PORT, ctrl_xport_params, dummy_buff_params_out, device_addr);
         ad9361_ctrl_iface_sptr codec_ctrl(new ad9361_ctrl_over_zc(codec_xport));
         _codec_ctrl = ad9361_ctrl::make(codec_ctrl);
     }
@@ -186,7 +200,7 @@ e200_impl::e200_impl(const uhd::device_addr_t &device_addr)
         perif.rx_data_xport = _fifo_iface->make_recv_xport(2, data_xport_args);
         perif.rx_flow_xport = _fifo_iface->make_send_xport(2, ctrl_xport_args);
         zero_copy_if::sptr codec_xport;
-        codec_xport = udp_zero_copy::make("localhost", E200_SERVER_CODEC_PORT);
+        codec_xport = udp_zero_copy::make("localhost", E200_SERVER_CODEC_PORT, ctrl_xport_params, dummy_buff_params_out, device_addr);
         ad9361_ctrl_iface_sptr codec_ctrl(new ad9361_ctrl_over_zc(codec_xport));
         _codec_ctrl = ad9361_ctrl::make(codec_ctrl);
     }
