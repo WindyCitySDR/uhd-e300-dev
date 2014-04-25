@@ -47,10 +47,12 @@
 static const boost::uint8_t  B200_FW_COMPAT_NUM_MAJOR = 0x04;
 static const boost::uint8_t  B200_FW_COMPAT_NUM_MINOR = 0x00;
 static const boost::uint16_t B200_FPGA_COMPAT_NUM = 0x03;
-static const double          B200_LINK_RATE_BPS = (5e9)/8; //practical link rate (5 Gbps)
 static const double          B200_BUS_CLOCK_RATE = 100e6;
 static const double          B200_DEFAULT_TICK_RATE = 32e6;
 static const boost::uint32_t B200_GPSDO_ST_NONE = 0x83;
+
+static const size_t B200_MAX_RATE_USB2              =  32000000; // bytes/s
+static const size_t B200_MAX_RATE_USB3              = 500000000; // bytes/s
 
 #define FLIP_SID(sid) (((sid)<<16)|((sid)>>16))
 
@@ -91,6 +93,7 @@ public:
     uhd::rx_streamer::sptr get_rx_stream(const uhd::stream_args_t &args);
     uhd::tx_streamer::sptr get_tx_stream(const uhd::stream_args_t &args);
     bool recv_async_msg(uhd::async_metadata_t &, double);
+    void check_streamer_args(const uhd::stream_args_t &args, double tick_rate, const char* direction = NULL);
 
 private:
     //controllers
@@ -127,8 +130,7 @@ private:
     void set_mb_eeprom(const uhd::usrp::mboard_eeprom_t &);
     void check_fw_compat(void);
     void check_fpga_compat(void);
-    void update_rx_subdev_spec(const uhd::usrp::subdev_spec_t &);
-    void update_tx_subdev_spec(const uhd::usrp::subdev_spec_t &);
+    void update_subdev_spec(const std::string &tx_rx, const uhd::usrp::subdev_spec_t &);
     void update_time_source(const std::string &);
     void update_clock_source(const std::string &);
     void update_bandsel(const std::string& which, double freq);
@@ -150,8 +152,12 @@ private:
         bool ant_rx2;
     };
     std::vector<radio_perifs_t> _radio_perifs;
-    void setup_radio(const size_t which_radio);
-    void handle_overflow(const size_t index);
+
+    /*! \brief Setup the DSP chain for one radio front-end.
+     *
+     */
+    void setup_radio(const size_t radio_index);
+    void handle_overflow(const size_t radio_index);
 
     struct gpio_state {
         boost::uint32_t  tx_bandsel_a, tx_bandsel_b, rx_bandsel_a, rx_bandsel_b, rx_bandsel_c, codec_arst, mimo, ref_sel;
@@ -174,13 +180,15 @@ private:
     void update_enables(void);
     void update_atrs(void);
 
-    void update_tick_rate(const double);
-    void update_rx_samp_rate(const size_t, const double);
-    void update_tx_samp_rate(const size_t, const double);
-
     double _tick_rate;
     double get_tick_rate(void){return _tick_rate;}
     double set_tick_rate(const double rate);
+    void update_tick_rate(const double);
+    void enforce_tick_rate_limits(size_t chan_count, double tick_rate, const char* direction = NULL);
+    void check_tick_rate_with_current_streamers(double rate);
+
+    void update_rx_samp_rate(const size_t, const double);
+    void update_tx_samp_rate(const size_t, const double);
 };
 
 #endif /* INCLUDED_B200_IMPL_HPP */

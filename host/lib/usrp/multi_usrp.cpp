@@ -24,6 +24,7 @@
 #include <uhd/usrp/dboard_id.hpp>
 #include <uhd/usrp/mboard_eeprom.hpp>
 #include <uhd/usrp/dboard_eeprom.hpp>
+#include <uhd/convert.hpp>
 #include <boost/assign/list_of.hpp>
 #include <boost/thread.hpp>
 #include <boost/foreach.hpp>
@@ -35,13 +36,19 @@ using namespace uhd::usrp;
 
 const std::string multi_usrp::ALL_GAINS = "";
 
-UHD_INLINE std::string string_vector_to_string(std::vector<std::string> values, std::string delimeter = std::string(" "))
+UHD_INLINE std::string string_vector_to_string(std::vector<std::string> values, std::string delimiter = std::string(" "))
 {
     std::string out = "";
     for (std::vector<std::string>::iterator iter = values.begin(); iter != values.end(); iter++)
-        out += delimeter + *iter;
+    {
+        out += (iter != values.begin() ? delimiter : "") + *iter;
+    }
     return out;
 }
+
+#define THROW_GAIN_NAME_ERROR(name,chan,dir) throw uhd::exception::runtime_error( \
+            (boost::format("%s: gain \"%s\" not found for channel %d.\nAvailable gains: %s\n") % \
+            __FUNCTION__ % name % chan % string_vector_to_string(get_##dir##_gain_names(chan))).str());
 
 /***********************************************************************
  * Helper methods
@@ -96,6 +103,8 @@ static meta_range_t make_overall_tune_range(
     }
     return range;
 }
+
+
 
 /***********************************************************************
  * Gain helper functions
@@ -583,6 +592,11 @@ public:
     /*******************************************************************
      * RX methods
      ******************************************************************/
+    rx_streamer::sptr get_rx_stream(const stream_args_t &args) {
+        _check_link_rate(args, false);
+        return this->get_device()->get_rx_stream(args);
+    }
+
     void set_rx_subdev_spec(const subdev_spec_t &spec, size_t mboard){
         if (mboard != ALL_MBOARDS){
             _tree->access<subdev_spec_t>(mb_root(mboard) / "rx_subdev_spec").set(spec);
@@ -671,10 +685,7 @@ public:
         try {
             return rx_gain_group(chan)->set_value(gain, name);
         } catch (uhd::key_error &e) {
-            std::stringstream err;
-            err << __FUNCTION__ << "(\"" << name << "\"): gain not found.\n" <<
-                "Available gains: " << string_vector_to_string(get_rx_gain_names(chan)) << std::endl;
-            throw uhd::exception::runtime_error(err.str());
+            THROW_GAIN_NAME_ERROR(name,chan,rx);
         }
     }
 
@@ -682,10 +693,7 @@ public:
         try {
             return rx_gain_group(chan)->get_value(name);
         } catch (uhd::key_error &e) {
-            std::stringstream err;
-            err << __FUNCTION__ << "(\"" << name << "\"): gain not found.\n" <<
-                "Available gains: " << string_vector_to_string(get_rx_gain_names(chan)) << std::endl;
-            throw uhd::exception::runtime_error(err.str());
+            THROW_GAIN_NAME_ERROR(name,chan,rx);
         }
     }
 
@@ -693,10 +701,7 @@ public:
         try {
             return rx_gain_group(chan)->get_range(name);
         } catch (uhd::key_error &e) {
-            std::stringstream err;
-            err << __FUNCTION__ << "(\"" << name << "\"): gain not found.\n" <<
-                "Available gains: " << string_vector_to_string(get_rx_gain_names(chan)) << std::endl;
-            throw uhd::exception::runtime_error(err.str());
+            THROW_GAIN_NAME_ERROR(name,chan,rx);
         }
     }
 
@@ -773,6 +778,11 @@ public:
     /*******************************************************************
      * TX methods
      ******************************************************************/
+    tx_streamer::sptr get_tx_stream(const stream_args_t &args) {
+        _check_link_rate(args, true);
+        return this->get_device()->get_tx_stream(args);
+    }
+
     void set_tx_subdev_spec(const subdev_spec_t &spec, size_t mboard){
         if (mboard != ALL_MBOARDS){
             _tree->access<subdev_spec_t>(mb_root(mboard) / "tx_subdev_spec").set(spec);
@@ -861,10 +871,7 @@ public:
         try {
             return tx_gain_group(chan)->set_value(gain, name);
         } catch (uhd::key_error &e) {
-            std::stringstream err;
-            err << __FUNCTION__ << "(\"" << name << "\"): gain not found.\n" <<
-                "Available gains: " << string_vector_to_string(get_rx_gain_names(chan)) << std::endl;
-            throw uhd::exception::runtime_error(err.str());
+            THROW_GAIN_NAME_ERROR(name,chan,tx);
         }
     }
 
@@ -872,10 +879,7 @@ public:
         try {
             return tx_gain_group(chan)->get_value(name);
         } catch (uhd::key_error &e) {
-            std::stringstream err;
-            err << __FUNCTION__ << "(\"" << name << "\"): gain not found.\n" <<
-                "Available gains: " << string_vector_to_string(get_rx_gain_names(chan)) << std::endl;
-            throw uhd::exception::runtime_error(err.str());
+            THROW_GAIN_NAME_ERROR(name,chan,tx);
         }
     }
 
@@ -883,10 +887,7 @@ public:
         try {
             return tx_gain_group(chan)->get_range(name);
         } catch (uhd::key_error &e) {
-            std::stringstream err;
-            err << __FUNCTION__ << "(\"" << name << "\"): gain not found.\n" <<
-                "Available gains: " << string_vector_to_string(get_rx_gain_names(chan)) << std::endl;
-            throw uhd::exception::runtime_error(err.str());
+            THROW_GAIN_NAME_ERROR(name,chan,tx);
         }
     }
 
@@ -1073,6 +1074,12 @@ private:
     fs_path rx_dsp_root(const size_t chan)
     {
         mboard_chan_pair mcp = rx_chan_to_mcp(chan);
+        if (_tree->exists(mb_root(mcp.mboard) / "rx_chan_dsp_mapping")) {
+            std::vector<size_t> map = _tree->access<std::vector<size_t> >(mb_root(mcp.mboard) / "rx_chan_dsp_mapping").get();
+            UHD_ASSERT_THROW(map.size() > mcp.chan);
+            mcp.chan = map[mcp.chan];
+        }
+
         try
         {
             const std::string name = _tree->list(mb_root(mcp.mboard) / "rx_dsps").at(mcp.chan);
@@ -1087,6 +1094,11 @@ private:
     fs_path tx_dsp_root(const size_t chan)
     {
         mboard_chan_pair mcp = tx_chan_to_mcp(chan);
+        if (_tree->exists(mb_root(mcp.mboard) / "tx_chan_dsp_mapping")) {
+            std::vector<size_t> map = _tree->access<std::vector<size_t> >(mb_root(mcp.mboard) / "tx_chan_dsp_mapping").get();
+            UHD_ASSERT_THROW(map.size() > mcp.chan);
+            mcp.chan = map[mcp.chan];
+        }
         try
         {
             const std::string name = _tree->list(mb_root(mcp.mboard) / "tx_dsps").at(mcp.chan);
@@ -1178,6 +1190,34 @@ private:
             gg->register_fcns(name, make_gain_fcns_from_subtree(_tree->subtree(tx_rf_fe_root(chan) / "gains" / name)), 0 /* low prio */);
         }
         return gg;
+    }
+
+    //! \param is_tx True for tx
+    // Assumption is that all mboards use the same link
+    bool _check_link_rate(const stream_args_t &args, bool is_tx) {
+        bool link_rate_is_ok = true;
+        size_t bytes_per_sample = convert::get_bytes_per_item(args.otw_format.empty() ? "sc16" : args.otw_format);
+        double max_link_rate = 0;
+        double sum_rate = 0;
+        BOOST_FOREACH(const size_t chan, args.channels) {
+            mboard_chan_pair mcp = is_tx ? tx_chan_to_mcp(chan) : rx_chan_to_mcp(chan);
+            if (_tree->exists(mb_root(mcp.mboard) / "link_max_rate")) {
+                max_link_rate = std::max(
+                    max_link_rate,
+                   _tree->access<double>(mb_root(mcp.mboard) / "link_max_rate").get()
+                );
+            }
+            sum_rate += is_tx ? get_tx_rate(chan) : get_rx_rate(chan);
+        }
+        if (max_link_rate > 0 and (max_link_rate / bytes_per_sample) < sum_rate) {
+            UHD_MSG(warning) << boost::format(
+                "The total sum of rates (%f MSps on %u channels) exceeds the maximum capacity of the connection.\n"
+                "This can cause %s."
+            ) % (sum_rate/1e6) % args.channels.size() % (is_tx ? "underruns (U)" : "overflows (O)")  << std::endl;
+            link_rate_is_ok = false;
+        }
+
+        return link_rate_is_ok;
     }
 };
 

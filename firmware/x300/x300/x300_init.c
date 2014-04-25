@@ -75,6 +75,7 @@ static void init_network(void)
     pkt_config = wb_pkt_iface64_init(PKT_RAM0_BASE, 0x1ffc);
     printf("PKT RAM0 BASE 0x%x\n", (&pkt_config)->base);
     u3_net_stack_init(&pkt_config);
+
     link_state_route_proto_init();
 
     //read everything from eeprom

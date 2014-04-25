@@ -1,5 +1,5 @@
 #
-# Copyright 2010-2013 Ettus Research LLC
+# Copyright 2010-2014 Ettus Research LLC
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -99,7 +99,7 @@ SET(CPACK_PACKAGE_DESCRIPTION_SUMMARY "Ettus Research - USRP Hardware Driver")
 SET(CPACK_PACKAGE_VENDOR              "Ettus Research LLC")
 SET(CPACK_PACKAGE_CONTACT             "Ettus Research <support@ettus.com>")
 SET(CPACK_PACKAGE_VERSION "${UHD_VERSION}")
-SET(CPACK_RESOURCE_FILE_WELCOME ${CMAKE_SOURCE_DIR}/../README.md)
+SET(CPACK_RESOURCE_FILE_WELCOME ${CMAKE_SOURCE_DIR}/README.md)
 SET(CPACK_RESOURCE_FILE_LICENSE ${CMAKE_SOURCE_DIR}/LICENSE)
 
 ########################################################################
@@ -200,4 +200,7 @@ IF(MSVC)
 ENDIF(MSVC)
 
 ########################################################################
+IF(NOT ${CPACK_GENERATOR} STREQUAL NSIS)
+    SET(CPACK_SET_DESTDIR "ON")
+ENDIF(NOT ${CPACK_GENERATOR} STREQUAL NSIS)
 INCLUDE(CPack) #include after setting vars

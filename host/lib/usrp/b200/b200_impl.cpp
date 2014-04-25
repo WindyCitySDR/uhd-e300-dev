@@ -1,5 +1,5 @@
 //
-// Copyright 2012-2013 Ettus Research LLC
+// Copyright 2012-2014 Ettus Research LLC
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -19,6 +19,7 @@
 #include "b200_regs.hpp"
 #include <uhd/transport/usb_control.hpp>
 #include <uhd/utils/msg.hpp>
+#include <uhd/utils/cast.hpp>
 #include <uhd/exception.hpp>
 #include <uhd/utils/static.hpp>
 #include <uhd/utils/images.hpp>
@@ -32,6 +33,7 @@
 #include <boost/functional/hash.hpp>
 #include <cstdio>
 #include <ctime>
+#include <cmath>
 
 using namespace uhd;
 using namespace uhd::usrp;
@@ -57,11 +59,11 @@ static device_addrs_t b200_find(const device_addr_t &hint)
     //since an address and resource is intended for a different, non-USB, device.
     if (hint.has_key("addr") || hint.has_key("resource")) return b200_addrs;
 
-    unsigned int vid, pid;
+    boost::uint16_t vid, pid;
 
     if(hint.has_key("vid") && hint.has_key("pid") && hint.has_key("type") && hint["type"] == "b200") {
-        sscanf(hint.get("vid").c_str(), "%x", &vid);
-        sscanf(hint.get("pid").c_str(), "%x", &pid);
+        vid = uhd::cast::hexstr_cast<boost::uint16_t>(hint.get("vid"));
+        pid = uhd::cast::hexstr_cast<boost::uint16_t>(hint.get("pid"));
     } else {
         vid = B200_VENDOR_ID;
         pid = B200_PRODUCT_ID;
@@ -156,12 +158,12 @@ b200_impl::b200_impl(const device_addr_t &device_addr)
     const fs_path mb_path = "/mboards/0";
 
     //try to match the given device address with something on the USB bus
-    uint16_t vid = B200_VENDOR_ID;
-    uint16_t pid = B200_PRODUCT_ID;
+    boost::uint16_t vid = B200_VENDOR_ID;
+    boost::uint16_t pid = B200_PRODUCT_ID;
     if (device_addr.has_key("vid"))
-            sscanf(device_addr.get("vid").c_str(), "%x", &vid);
+        vid = uhd::cast::hexstr_cast<boost::uint16_t>(device_addr.get("vid"));
     if (device_addr.has_key("pid"))
-            sscanf(device_addr.get("pid").c_str(), "%x", &pid);
+        pid = uhd::cast::hexstr_cast<boost::uint16_t>(device_addr.get("pid"));
 
     std::vector<usb_device_handle::sptr> device_list =
         usb_device_handle::get_device_list(vid, pid);
@@ -249,6 +251,7 @@ b200_impl::b200_impl(const device_addr_t &device_addr)
         ctrl_xport_args
     );
     while (_ctrl_transport->get_recv_buff(0.0)){} //flush ctrl xport
+    _tree->create<double>(mb_path / "link_max_rate").set((usb_speed == 3) ? B200_MAX_RATE_USB3 : B200_MAX_RATE_USB2);
 
     ////////////////////////////////////////////////////////////////////
     // Async task structure
@@ -373,12 +376,15 @@ b200_impl::b200_impl(const device_addr_t &device_addr)
     ////////////////////////////////////////////////////////////////////
     // create frontend mapping
     ////////////////////////////////////////////////////////////////////
+    std::vector<size_t> default_map(2, 0); default_map[1] = 1; // Set this to A->0 B->1 even if there's only A
+    _tree->create<std::vector<size_t> >(mb_path / "rx_chan_dsp_mapping").set(default_map);
+    _tree->create<std::vector<size_t> >(mb_path / "tx_chan_dsp_mapping").set(default_map);
     _tree->create<subdev_spec_t>(mb_path / "rx_subdev_spec")
         .set(subdev_spec_t())
-        .subscribe(boost::bind(&b200_impl::update_rx_subdev_spec, this, _1));
+        .subscribe(boost::bind(&b200_impl::update_subdev_spec, this, "rx", _1));
     _tree->create<subdev_spec_t>(mb_path / "tx_subdev_spec")
         .set(subdev_spec_t())
-        .subscribe(boost::bind(&b200_impl::update_tx_subdev_spec, this, _1));
+        .subscribe(boost::bind(&b200_impl::update_subdev_spec, this, "tx", _1));
 
     ////////////////////////////////////////////////////////////////////
     // setup radio control
@@ -659,9 +665,40 @@ void b200_impl::codec_loopback_self_test(wb_iface::sptr iface)
 /***********************************************************************
  * Sample and tick rate comprehension below
  **********************************************************************/
+void b200_impl::enforce_tick_rate_limits(size_t chan_count, double tick_rate, const char* direction /*= NULL*/)
+{
+    const size_t max_chans = 2;
+    if (chan_count > max_chans)
+    {
+        throw uhd::value_error(boost::str(
+            boost::format("cannot not setup %d %s channels (maximum is %d)")
+                % chan_count
+                % (direction ? direction : "data")
+                % max_chans
+        ));
+    }
+    else
+    {
+        const double max_tick_rate = ((chan_count <= 1) ? AD9361_1_CHAN_CLOCK_RATE_MAX : AD9361_2_CHAN_CLOCK_RATE_MAX);
+        if (tick_rate > max_tick_rate)
+        {
+            throw uhd::value_error(boost::str(
+                boost::format("current master clock rate (%.2f MHz) exceeds maximum possible master clock rate (%.2f MHz) when using %d %s channels")
+                    % (tick_rate/1e6)
+                    % (max_tick_rate/1e6)
+                    % chan_count
+                    % (direction ? direction : "data")
+            ));
+        }
+    }
+}
+
 double b200_impl::set_tick_rate(const double rate)
 {
     UHD_MSG(status) << "Asking for clock rate " << rate/1e6 << " MHz\n";
+
+    check_tick_rate_with_current_streamers(rate);   // Defined in b200_io_impl.cpp
+
     _tick_rate = _codec_ctrl->set_clock_rate(rate);
     UHD_MSG(status) << "Actually got clock rate " << _tick_rate/1e6 << " MHz\n";
 

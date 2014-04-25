@@ -20,6 +20,7 @@
 #include "b100_regs.hpp"
 #include <uhd/transport/usb_control.hpp>
 #include <uhd/utils/msg.hpp>
+#include <uhd/utils/cast.hpp>
 #include <uhd/exception.hpp>
 #include <uhd/utils/static.hpp>
 #include <uhd/utils/images.hpp>
@@ -56,11 +57,11 @@ static device_addrs_t b100_find(const device_addr_t &hint)
     //since an address and resource is intended for a different, non-USB, device.
     if (hint.has_key("addr") || hint.has_key("resource")) return b100_addrs;
 
-    unsigned int vid, pid;
+    boost::uint16_t vid, pid;
 
     if(hint.has_key("vid") && hint.has_key("pid") && hint.has_key("type") && hint["type"] == "b100") {
-        sscanf(hint.get("vid").c_str(), "%x", &vid);
-        sscanf(hint.get("pid").c_str(), "%x", &pid);
+        vid = uhd::cast::hexstr_cast<boost::uint16_t>(hint.get("vid"));
+        pid = uhd::cast::hexstr_cast<boost::uint16_t>(hint.get("pid"));
     } else {
         vid = B100_VENDOR_ID;
         pid = B100_PRODUCT_ID;
@@ -515,6 +516,7 @@ b100_impl::b100_impl(const device_addr_t &device_addr){
     _tree->access<subdev_spec_t>(mb_path / "tx_subdev_spec").set(subdev_spec_t("A:" + _tree->list(mb_path / "dboards/A/tx_frontends").at(0)));
     _tree->access<std::string>(mb_path / "clock_source/value").set("internal");
     _tree->access<std::string>(mb_path / "time_source/value").set("none");
+    _tree->create<double>(mb_path / "link_max_rate").set(B100_MAX_RATE_USB2);
 }
 
 b100_impl::~b100_impl(void){
