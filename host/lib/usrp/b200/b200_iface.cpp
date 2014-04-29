@@ -39,6 +39,9 @@
         str(boost::format("LIBUSB_ERROR_CODE %d") % code)
 #endif
 
+#include <ad9361_transaction.h>
+#include <ad9361_dispatch.h>
+
 using namespace uhd;
 using namespace uhd::transport;
 
@@ -318,7 +321,7 @@ public:
 
         for (size_t i = 0; i < read_retries; i++)
         {
-            ret = fx3_control_read(B200_VREQ_AD9361_CTRL_READ, 0x00, 0x00, out_buff, bytes_to_read, 3000);
+            ret = fx3_control_read(B200_VREQ_AD9361_CTRL_READ, 0x00, 0x00, out_buff, bytes_to_read, 1000);
             if (ret < 0)
             {
                 if (ret == LIBUSB_ERROR_TIMEOUT)
@@ -344,6 +347,11 @@ public:
         }
 
         throw uhd::io_error(str(boost::format("Failed to read complete AD9361 (expecting: %d, last read: %d)") % bytes_to_read % ret));
+    }
+
+    uint64_t get_device_handle()
+    {
+        return 0;   //Unused in B200 because the chip class is in FX3 firmware
     }
 
     void load_firmware(const std::string filestring, UHD_UNUSED(bool force) = false)

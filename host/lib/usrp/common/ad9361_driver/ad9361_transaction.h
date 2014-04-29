@@ -25,8 +25,8 @@ extern "C" {
 #endif
 
 //various constants
-#define AD9361_TRANSACTION_VERSION  0x4
-#define AD9361_DISPATCH_PACKET_SIZE 64
+#define AD9361_TRANSACTION_VERSION 0x4
+#define AD9361_DISPATCH_PACKET_SIZE      64
 
 //action types
 #define AD9361_ACTION_ECHO 0
@@ -40,28 +40,6 @@ extern "C" {
 #define AD9361_ACTION_SET_CODEC_LOOP 8
 #define AD9361_ACTION_SET_CLOCK_RATE 9
 #define AD9361_ACTION_SET_ACTIVE_CHAINS 10
-
-typedef union
-{
-    double d;
-    uint32_t x[2];
-} ad9361_double_union_t;
-
-static inline void ad9361_double_pack(const double input, uint32_t output[2])
-{
-    ad9361_double_union_t p = {};
-    p.d = input;
-    output[0] = p.x[0];
-    output[1] = p.x[1];
-}
-
-static inline double ad9361_double_unpack(const uint32_t input[2])
-{
-    ad9361_double_union_t p = {};
-    p.x[0] = input[0];
-    p.x[1] = input[1];
-    return p.d;
-}
 
 typedef struct
 {
@@ -93,6 +71,9 @@ typedef struct
         uint32_t rate[2];
 
     } value;
+
+    //location info for the ad9361 chip class
+    uint64_t handle;
 
     //error message comes back as a reply -
     //set to null string for no error \0
