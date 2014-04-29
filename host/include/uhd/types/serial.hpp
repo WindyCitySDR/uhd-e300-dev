@@ -180,6 +180,8 @@ namespace uhd{
             boost::uint32_t data,
             size_t num_bits
         );
+
+        static sptr make_spidev(const std::string &device);
     };
 
     /*!
