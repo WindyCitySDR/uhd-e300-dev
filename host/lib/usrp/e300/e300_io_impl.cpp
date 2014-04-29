@@ -1,5 +1,5 @@
 //
-// Copyright 2013 Ettus Research LLC
+// Copyright 2013-2014 Ettus Research LLC
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -15,8 +15,8 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 //
 
-#include "e200_regs.hpp"
-#include "e200_impl.hpp"
+#include "e300_regs.hpp"
+#include "e300_impl.hpp"
 #include "validate_subdev_spec.hpp"
 #include "../../transport/super_recv_packet_handler.hpp"
 #include "../../transport/super_send_packet_handler.hpp"
@@ -34,7 +34,7 @@ using namespace uhd::transport;
 /***********************************************************************
  * update streamer rates
  **********************************************************************/
-void e200_impl::update_tick_rate(const double rate)
+void e300_impl::update_tick_rate(const double rate)
 {
     BOOST_FOREACH(radio_perifs_t &perif, _radio_perifs)
     {
@@ -52,14 +52,14 @@ void e200_impl::update_tick_rate(const double rate)
     }
 }
 
-void e200_impl::update_rx_samp_rate(const size_t dspno, const double rate)
+void e300_impl::update_rx_samp_rate(const size_t dspno, const double rate)
 {
     boost::shared_ptr<sph::recv_packet_streamer> my_streamer =
         boost::dynamic_pointer_cast<sph::recv_packet_streamer>(_radio_perifs[dspno].rx_streamer.lock());
     if (my_streamer) my_streamer->set_samp_rate(rate);
 }
 
-void e200_impl::update_tx_samp_rate(const size_t dspno, const double rate)
+void e300_impl::update_tx_samp_rate(const size_t dspno, const double rate)
 {
     boost::shared_ptr<sph::send_packet_streamer> my_streamer =
         boost::dynamic_pointer_cast<sph::send_packet_streamer>(_radio_perifs[dspno].tx_streamer.lock());
@@ -69,7 +69,7 @@ void e200_impl::update_tx_samp_rate(const size_t dspno, const double rate)
 /***********************************************************************
  * frontend selection
  **********************************************************************/
-void e200_impl::update_rx_subdev_spec(const uhd::usrp::subdev_spec_t &spec)
+void e300_impl::update_rx_subdev_spec(const uhd::usrp::subdev_spec_t &spec)
 {
     //sanity checking
     if (spec.size()) validate_subdev_spec(_tree, spec, "rx");
@@ -98,7 +98,7 @@ void e200_impl::update_rx_subdev_spec(const uhd::usrp::subdev_spec_t &spec)
     this->update_active_frontends();
 }
 
-void e200_impl::update_tx_subdev_spec(const uhd::usrp::subdev_spec_t &spec)
+void e300_impl::update_tx_subdev_spec(const uhd::usrp::subdev_spec_t &spec)
 {
     //sanity checking
     if (spec.size()) validate_subdev_spec(_tree, spec, "tx");
@@ -130,7 +130,7 @@ void e200_impl::update_tx_subdev_spec(const uhd::usrp::subdev_spec_t &spec)
 /***********************************************************************
  * VITA stuff
  **********************************************************************/
-static void e200_if_hdr_unpack_le(
+static void e300_if_hdr_unpack_le(
     const boost::uint32_t *packet_buff,
     vrt::if_packet_info_t &if_packet_info
 ){
@@ -138,7 +138,7 @@ static void e200_if_hdr_unpack_le(
     return vrt::if_hdr_unpack_le(packet_buff, if_packet_info);
 }
 
-static void e200_if_hdr_pack_le(
+static void e300_if_hdr_pack_le(
     boost::uint32_t *packet_buff,
     vrt::if_packet_info_t &if_packet_info
 ){
@@ -181,7 +181,7 @@ static void handle_rx_flowctrl(const boost::uint32_t sid, zero_copy_if::sptr xpo
     packet_info.has_tlr = false;
 
     //load header
-    e200_if_hdr_pack_le(pkt, packet_info);
+    e300_if_hdr_pack_le(pkt, packet_info);
 
     //load payload
     pkt[packet_info.num_header_words32+0] = uhd::htowx<boost::uint32_t>(0);
@@ -195,9 +195,9 @@ static void handle_rx_flowctrl(const boost::uint32_t sid, zero_copy_if::sptr xpo
 /***********************************************************************
  * TX flow control handler
  **********************************************************************/
-struct e200_tx_fc_guts_t
+struct e300_tx_fc_guts_t
 {
-    e200_tx_fc_guts_t(void):
+    e300_tx_fc_guts_t(void):
         last_seq_out(0),
         last_seq_ack(0),
         seq_queue(1),
@@ -208,7 +208,7 @@ struct e200_tx_fc_guts_t
     bounded_buffer<async_metadata_t> async_queue;
 };
 
-static void handle_tx_async_msgs(boost::shared_ptr<e200_tx_fc_guts_t> guts, zero_copy_if::sptr xport)
+static void handle_tx_async_msgs(boost::shared_ptr<e300_tx_fc_guts_t> guts, zero_copy_if::sptr xport)
 {
     managed_recv_buffer::sptr buff = xport->get_recv_buff();
     if (not buff) return;
@@ -221,7 +221,7 @@ static void handle_tx_async_msgs(boost::shared_ptr<e200_tx_fc_guts_t> guts, zero
     //unpacking can fail
     try
     {
-        e200_if_hdr_unpack_le(packet_buff, if_packet_info);
+        e300_if_hdr_unpack_le(packet_buff, if_packet_info);
     }
     catch(const std::exception &ex)
     {
@@ -246,7 +246,7 @@ static void handle_tx_async_msgs(boost::shared_ptr<e200_tx_fc_guts_t> guts, zero
 
 static managed_send_buffer::sptr get_tx_buff_with_flowctrl(
     task::sptr /*holds ref*/,
-    boost::shared_ptr<e200_tx_fc_guts_t> guts,
+    boost::shared_ptr<e300_tx_fc_guts_t> guts,
     zero_copy_if::sptr xport,
     const size_t fc_window,
     const double timeout
@@ -268,7 +268,7 @@ static managed_send_buffer::sptr get_tx_buff_with_flowctrl(
 /***********************************************************************
  * Async Data
  **********************************************************************/
-bool e200_impl::recv_async_msg(
+bool e300_impl::recv_async_msg(
     async_metadata_t &async_metadata, double timeout
 ){
     boost::shared_ptr<sph::send_packet_streamer> my_streamer =
@@ -280,7 +280,7 @@ bool e200_impl::recv_async_msg(
 /***********************************************************************
  * Receive streamer
  **********************************************************************/
-rx_streamer::sptr e200_impl::get_rx_stream(const uhd::stream_args_t &args_)
+rx_streamer::sptr e300_impl::get_rx_stream(const uhd::stream_args_t &args_)
 {
     boost::mutex::scoped_lock lock(_stream_spawn_mutex);
     stream_args_t args = args_;
@@ -288,7 +288,7 @@ rx_streamer::sptr e200_impl::get_rx_stream(const uhd::stream_args_t &args_)
     //setup defaults for unspecified values
     if (not args.otw_format.empty() and args.otw_format != "sc16")
     {
-        throw uhd::value_error("e200_impl::get_rx_stream only supports otw_format sc16");
+        throw uhd::value_error("e300_impl::get_rx_stream only supports otw_format sc16");
     }
     args.otw_format = "sc16";
     args.channels = args.channels.empty()? std::vector<size_t>(1, 0) : args.channels;
@@ -313,7 +313,7 @@ rx_streamer::sptr e200_impl::get_rx_stream(const uhd::stream_args_t &args_)
     boost::shared_ptr<sph::recv_packet_streamer> my_streamer = boost::make_shared<sph::recv_packet_streamer>(spp);
 
     //init some streamer stuff
-    my_streamer->set_vrt_unpacker(&e200_if_hdr_unpack_le);
+    my_streamer->set_vrt_unpacker(&e300_if_hdr_unpack_le);
 
     //set the converter
     uhd::convert::id_type id;
@@ -340,7 +340,7 @@ rx_streamer::sptr e200_impl::get_rx_stream(const uhd::stream_args_t &args_)
     boost::shared_ptr<boost::uint32_t> seq32(new boost::uint32_t(0));
     my_streamer->set_xport_handle_flowctrl(0, boost::bind(
         &handle_rx_flowctrl, data_sid, perif.rx_flow_xport, seq32, _1
-    ), static_cast<size_t>(static_cast<double>(fc_window) * E200_RX_SW_BUFF_FULLNESS), true/*init*/);
+    ), static_cast<size_t>(static_cast<double>(fc_window) * E300_RX_SW_BUFF_FULLNESS), true/*init*/);
 
     my_streamer->set_issue_stream_cmd(0, boost::bind(
         &rx_vita_core_3000::issue_stream_command, perif.framer, _1
@@ -357,7 +357,7 @@ rx_streamer::sptr e200_impl::get_rx_stream(const uhd::stream_args_t &args_)
 /***********************************************************************
  * Transmit streamer
  **********************************************************************/
-tx_streamer::sptr e200_impl::get_tx_stream(const uhd::stream_args_t &args_)
+tx_streamer::sptr e300_impl::get_tx_stream(const uhd::stream_args_t &args_)
 {
     boost::mutex::scoped_lock lock(_stream_spawn_mutex);
     stream_args_t args = args_;
@@ -365,7 +365,7 @@ tx_streamer::sptr e200_impl::get_tx_stream(const uhd::stream_args_t &args_)
     //setup defaults for unspecified values
     if (not args.otw_format.empty() and args.otw_format != "sc16")
     {
-        throw uhd::value_error("e200_impl::get_rx_stream only supports otw_format sc16");
+        throw uhd::value_error("e300_impl::get_rx_stream only supports otw_format sc16");
     }
     args.otw_format = "sc16";
     args.channels = args.channels.empty()? std::vector<size_t>(1, 0) : args.channels;
@@ -390,7 +390,7 @@ tx_streamer::sptr e200_impl::get_tx_stream(const uhd::stream_args_t &args_)
     boost::shared_ptr<sph::send_packet_streamer> my_streamer = boost::make_shared<sph::send_packet_streamer>(spp);
 
     //init some streamer stuff
-    my_streamer->set_vrt_packer(&e200_if_hdr_pack_le);
+    my_streamer->set_vrt_packer(&e300_if_hdr_pack_le);
 
     //set the converter
     uhd::convert::id_type id;
@@ -406,7 +406,7 @@ tx_streamer::sptr e200_impl::get_tx_stream(const uhd::stream_args_t &args_)
     //flow control setup
     const size_t fc_window = perif.tx_data_xport->get_num_send_frames();
     perif.deframer->configure_flow_control(0/*cycs off*/, fc_window/8/*pkts*/);
-    boost::shared_ptr<e200_tx_fc_guts_t> guts(new e200_tx_fc_guts_t());
+    boost::shared_ptr<e300_tx_fc_guts_t> guts(new e300_tx_fc_guts_t());
     task::sptr task = task::make(boost::bind(&handle_tx_async_msgs, guts, perif.tx_flow_xport));
 
     my_streamer->set_xport_chan_get_buff(0, boost::bind(

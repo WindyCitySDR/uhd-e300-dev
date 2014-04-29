@@ -1,5 +1,5 @@
 //
-// Copyright 2013 Ettus Research LLC
+// Copyright 2013-2014 Ettus Research LLC
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -15,8 +15,8 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 //
 
-#ifndef INCLUDED_E200_IMPL_HPP
-#define INCLUDED_E200_IMPL_HPP
+#ifndef INCLUDED_E300_IMPL_HPP
+#define INCLUDED_E300_IMPL_HPP
 
 #include <uhd/device.hpp>
 #include <uhd/property_tree.hpp>
@@ -26,7 +26,7 @@
 #include <uhd/types/serial.hpp>
 #include <boost/weak_ptr.hpp>
 #include <boost/thread/mutex.hpp>
-#include "e200_fifo_config.hpp"
+#include "e300_fifo_config.hpp"
 #include "radio_ctrl_core_3000.hpp"
 #include "rx_vita_core_3000.hpp"
 #include "tx_vita_core_3000.hpp"
@@ -36,28 +36,28 @@
 #include "ad9361_ctrl.hpp"
 #include "gpio_core_200.hpp"
 
-static const std::string E200_FPGA_FILE_NAME = "usrp_e200_fpga.bin";
+static const std::string E300_FPGA_FILE_NAME = "usrp_e300_fpga.bin";
 
-static std::string E200_SERVER_RX_PORT = "321756";
-static std::string E200_SERVER_TX_PORT = "321757";
-static std::string E200_SERVER_CTRL_PORT = "321758";
-static std::string E200_SERVER_CODEC_PORT = "321759";
+static std::string E300_SERVER_RX_PORT = "321756";
+static std::string E300_SERVER_TX_PORT = "321757";
+static std::string E300_SERVER_CTRL_PORT = "321758";
+static std::string E300_SERVER_CODEC_PORT = "321759";
 
-static const double E200_DEFAULT_TICK_RATE = 32e6;
+static const double E300_DEFAULT_TICK_RATE = 32e6;
 
-static const double E200_RX_SW_BUFF_FULLNESS = 0.5;        //Buffer should be half full
+static const double E300_RX_SW_BUFF_FULLNESS = 0.5;        //Buffer should be half full
 
 /*!
- * USRP-E200 implementation guts:
+ * USRP-E300 implementation guts:
  * The implementation details are encapsulated here.
  * Handles properties on the mboard, dboard, dsps...
  */
-class e200_impl : public uhd::device
+class e300_impl : public uhd::device
 {
 public:
     //structors
-    e200_impl(const uhd::device_addr_t &);
-    ~e200_impl(void);
+    e300_impl(const uhd::device_addr_t &);
+    ~e300_impl(void);
 
     //the io interface
     boost::mutex _stream_spawn_mutex;
@@ -70,7 +70,7 @@ private:
 
     void load_fpga_image(const std::string &path);
 
-    e200_fifo_interface::sptr _fifo_iface;
+    e300_fifo_interface::sptr _fifo_iface;
 
     void register_loopback_self_test(uhd::wb_iface::sptr iface);
 
@@ -112,6 +112,7 @@ private:
     void update_rx_subdev_spec(const uhd::usrp::subdev_spec_t &spec);
     void update_tx_subdev_spec(const uhd::usrp::subdev_spec_t &spec);
 
+    ad9361_ctrl_transport::sptr _codec_xport;
     ad9361_ctrl::sptr _codec_ctrl;
     void codec_loopback_self_test(uhd::wb_iface::sptr iface);
 
@@ -140,7 +141,6 @@ private:
     void update_antenna_sel(const std::string &fe, const std::string &ant);
     void update_fe_lo_freq(const std::string &fe, const double freq);
     void update_active_frontends(void);
-
 };
 
-#endif /* INCLUDED_E200_IMPL_HPP */
+#endif /* INCLUDED_E300_IMPL_HPP */

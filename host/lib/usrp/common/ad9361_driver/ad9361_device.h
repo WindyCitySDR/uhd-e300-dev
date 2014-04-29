@@ -25,7 +25,7 @@ extern "C" {
 #endif
 
 typedef enum {
-    AD9361_GENERIC, AD9361_B200, AD9361_E200
+    AD9361_GENERIC, AD9361_B200, AD9361_E300
 } ad9361_product_t;
 
 ////////////////////////////////////////////////////////////

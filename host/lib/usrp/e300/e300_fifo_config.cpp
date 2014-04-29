@@ -1,5 +1,5 @@
 //
-// Copyright 2013 Ettus Research LLC
+// Copyright 2013-2014 Ettus Research LLC
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -15,7 +15,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 //
 
-#ifdef E200_NATIVE
+#ifdef E300_NATIVE
 
 // constants coded into the fpga parameters
 #define ZF_CONFIG_BASE 0x40000000
@@ -51,7 +51,7 @@
 #define ZF_STREAM_OFF(which) ((which)*32)
 
 #include <boost/cstdint.hpp>
-#include "e200_fifo_config.hpp"
+#include "e300_fifo_config.hpp"
 #include <sys/mman.h> //mmap
 #include <fcntl.h> //open, close
 #include <poll.h> //poll
@@ -67,9 +67,9 @@
 #include <boost/thread/mutex.hpp>
 #include <boost/thread/condition_variable.hpp>
 
-struct e200_fifo_poll_waiter
+struct e300_fifo_poll_waiter
 {
-    e200_fifo_poll_waiter(const int fd):
+    e300_fifo_poll_waiter(const int fd):
         fd(fd)
     {
         //NOP
@@ -89,7 +89,8 @@ struct e200_fifo_poll_waiter
             fds[0].events = POLLIN;
             const int r = ::poll(fds, 1, long(timeout*1000));
             //std::cout << "r " << r << std::endl;
-            if (fds[0].revents & POLLIN) ::read(fd, NULL, 0);
+            if (fds[0].revents & POLLIN)
+                ::read(fd, NULL, 0);
 
             _poll_claimed.write(0);
             cond.notify_all();
@@ -133,9 +134,9 @@ inline boost::uint32_t zf_peek32(const boost::uint32_t addr)
 /***********************************************************************
  * managed buffer
  **********************************************************************/
-struct e200_fifo_mb : managed_buffer
+struct e300_fifo_mb : managed_buffer
 {
-    e200_fifo_mb(const __mem_addrz_t &addrs, const size_t len):
+    e300_fifo_mb(const __mem_addrz_t &addrs, const size_t len):
         ctrl_base(addrs.ctrl), phys_mem(addrs.phys), mem((void *)addrs.data), len(len){}
 
     void release(void)
@@ -162,15 +163,15 @@ struct e200_fifo_mb : managed_buffer
  * transport
  **********************************************************************/
 template <typename BaseClass>
-struct e200_transport : zero_copy_if
+struct e300_transport : zero_copy_if
 {
 
-    e200_transport(
+    e300_transport(
         boost::shared_ptr<void> allocator,
         const __mem_addrz_t &addrs,
         const size_t num_frames,
         const size_t frame_size,
-        e200_fifo_poll_waiter *waiter,
+        e300_fifo_poll_waiter *waiter,
         const bool auto_release
     ):
         _allocator(allocator),
@@ -180,9 +181,9 @@ struct e200_transport : zero_copy_if
         _index(0),
         _waiter(waiter)
     {
-        UHD_MSG(status) << boost::format("phys 0x%x") % addrs.phys << std::endl;
-        UHD_MSG(status) << boost::format("data 0x%x") % addrs.data << std::endl;
-        UHD_MSG(status) << boost::format("ctrl 0x%x") % addrs.ctrl << std::endl;
+        //UHD_MSG(status) << boost::format("phys 0x%x") % addrs.phys << std::endl;
+        //UHD_MSG(status) << boost::format("data 0x%x") % addrs.data << std::endl;
+        //UHD_MSG(status) << boost::format("ctrl 0x%x") % addrs.ctrl << std::endl;
 
         const boost::uint32_t sig = zf_peek32(_addrs.ctrl + ARBITER_RD_SIG);
         UHD_ASSERT_THROW((sig >> 16) == 0xACE0);
@@ -194,7 +195,7 @@ struct e200_transport : zero_copy_if
             __mem_addrz_t mb_addrs = addrs;
             mb_addrs.phys += (i*frame_size);
             mb_addrs.data += (i*frame_size);
-            boost::shared_ptr<e200_fifo_mb> mb(new e200_fifo_mb(mb_addrs, frame_size));
+            boost::shared_ptr<e300_fifo_mb> mb(new e300_fifo_mb(mb_addrs, frame_size));
 
             //setup the buffers so they are "positioned for use"
             const size_t sts_good = (1 << 7) | (_addrs.which & 0xf);
@@ -205,7 +206,7 @@ struct e200_transport : zero_copy_if
         }
     }
 
-    ~e200_transport(void)
+    ~e300_transport(void)
     {
         //NOP
     }
@@ -222,7 +223,8 @@ struct e200_transport : zero_copy_if
                 UHD_ASSERT_THROW((sts >> 7) & 0x1); //assert OK
                 UHD_ASSERT_THROW((sts & 0xf) == _addrs.which); //expected tag
                 zf_poke32(_addrs.ctrl + ARBITER_WR_STS_RDY, 1); //pop from sts fifo
-                if (_index == _num_frames) _index = 0;
+                if (_index == _num_frames)
+                    _index = 0;
                 return _buffs[_index++]->get_new<T>();
             }
             _waiter->wait(timeout);
@@ -268,16 +270,16 @@ struct e200_transport : zero_copy_if
     const size_t _num_frames;
     const size_t _frame_size;
     size_t _index;
-    e200_fifo_poll_waiter *_waiter;
-    std::vector<boost::shared_ptr<e200_fifo_mb> > _buffs;
+    e300_fifo_poll_waiter *_waiter;
+    std::vector<boost::shared_ptr<e300_fifo_mb> > _buffs;
 };
 
 /***********************************************************************
  * memory mapping
  **********************************************************************/
-struct e200_fifo_interface_impl : e200_fifo_interface
+struct e300_fifo_interface_impl : e300_fifo_interface
 {
-    e200_fifo_interface_impl(const e200_fifo_config_t &config):
+    e300_fifo_interface_impl(const e300_fifo_config_t &config):
         config(config),
         bytes_in_use(0),
         recv_entries_in_use(0),
@@ -288,18 +290,18 @@ struct e200_fifo_interface_impl : e200_fifo_interface
         fd = ::open(dev.c_str(), O_RDWR|O_SYNC);
         if (fd < 0)
         {
-            throw uhd::runtime_error("E200: failed to open " + dev);
+            throw uhd::runtime_error("e300: failed to open " + dev);
         }
 
         //mmap the control and data regions into virtual space
-        UHD_VAR(config.ctrl_length);
-        UHD_VAR(config.buff_length);
-        UHD_VAR(config.phys_addr);
+        //UHD_VAR(config.ctrl_length);
+        //UHD_VAR(config.buff_length);
+        //UHD_VAR(config.phys_addr);
         buff = ::mmap(NULL, config.ctrl_length + config.buff_length, PROT_READ|PROT_WRITE, MAP_SHARED, fd, 0);
         if (buff == MAP_FAILED)
         {
             ::close(fd);
-            throw uhd::runtime_error("E200: failed to mmap " + dev);
+            throw uhd::runtime_error("e300: failed to mmap " + dev);
         }
 
         //segment the memory according to zynq fifo arbiter
@@ -310,10 +312,10 @@ struct e200_fifo_interface_impl : e200_fifo_interface
         std::memset((void *)data_space, 0, config.buff_length);
 
         //create a poll waiter for the transports
-        waiter = new e200_fifo_poll_waiter(fd);
+        waiter = new e300_fifo_poll_waiter(fd);
     }
 
-    ~e200_fifo_interface_impl(void)
+    ~e300_fifo_interface_impl(void)
     {
         delete waiter;
         UHD_LOG << "cleanup: munmap" << std::endl;
@@ -336,8 +338,8 @@ struct e200_fifo_interface_impl : e200_fifo_interface
         addrs.ctrl = ((is_recv)? S2H_BASE(ctrl_space) : H2S_BASE(ctrl_space)) + ZF_STREAM_OFF(which_stream);
 
         uhd::transport::zero_copy_if::sptr xport;
-        if (is_recv) xport.reset(new e200_transport<managed_recv_buffer>(shared_from_this(), addrs, num_frames, frame_size, waiter, is_recv));
-        else         xport.reset(new e200_transport<managed_send_buffer>(shared_from_this(), addrs, num_frames, frame_size, waiter, is_recv));
+        if (is_recv) xport.reset(new e300_transport<managed_recv_buffer>(shared_from_this(), addrs, num_frames, frame_size, waiter, is_recv));
+        else         xport.reset(new e300_transport<managed_send_buffer>(shared_from_this(), addrs, num_frames, frame_size, waiter, is_recv));
 
         bytes_in_use += num_frames*frame_size;
         entries_in_use += num_frames;
@@ -366,8 +368,8 @@ struct e200_fifo_interface_impl : e200_fifo_interface
         return this->make_xport(which_stream, args, false);
     }
 
-    e200_fifo_config_t config;
-    e200_fifo_poll_waiter *waiter;
+    e300_fifo_config_t config;
+    e300_fifo_poll_waiter *waiter;
     size_t bytes_in_use;
     int fd;
     void *buff;
@@ -378,19 +380,19 @@ struct e200_fifo_interface_impl : e200_fifo_interface
     boost::mutex setup_mutex;
 };
 
-e200_fifo_interface::sptr e200_fifo_interface::make(const e200_fifo_config_t &config)
+e300_fifo_interface::sptr e300_fifo_interface::make(const e300_fifo_config_t &config)
 {
-    return e200_fifo_interface::sptr(new e200_fifo_interface_impl(config));
+    return e300_fifo_interface::sptr(new e300_fifo_interface_impl(config));
 }
 
-#else //E200_NATIVE
+#else //E300_NATIVE
 
-#include "e200_fifo_config.hpp"
+#include "e300_fifo_config.hpp"
 #include <uhd/exception.hpp>
 
-e200_fifo_interface::sptr e200_fifo_interface::make(const e200_fifo_config_t &)
+e300_fifo_interface::sptr e300_fifo_interface::make(const e300_fifo_config_t &)
 {
-    throw uhd::runtime_error("e200_fifo_interface::make() !E200_NATIVE");
+    throw uhd::runtime_error("e300_fifo_interface::make() !E300_NATIVE");
 }
 
-#endif //E200_NATIVE
+#endif //E300_NATIVE

@@ -1,5 +1,5 @@
 //
-// Copyright 2013 Ettus Research LLC
+// Copyright 2013-2014 Ettus Research LLC
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -15,12 +15,14 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 //
 
-#include "e200_impl.hpp"
-#include "e200_regs.hpp"
+#include "e300_impl.hpp"
+#include "e300_regs.hpp"
+
 #include <uhd/utils/msg.hpp>
 #include <uhd/utils/log.hpp>
 #include <uhd/utils/static.hpp>
 #include <uhd/utils/images.hpp>
+#include <uhd/types/serial.hpp>
 #include <uhd/usrp/dboard_eeprom.hpp>
 #include <uhd/transport/udp_zero_copy.hpp>
 #include <uhd/types/sensors.hpp>
@@ -41,28 +43,28 @@ namespace asio = boost::asio;
 /***********************************************************************
  * Discovery
  **********************************************************************/
-static device_addrs_t e200_find(const device_addr_t &hint_)
+static device_addrs_t e300_find(const device_addr_t &hint_)
 {
     //we only do single device discovery for now
     const device_addr_t hint = separate_device_addr(hint_).at(0);
 
-    UHD_LOG << "e200_find with hint " << hint.to_pp_string() << std::endl;
-    device_addrs_t e200_addrs;
+    UHD_LOG << "e300_find with hint " << hint.to_pp_string() << std::endl;
+    device_addrs_t e300_addrs;
 
-    //return an empty list of addresses when type is set to non-e200
-    if (hint.has_key("type") and hint["type"] != "e200") return e200_addrs;
+    //return an empty list of addresses when type is set to non-e300
+    if (hint.has_key("type") and hint["type"] != "e300") return e300_addrs;
 
     //Return an empty list of addresses when a resource is specified,
     //since a resource is intended for a different, non-USB, device.
-    if (hint.has_key("resource")) return e200_addrs;
+    if (hint.has_key("resource")) return e300_addrs;
 
     // need network discovery that takes addr
     if (hint.has_key("addr")) try
     {
-        UHD_LOG << "e200_find try network discovery..." << std::endl;
+        UHD_LOG << "e300_find try network discovery..." << std::endl;
         asio::io_service io_service;
         asio::ip::udp::resolver resolver(io_service);
-        asio::ip::udp::resolver::query query(asio::ip::udp::v4(), hint["addr"], E200_SERVER_CODEC_PORT);
+        asio::ip::udp::resolver::query query(asio::ip::udp::v4(), hint["addr"], E300_SERVER_CODEC_PORT);
         asio::ip::udp::endpoint endpoint = *resolver.resolve(query);
         {
             boost::shared_ptr<asio::ip::udp::socket> socket;
@@ -71,15 +73,15 @@ static device_addrs_t e200_find(const device_addr_t &hint_)
             socket->close();
         }
         device_addr_t new_addr;
-        new_addr["type"] = "e200";
+        new_addr["type"] = "e300";
         new_addr["addr"] = hint["addr"];
-        e200_addrs.push_back(new_addr);
-        UHD_LOG << "e200_find network discovery good " << new_addr.to_pp_string() << std::endl;
-        return e200_addrs;
+        e300_addrs.push_back(new_addr);
+        UHD_LOG << "e300_find network discovery good " << new_addr.to_pp_string() << std::endl;
+        return e300_addrs;
     }
     catch(...)
     {
-        UHD_LOG << "e200_find network discovery threw" << std::endl;
+        UHD_LOG << "e300_find network discovery threw" << std::endl;
     }
 
     //device node not provided, assume its 0
@@ -87,14 +89,14 @@ static device_addrs_t e200_find(const device_addr_t &hint_)
     {
         device_addr_t new_addr = hint;
         new_addr["node"] = "/dev/axi_fpga";
-        return e200_find(new_addr);
+        return e300_find(new_addr);
     }
 
     //use the given device node name
     if (fs::exists(hint["node"]))
     {
         device_addr_t new_addr;
-        new_addr["type"] = "e200";
+        new_addr["type"] = "e300";
         new_addr["node"] = fs::system_complete(fs::path(hint["node"])).string();
         //TODO read EEPROM!
         new_addr["name"] = "";
@@ -103,45 +105,45 @@ static device_addrs_t e200_find(const device_addr_t &hint_)
             (not hint.has_key("name")   or hint["name"]   == new_addr["name"]) and
             (not hint.has_key("serial") or hint["serial"] == new_addr["serial"])
         ){
-            e200_addrs.push_back(new_addr);
+            e300_addrs.push_back(new_addr);
         }
     }
 
-    return e200_addrs;
+    return e300_addrs;
 }
 
 /***********************************************************************
  * Make
  **********************************************************************/
-static device::sptr e200_make(const device_addr_t &device_addr)
+static device::sptr e300_make(const device_addr_t &device_addr)
 {
-    UHD_LOG << "e200_make with args " << device_addr.to_pp_string() << std::endl;
-    return device::sptr(new e200_impl(device_addr));
+    UHD_LOG << "e300_make with args " << device_addr.to_pp_string() << std::endl;
+    return device::sptr(new e300_impl(device_addr));
 }
 
-UHD_STATIC_BLOCK(register_e200_device)
+UHD_STATIC_BLOCK(register_e300_device)
 {
-    device::register_device(&e200_find, &e200_make);
+    device::register_device(&e300_find, &e300_make);
 }
 
 /***********************************************************************
  * Structors
  **********************************************************************/
-e200_impl::e200_impl(const uhd::device_addr_t &device_addr)
+e300_impl::e300_impl(const uhd::device_addr_t &device_addr)
 {
-    e200_impl_begin:
+    e300_impl_begin:
     ////////////////////////////////////////////////////////////////////
     // load the fpga image
     ////////////////////////////////////////////////////////////////////
     if (not device_addr.has_key("addr"))
     {
-        //extract the FPGA path for the E200
-        const std::string e200_fpga_image = find_image_path(
-            device_addr.get("fpga", E200_FPGA_FILE_NAME)
+        //extract the FPGA path for the e300
+        const std::string e300_fpga_image = find_image_path(
+            device_addr.get("fpga", E300_FPGA_FILE_NAME)
         );
 
         //load fpga image - its super fast
-        this->load_fpga_image(e200_fpga_image);
+        this->load_fpga_image(e300_fpga_image);
     }
 
     ////////////////////////////////////////////////////////////////////
@@ -152,13 +154,13 @@ e200_impl::e200_impl(const uhd::device_addr_t &device_addr)
     ctrl_xport_params.num_recv_frames = 32;
     ctrl_xport_params.send_frame_size = 64;
     ctrl_xport_params.num_send_frames = 32;
-    
+
     uhd::transport::zero_copy_xport_params data_xport_params;
     data_xport_params.recv_frame_size = 2048;
     data_xport_params.num_recv_frames = 128;
     data_xport_params.send_frame_size = 2048;
     data_xport_params.num_send_frames = 128;
-    
+
     uhd::device_addr_t ctrl_xport_args;
     ctrl_xport_args["recv_frame_size"] = str(boost::format("%d") % ctrl_xport_params.recv_frame_size);
     ctrl_xport_args["num_recv_frames"] = str(boost::format("%d") % ctrl_xport_params.num_recv_frames);
@@ -178,31 +180,30 @@ e200_impl::e200_impl(const uhd::device_addr_t &device_addr)
     if (_network_mode)
     {
         radio_perifs_t &perif = _radio_perifs[0];
-        perif.send_ctrl_xport = udp_zero_copy::make(device_addr["addr"], E200_SERVER_CTRL_PORT, ctrl_xport_params, dummy_buff_params_out, device_addr);
+        perif.send_ctrl_xport = udp_zero_copy::make(device_addr["addr"], E300_SERVER_CTRL_PORT, ctrl_xport_params, dummy_buff_params_out, device_addr);
         perif.recv_ctrl_xport = perif.send_ctrl_xport;
-        perif.tx_data_xport = udp_zero_copy::make(device_addr["addr"], E200_SERVER_TX_PORT, data_xport_params, dummy_buff_params_out, device_addr);
+        perif.tx_data_xport = udp_zero_copy::make(device_addr["addr"], E300_SERVER_TX_PORT, data_xport_params, dummy_buff_params_out, device_addr);
         perif.tx_flow_xport = perif.tx_data_xport;
-        perif.rx_data_xport = udp_zero_copy::make(device_addr["addr"], E200_SERVER_RX_PORT, data_xport_params, dummy_buff_params_out, device_addr);
+        perif.rx_data_xport = udp_zero_copy::make(device_addr["addr"], E300_SERVER_RX_PORT, data_xport_params, dummy_buff_params_out, device_addr);
         perif.rx_flow_xport = perif.rx_data_xport;
         zero_copy_if::sptr codec_xport;
-        codec_xport = udp_zero_copy::make(device_addr["addr"], E200_SERVER_CODEC_PORT, ctrl_xport_params, dummy_buff_params_out, device_addr);
-        ad9361_ctrl_iface_sptr codec_ctrl(new ad9361_ctrl_over_zc(codec_xport));
-        _codec_ctrl = ad9361_ctrl::make(codec_ctrl);
+        codec_xport = udp_zero_copy::make(device_addr["addr"], E300_SERVER_CODEC_PORT, ctrl_xport_params, dummy_buff_params_out, device_addr);
+        _codec_ctrl = ad9361_ctrl::make(ad9361_ctrl_transport::make_zero_copy(codec_xport));
     }
     else
     {
         radio_perifs_t &perif = _radio_perifs[0];
-        _fifo_iface = e200_fifo_interface::make(e200_read_sysfs());
+        _fifo_iface = e300_fifo_interface::make(e300_read_sysfs());
         perif.send_ctrl_xport = _fifo_iface->make_send_xport(1, ctrl_xport_args);
         perif.recv_ctrl_xport = _fifo_iface->make_recv_xport(1, ctrl_xport_args);
         perif.tx_data_xport = _fifo_iface->make_send_xport(0, data_xport_args);
         perif.tx_flow_xport = _fifo_iface->make_recv_xport(0, ctrl_xport_args);
         perif.rx_data_xport = _fifo_iface->make_recv_xport(2, data_xport_args);
         perif.rx_flow_xport = _fifo_iface->make_send_xport(2, ctrl_xport_args);
-        zero_copy_if::sptr codec_xport;
-        codec_xport = udp_zero_copy::make("localhost", E200_SERVER_CODEC_PORT, ctrl_xport_params, dummy_buff_params_out, device_addr);
-        ad9361_ctrl_iface_sptr codec_ctrl(new ad9361_ctrl_over_zc(codec_xport));
-        _codec_ctrl = ad9361_ctrl::make(codec_ctrl);
+        _codec_xport = ad9361_ctrl_transport::make_software(AD9361_E300, uhd::spi_iface::make_spidev("/dev/spidev0.1"));
+        _codec_ctrl = ad9361_ctrl::make(_codec_xport);
+        // This is horrible ... why do I have to sleep here?
+        boost::this_thread::sleep(boost::posix_time::milliseconds(100));
     }
 
     ////////////////////////////////////////////////////////////////////
@@ -211,11 +212,12 @@ e200_impl::e200_impl(const uhd::device_addr_t &device_addr)
     if (device_addr.has_key("server"))
     {
         boost::thread_group tg;
-        tg.create_thread(boost::bind(&e200_impl::run_server, this, E200_SERVER_RX_PORT, "RX"));
-        tg.create_thread(boost::bind(&e200_impl::run_server, this, E200_SERVER_TX_PORT, "TX"));
-        tg.create_thread(boost::bind(&e200_impl::run_server, this, E200_SERVER_CTRL_PORT, "CTRL"));
+        tg.create_thread(boost::bind(&e300_impl::run_server, this, E300_SERVER_RX_PORT, "RX"));
+        tg.create_thread(boost::bind(&e300_impl::run_server, this, E300_SERVER_TX_PORT, "TX"));
+        tg.create_thread(boost::bind(&e300_impl::run_server, this, E300_SERVER_CTRL_PORT, "CTRL"));
+        tg.create_thread(boost::bind(&e300_impl::run_server, this, E300_SERVER_CODEC_PORT, "CODEC"));
         tg.join_all();
-        goto e200_impl_begin;
+        goto e300_impl_begin;
     }
 
     ////////////////////////////////////////////////////////////////////
@@ -224,7 +226,7 @@ e200_impl::e200_impl(const uhd::device_addr_t &device_addr)
     _tree = property_tree::make();
     _tree->create<std::string>("/name").set("E-Series Device");
     const fs_path mb_path = "/mboards/0";
-    _tree->create<std::string>(mb_path / "name").set("uSerp");
+    _tree->create<std::string>(mb_path / "name").set("E300");
     _tree->create<std::string>(mb_path / "codename").set("");
 
     ////////////////////////////////////////////////////////////////////
@@ -246,9 +248,9 @@ e200_impl::e200_impl(const uhd::device_addr_t &device_addr)
     // clocking
     ////////////////////////////////////////////////////////////////////
     _tree->create<double>(mb_path / "tick_rate")
-        .coerce(boost::bind(&e200_impl::set_tick_rate, this, _1))
-        .publish(boost::bind(&e200_impl::get_tick_rate, this))
-        .subscribe(boost::bind(&e200_impl::update_tick_rate, this, _1));
+        .coerce(boost::bind(&e300_impl::set_tick_rate, this, _1))
+        .publish(boost::bind(&e300_impl::get_tick_rate, this))
+        .subscribe(boost::bind(&e300_impl::update_tick_rate, this, _1));
 
     //default some chains on -- needed for setup purposes
     _codec_ctrl->set_active_chains(true, false, true, false);
@@ -278,12 +280,12 @@ e200_impl::e200_impl(const uhd::device_addr_t &device_addr)
         ;//.subscribe(boost::bind(&time_core_3000::set_time_next_pps, _radio_perifs[1].time64, _1));
     //setup time source props
     _tree->create<std::string>(mb_path / "time_source" / "value")
-        .subscribe(boost::bind(&e200_impl::update_time_source, this, _1));
+        .subscribe(boost::bind(&e300_impl::update_time_source, this, _1));
     static const std::vector<std::string> time_sources = boost::assign::list_of("none")("external")("gpsdo");
     _tree->create<std::vector<std::string> >(mb_path / "time_source" / "options").set(time_sources);
     //setup reference source props
     _tree->create<std::string>(mb_path / "clock_source" / "value")
-        .subscribe(boost::bind(&e200_impl::update_clock_source, this, _1));
+        .subscribe(boost::bind(&e300_impl::update_clock_source, this, _1));
     static const std::vector<std::string> clock_sources = boost::assign::list_of("internal")("external")("gpsdo");
     _tree->create<std::vector<std::string> >(mb_path / "clock_source" / "options").set(clock_sources);
 
@@ -339,7 +341,7 @@ e200_impl::e200_impl(const uhd::device_addr_t &device_addr)
         _tree->create<double>(rf_fe_path / "freq" / "value")
             .set(0.0)
             .coerce(boost::bind(&ad9361_ctrl::tune, _codec_ctrl, fe_name, _1))
-            .subscribe(boost::bind(&e200_impl::update_fe_lo_freq, this, fe_name, _1));
+            .subscribe(boost::bind(&e300_impl::update_fe_lo_freq, this, fe_name, _1));
         _tree->create<meta_range_t>(rf_fe_path / "freq" / "range")
             .publish(boost::bind(&ad9361_ctrl::get_rf_freq_range));
 
@@ -349,7 +351,7 @@ e200_impl::e200_impl(const uhd::device_addr_t &device_addr)
             static const std::vector<std::string> ants = boost::assign::list_of("TX/RX")("RX2");
             _tree->create<std::vector<std::string> >(rf_fe_path / "antenna" / "options").set(ants);
             _tree->create<std::string>(rf_fe_path / "antenna" / "value")
-                .subscribe(boost::bind(&e200_impl::update_antenna_sel, this, fe_name, _1))
+                .subscribe(boost::bind(&e300_impl::update_antenna_sel, this, fe_name, _1))
                 .set("RX2");
         }
         if (fe_name[0] == 'T')
@@ -366,10 +368,10 @@ e200_impl::e200_impl(const uhd::device_addr_t &device_addr)
     ////////////////////////////////////////////////////////////////////
     _tree->create<subdev_spec_t>(mb_path / "rx_subdev_spec")
         .set(subdev_spec_t())
-        .subscribe(boost::bind(&e200_impl::update_rx_subdev_spec, this, _1));
+        .subscribe(boost::bind(&e300_impl::update_rx_subdev_spec, this, _1));
     _tree->create<subdev_spec_t>(mb_path / "tx_subdev_spec")
         .set(subdev_spec_t())
-        .subscribe(boost::bind(&e200_impl::update_tx_subdev_spec, this, _1));
+        .subscribe(boost::bind(&e300_impl::update_tx_subdev_spec, this, _1));
 
     ////////////////////////////////////////////////////////////////////
     // do some post-init tasks
@@ -378,7 +380,7 @@ e200_impl::e200_impl(const uhd::device_addr_t &device_addr)
     //init the clock rate to something, but only when we have active chains
     //init the clock rate to something reasonable
     _tree->access<double>(mb_path / "tick_rate").set(
-        device_addr.cast<double>("master_clock_rate", E200_DEFAULT_TICK_RATE));
+        device_addr.cast<double>("master_clock_rate", E300_DEFAULT_TICK_RATE));
     //_codec_ctrl->set_active_chains(false, false, false, false);
 
     _tree->access<subdev_spec_t>(mb_path / "rx_subdev_spec").set(subdev_spec_t("A:RX2"));
@@ -389,12 +391,12 @@ e200_impl::e200_impl(const uhd::device_addr_t &device_addr)
 
 }
 
-e200_impl::~e200_impl(void)
+e300_impl::~e300_impl(void)
 {
     /* NOP */
 }
 
-double e200_impl::set_tick_rate(const double rate)
+double e300_impl::set_tick_rate(const double rate)
 {
     const size_t factor = 1.0;//((_fe_enb_map["RX1"] and _fe_enb_map["RX2"]) or (_fe_enb_map["TX1"] and _fe_enb_map["TX2"]))? 2:1;
     UHD_MSG(status) << "asking for clock rate " << rate/1e6 << " MHz\n";
@@ -409,7 +411,7 @@ double e200_impl::set_tick_rate(const double rate)
     return _tick_rate;
 }
 
-void e200_impl::load_fpga_image(const std::string &path)
+void e300_impl::load_fpga_image(const std::string &path)
 {
     if (not fs::exists("/dev/xdevcfg"))
     {
@@ -438,7 +440,7 @@ void e200_impl::load_fpga_image(const std::string &path)
     UHD_MSG(status) << " done" << std::endl;
 }
 
-void e200_impl::register_loopback_self_test(wb_iface::sptr iface)
+void e300_impl::register_loopback_self_test(wb_iface::sptr iface)
 {
     bool test_fail = false;
     UHD_MSG(status) << "Performing register loopback test... " << std::flush;
@@ -453,7 +455,7 @@ void e200_impl::register_loopback_self_test(wb_iface::sptr iface)
     UHD_MSG(status) << ((test_fail)? " fail" : "pass") << std::endl;
 }
 
-void e200_impl::codec_loopback_self_test(wb_iface::sptr iface)
+void e300_impl::codec_loopback_self_test(wb_iface::sptr iface)
 {
     bool test_fail = false;
     UHD_ASSERT_THROW(bool(iface));
@@ -477,24 +479,22 @@ void e200_impl::codec_loopback_self_test(wb_iface::sptr iface)
     iface->poke32(TOREG(SR_CODEC_IDLE), 0);
 }
 
-void e200_impl::update_time_source(const std::string &)
+void e300_impl::update_time_source(const std::string &)
 {
-    
 }
 
-void e200_impl::update_clock_source(const std::string &)
+void e300_impl::update_clock_source(const std::string &)
 {
-    
 }
 
-void e200_impl::update_antenna_sel(const std::string &fe, const std::string &ant)
+void e300_impl::update_antenna_sel(const std::string &fe, const std::string &ant)
 {
     const size_t i = (fe == "RX1")? 0 : 1;
     _fe_control_settings[i].rx_ant = ant;
     this->update_atrs(i);
 }
 
-void e200_impl::update_fe_lo_freq(const std::string &fe, const double freq)
+void e300_impl::update_fe_lo_freq(const std::string &fe, const double freq)
 {
     for (size_t i = 0; i < 2; i++)
     {
@@ -504,7 +504,7 @@ void e200_impl::update_fe_lo_freq(const std::string &fe, const double freq)
     }
 }
 
-void e200_impl::update_active_frontends(void)
+void e300_impl::update_active_frontends(void)
 {
     _codec_ctrl->set_active_chains(
         _fe_control_settings[0].tx_enb,
@@ -516,7 +516,7 @@ void e200_impl::update_active_frontends(void)
     this->update_atrs(1);
 }
 
-void e200_impl::setup_radio(const size_t dspno)
+void e300_impl::setup_radio(const size_t dspno)
 {
     radio_perifs_t &perif = _radio_perifs[dspno];
     const fs_path mb_path = "/mboards/0";
@@ -543,7 +543,7 @@ void e200_impl::setup_radio(const size_t dspno)
         .publish(boost::bind(&rx_dsp_core_3000::get_host_rates, perif.ddc));
     _tree->create<double>(rx_dsp_path / "rate" / "value")
         .coerce(boost::bind(&rx_dsp_core_3000::set_host_rate, perif.ddc, _1))
-        .subscribe(boost::bind(&e200_impl::update_rx_samp_rate, this, dspno, _1))
+        .subscribe(boost::bind(&e300_impl::update_rx_samp_rate, this, dspno, _1))
         .set(1e6);
     _tree->create<double>(rx_dsp_path / "freq" / "value")
         .coerce(boost::bind(&rx_dsp_core_3000::set_freq, perif.ddc, _1))
@@ -567,7 +567,7 @@ void e200_impl::setup_radio(const size_t dspno)
         .publish(boost::bind(&tx_dsp_core_3000::get_host_rates, perif.duc));
     _tree->create<double>(tx_dsp_path / "rate" / "value")
         .coerce(boost::bind(&tx_dsp_core_3000::set_host_rate, perif.duc, _1))
-        .subscribe(boost::bind(&e200_impl::update_tx_samp_rate, this, dspno, _1))
+        .subscribe(boost::bind(&e300_impl::update_tx_samp_rate, this, dspno, _1))
         .set(1e6);
     _tree->create<double>(tx_dsp_path / "freq" / "value")
         .coerce(boost::bind(&tx_dsp_core_3000::set_freq, perif.duc, _1))
@@ -590,7 +590,7 @@ void e200_impl::setup_radio(const size_t dspno)
 ////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////
 
-void e200_impl::update_atrs(const size_t &fe)
+void e300_impl::update_atrs(const size_t &fe)
 {
     const fe_control_settings_t &settings = _fe_control_settings[fe];
 

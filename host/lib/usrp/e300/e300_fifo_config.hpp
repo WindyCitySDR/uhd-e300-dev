@@ -1,5 +1,5 @@
 //
-// Copyright 2013 Ettus Research LLC
+// Copyright 2013-2014 Ettus Research LLC
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -15,28 +15,28 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 //
 
-#ifndef INCLUDED_E200_FIFO_CONFIG_HPP
-#define INCLUDED_E200_FIFO_CONFIG_HPP
+#ifndef INCLUDED_E300_FIFO_CONFIG_HPP
+#define INCLUDED_E300_FIFO_CONFIG_HPP
 
 #include <uhd/types/device_addr.hpp>
 #include <uhd/transport/zero_copy.hpp>
 #include <boost/enable_shared_from_this.hpp>
 
-struct e200_fifo_config_t
+struct e300_fifo_config_t
 {
     size_t ctrl_length;
     size_t buff_length;
     size_t phys_addr;
 };
 
-e200_fifo_config_t e200_read_sysfs(void);
+e300_fifo_config_t e300_read_sysfs(void);
 
-struct e200_fifo_interface : boost::enable_shared_from_this<e200_fifo_interface>
+struct e300_fifo_interface : boost::enable_shared_from_this<e300_fifo_interface>
 {
-    typedef boost::shared_ptr<e200_fifo_interface> sptr;
-    static sptr make(const e200_fifo_config_t &config);
+    typedef boost::shared_ptr<e300_fifo_interface> sptr;
+    static sptr make(const e300_fifo_config_t &config);
     virtual uhd::transport::zero_copy_if::sptr make_recv_xport(const size_t which_stream, const uhd::device_addr_t &args) = 0;
     virtual uhd::transport::zero_copy_if::sptr make_send_xport(const size_t which_stream, const uhd::device_addr_t &args) = 0;
 };
 
-#endif /* INCLUDED_E200_FIFO_CONFIG_HPP */
+#endif /* INCLUDED_E300_FIFO_CONFIG_HPP */

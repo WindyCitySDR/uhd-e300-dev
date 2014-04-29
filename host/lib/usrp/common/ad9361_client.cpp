@@ -7,7 +7,7 @@
 double ad9361_client_get_band_edge(ad9361_product_t product, frequency_band_t band)
 {
     switch (product) {
-    case AD9361_E200:
+    case AD9361_E300:
         switch (band) {
         case AD9361_RX_BAND0:   return 1.2e9;
         case AD9361_RX_BAND1:   return 2.6e9;
@@ -27,7 +27,7 @@ double ad9361_client_get_band_edge(ad9361_product_t product, frequency_band_t ba
 clocking_mode_t ad9361_client_get_clocking_mode(ad9361_product_t product)
 {
     switch (product) {
-    case AD9361_E200:
+    case AD9361_E300:
         return AD9361_XTAL_P_CLK_PATH;
     case AD9361_B200:
         return AD9361_XTAL_N_CLK_PATH;
@@ -40,7 +40,7 @@ digital_interface_mode_t ad9361_client_get_digital_interface_mode(ad9361_product
 {
     switch (product) {
         case AD9361_B200:   return AD9361_DDR_FDD_LVCMOS;
-        case AD9361_E200:   return AD9361_DDR_FDD_LVCMOS;
+        case AD9361_E300:   return AD9361_DDR_FDD_LVCMOS;
         default:            return AD9361_DDR_FDD_LVCMOS;
     }
 }
@@ -55,7 +55,7 @@ digital_interface_delays_t ad9361_client_get_digital_interface_timing(ad9361_pro
             delays.tx_clk_delay = 0;
             delays.tx_data_delay = 0xF;
             break;
-        case AD9361_E200:
+        case AD9361_E300:
             delays.rx_clk_delay = 0;
             delays.rx_data_delay = 0xF;
             delays.tx_clk_delay = 0;
