@@ -355,6 +355,10 @@ private:
     void update_atr_leds(gpio_core_200_32wo::sptr, const std::string &ant);
     boost::uint32_t get_fp_gpio(gpio_core_200::sptr, const std::string &);
     void set_fp_gpio(gpio_core_200::sptr, const std::string &, const boost::uint32_t);
+
+
+    // Loopback stuff
+    void test_rfnoc_loopback();
 };
 
 #endif /* INCLUDED_X300_IMPL_HPP */

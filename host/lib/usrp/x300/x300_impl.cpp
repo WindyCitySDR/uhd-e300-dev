@@ -366,6 +366,12 @@ x300_impl::x300_impl(const uhd::device_addr_t &dev_addr)
     {
         this->setup_mb(i, device_args[i]);
     }
+
+    if (dev_addr.has_key("loopback_test")) {
+        UHD_MSG(status) << "Testing RFNoC loopback..." << std::endl;
+        boost::this_thread::sleep(boost::posix_time::milliseconds(100));
+        this->test_rfnoc_loopback();
+    }
 }
 
 void x300_impl::setup_mb(const size_t mb_i, const uhd::device_addr_t &dev_addr)
@@ -1703,3 +1709,42 @@ x300_impl::x300_mboard_t x300_impl::get_mb_type_from_eeprom(const uhd::usrp::mbo
     return mb_type;
 }
 
+
+// Loopback
+#include "../../transport/loopback_test.hpp"
+void x300_impl::test_rfnoc_loopback()
+{
+    //sid_config_t sid_config;
+    //sid_config.router_addr_there = X300_DEVICE_THERE;
+    //sid_config.dst_prefix = 0x00;
+    //sid_config.router_dst_there = X300_XB_DST_CE0;
+    //sid_config.router_dst_here = 0;
+    //boost::uint32_t sid = allocate_sid(_mb[0], sid_config);
+
+        //setup the dsp transport hints (TODO)
+        device_addr_t device_addr = _mb[0].send_args;
+
+    //allocate sid and create transport
+    boost::uint32_t data_sid;
+    UHD_LOG << "creating tx stream " << device_addr.to_string() << std::endl;
+    both_xports_t xport = this->make_transport(
+        0, // mb index
+        X300_XB_DST_CE0, // destination (top 6 bits of local part of sid)
+        0x00, // "prefix" (lower 2 bits of sid, not relevant unless radio)
+        device_addr,
+        data_sid // sid (output)
+    );
+    UHD_LOG << boost::format("data_sid = 0x%08x\n") % data_sid << std::endl;
+
+    loopback_test tester;
+    device_addr_t results = tester.run_test(
+        xport.send,
+        xport.recv,
+        data_sid,
+        _mb[0].if_pkt_is_big_endian,
+        100
+    );
+
+    UHD_MSG(status) << results.to_pp_string() << std::endl;
+}
+// vim: sw=4 expandtab:
