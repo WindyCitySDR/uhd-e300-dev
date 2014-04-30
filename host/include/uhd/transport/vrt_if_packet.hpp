@@ -62,6 +62,13 @@ namespace vrt{
 	    PACKET_TYPE_CMD       = 0x2, // Command
 	    PACKET_TYPE_RESP      = 0x3, // Cmd response / errors
         } packet_type;
+        //enum packet_type_t
+        //{
+            //PACKET_TYPE_DATA      = 0x0, // Data
+            //PACKET_TYPE_FC        = 0x1, // Flow control
+            //PACKET_TYPE_CMD       = 0x2, // Command
+            //PACKET_TYPE_RESP      = 0x3, // Cmd response / errors
+        //} packet_type;
 
         //size fields
         size_t num_payload_words32; //required in pack, derived in unpack
