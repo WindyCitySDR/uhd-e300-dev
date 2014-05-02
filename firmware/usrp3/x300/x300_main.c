@@ -340,11 +340,10 @@ static void handle_uarts(void)
     shmem[X300_FW_SHMEM_UART_WORDS32] = NUM_POOL_WORDS32;
 
     ////////////////////////////////////////////////////////////////////
-    // RX UART - try to get a character and post it to the shmem buffer
+    // RX UART - get available characters and post to the shmem buffer
     ////////////////////////////////////////////////////////////////////
     static uint32_t rxoffset = 0;
-    const int rxch = wb_uart_getc(UART0_BASE);
-    if (rxch != -1)
+    for (int rxch = wb_uart_getc(UART0_BASE); rxch != -1; rxch = wb_uart_getc(UART0_BASE))
     {
         rxoffset = (rxoffset+1) % (NUM_POOL_WORDS32*4);
         const int shift = ((rxoffset%4) * 8);
@@ -356,10 +355,10 @@ static void handle_uarts(void)
     }
 
     ////////////////////////////////////////////////////////////////////
-    // TX UART - check for a character in the shmem buffer and send it
+    // TX UART - check for characters in the shmem buffer and send them
     ////////////////////////////////////////////////////////////////////
     static uint32_t txoffset = 0;
-    if (txoffset != shmem[X300_FW_SHMEM_UART_TX_INDEX])
+    while (txoffset != shmem[X300_FW_SHMEM_UART_TX_INDEX])
     {
         const int shift = ((txoffset%4) * 8);
         const int txch = txpool[txoffset/4] >> shift;
@@ -373,15 +372,22 @@ static void handle_uarts(void)
  **********************************************************************/
 static void update_forwarding(const uint8_t e)
 {
-    //update forwarding rules
-    uint32_t forward = 0;
-    if (!link_state_route_proto_causes_cycle_cached(e, (e+1)%2))
-    {
-        forward |= (1 << 0); //forward bcast
-        forward |= (1 << 1); //forward not mac dest
-    }
-    const uint32_t eth_base = (e == 0)? SR_ETHINT0 : SR_ETHINT1;
-    wb_poke32(SR_ADDR(SET0_BASE, eth_base + 8 + 4), forward);
+    /* FIXME: This code is broken.
+     * It blindly enables forwarding without regard to whether or not
+     * packets can be forwarded.  If one of the Ethernet interfaces is not
+     * connected, data backs up until the first interface becomes unresponsive.
+     *
+     * //update forwarding rules
+     * uint32_t forward = 0;
+     * if (!link_state_route_proto_causes_cycle_cached(e, (e+1)%2))
+     * {
+     *     forward |= (1 << 0); //forward bcast
+     *     forward |= (1 << 1); //forward not mac dest
+     * }
+     * const uint32_t eth_base = (e == 0)? SR_ETHINT0 : SR_ETHINT1;
+     * wb_poke32(SR_ADDR(SET0_BASE, eth_base + 8 + 4), forward);
+     */
+
 }
 
 static void handle_link_state(void)
@@ -391,13 +397,9 @@ static void handle_link_state(void)
     shmem[X300_FW_SHMEM_ROUTE_MAP_ADDR] = (uint32_t)link_state_route_get_node_mapping(&map_len);
     shmem[X300_FW_SHMEM_ROUTE_MAP_LEN] = map_len;
 
-    //update forwarding for all eths
-    //low overhead: this does not run the algorithm
-    for (uint8_t e = 0; e < ethernet_ninterfaces(); e++) update_forwarding(e);
-
     static size_t count = 0;
-    if (count++ < 2000) return; //2 seconds
-    count = 0;
+    if (count--) return;
+    count = 2000;  //repeat every ~2 seconds
 
     link_state_route_proto_tick();
     for (size_t e = 0; e < ethernet_ninterfaces(); e++)
@@ -407,7 +409,12 @@ static void handle_link_state(void)
             link_state_route_proto_update(e);
             link_state_route_proto_flood(e);
         }
+
+        //update forwarding if something changed
+        bool before = link_state_route_proto_causes_cycle_cached(e, (e+1)%2);
         link_state_route_proto_update_cycle_cache(e);
+        if (before != link_state_route_proto_causes_cycle_cached(e, (e+1)%2))
+            update_forwarding(e);
         /*
         printf("is there a cycle %s -> %s? %s\n",
             ip_addr_to_str(u3_net_stack_get_ip_addr(e)),
