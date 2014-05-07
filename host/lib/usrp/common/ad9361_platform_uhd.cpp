@@ -9,40 +9,23 @@
 #include <unistd.h>
 #include <stdint.h>
 #include <ad9361_platform.h>
-#include <uhd/types/serial.hpp>
 #include "ad9361_ctrl.hpp"
 #include <stdio.h>
 
+//If the platform for the AD9361 driver is UHD (host) then the handle is simply
+//a pointer to a device class instance
 ad9361_device_t* get_ad9361_device(uint64_t handle)
 {
     return reinterpret_cast<ad9361_device_t*>(reinterpret_cast<void*>(handle));
 }
 
-#define AD9361_SPI_WRITE_CMD    0x00800000
-#define AD9361_SPI_READ_CMD     0x00000000
-#define AD9361_SPI_ADDR_MASK    0x003FFF00
-#define AD9361_SPI_ADDR_SHIFT   8
-#define AD9361_SPI_DATA_MASK    0x000000FF
-#define AD9361_SPI_DATA_SHIFT   0
-#define AD9361_SPI_SLAVE_NUM    0x1
-#define AD9361_SPI_NUM_BITS     24
-
 uint8_t read_ad9361_reg(ad9361_device_t* device, uint32_t reg)
 {
-    if (device && device->xact_iface) {
-        uhd::spi_iface* spi_iface = reinterpret_cast<uhd::spi_iface*>(device->xact_iface);
-
-        uhd::spi_config_t config;
-        config.mosi_edge = uhd::spi_config_t::EDGE_FALL;
-        config.miso_edge = uhd::spi_config_t::EDGE_FALL;    //TODO (Ashish): FPGA SPI workaround. This should be EDGE_RISE
-
-        uint32_t rd_word = AD9361_SPI_READ_CMD |
-                           ((uint32_t(reg) << AD9361_SPI_ADDR_SHIFT) & AD9361_SPI_ADDR_MASK);
-
-        uint32_t val = (spi_iface->read_spi(AD9361_SPI_SLAVE_NUM, config, rd_word, AD9361_SPI_NUM_BITS));
-        val &= 0xFF;
-
-        return static_cast<uint8_t>(val);
+    if (device && device->io_iface) {
+        //If the platform for the AD9361 driver is UHD (host) then the io_iface is
+        //a pointer to a ad9361_io implementation
+        ad9361_io* io_iface = reinterpret_cast<ad9361_io*>(device->io_iface);
+        return io_iface->peek8(reg);
     } else {
         return 0;
     }
@@ -50,21 +33,11 @@ uint8_t read_ad9361_reg(ad9361_device_t* device, uint32_t reg)
 
 void write_ad9361_reg(ad9361_device_t* device, uint32_t reg, uint8_t val)
 {
-    if (device && device->xact_iface) {
-        uhd::spi_iface* spi_iface = reinterpret_cast<uhd::spi_iface*>(device->xact_iface);
-
-        uhd::spi_config_t config;
-        config.mosi_edge = uhd::spi_config_t::EDGE_FALL;
-        config.miso_edge = uhd::spi_config_t::EDGE_FALL;    //TODO (Ashish): FPGA SPI workaround. This should be EDGE_RISE
-
-        uint32_t wr_word = AD9361_SPI_WRITE_CMD |
-                           ((uint32_t(reg) << AD9361_SPI_ADDR_SHIFT) & AD9361_SPI_ADDR_MASK) |
-                           ((uint32_t(val) << AD9361_SPI_DATA_SHIFT) & AD9361_SPI_DATA_MASK);
-        spi_iface->write_spi(
-            AD9361_SPI_SLAVE_NUM, config, wr_word, AD9361_SPI_NUM_BITS);
-
-        //TODO (Ashish): Is this necessary? The FX3 firmware does it right now but for
-        read_ad9361_reg(device, reg);
+    if (device && device->io_iface) {
+        //If the platform for the AD9361 driver is UHD (host) then the io_iface is
+        //a pointer to a ad9361_io implementation
+        ad9361_io* io_iface = reinterpret_cast<ad9361_io*>(device->io_iface);
+        io_iface->poke8(reg, val);
     }
 }
 

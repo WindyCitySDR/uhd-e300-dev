@@ -8,8 +8,8 @@
 #include <stdarg.h>
 #include <stdio.h>
 #include <stdbool.h>
-#include <string.h>
 #include <math.h>
+#include <string.h>
 
 #include <ad9361_transaction.h>
 #include "ad9361_filter_taps.h"
@@ -200,8 +200,7 @@ void setup_rx_fir(ad9361_device_t* device, int total_num_taps) {
 }
 
 /* Program the TX FIR Filter. */
-void setup_tx_fir(ad9361_device_t* device,
-        int total_num_taps) {
+void setup_tx_fir(ad9361_device_t* device, int total_num_taps) {
     int num_taps = total_num_taps / 2;
     uint16_t coeffs[num_taps];
     int i;

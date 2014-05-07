@@ -32,15 +32,14 @@
 #include <cstring>
 #include <iomanip>
 #include <libusb.h>
+#include <ad9361_transaction.h>
+#include <ad9361_dispatch.h>
 
 //! libusb_error_name is only in newer API
 #ifndef HAVE_LIBUSB_ERROR_NAME
     #define libusb_error_name(code) \
         str(boost::format("LIBUSB_ERROR_CODE %d") % code)
 #endif
-
-#include <ad9361_transaction.h>
-#include <ad9361_dispatch.h>
 
 using namespace uhd;
 using namespace uhd::transport;
@@ -321,7 +320,7 @@ public:
 
         for (size_t i = 0; i < read_retries; i++)
         {
-            ret = fx3_control_read(B200_VREQ_AD9361_CTRL_READ, 0x00, 0x00, out_buff, bytes_to_read, 1000);
+            ret = fx3_control_read(B200_VREQ_AD9361_CTRL_READ, 0x00, 0x00, out_buff, bytes_to_read, 3000);
             if (ret < 0)
             {
                 if (ret == LIBUSB_ERROR_TIMEOUT)

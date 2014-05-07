@@ -55,8 +55,8 @@ typedef struct {
     int32_t     tfir_factor;
     //Register soft-copies
     ad9361_chip_regs_t regs;
-    //Transact Interface
-    void*       xact_iface;
+    //IO Interface
+    void*       io_iface;
 } ad9361_device_t;
 
 #ifdef __cplusplus

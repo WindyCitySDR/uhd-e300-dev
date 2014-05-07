@@ -123,6 +123,7 @@ public:
 
 class adf4001_ctrl {
 public:
+    typedef boost::shared_ptr<adf4001_ctrl> sptr;
 
     adf4001_ctrl(spi_core_3000::sptr _spi, int slaveno);
     void set_lock_to_ext_ref(bool external);
