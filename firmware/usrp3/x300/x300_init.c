@@ -75,6 +75,7 @@ static void init_network(void)
     pkt_config = wb_pkt_iface64_init(PKT_RAM0_BASE, 0x1ffc);
     printf("PKT RAM0 BASE 0x%x\n", (&pkt_config)->base);
     u3_net_stack_init(&pkt_config);
+
     link_state_route_proto_init();
 
     //read everything from eeprom
@@ -149,8 +150,12 @@ void x300_init(void)
 
     // For eth interfaces, initialize the PHY's
     mdelay(100);
-    xge_ethernet_init(0);
-    xge_ethernet_init(1);
+    if (wb_peek32(SR_ADDR(RB0_BASE, RB_ETH_TYPE0)) == 1) {
+        xge_ethernet_init(0);
+    }
+    if (wb_peek32(SR_ADDR(RB0_BASE, RB_ETH_TYPE1)) == 1) {
+        xge_ethernet_init(1);
+    }
 
     //print network summary
     for (uint8_t e = 0; e < ethernet_ninterfaces(); e++)
