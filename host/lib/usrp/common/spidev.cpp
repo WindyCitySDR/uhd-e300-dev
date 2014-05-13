@@ -15,16 +15,19 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 //
 
+#include <uhd/config.hpp>
+
+#ifdef UHD_PLATFORM_LINUX
+
+#include <uhd/exception.hpp>
+#include <uhd/types/serial.hpp>
+#include <boost/thread.hpp>
+#include <boost/format.hpp>
+
 #include <fcntl.h>
 #include <sys/ioctl.h>
 #include <linux/types.h>
 #include <linux/spi/spidev.h>
-
-#include <uhd/exception.hpp>
-#include <uhd/types/serial.hpp>
-
-#include <boost/thread.hpp>
-#include <boost/format.hpp>
 
 class spidev_impl : public uhd::spi_iface
 {
@@ -99,7 +102,10 @@ public:
         if (ret < 1)
             throw uhd::runtime_error("Could not send spidev message");
 
-        return rx[2];
+        if (readback)
+            return rx[2];
+
+        return 0;
     }
 
 private:
@@ -114,3 +120,4 @@ uhd::spi_iface::sptr uhd::spi_iface::make_spidev(const std::string &device)
 {
     return uhd::spi_iface::sptr(new spidev_impl(device));
 }
+#endif /* UHD_PLATFORM_LINUX */

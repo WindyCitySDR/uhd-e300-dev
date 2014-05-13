@@ -5,12 +5,15 @@
 #include <uhd/utils/msg.hpp>
 #include <cmath>
 #include <cstdlib>
+#include <cstdio>
 #include <cstring>
+
 #include <unistd.h>
-#include <stdint.h>
 #include <ad9361_platform.h>
 #include "ad9361_ctrl.hpp"
-#include <stdio.h>
+
+#include <boost/cstdint.hpp>
+#include <boost/thread.hpp>
 
 //If the platform for the AD9361 driver is UHD (host) then the handle is simply
 //a pointer to a device class instance
@@ -70,7 +73,7 @@ double ad9361_sqrt(double val)
 
 void ad9361_msleep(const uint32_t millis)
 {
-    usleep(millis*1000);
+    boost::this_thread::sleep(boost::posix_time::milliseconds(millis));
 }
 
 int ad9361_floor_to_int(double val)

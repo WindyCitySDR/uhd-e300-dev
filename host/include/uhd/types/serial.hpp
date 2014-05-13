@@ -181,7 +181,9 @@ namespace uhd{
             size_t num_bits
         );
 
+#ifdef UHD_PLATFORM_LINUX
         static sptr make_spidev(const std::string &device);
+#endif /* UHD_PLATFORM_LINUX */
     };
 
     /*!
