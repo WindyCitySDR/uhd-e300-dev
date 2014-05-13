@@ -8,7 +8,6 @@
 #include <cstdio>
 #include <cstring>
 
-#include <unistd.h>
 #include <ad9361_platform.h>
 #include "ad9361_ctrl.hpp"
 
