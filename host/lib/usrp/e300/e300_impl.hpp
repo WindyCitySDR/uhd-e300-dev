@@ -57,7 +57,7 @@ class e300_impl : public uhd::device
 public:
     //structors
     e300_impl(const uhd::device_addr_t &);
-    ~e300_impl(void);
+    virtual ~e300_impl(void);
 
     //the io interface
     boost::mutex _stream_spawn_mutex;

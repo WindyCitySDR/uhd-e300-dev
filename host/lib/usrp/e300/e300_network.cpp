@@ -229,7 +229,9 @@ void e300_impl::run_server(const std::string &port, const std::string &what)
                 tg.create_thread(boost::bind(&e300_send_tunnel, "control tunnel", socket, perif.send_ctrl_xport, &endpoint, &running));
             }
             if (what == "CODEC")
+            {
                 tg.create_thread(boost::bind(&e300_codec_ctrl_tunnel, "CODEC tunnel", socket, _codec_xport, &endpoint, &running));
+            }
 
             tg.join_all();
             socket->close();
