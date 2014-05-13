@@ -50,6 +50,10 @@
 #include <uhd/transport/vrt_if_packet.hpp>
 #include "recv_packet_demuxer_3000.hpp"
 
+///////////// RFNOC /////////////////////
+#include "nocshell_ctrl_core.hpp"
+///////////// RFNOC /////////////////////
+
 static const std::string X300_FW_FILE_NAME  = "usrp_x300_fw.bin";
 
 static const double X300_DEFAULT_TICK_RATE      = 200e6;        //Hz
@@ -103,7 +107,7 @@ static const size_t X300_MAX_RATE_1GIGE             = 100000000; // bytes/s
 #define X300_XB_DST_R1 3 // Radio 1 -> Slot B
 #define X300_XB_DST_CE0 4
 #define X300_XB_DST_CE1 5
-#define X300_XB_DST_CE2 5
+#define X300_XB_DST_CE2 6
 #define X300_XB_DST_PCI 7
 
 #define X300_DEVICE_THERE 2
@@ -151,6 +155,10 @@ public:
     //the io interface
     uhd::rx_streamer::sptr get_rx_stream(const uhd::stream_args_t &);
     uhd::tx_streamer::sptr get_tx_stream(const uhd::stream_args_t &);
+    ///////////// RFNOC ////////////////////////
+    void dummy_issue_stream_command(const uhd::stream_cmd_t &stream_cmd);
+    void handle_overflow_ce(boost::weak_ptr<uhd::rx_streamer> streamer);
+    ///////////// RFNOC ////////////////////////
 
     //support old async call
     bool recv_async_msg(uhd::async_metadata_t &, double);
@@ -166,6 +174,11 @@ public:
     static x300_mboard_t get_mb_type_from_eeprom(const uhd::usrp::mboard_eeprom_t& mb_eeprom);
 
 private:
+    /////////////////////// RFNOC ///////////////////////////////////////////
+    uhd::rx_streamer::sptr get_rx_stream_ce(const uhd::stream_args_t &, boost::uint16_t src_addr);
+    uhd::tx_streamer::sptr get_tx_stream_ce(const uhd::stream_args_t &, boost::uint16_t dst_addr);
+    /////////////////////// RFNOC ///////////////////////////////////////////
+
     boost::shared_ptr<async_md_type> _async_md;
 
     //perifs in the radio core
@@ -193,6 +206,10 @@ private:
     {
         uhd::dict<size_t, boost::weak_ptr<uhd::rx_streamer> > rx_streamers;
         uhd::dict<size_t, boost::weak_ptr<uhd::tx_streamer> > tx_streamers;
+        //////////////////// RFNOC ///////////////////////////////////
+        uhd::dict<size_t, boost::weak_ptr<uhd::rx_streamer> > ce_rx_streamers;
+        uhd::dict<size_t, boost::weak_ptr<uhd::tx_streamer> > ce_tx_streamers;
+        //////////////////// RFNOC ///////////////////////////////////
 
         uhd::task::sptr claimer_task;
         std::string addr;
@@ -221,6 +238,10 @@ private:
         x300_clock_ctrl::sptr clock;
         uhd::gps_ctrl::sptr gps;
         gpio_core_200::sptr fp_gpio;
+
+	///////////// RFNOC /////////////////////
+	nocshell_ctrl_core::sptr nocshell_ctrls[3];
+	///////////// RFNOC /////////////////////
 
         //clock control register bits
         int clock_control_regs_clock_source;
@@ -358,7 +379,8 @@ private:
 
 
     // Loopback stuff
-    void test_rfnoc_loopback();
+    void test_rfnoc_loopback(int ce_index);
 };
 
 #endif /* INCLUDED_X300_IMPL_HPP */
+// vim: sw=4 expandtab:

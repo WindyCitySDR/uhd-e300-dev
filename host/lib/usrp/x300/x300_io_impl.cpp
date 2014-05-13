@@ -357,6 +357,13 @@ rx_streamer::sptr x300_impl::get_rx_stream(const uhd::stream_args_t &args_)
     args.otw_format = "sc16";
     args.channels = args.channels.empty()? std::vector<size_t>(1, 0) : args.channels;
 
+    if (args.args.has_key("src_addr")) {
+        ce_streamer = true;
+        boost::uint16_t src_addr = uhd::cast::hexstr_cast<boost::uint16_t>(args.args["src_addr"]);
+        UHD_ASSERT_THROW(args.channels.size() == 1);
+        return get_rx_stream_ce(args, src_addr);
+    }
+
     boost::shared_ptr<sph::recv_packet_streamer> my_streamer;
     for (size_t stream_i = 0; stream_i < args.channels.size(); stream_i++)
     {
@@ -490,6 +497,155 @@ rx_streamer::sptr x300_impl::get_rx_stream(const uhd::stream_args_t &args_)
     return my_streamer;
 }
 
+rx_streamer::sptr x300_impl::get_rx_stream_ce(const uhd::stream_args_t &args_, boost::uint16_t dest_addr)
+{
+    boost::mutex::scoped_lock lock(_transport_setup_mutex);
+    stream_args_t args = args_;
+
+    //setup defaults for unspecified values
+    if (not args.otw_format.empty() and args.otw_format != "sc16")
+    {
+        throw uhd::value_error("x300_impl::get_rx_stream_ce only supports otw_format sc16");
+    }
+    if (not args.cpu_format.empty() and args.cpu_format != "sc16")
+    {
+        throw uhd::value_error("x300_impl::get_rx_stream_ce only supports cpu_format sc16");
+    }
+    args.otw_format = "sc16";
+    args.cpu_format = "sc16";
+
+    boost::shared_ptr<sph::recv_packet_streamer> my_streamer;
+
+    // TODO: Find the right mainboard depending on the address
+    size_t mb_index = 0;
+    UHD_ASSERT_THROW(mb_index < _mb.size());
+
+    // Find the right CE TODO this is ugly
+    size_t ce_index = dest_addr;
+    boost::uint8_t sid_lower;
+    switch (dest_addr) { // Right now this is ce index (should this be sid? TODO)
+        case 0:
+            sid_lower = X300_XB_DST_CE0;
+        case 1:
+            sid_lower = X300_XB_DST_CE1;
+        case 2:
+            sid_lower = X300_XB_DST_CE2;
+    }
+    UHD_ASSERT_THROW(ce_index >= 0 and ce_index <= 2);
+
+    // Setup
+    mboard_members_t &mb = _mb[mb_index];
+
+    //radio_perifs_t &perif = mb.radio_perifs[radio_index];
+
+    //setup the dsp transport hints (default to a large recv buff)
+    device_addr_t device_addr = mb.recv_args;
+    if (not device_addr.has_key("recv_buff_size"))
+    {
+        if (mb.xport_path != "nirio") {
+            //For the ethernet transport, the buffer has to be set before creating
+            //the transport because it is independent of the frame size and # frames
+            //For nirio, the buffer size is not configurable by the user
+            #if defined(UHD_PLATFORM_MACOS) || defined(UHD_PLATFORM_BSD)
+                //limit buffer resize on macos or it will error
+                device_addr["recv_buff_size"] = boost::lexical_cast<std::string>(X300_RX_SW_BUFF_SIZE_ETH_MACOS);
+            #elif defined(UHD_PLATFORM_LINUX) || defined(UHD_PLATFORM_WIN32)
+                //set to half-a-second of buffering at max rate
+                device_addr["recv_buff_size"] = boost::lexical_cast<std::string>(X300_RX_SW_BUFF_SIZE_ETH);
+            #endif
+        }
+    }
+
+    //allocate sid and create transport
+    boost::uint32_t data_sid;
+    UHD_LOG << "creating rx stream " << device_addr.to_string() << std::endl;
+    both_xports_t xport = this->make_transport(mb_index, sid_lower, 0x00, device_addr, data_sid);
+    UHD_LOG << boost::format("data_sid = 0x%08x, actual recv_buff_size = %d\n") % data_sid % xport.recv_buff_size << std::endl;
+
+    // To calculate the max number of samples per packet, we assume the maximum header length
+    // to avoid fragmentation should the entire header be used.
+    const size_t bpp = xport.recv->get_recv_frame_size() - X300_RX_MAX_HDR_LEN; // bytes per packet
+    const size_t bpi = convert::get_bytes_per_item(args.otw_format); // bytes per item
+    const size_t spp = unsigned(args.args.cast<double>("spp", bpp/bpi)); // samples per packet
+
+    //make the new streamer given the samples per packet
+    if (not my_streamer) my_streamer = boost::make_shared<sph::recv_packet_streamer>(spp);
+    my_streamer->resize(args.channels.size());
+
+    //init some streamer stuff
+    std::string conv_endianness;
+    if (mb.if_pkt_is_big_endian) {
+        my_streamer->set_vrt_unpacker(&x300_if_hdr_unpack_be);
+        conv_endianness = "be";
+    } else {
+        my_streamer->set_vrt_unpacker(&x300_if_hdr_unpack_le);
+        conv_endianness = "le";
+    }
+
+    //set the converter
+    uhd::convert::id_type id;
+    id.input_format = args.otw_format + "_item32_" + conv_endianness;
+    id.num_inputs = 1;
+    id.output_format = args.cpu_format;
+    id.num_outputs = 1;
+    my_streamer->set_converter(id);
+
+    //flow control setup
+    const size_t fc_window = get_rx_flow_control_window(xport.recv->get_recv_frame_size(), xport.recv_buff_size, device_addr);
+    const size_t fc_handle_window = std::max<size_t>(1, fc_window / X300_RX_FC_REQUEST_FREQ);
+
+    UHD_LOG << "RX Flow Control Window = " << fc_window << ", RX Flow Control Handler Window = " << fc_handle_window << std::endl;
+
+    // Configure flow control (hope this works)
+    mb.nocshell_ctrls[ce_index]->poke32(0x0000, window_size-1);
+    mb.nocshell_ctrls[ce_index]->poke32(0x0001, window_size?1:0);
+
+    boost::shared_ptr<boost::uint32_t> seq32(new boost::uint32_t(0));
+    //Give the streamer a functor to get the recv_buffer
+    //bind requires a zero_copy_if::sptr to add a streamer->xport lifetime dependency
+    my_streamer->set_xport_chan_get_buff(
+        0,
+        boost::bind(&zero_copy_if::get_recv_buff, xport.recv, _1),
+        true /*flush*/
+    );
+    //Give the streamer a functor to handle overflows
+    //bind requires a weak_ptr to break the a streamer->streamer circular dependency
+    //Using "this" is OK because we know that x300_impl will outlive the streamer
+    my_streamer->set_overflow_handler(
+        boost::bind(&x300_impl::handle_overflow_ce, this, boost::weak_ptr<uhd::rx_streamer>(my_streamer))
+    );
+    //Give the streamer a functor to send flow control messages
+    //handle_rx_flowctrl is static and has no lifetime issues
+    my_streamer->set_xport_handle_flowctrl(
+        0, boost::bind(&handle_rx_flowctrl, data_sid, xport.send, mb.if_pkt_is_big_endian, seq32, _1),
+        fc_handle_window,
+        true/*init*/
+    );
+    //Give the streamer a functor issue stream cmd
+    //bind requires a rx_vita_core_3000::sptr to add a streamer->framer lifetime dependency
+    my_streamer->set_issue_stream_cmd(
+        0, boost::bind(&x300_impl::dummy_issue_stream_command, this, _1)
+    );
+
+    //Store a weak pointer to prevent a streamer->x300_impl->streamer circular dependency
+    mb.ce_rx_streamers[ce_index] = boost::weak_ptr<sph::recv_packet_streamer>(my_streamer);
+
+    return my_streamer;
+}
+
+// Does nothing
+void x300_impl::dummy_issue_stream_command(const uhd::stream_cmd_t &stream_cmd)
+{
+    // nop
+    return;
+}
+
+//  This probably wants a ref to the nocshell controller at some point
+void x300_impl::handle_overflow_ce(boost::weak_ptr<uhd::rx_streamer> streamer)
+{
+    return;
+}
+
 void x300_impl::handle_overflow(x300_impl::radio_perifs_t &perif, boost::weak_ptr<uhd::rx_streamer> streamer)
 {
     boost::shared_ptr<sph::recv_packet_streamer> my_streamer =
@@ -536,6 +692,13 @@ tx_streamer::sptr x300_impl::get_tx_stream(const uhd::stream_args_t &args_)
     }
     args.otw_format = "sc16";
     args.channels = args.channels.empty()? std::vector<size_t>(1, 0) : args.channels;
+
+    if (args.args.has_key("dst_addr")) {
+        ce_streamer = true;
+        boost::uint16_t dest_addr = uhd::cast::hexstr_cast<boost::uint16_t>(args.args["dst_addr"]);
+        UHD_ASSERT_THROW(args.channels.size() == 1);
+        return get_rx_stream_ce(args, dest_addr);
+    }
 
     //shared async queue for all channels in streamer
     boost::shared_ptr<async_md_type> async_md(new async_md_type(1000/*messages deep*/));
@@ -642,3 +805,127 @@ tx_streamer::sptr x300_impl::get_tx_stream(const uhd::stream_args_t &args_)
 
     return my_streamer;
 }
+
+tx_streamer::sptr x300_impl::get_tx_stream_ce(const uhd::stream_args_t &args_)
+{
+    boost::mutex::scoped_lock lock(_transport_setup_mutex);
+    stream_args_t args = args_;
+
+    UHD_ASSERT_THROW(args.channels.size() == 1);
+    //setup defaults for unspecified values
+    if (not args.otw_format.empty() and args.otw_format != "sc16")
+    {
+        throw uhd::value_error("x300_impl::get_rx_stream_ce only supports otw_format sc16");
+    }
+    if (not args.cpu_format.empty() and args.cpu_format != "sc16")
+    {
+        throw uhd::value_error("x300_impl::get_rx_stream_ce only supports cpu_format sc16");
+    }
+    args.otw_format = "sc16";
+    args.cpu_format = "sc16";
+
+    //shared async queue for all channels in streamer
+    boost::shared_ptr<async_md_type> async_md(new async_md_type(1000/*messages deep*/));
+
+    boost::shared_ptr<sph::send_packet_streamer> my_streamer;
+
+    // TODO: Find the right mainboard depending on the address
+    size_t mb_index = 0;
+    size_t stream_i = 0;
+    // Find the DSP that corresponds to this mainboard and subdev
+    UHD_ASSERT_THROW(mb_index < _mb.size());
+
+    // Find the right CE TODO this is ugly
+    size_t ce_index = dest_addr;
+    boost::uint8_t sid_lower;
+    switch (dest_addr) { // Right now this is ce index (should this be sid? TODO)
+        case 0:
+            sid_lower = X300_XB_DST_CE0;
+        case 1:
+            sid_lower = X300_XB_DST_CE1;
+        case 2:
+            sid_lower = X300_XB_DST_CE2;
+    }
+    UHD_ASSERT_THROW(ce_index >= 0 and ce_index <= 2);
+
+    // Setup
+    mboard_members_t &mb = _mb[mb_index];
+
+    //setup the dsp transport hints (TODO)
+    device_addr_t device_addr = mb.send_args;
+
+    //allocate sid and create transport
+    boost::uint32_t data_sid;
+    UHD_LOG << "creating tx stream " << device_addr.to_string() << std::endl;
+    both_xports_t xport = this->make_transport(mb_index, sid_lower, 0x00, device_addr, data_sid);
+    UHD_LOG << boost::format("data_sid = 0x%08x\n") % data_sid << std::endl;
+
+    // To calculate the max number of samples per packet, we assume the maximum header length
+    // to avoid fragmentation should the entire header be used.
+    const size_t bpp = xport.send->get_send_frame_size() - X300_TX_MAX_HDR_LEN;
+    const size_t bpi = convert::get_bytes_per_item(args.otw_format);
+    const size_t spp = unsigned(args.args.cast<double>("spp", bpp/bpi));
+
+    //make the new streamer given the samples per packet
+    if (not my_streamer) my_streamer = boost::make_shared<sph::send_packet_streamer>(spp);
+    my_streamer->resize(args.channels.size());
+
+    std::string conv_endianness;
+    if (mb.if_pkt_is_big_endian) {
+        my_streamer->set_vrt_packer(&x300_if_hdr_pack_be);
+        conv_endianness = "be";
+    } else {
+        my_streamer->set_vrt_packer(&x300_if_hdr_pack_le);
+        conv_endianness = "le";
+    }
+
+    //set the converter
+    uhd::convert::id_type id;
+    id.input_format = args.cpu_format;
+    id.num_inputs = 1;
+    id.output_format = args.otw_format + "_item32_" + conv_endianness;
+    id.num_outputs = 1;
+    my_streamer->set_converter(id);
+
+    //flow control setup
+    size_t fc_window = get_tx_flow_control_window(xport.send->get_send_frame_size(), device_addr);  //In packets
+    const size_t fc_handle_window = std::max<size_t>(1, fc_window/X300_TX_FC_RESPONSE_FREQ);
+
+    UHD_LOG << "TX Flow Control Window = " << fc_window << ", TX Flow Control Handler Window = " << fc_handle_window << std::endl;
+
+    { // configure flow control, normally: perif.deframer->configure_flow_control(0/*cycs off*/, fc_handle_window);
+        size_t cycs_per_up = 0;
+        if (cycs_per_up == 0) mb.nocshell_ctrls[ce_index]->poke32(0x0002, 0);
+        else mb.nocshell_ctrls[ce_index]->poke32(0x0002, (1 << 31) | ((cycs_per_up) & 0xffffff));
+        if (pkts_per_up == 0) mb.nocshell_ctrls[ce_index]->poke32(0x0003, 0);
+        else mb.nocshell_ctrls[ce_index]->poke32(0x0003, (1 << 31) | ((pkts_per_up) & 0xffff));
+    }
+
+    boost::shared_ptr<x300_tx_fc_guts_t> guts(new x300_tx_fc_guts_t());
+    guts->stream_channel = 0;
+    guts->device_channel = 0;
+    guts->async_queue = async_md;
+    guts->old_async_queue = _async_md;
+    task::sptr task = task::make(boost::bind(&handle_tx_async_msgs, guts, xport.recv, mb.if_pkt_is_big_endian, mb.clock));
+
+    //Give the streamer a functor to get the send buffer
+    //get_tx_buff_with_flowctrl is static so bind has no lifetime issues
+    //xport.send (sptr) is required to add streamer->data-transport lifetime dependency
+    //task (sptr) is required to add  a streamer->async-handler lifetime dependency
+    my_streamer->set_xport_chan_get_buff(
+        stream_i,
+        boost::bind(&get_tx_buff_with_flowctrl, task, guts, xport.send, fc_window, _1)
+    );
+    //Give the streamer a functor handled received async messages
+    my_streamer->set_async_receiver(
+        boost::bind(&async_md_type::pop_with_timed_wait, async_md, _1, _2)
+    );
+    my_streamer->set_xport_chan_sid(stream_i, true, data_sid);
+    my_streamer->set_enable_trailer(false); //TODO not implemented trailer support yet
+
+    //Store a weak pointer to prevent a streamer->x300_impl->streamer circular dependency
+    mb.ce_tx_streamers[ce_index] = boost::weak_ptr<sph::send_packet_streamer>(my_streamer);
+
+    return my_streamer;
+}
+// vim: sw=4 expandtab:
