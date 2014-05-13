@@ -16,11 +16,10 @@
 //
 
 #include <uhd/config.hpp>
+#include "e300_impl.hpp"
 
-#ifdef UHD_PLATFORM_LINUX
-
+#ifdef E300_NATIVE
 #include <uhd/exception.hpp>
-#include <uhd/types/serial.hpp>
 #include <boost/thread.hpp>
 #include <boost/format.hpp>
 
@@ -28,6 +27,7 @@
 #include <sys/ioctl.h>
 #include <linux/types.h>
 #include <linux/spi/spidev.h>
+
 
 class spidev_impl : public uhd::spi_iface
 {
@@ -74,15 +74,12 @@ public:
         close(_fd);
     }
 
-    boost::uint32_t transact_spi(int which_slave, const uhd::spi_config_t &config,
+    boost::uint32_t transact_spi(int, const uhd::spi_config_t &,
                                  boost::uint32_t data, size_t num_bits,
-                                 bool readback)
+                                 bool)
     {
         int ret(0);
         struct spi_ioc_transfer tr;
-
-        (void) which_slave;
-        (void) config;
 
         uint8_t *tx_data = reinterpret_cast<uint8_t *>(&data);
 
@@ -102,10 +99,7 @@ public:
         if (ret < 1)
             throw uhd::runtime_error("Could not send spidev message");
 
-        if (readback)
-            return rx[2];
-
-        return 0;
+        return rx[2];
     }
 
 private:
@@ -116,8 +110,13 @@ private:
     boost::uint16_t _delay;
 };
 
-uhd::spi_iface::sptr uhd::spi_iface::make_spidev(const std::string &device)
+uhd::spi_iface::sptr e300_impl::make_spidev(const std::string &device)
 {
     return uhd::spi_iface::sptr(new spidev_impl(device));
 }
-#endif /* UHD_PLATFORM_LINUX */
+#else
+uhd::spi_iface::sptr e300_impl::make_spidev(const std::string &)
+{
+    throw uhd::runtime_error("e300_impl::make_spidev() !E300_NATIVE");
+}
+#endif //E300_NATIVE

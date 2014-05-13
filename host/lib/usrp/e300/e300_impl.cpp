@@ -200,7 +200,7 @@ e300_impl::e300_impl(const uhd::device_addr_t &device_addr)
         perif.tx_flow_xport = _fifo_iface->make_recv_xport(0, ctrl_xport_args);
         perif.rx_data_xport = _fifo_iface->make_recv_xport(2, data_xport_args);
         perif.rx_flow_xport = _fifo_iface->make_send_xport(2, ctrl_xport_args);
-        _codec_xport = ad9361_ctrl_transport::make_software_spi(AD9361_E300, uhd::spi_iface::make_spidev("/dev/spidev0.1"), 1);
+        _codec_xport = ad9361_ctrl_transport::make_software_spi(AD9361_E300, make_spidev("/dev/spidev0.1"), 1);
         _codec_ctrl = ad9361_ctrl::make(_codec_xport);
         // This is horrible ... why do I have to sleep here?
         boost::this_thread::sleep(boost::posix_time::milliseconds(100));
