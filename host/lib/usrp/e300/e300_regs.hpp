@@ -1,5 +1,5 @@
 //
-// Copyright 2012-2013 Ettus Research LLC
+// Copyright 2012-2014 Ettus Research LLC
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -15,8 +15,8 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 //
 
-#ifndef INCLUDED_B250_REGS_HPP
-#define INCLUDED_B250_REGS_HPP
+#ifndef INCLUDED_E300_REGS_HPP
+#define INCLUDED_E300_REGS_HPP
 
 #include <boost/cstdint.hpp>
 
@@ -58,4 +58,4 @@ localparam RXB_BANDSEL = 6;
 localparam RX_BANDSEL = 3;
 localparam TX_BANDSEL = 0;
 
-#endif /* INCLUDED_B250_REGS_HPP */
+#endif /* INCLUDED_E300_REGS_HPP */

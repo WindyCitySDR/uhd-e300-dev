@@ -32,6 +32,8 @@
 #include <cstring>
 #include <iomanip>
 #include <libusb.h>
+#include <ad9361_transaction.h>
+#include <ad9361_dispatch.h>
 
 //! libusb_error_name is only in newer API
 #ifndef HAVE_LIBUSB_ERROR_NAME
@@ -344,6 +346,11 @@ public:
         }
 
         throw uhd::io_error(str(boost::format("Failed to read complete AD9361 (expecting: %d, last read: %d)") % bytes_to_read % ret));
+    }
+
+    uint64_t get_device_handle()
+    {
+        return 0;   //Unused in B200 because the chip class is in FX3 firmware
     }
 
     void load_firmware(const std::string filestring, UHD_UNUSED(bool force) = false)

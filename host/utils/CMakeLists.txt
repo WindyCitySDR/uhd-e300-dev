@@ -62,7 +62,10 @@ IF(ENABLE_USB)
     )
     INCLUDE_DIRECTORIES(${LIBUSB_INCLUDE_DIRS})
     # Additional include directories for b2xx_fx3_utils
-    INCLUDE_DIRECTORIES(${CMAKE_CURRENT_SOURCE_DIR}/../lib/usrp/b200 ${CMAKE_CURRENT_SOURCE_DIR}/../lib/usrp/common)
+    INCLUDE_DIRECTORIES(
+        ${CMAKE_CURRENT_SOURCE_DIR}/../lib/usrp/b200
+        ${CMAKE_CURRENT_SOURCE_DIR}/../lib/usrp/common
+        ${CMAKE_CURRENT_SOURCE_DIR}/../lib/usrp/common/ad9361_driver)
 ENDIF(ENABLE_USB)
 
 IF(LINUX AND ENABLE_USB)
