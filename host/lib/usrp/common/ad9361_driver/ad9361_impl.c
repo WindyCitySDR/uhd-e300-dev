@@ -7,7 +7,6 @@
 
 #include <stdarg.h>
 #include <stdio.h>
-#include <stdbool.h>
 #include <math.h>
 #include <string.h>
 
@@ -75,7 +74,7 @@ void ad9361_set_msgfn(msgfn pfn)
 #define B8(d) ((unsigned char)B8__(HEX__(d)))
 
 double set_gain(uint64_t handle, int which, int n, const double value);
-void set_active_chains(uint64_t handle, bool tx1, bool tx2, bool rx1, bool rx2);
+void set_active_chains(uint64_t handle, int tx1, int tx2, int rx1, int rx2);
 /***********************************************************************
  * Placeholders, unused, or test functions
  **********************************************************************/
@@ -1637,7 +1636,7 @@ void init_ad9361(uint64_t handle) {
     write_ad9361_reg(device, 0x15C, 0x67); // Power Measurement Duration
 
     /* Turn on the default RX & TX chains. */
-    set_active_chains(handle, true, false, false, false);
+    set_active_chains(handle, 1, 0, 0, 0);
 
     /* Set TXers & RXers on (only works in FDD mode) */
     write_ad9361_reg(device, 0x014, 0x21);
@@ -1784,7 +1783,7 @@ double set_clock_rate(uint64_t handle, const double req_rate) {
  *  TX / RX2        Side B              RX2 (when switched to RX)
  *  RX2             Side B              RX2
  */
-void set_active_chains(uint64_t handle, bool tx1, bool tx2, bool rx1, bool rx2) {
+void set_active_chains(uint64_t handle, int tx1, int tx2, int rx1, int rx2) {
     ad9361_device_t* device = get_ad9361_device(handle);
 
     /* Clear out the current active chain settings. */
