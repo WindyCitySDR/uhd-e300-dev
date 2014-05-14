@@ -23,6 +23,13 @@
 #define AD9361_MIN(a, b) (((a) < (b)) ? (a) : (b))
 #define AD9361_MAX(a, b) (((a) > (b)) ? (a) : (b))
 
+#ifdef _MSC_VER
+int lround(double num)
+{
+    return (int)(num > 0 ? num + 0.5 : ceil(num - 0.5));
+}
+#endif
+
 ////////////////////////////////////////////////////////////
 
 static void fake_msg(const char* str, ...)
@@ -90,7 +97,7 @@ void post_err_msg( const char* error)
     strncpy(request->error_msg, error, AD9361_TRANSACTION_MAX_ERROR_MSG);
 }
 
-/* Make Catalina output its test tone. */
+/* Make AD9361 output its test tone. */
 void output_test_tone(ad9361_device_t* device) {
     /* Output a 480 kHz tone at 800 MHz */
     write_ad9361_reg(device, 0x3F4, 0x0B);
@@ -99,7 +106,7 @@ void output_test_tone(ad9361_device_t* device) {
     write_ad9361_reg(device, 0x3FE, 0x3F);
 }
 
-/* Turn on/off Catalina's TX port --> RX port loopback. */
+/* Turn on/off AD9361's TX port --> RX port loopback. */
 void data_port_loopback(uint64_t handle, const int on) {
     ad9361_device_t* device = get_ad9361_device(handle);
     msg("[data_port_loopback] Enabled: %d", on);
@@ -119,7 +126,7 @@ int freq_is_nearly_equal(double a, double b) {
  **********************************************************************/
 
 /* This function takes in the calculated maximum number of FIR taps, and
- * returns a number of taps that makes Catalina happy. */
+ * returns a number of taps that makes AD9361 happy. */
 int get_num_taps(int max_num_taps)
 {
     int num_taps, i;
@@ -265,7 +272,7 @@ void calibrate_synth_charge_pumps(ad9361_device_t* device)
     /* If this function ever gets called, and the ENSM isn't already in the
      * ALERT state, then something has gone horribly wrong. */
     if((read_ad9361_reg(device, 0x017) & 0x0F) != 5) {
-        post_err_msg("Catalina not in ALERT during cal!");
+        post_err_msg("AD9361 not in ALERT during cal!");
     }
 
     /* Calibrate the RX synthesizer charge pump. */
@@ -758,7 +765,7 @@ void calibrate_rf_dc_offset(ad9361_device_t* device)
 
 /* Start the RX quadrature calibration.
  *
- * Note that we are using Catalina's 'tracking' feature for RX quadrature
+ * Note that we are using AD9361's 'tracking' feature for RX quadrature
  * calibration, so once it starts it continues to free-run during operation.
  * It should be re-run for large frequency changes. */
 void calibrate_rx_quadrature(ad9361_device_t* device) {
@@ -1292,7 +1299,7 @@ double tune_helper(ad9361_device_t* device, int which, const double value) {
 
 /* Configure the various clock / sample rates in the RX and TX chains.
  *
- * Functionally, this function configures Catalina's RX and TX rates. For
+ * Functionally, this function configures AD9361's RX and TX rates. For
  * a requested TX & RX rate, it sets the interpolation & decimation filters,
  * and tunes the VCO that feeds the ADCs and DACs.
  */
@@ -1396,7 +1403,7 @@ double setup_rates(ad9361_device_t* device, const double rate)
         device->regs.bbpll = device->regs.bbpll & 0xF7;
     }
 
-    /* Set the dividers / interpolators in Catalina. */
+    /* Set the dividers / interpolators in AD9361. */
     write_ad9361_reg(device, 0x002, device->regs.txfilt);
     write_ad9361_reg(device, 0x003, device->regs.rxfilt);
     write_ad9361_reg(device, 0x004, device->regs.inputsel);
@@ -1647,7 +1654,7 @@ void init_ad9361(uint64_t handle) {
 }
 
 
-/* This function sets the RX / TX rate between Catalina and the FPGA, and
+/* This function sets the RX / TX rate between AD9361 and the FPGA, and
  * thus determines the interpolation / decimation required in the FPGA to
  * achieve the user's requested rate.
  *
@@ -1773,13 +1780,13 @@ double set_clock_rate(uint64_t handle, const double req_rate) {
 
 /* Set which of the four TX / RX chains provided by AD9361 are active.
  *
- * Catalina provides two sets of chains, Side A and Side B. Each side
+ * AD9361 provides two sets of chains, Side A and Side B. Each side
  * provides one TX antenna, and one RX antenna. The B200 maintains the USRP
  * standard of providing one antenna connection that is both TX & RX, and
  * one that is RX-only - for each chain. Thus, the possible antenna and
  * chain selections are:
  *
- *  B200 Antenna    Catalina Side       Catalina Chain
+ *  B200 Antenna    AD9361 Side       AD9361 Chain
  *  -------------------------------------------------------------------
  *  TX / RX1        Side A              TX1 (when switched to TX)
  *  TX / RX1        Side A              RX1 (when switched to RX)
