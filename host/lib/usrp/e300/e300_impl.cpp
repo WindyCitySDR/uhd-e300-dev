@@ -285,15 +285,29 @@ e300_impl::e300_impl(const uhd::device_addr_t &device_addr)
     _codec_ctrl->set_clock_rate(50e6);
 
     ////////////////////////////////////////////////////////////////////
-    // setup radio goo
+    // setup radios
     ////////////////////////////////////////////////////////////////////
     this->setup_radio(0);
     //TODO this->setup_radio(1);
 
-
     _codec_ctrl->data_port_loopback(true);
     this->codec_loopback_self_test(_radio_perifs[0].ctrl);
     _codec_ctrl->data_port_loopback(false);
+
+    ////////////////////////////////////////////////////////////////////
+    // internal gpios
+    ////////////////////////////////////////////////////////////////////
+    gpio_core_200::sptr fp_gpio = gpio_core_200::make(_radio_perifs[0].ctrl, TOREG(SR_FP_GPIO), RB32_FP_GPIO);
+    const std::vector<std::string> gpio_attrs = boost::assign::list_of("CTRL")("DDR")("OUT")("ATR_0X")("ATR_RX")("ATR_TX")("ATR_XX");
+    BOOST_FOREACH(const std::string &attr, gpio_attrs)
+    {
+        _tree->create<boost::uint8_t>(mb_path / "gpio" / "INT0" / attr)
+            .set(0)
+            .subscribe(boost::bind(&e300_impl::set_internal_gpio, this, fp_gpio, attr, _1));
+    }
+    _tree->create<boost::uint8_t>(mb_path / "gpio" / "INT0" / "READBACK")
+        .publish(boost::bind(&e300_impl::get_internal_gpio, this, fp_gpio, "READBACK"));
+
 
     ////////////////////////////////////////////////////////////////////
     // register the time keepers - only one can be the highlander
@@ -417,6 +431,29 @@ e300_impl::e300_impl(const uhd::device_addr_t &device_addr)
     _tree->access<std::string>(mb_path / "clock_source" / "value").set("internal");
     _tree->access<std::string>(mb_path / "time_source" / "value").set("none");
 
+}
+
+boost::uint8_t e300_impl::get_internal_gpio(gpio_core_200::sptr gpio, const std::string &)
+{
+    return boost::uint32_t(gpio->read_gpio(dboard_iface::UNIT_RX));
+}
+
+void e300_impl::set_internal_gpio(gpio_core_200::sptr gpio, const std::string &attr, const boost::uint8_t value)
+{
+    if (attr == "CTRL")
+        return gpio->set_pin_ctrl(dboard_iface::UNIT_RX, value);
+    else if (attr == "DDR")
+        return gpio->set_gpio_ddr(dboard_iface::UNIT_RX, value);
+    else if (attr == "OUT")
+        return gpio->set_gpio_out(dboard_iface::UNIT_RX, value);
+    else if (attr == "ATR_0X")
+        return gpio->set_atr_reg(dboard_iface::UNIT_RX, dboard_iface::ATR_REG_IDLE, value);
+    else if (attr == "ATR_RX")
+        return gpio->set_atr_reg(dboard_iface::UNIT_RX, dboard_iface::ATR_REG_RX_ONLY, value);
+    else if (attr == "ATR_TX")
+        return gpio->set_atr_reg(dboard_iface::UNIT_RX, dboard_iface::ATR_REG_TX_ONLY, value);
+    else if (attr == "ATR_XX")
+        return gpio->set_atr_reg(dboard_iface::UNIT_RX, dboard_iface::ATR_REG_FULL_DUPLEX, value);
 }
 
 e300_impl::~e300_impl(void)

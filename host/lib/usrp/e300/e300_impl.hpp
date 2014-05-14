@@ -151,6 +151,10 @@ private:
     void update_active_frontends(void);
 
     uhd::usrp::e300::global_regs::sptr _global_regs;
+
+    boost::uint8_t get_internal_gpio(gpio_core_200::sptr, const std::string &);
+
+    void set_internal_gpio(gpio_core_200::sptr gpio, const std::string &attr, const boost::uint8_t value);
 };
 
 #endif /* INCLUDED_E300_IMPL_HPP */
