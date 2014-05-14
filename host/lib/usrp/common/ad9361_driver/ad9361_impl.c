@@ -1023,11 +1023,16 @@ void setup_gain_control(ad9361_device_t* device)
  * included header file. The table is indexed based on the passed VCO rate.
  */
 void setup_synth(ad9361_device_t* device, int which, double vcorate) {
+    int vcoindex, i;
+    uint8_t vco_output_level, vco_varactor, vco_bias_ref, vco_bias_tcf;
+    uint8_t vco_cal_offset, vco_varactor_ref, charge_pump_curr;
+    uint8_t loop_filter_c2, loop_filter_c1, loop_filter_r1, loop_filter_c3;
+    uint8_t loop_filter_r3;
+
     /* The vcorates in the vco_index array represent lower boundaries for
      * rates. Once we find a match, we use that index to look-up the rest of
      * the register values in the LUT. */
-    int vcoindex = 0;
-    int i;
+    vcoindex = 0;
     for(i = 0; i < 53; i++) {
         vcoindex = i;
         if(vcorate > vco_index[i]) {
@@ -1039,18 +1044,18 @@ void setup_synth(ad9361_device_t* device, int which, double vcorate) {
         post_err_msg("vcoindex > 53");
 
     /* Parse the values out of the LUT based on our calculated index... */
-    uint8_t vco_output_level = synth_cal_lut[vcoindex][0];
-    uint8_t vco_varactor = synth_cal_lut[vcoindex][1];
-    uint8_t vco_bias_ref = synth_cal_lut[vcoindex][2];
-    uint8_t vco_bias_tcf = synth_cal_lut[vcoindex][3];
-    uint8_t vco_cal_offset = synth_cal_lut[vcoindex][4];
-    uint8_t vco_varactor_ref = synth_cal_lut[vcoindex][5];
-    uint8_t charge_pump_curr = synth_cal_lut[vcoindex][6];
-    uint8_t loop_filter_c2 = synth_cal_lut[vcoindex][7];
-    uint8_t loop_filter_c1 = synth_cal_lut[vcoindex][8];
-    uint8_t loop_filter_r1 = synth_cal_lut[vcoindex][9];
-    uint8_t loop_filter_c3 = synth_cal_lut[vcoindex][10];
-    uint8_t loop_filter_r3 = synth_cal_lut[vcoindex][11];
+    vco_output_level = synth_cal_lut[vcoindex][0];
+    vco_varactor = synth_cal_lut[vcoindex][1];
+    vco_bias_ref = synth_cal_lut[vcoindex][2];
+    vco_bias_tcf = synth_cal_lut[vcoindex][3];
+    vco_cal_offset = synth_cal_lut[vcoindex][4];
+    vco_varactor_ref = synth_cal_lut[vcoindex][5];
+    charge_pump_curr = synth_cal_lut[vcoindex][6];
+    loop_filter_c2 = synth_cal_lut[vcoindex][7];
+    loop_filter_c1 = synth_cal_lut[vcoindex][8];
+    loop_filter_r1 = synth_cal_lut[vcoindex][9];
+    loop_filter_c3 = synth_cal_lut[vcoindex][10];
+    loop_filter_r3 = synth_cal_lut[vcoindex][11];
 
     /* ... annnd program! */
     if(which == RX_TYPE) {
@@ -1089,6 +1094,10 @@ void setup_synth(ad9361_device_t* device, int which, double vcorate) {
  * not exported outside of this file, and is invoked based on the rate
  * fed to the public set_clock_rate function. */
 double tune_bbvco(ad9361_device_t* device, const double rate) {
+    double fref, vcomax, vcomin, vcorate, actual_vcorate;
+    double icp_baseline, freq_baseline, icp;
+    int modulus, vcodiv, i, nint, nfrac, icp_reg;
+
     msg("[tune_bbvco] rate=%.10f", rate);
 
     /* Let's not re-tune to the same frequency over and over... */
@@ -1098,16 +1107,13 @@ double tune_bbvco(ad9361_device_t* device, const double rate) {
 
     device->req_coreclk = rate;
 
-    const double fref = 40e6;
-    const int modulus = 2088960;
-    const double vcomax = 1430e6;
-    const double vcomin = 672e6;
-    double vcorate;
-    int vcodiv;
+    fref = 40e6;
+    modulus = 2088960;
+    vcomax = 1430e6;
+    vcomin = 672e6;
 
     /* Iterate over VCO dividers until appropriate divider is found. */
-    int i = 1;
-    for(; i <= 6; i++) {
+    for(i = 1; i <= 6; i++) {
         vcodiv = 1 << i;
         vcorate = rate * vcodiv;
 
@@ -1119,18 +1125,18 @@ double tune_bbvco(ad9361_device_t* device, const double rate) {
     msg("[tune_bbvco] vcodiv=%d vcorate=%.10f", vcodiv, vcorate);
 
     /* Fo = Fref * (Nint + Nfrac / mod) */
-    int nint = vcorate / fref;
+    nint = vcorate / fref;
     msg("[tune_bbvco] (nint)=%.10f", (vcorate / fref));
-    int nfrac = lround(((vcorate / fref) - (double)nint) * (double)modulus);
+    nfrac = lround(((vcorate / fref) - (double)nint) * (double)modulus);
     msg("[tune_bbvco] (nfrac)=%.10f", (((vcorate / fref) - (double)nint) * (double)modulus));
     msg("[tune_bbvco] nint=%d nfrac=%d", nint, nfrac);
-    double actual_vcorate = fref * ((double)nint + ((double)nfrac / (double)modulus));
+    actual_vcorate = fref * ((double)nint + ((double)nfrac / (double)modulus));
 
     /* Scale CP current according to VCO rate */
-    const double icp_baseline = 150e-6;
-    const double freq_baseline = 1280e6;
-    double icp = icp_baseline * (actual_vcorate / freq_baseline);
-    int icp_reg = (icp / 25e-6) - 1;
+    icp_baseline = 150e-6;
+    freq_baseline = 1280e6;
+    icp = icp_baseline * (actual_vcorate / freq_baseline);
+    icp_reg = (icp / 25e-6) - 1;
 
     write_ad9361_reg(device, 0x045, 0x00);            // REFCLK / 1 to BBPLL
     write_ad9361_reg(device, 0x046, icp_reg & 0x3F);  // CP current
@@ -1176,15 +1182,15 @@ void program_gains(uint64_t handle) {
 double tune_helper(ad9361_device_t* device, int which, const double value) {
 
     /* The RFPLL runs from 6 GHz - 12 GHz */
-    const double fref = 80e6;
-    const int modulus = 8388593;
-    const double vcomax = 12e9;
-    const double vcomin = 6e9;
-    double vcorate;
-    int vcodiv;
+    double fref, vcomax, vcomin, vcorate, actual_vcorate, actual_lo;
+    int modulus, vcodiv, i, nint, nfrac;
+
+    fref = 80e6;
+    modulus = 8388593;
+    vcomax = 12e9;
+    vcomin = 6e9;
 
     /* Iterate over VCO dividers until appropriate divider is found. */
-    int i;
     for(i = 0; i <= 6; i++) {
         vcodiv = 2 << i;
         vcorate = value * vcodiv;
@@ -1193,11 +1199,11 @@ double tune_helper(ad9361_device_t* device, int which, const double value) {
     if(i == 7)
         post_err_msg("RFVCO can't find valid VCO rate!");
 
-    int nint = vcorate / fref;
-    int nfrac = ((vcorate / fref) - nint) * modulus;
+    nint = vcorate / fref;
+    nfrac = ((vcorate / fref) - nint) * modulus;
 
-    double actual_vcorate = fref * (nint + (double)(nfrac)/modulus);
-    double actual_lo = actual_vcorate / vcodiv;
+    actual_vcorate = fref * (nint + (double)(nfrac)/modulus);
+    actual_lo = actual_vcorate / vcodiv;
 
     if(which == RX_TYPE) {
 
@@ -1290,7 +1296,10 @@ double tune_helper(ad9361_device_t* device, int which, const double value) {
  * a requested TX & RX rate, it sets the interpolation & decimation filters,
  * and tunes the VCO that feeds the ADCs and DACs.
  */
-double setup_rates(ad9361_device_t* device, const double rate) {
+double setup_rates(ad9361_device_t* device, const double rate)
+{
+    double adcclk, dacclk;
+    int max_tx_taps, max_rx_taps, num_tx_taps, num_rx_taps;
 
     /* If we make it into this function, then we are tuning to a new rate.
      * Store the new rate. */
@@ -1374,8 +1383,8 @@ double setup_rates(ad9361_device_t* device, const double rate) {
     msg("[setup_rates] divfactor=%d", divfactor);
 
     /* Tune the BBPLL to get the ADC and DAC clocks. */
-    const double adcclk = tune_bbvco(device, rate * divfactor);
-    double dacclk = adcclk;
+    adcclk = tune_bbvco(device, rate * divfactor);
+    dacclk = adcclk;
 
     /* The DAC clock must be <= 336e6, and is either the ADC clock or 1/2 the
      * ADC clock.*/
@@ -1398,12 +1407,12 @@ double setup_rates(ad9361_device_t* device, const double rate) {
 
     /* Setup the RX and TX FIR filters. Scale the number of taps based on
      * the clock speed. */
-    const int max_tx_taps = 16 * AD9361_MIN((int)((dacclk / rate) + 0.5), \
+    max_tx_taps = 16 * AD9361_MIN((int)((dacclk / rate) + 0.5), \
             AD9361_MIN(4 * (1 << device->tfir_factor), 8));
-    const int max_rx_taps = AD9361_MIN((16 * (int)(adcclk / rate)), 128);
+    max_rx_taps = AD9361_MIN((16 * (int)(adcclk / rate)), 128);
 
-    const int num_tx_taps = get_num_taps(max_tx_taps);
-    const int num_rx_taps = get_num_taps(max_rx_taps);
+    num_tx_taps = get_num_taps(max_tx_taps);
+    num_rx_taps = get_num_taps(max_rx_taps);
 
     setup_tx_fir(device, num_tx_taps);
     setup_rx_fir(device, num_rx_taps);
