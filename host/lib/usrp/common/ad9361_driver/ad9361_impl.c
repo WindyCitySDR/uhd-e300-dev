@@ -6,6 +6,7 @@
  */
 
 #include <stdarg.h>
+#include <stdlib.h>
 #include <stdio.h>
 #include <math.h>
 #include <string.h>
@@ -498,7 +499,7 @@ void calibrate_rx_TIAs(ad9361_device_t* device)
     double bbbw, ceil_bbbw_mhz, CTIA_fF;
     int Cbbf, R2346;
     uint8_t reg1eb, reg1ec, reg1e6, reg1db, reg1dc, reg1dd;
-    uint8_t reg1de, reg1df;
+    uint8_t reg1de, reg1df, temp;
 
     reg1eb = read_ad9361_reg(device, 0x1eb) & 0x3F;
     reg1ec = read_ad9361_reg(device, 0x1ec) & 0x7F;
@@ -539,11 +540,11 @@ void calibrate_rx_TIAs(ad9361_device_t* device)
         reg1dc = 0x40;
         reg1de = 0x40;
 
-        uint8_t temp = (uint8_t) AD9361_MIN(127, (ad9361_floor_to_int(0.5 + ((CTIA_fF - 400.0) / 320.0))));
+        temp = (uint8_t) AD9361_MIN(127, (ad9361_floor_to_int(0.5 + ((CTIA_fF - 400.0) / 320.0))));
         reg1dd = temp;
         reg1df = temp;
     } else {
-        uint8_t temp = (uint8_t) ad9361_floor_to_int(0.5 + ((CTIA_fF - 400.0) / 40.0)) + 0x40;
+        temp = (uint8_t) ad9361_floor_to_int(0.5 + ((CTIA_fF - 400.0) / 40.0)) + 0x40;
         reg1dc = temp;
         reg1de = temp;
         reg1dd = 0;
@@ -1298,7 +1299,7 @@ double tune_helper(ad9361_device_t* device, int which, const double value) {
 double setup_rates(ad9361_device_t* device, const double rate)
 {
     double adcclk, dacclk;
-    int max_tx_taps, max_rx_taps, num_tx_taps, num_rx_taps;
+    int max_tx_taps, max_rx_taps, num_tx_taps, num_rx_taps, divfactor;
 
     /* If we make it into this function, then we are tuning to a new rate.
      * Store the new rate. */
@@ -1309,7 +1310,7 @@ double setup_rates(ad9361_device_t* device, const double rate)
      * receivers have to be turned on for the calibration portion of
      * bring-up, and then they will be switched out to reflect the actual
      * user-requested antenna selections. */
-    int divfactor = 0;
+    divfactor = 0;
     device->tfir_factor = 0;
     if(rate < 0.33e6) {
         // RX1 + RX2 enabled, 3, 2, 2, 4
@@ -1423,6 +1424,9 @@ double setup_rates(ad9361_device_t* device, const double rate)
  * Publicly exported functions to host calls
  **********************************************************************/
 void init_ad9361(uint64_t handle) {
+    digital_interface_delays_t timing;
+    uint8_t rx_delays, tx_delays;
+
     ad9361_device_t* device = get_ad9361_device(handle);
     /* Initialize shadow registers. */
     device->regs.vcodivs = 0x00;
@@ -1513,9 +1517,9 @@ void init_ad9361(uint64_t handle) {
     }
 
     /* Data delay for TX and RX data clocks */
-    digital_interface_delays_t timing = ad9361_client_get_digital_interface_timing(device->product);
-    uint8_t rx_delays = ((timing.rx_clk_delay & 0xF) << 4) | (timing.rx_data_delay & 0xF);
-    uint8_t tx_delays = ((timing.tx_clk_delay & 0xF) << 4) | (timing.tx_data_delay & 0xF);
+    timing = ad9361_client_get_digital_interface_timing(device->product);
+    rx_delays = ((timing.rx_clk_delay & 0xF) << 4) | (timing.rx_data_delay & 0xF);
+    tx_delays = ((timing.tx_clk_delay & 0xF) << 4) | (timing.tx_data_delay & 0xF);
     write_ad9361_reg(device, 0x006, rx_delays);
     write_ad9361_reg(device, 0x007, tx_delays);
 
@@ -1649,6 +1653,8 @@ void init_ad9361(uint64_t handle) {
  *
  * This is the only clock setting function that is exposed to the outside. */
 double set_clock_rate(uint64_t handle, const double req_rate) {
+    uint8_t current_state, orig_tx_chains, orig_rx_chains;
+    double rate;
     ad9361_device_t* device = get_ad9361_device(handle);
 
     if(req_rate > 61.44e6) {
@@ -1666,7 +1672,7 @@ double set_clock_rate(uint64_t handle, const double req_rate) {
 
     /* We must be in the SLEEP / WAIT state to do this. If we aren't already
      * there, transition the ENSM to State 0. */
-    uint8_t current_state = read_ad9361_reg(device, 0x017) & 0x0F;
+    current_state = read_ad9361_reg(device, 0x017) & 0x0F;
     switch(current_state) {
         case 0x05:
             /* We are in the ALERT state. */
@@ -1688,12 +1694,12 @@ double set_clock_rate(uint64_t handle, const double req_rate) {
     /* Store the current chain / antenna selections so that we can restore
      * them at the end of this routine; all chains will be enabled from
      * within setup_rates for calibration purposes. */
-    uint8_t orig_tx_chains = device->regs.txfilt & 0xC0;
-    uint8_t orig_rx_chains = device->regs.rxfilt & 0xC0;
+    orig_tx_chains = device->regs.txfilt & 0xC0;
+    orig_rx_chains = device->regs.rxfilt & 0xC0;
 
     /* Call into the clock configuration / settings function. This is where
      * all the hard work gets done. */
-    double rate = setup_rates(device, req_rate);
+    rate = setup_rates(device, req_rate);
 
     msg("[set_clock_rate] rate=%.10f", rate);
 
@@ -1936,6 +1942,7 @@ void ad9361_dispatch(/*const char request[64]*/const char* vrb, /*char response[
 {
     double ret_val;
     int mask;
+    ad9361_transaction_t *request, *response;
 
     memcpy(vrb_out, vrb, AD9361_DISPATCH_PACKET_SIZE); //copy request to response memory
     tmp_req_buffer = vrb_out;
@@ -1945,8 +1952,8 @@ void ad9361_dispatch(/*const char request[64]*/const char* vrb, /*char response[
     ret_val = 0.0;
     mask = 0;
 
-    const ad9361_transaction_t *request = (const ad9361_transaction_t *)vrb;
-    ad9361_transaction_t *response = (ad9361_transaction_t *)vrb_out;
+    request = (ad9361_transaction_t *)vrb;
+    response = (ad9361_transaction_t *)vrb_out;
 
     //msg("[dispatch_vrq] action=%d", request->action);
     //msg("[dispatch_vrq] action=%f", (double)request->action);
