@@ -24,9 +24,9 @@
 #define AD9361_MAX(a, b) (((a) > (b)) ? (a) : (b))
 
 #ifdef _MSC_VER
-int lround(double num)
+long lround(double num)
 {
-    return (int)(num > 0 ? num + 0.5 : ceil(num - 0.5));
+    return (long)(num > 0 ? num + 0.5 : ceil(num - 0.5));
 }
 #endif
 
