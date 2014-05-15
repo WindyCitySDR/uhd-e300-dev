@@ -37,6 +37,7 @@ SET(example_sources
     txrx_loopback_to_file.cpp
     latency_test.cpp
     fpgpio.cpp
+    rfnoc_loopback.cpp
 )
 
 #for each source: build an executable and install

@@ -379,7 +379,7 @@ private:
 
 
     // Loopback stuff
-    void test_rfnoc_loopback(int ce_index);
+    void test_rfnoc_loopback(size_t mb_index, int ce_index);
 };
 
 #endif /* INCLUDED_X300_IMPL_HPP */

@@ -29,6 +29,10 @@
 #include <boost/foreach.hpp>
 #include <boost/make_shared.hpp>
 
+////////////// RFNOC /////////////////
+#include <uhd/utils/cast.hpp>
+////////////// RFNOC /////////////////
+
 using namespace uhd;
 using namespace uhd::usrp;
 using namespace uhd::transport;
@@ -358,7 +362,6 @@ rx_streamer::sptr x300_impl::get_rx_stream(const uhd::stream_args_t &args_)
     args.channels = args.channels.empty()? std::vector<size_t>(1, 0) : args.channels;
 
     if (args.args.has_key("src_addr")) {
-        ce_streamer = true;
         boost::uint16_t src_addr = uhd::cast::hexstr_cast<boost::uint16_t>(args.args["src_addr"]);
         UHD_ASSERT_THROW(args.channels.size() == 1);
         return get_rx_stream_ce(args, src_addr);
@@ -497,9 +500,9 @@ rx_streamer::sptr x300_impl::get_rx_stream(const uhd::stream_args_t &args_)
     return my_streamer;
 }
 
-rx_streamer::sptr x300_impl::get_rx_stream_ce(const uhd::stream_args_t &args_, boost::uint16_t dest_addr)
+rx_streamer::sptr x300_impl::get_rx_stream_ce(const uhd::stream_args_t &args_, boost::uint16_t src_addr)
 {
-    boost::mutex::scoped_lock lock(_transport_setup_mutex);
+    UHD_MSG(status) << "get_rx_stream_ce()" << std::endl;
     stream_args_t args = args_;
 
     //setup defaults for unspecified values
@@ -521,20 +524,27 @@ rx_streamer::sptr x300_impl::get_rx_stream_ce(const uhd::stream_args_t &args_, b
     UHD_ASSERT_THROW(mb_index < _mb.size());
 
     // Find the right CE TODO this is ugly
-    size_t ce_index = dest_addr;
+    size_t ce_index = src_addr;
     boost::uint8_t sid_lower;
-    switch (dest_addr) { // Right now this is ce index (should this be sid? TODO)
+    switch (src_addr) { // Right now this is ce index (should this be sid? TODO)
         case 0:
             sid_lower = X300_XB_DST_CE0;
+            break;
         case 1:
             sid_lower = X300_XB_DST_CE1;
+            break;
         case 2:
             sid_lower = X300_XB_DST_CE2;
+            break;
     }
-    UHD_ASSERT_THROW(ce_index >= 0 and ce_index <= 2);
+    UHD_ASSERT_THROW(ce_index <= 2);
+    UHD_MSG(status) << "ce_index==" << ce_index << std::endl;
+    UHD_MSG(status) << "sid_lower==" << sid_lower << std::endl;
+    UHD_MSG(status) << "mb_index==" << mb_index << std::endl;
 
     // Setup
     mboard_members_t &mb = _mb[mb_index];
+    size_t stream_i = 0;
 
     //radio_perifs_t &perif = mb.radio_perifs[radio_index];
 
@@ -561,6 +571,7 @@ rx_streamer::sptr x300_impl::get_rx_stream_ce(const uhd::stream_args_t &args_, b
     UHD_LOG << "creating rx stream " << device_addr.to_string() << std::endl;
     both_xports_t xport = this->make_transport(mb_index, sid_lower, 0x00, device_addr, data_sid);
     UHD_LOG << boost::format("data_sid = 0x%08x, actual recv_buff_size = %d\n") % data_sid % xport.recv_buff_size << std::endl;
+    UHD_MSG(status) << str(boost::format("rx data_sid = 0x%08x") % data_sid) << std::endl;
 
     // To calculate the max number of samples per packet, we assume the maximum header length
     // to avoid fragmentation should the entire header be used.
@@ -597,14 +608,14 @@ rx_streamer::sptr x300_impl::get_rx_stream_ce(const uhd::stream_args_t &args_, b
     UHD_LOG << "RX Flow Control Window = " << fc_window << ", RX Flow Control Handler Window = " << fc_handle_window << std::endl;
 
     // Configure flow control (hope this works)
-    mb.nocshell_ctrls[ce_index]->poke32(0x0000, window_size-1);
-    mb.nocshell_ctrls[ce_index]->poke32(0x0001, window_size?1:0);
+    mb.nocshell_ctrls[ce_index]->poke32(0x0000, fc_window-1);
+    mb.nocshell_ctrls[ce_index]->poke32(0x0001, fc_window?1:0);
 
     boost::shared_ptr<boost::uint32_t> seq32(new boost::uint32_t(0));
     //Give the streamer a functor to get the recv_buffer
     //bind requires a zero_copy_if::sptr to add a streamer->xport lifetime dependency
     my_streamer->set_xport_chan_get_buff(
-        0,
+        stream_i,
         boost::bind(&zero_copy_if::get_recv_buff, xport.recv, _1),
         true /*flush*/
     );
@@ -612,12 +623,13 @@ rx_streamer::sptr x300_impl::get_rx_stream_ce(const uhd::stream_args_t &args_, b
     //bind requires a weak_ptr to break the a streamer->streamer circular dependency
     //Using "this" is OK because we know that x300_impl will outlive the streamer
     my_streamer->set_overflow_handler(
+        stream_i,
         boost::bind(&x300_impl::handle_overflow_ce, this, boost::weak_ptr<uhd::rx_streamer>(my_streamer))
     );
     //Give the streamer a functor to send flow control messages
     //handle_rx_flowctrl is static and has no lifetime issues
     my_streamer->set_xport_handle_flowctrl(
-        0, boost::bind(&handle_rx_flowctrl, data_sid, xport.send, mb.if_pkt_is_big_endian, seq32, _1),
+        stream_i, boost::bind(&handle_rx_flowctrl, data_sid, xport.send, mb.if_pkt_is_big_endian, seq32, _1),
         fc_handle_window,
         true/*init*/
     );
@@ -636,7 +648,6 @@ rx_streamer::sptr x300_impl::get_rx_stream_ce(const uhd::stream_args_t &args_, b
 // Does nothing
 void x300_impl::dummy_issue_stream_command(const uhd::stream_cmd_t &stream_cmd)
 {
-    // nop
     return;
 }
 
@@ -693,12 +704,14 @@ tx_streamer::sptr x300_impl::get_tx_stream(const uhd::stream_args_t &args_)
     args.otw_format = "sc16";
     args.channels = args.channels.empty()? std::vector<size_t>(1, 0) : args.channels;
 
+    UHD_MSG(status) << "checking dst_addr" << std::endl;
     if (args.args.has_key("dst_addr")) {
-        ce_streamer = true;
         boost::uint16_t dest_addr = uhd::cast::hexstr_cast<boost::uint16_t>(args.args["dst_addr"]);
+        UHD_MSG(status) << "dst_addr==" << dest_addr << std::endl;
         UHD_ASSERT_THROW(args.channels.size() == 1);
-        return get_rx_stream_ce(args, dest_addr);
+        return this->get_tx_stream_ce(args, dest_addr);
     }
+    UHD_MSG(status) << "nope, not there" << std::endl;
 
     //shared async queue for all channels in streamer
     boost::shared_ptr<async_md_type> async_md(new async_md_type(1000/*messages deep*/));
@@ -806,10 +819,10 @@ tx_streamer::sptr x300_impl::get_tx_stream(const uhd::stream_args_t &args_)
     return my_streamer;
 }
 
-tx_streamer::sptr x300_impl::get_tx_stream_ce(const uhd::stream_args_t &args_)
+tx_streamer::sptr x300_impl::get_tx_stream_ce(const uhd::stream_args_t &args_, boost::uint16_t dst_addr)
 {
-    boost::mutex::scoped_lock lock(_transport_setup_mutex);
     stream_args_t args = args_;
+    UHD_MSG(status) << "get_tx_stream_ce()" << std::endl;
 
     UHD_ASSERT_THROW(args.channels.size() == 1);
     //setup defaults for unspecified values
@@ -836,17 +849,26 @@ tx_streamer::sptr x300_impl::get_tx_stream_ce(const uhd::stream_args_t &args_)
     UHD_ASSERT_THROW(mb_index < _mb.size());
 
     // Find the right CE TODO this is ugly
-    size_t ce_index = dest_addr;
+    size_t ce_index = dst_addr;
     boost::uint8_t sid_lower;
-    switch (dest_addr) { // Right now this is ce index (should this be sid? TODO)
+    switch (dst_addr) { // Right now this is ce index (should this be sid? TODO)
         case 0:
             sid_lower = X300_XB_DST_CE0;
+            std::cout << "X300_XB_DST_CE0" << std::endl;
+            break;
         case 1:
             sid_lower = X300_XB_DST_CE1;
+            std::cout << "X300_XB_DST_CE1" << std::endl;
+            break;
         case 2:
             sid_lower = X300_XB_DST_CE2;
+            std::cout << "X300_XB_DST_CE2" << std::endl;
+            break;
     }
-    UHD_ASSERT_THROW(ce_index >= 0 and ce_index <= 2);
+    UHD_ASSERT_THROW(ce_index <= 2);
+    UHD_MSG(status) << "ce_index==" << ce_index << std::endl;
+    UHD_MSG(status) << "sid_lower==" << sid_lower << std::endl;
+    UHD_MSG(status) << "mb_index==" << mb_index << std::endl;
 
     // Setup
     mboard_members_t &mb = _mb[mb_index];
@@ -859,12 +881,20 @@ tx_streamer::sptr x300_impl::get_tx_stream_ce(const uhd::stream_args_t &args_)
     UHD_LOG << "creating tx stream " << device_addr.to_string() << std::endl;
     both_xports_t xport = this->make_transport(mb_index, sid_lower, 0x00, device_addr, data_sid);
     UHD_LOG << boost::format("data_sid = 0x%08x\n") % data_sid << std::endl;
+    if (ce_index == 0) {
+        boost::uint32_t data = (((data_sid >> 16)-1) & 0xFFFF) | (1 << 16);
+        _mb[mb_index].nocshell_ctrls[ce_index]->poke32(
+            SR_ADDR(0x0000, 8),
+            data
+        );
+    }
 
     // To calculate the max number of samples per packet, we assume the maximum header length
     // to avoid fragmentation should the entire header be used.
     const size_t bpp = xport.send->get_send_frame_size() - X300_TX_MAX_HDR_LEN;
     const size_t bpi = convert::get_bytes_per_item(args.otw_format);
     const size_t spp = unsigned(args.args.cast<double>("spp", bpp/bpi));
+    UHD_MSG(status) << "spp==" << spp << std::endl;
 
     //make the new streamer given the samples per packet
     if (not my_streamer) my_streamer = boost::make_shared<sph::send_packet_streamer>(spp);
@@ -885,16 +915,22 @@ tx_streamer::sptr x300_impl::get_tx_stream_ce(const uhd::stream_args_t &args_)
     id.num_inputs = 1;
     id.output_format = args.otw_format + "_item32_" + conv_endianness;
     id.num_outputs = 1;
+    UHD_MSG(status) << "convert id " << id.to_pp_string() << std::endl;
     my_streamer->set_converter(id);
 
     //flow control setup
+    UHD_VAR(xport.send->get_send_frame_size());
+    // THIS IS A BUG: get_send_frame_size() will not report the actual packet size if e.g. if spp is set
     size_t fc_window = get_tx_flow_control_window(xport.send->get_send_frame_size(), device_addr);  //In packets
+    UHD_VAR(fc_window);
     const size_t fc_handle_window = std::max<size_t>(1, fc_window/X300_TX_FC_RESPONSE_FREQ);
+    UHD_VAR(fc_handle_window);
 
     UHD_LOG << "TX Flow Control Window = " << fc_window << ", TX Flow Control Handler Window = " << fc_handle_window << std::endl;
 
     { // configure flow control, normally: perif.deframer->configure_flow_control(0/*cycs off*/, fc_handle_window);
         size_t cycs_per_up = 0;
+        size_t pkts_per_up = fc_handle_window;
         if (cycs_per_up == 0) mb.nocshell_ctrls[ce_index]->poke32(0x0002, 0);
         else mb.nocshell_ctrls[ce_index]->poke32(0x0002, (1 << 31) | ((cycs_per_up) & 0xffffff));
         if (pkts_per_up == 0) mb.nocshell_ctrls[ce_index]->poke32(0x0003, 0);

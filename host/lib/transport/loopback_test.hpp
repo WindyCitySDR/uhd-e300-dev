@@ -35,7 +35,8 @@ public:
         zero_copy_if::sptr rx_transport,
         boost::uint32_t sid,
         bool big_endian,
-        boost::uint32_t duration_ms);
+        boost::uint32_t duration_ms
+	);
 
 private:
     void _stream_tx(

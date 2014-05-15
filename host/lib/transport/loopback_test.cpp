@@ -17,6 +17,7 @@
 
 #include "loopback_test.hpp"
 #include <iostream>
+#include "nocshell_ctrl_core.hpp"
 
 namespace uhd { namespace transport {
 
@@ -26,7 +27,8 @@ const device_addr_t& loopback_test::run_test
     zero_copy_if::sptr rx_transport,
     boost::uint32_t sid,
     bool big_endian,
-    boost::uint32_t duration_ms)
+    boost::uint32_t duration_ms
+    )
 {
     vrt::if_packet_info_t pkt_info;
     _initialize_chdr(tx_transport, rx_transport, sid, pkt_info);
@@ -39,8 +41,9 @@ const device_addr_t& loopback_test::run_test
     boost::this_thread::sleep(boost::posix_time::milliseconds(duration_ms));
 
     _tx_thread->interrupt();
-    _rx_thread->interrupt();
     _tx_thread->join();
+    boost::this_thread::sleep(boost::posix_time::milliseconds(duration_ms));
+    _rx_thread->interrupt();
     _rx_thread->join();
 
     boost::posix_time::ptime stop_time(boost::posix_time::microsec_clock::local_time());
@@ -53,6 +56,8 @@ const device_addr_t& loopback_test::run_test
 
     _results["TX-Bytes"] = (boost::format("%.2fMB") % (tx_bytes/(1024*1024))).str();
     _results["RX-Bytes"] = (boost::format("%.2fMB") % (rx_bytes/(1024*1024))).str();
+    _results["TX-Packets"] = (boost::format("%d") % (_num_tx_packets)).str();
+    _results["RX-Packets"] = (boost::format("%d") % (_num_rx_packets)).str();
     _results["TX-Throughput"] = (boost::format("%.2fMB/s") % (tx_rate/(1024*1024))).str();
     _results["RX-Throughput"] = (boost::format("%.2fMB/s") % (rx_rate/(1024*1024))).str();
     _results["TX-Timeouts"] = boost::lexical_cast<std::string>(_num_tx_timeouts);
@@ -107,21 +112,24 @@ void loopback_test::_stream_rx(zero_copy_if* transport, const vrt::if_packet_inf
                     vrt::if_hdr_unpack_le(packet_buff, pkt_info);
                 }
                 const boost::uint32_t *data_buff = packet_buff + pkt_info.num_header_words32;
-		for (unsigned i = 0; i < pkt_info.num_payload_words32; i++) {
-		    if (data_buff[i] != 0xAAAAAAAA) {
-			_num_data_errors++;
-			std::cout << "i=" << std::dec << i << " value=" << std::hex << data_buff[i] << std::endl;
-		    }
-		}
+		//for (unsigned i = 0; i < pkt_info.num_payload_words32; i++) {
+		    //if (data_buff[i] != 0xAAAAAAAA) {
+			//_num_data_errors++;
+			//std::cout << "i=" << std::dec << i << " value=" << std::hex << data_buff[i] << std::endl;
+		    //}
+		//}
 
                 //if (exp_pkt_info->packet_type != pkt_info.packet_type ||
                     //exp_pkt_info->num_payload_bytes != pkt_info.num_payload_bytes) {
                     //_num_data_errors++;
                 //}
                 if (exp_pkt_info->packet_type != pkt_info.packet_type) {
+			std::cout << "got packet type " << std::hex << pkt_info.packet_type << "  expected " << exp_pkt_info->packet_type << std::endl;
                     _num_data_errors++;
                 }
-            } catch(const std::exception &ex) {
+            //} catch(const std::exception &ex) {
+            } catch(const uhd::value_error &ex) {
+		std::cout << "unpack failure " << ex.what() << std::endl;
                 _num_data_errors++;
             }
         } else {
@@ -149,6 +157,7 @@ void loopback_test::_initialize_chdr(
     _rx_timeout = 0.5;
 
     size_t frame_size = std::min(tx_transport->get_send_frame_size(), rx_transport->get_recv_frame_size());
+    frame_size /= 2;
 
     pkt_info.link_type = vrt::if_packet_info_t::LINK_TYPE_CHDR;
     pkt_info.packet_type = vrt::if_packet_info_t::PACKET_TYPE_DATA;
@@ -165,5 +174,6 @@ void loopback_test::_initialize_chdr(
     pkt_info.has_tsf = false;
     pkt_info.has_tlr = false;
 }
+
 
 }}
