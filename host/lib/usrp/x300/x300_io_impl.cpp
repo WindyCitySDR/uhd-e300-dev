@@ -921,7 +921,8 @@ tx_streamer::sptr x300_impl::get_tx_stream_ce(const uhd::stream_args_t &args_, b
     //flow control setup
     UHD_VAR(xport.send->get_send_frame_size());
     // THIS IS A BUG: get_send_frame_size() will not report the actual packet size if e.g. if spp is set
-    size_t fc_window = get_tx_flow_control_window(xport.send->get_send_frame_size(), device_addr);  //In packets
+    //size_t fc_window = get_tx_flow_control_window(xport.send->get_send_frame_size(), device_addr);  //In packets
+    size_t fc_window = 16;
     UHD_VAR(fc_window);
     const size_t fc_handle_window = std::max<size_t>(1, fc_window/X300_TX_FC_RESPONSE_FREQ);
     UHD_VAR(fc_handle_window);
@@ -931,10 +932,10 @@ tx_streamer::sptr x300_impl::get_tx_stream_ce(const uhd::stream_args_t &args_, b
     { // configure flow control, normally: perif.deframer->configure_flow_control(0/*cycs off*/, fc_handle_window);
         size_t cycs_per_up = 0;
         size_t pkts_per_up = fc_handle_window;
-        if (cycs_per_up == 0) mb.nocshell_ctrls[ce_index]->poke32(0x0002, 0);
-        else mb.nocshell_ctrls[ce_index]->poke32(0x0002, (1 << 31) | ((cycs_per_up) & 0xffffff));
-        if (pkts_per_up == 0) mb.nocshell_ctrls[ce_index]->poke32(0x0003, 0);
-        else mb.nocshell_ctrls[ce_index]->poke32(0x0003, (1 << 31) | ((pkts_per_up) & 0xffff));
+        if (cycs_per_up == 0) mb.nocshell_ctrls[ce_index]->poke32(SR_ADDR(0x0000, 2), 0);
+        else mb.nocshell_ctrls[ce_index]->poke32(SR_ADDR(0x0000, 2), (1 << 31) | ((cycs_per_up) & 0xffffff));
+        if (pkts_per_up == 0) mb.nocshell_ctrls[ce_index]->poke32(SR_ADDR(0x0000, 3), 0);
+        else mb.nocshell_ctrls[ce_index]->poke32(SR_ADDR(0x0000, 3), (1 << 31) | ((pkts_per_up) & 0xffff));
     }
 
     boost::shared_ptr<x300_tx_fc_guts_t> guts(new x300_tx_fc_guts_t());
