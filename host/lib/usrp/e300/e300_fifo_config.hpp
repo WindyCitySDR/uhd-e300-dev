@@ -30,6 +30,7 @@ struct e300_fifo_config_t
 };
 
 e300_fifo_config_t e300_read_sysfs(void);
+long e300_read_hwmon(const std::string &node);
 
 struct e300_fifo_interface : boost::enable_shared_from_this<e300_fifo_interface>
 {

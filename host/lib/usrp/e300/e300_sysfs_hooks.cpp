@@ -36,6 +36,7 @@ static const size_t NPAGES = 8;
 
 static const std::string E300_AXI_FPGA_SYSFS = "40000000.axi-fpga";
 static const std::string E300_XDEV_SYSFS = "f8007000.ps7-dev-cfg";
+static const std::string E300_TEMP_SYSFS = "f8007100.ps7-xadc";
 
 static int get_params_from_sysfs(unsigned long *buffer_length,
                                  unsigned long *control_length,
@@ -125,6 +126,7 @@ static bool e300_fpga_loaded_successfully(void)
         return false;
 }
 
+
 #include "e300_fifo_config.hpp"
 #include <uhd/exception.hpp>
 
@@ -151,6 +153,41 @@ e300_fifo_config_t e300_read_sysfs(void)
     return config;
 }
 
+long e300_read_hwmon(const std::string &node)
+{
+    struct udev *udev;
+    struct udev_enumerate *enumerate;
+    struct udev_list_entry *devices, *dev_list_entry;
+    struct udev_device *dev;
+
+    udev = udev_new();
+    if (!udev) {
+        printf("Fail\n");
+        return 1;
+    }
+    long result = 0;
+
+    enumerate = udev_enumerate_new(udev);
+    udev_enumerate_add_match_sysname(enumerate, E300_TEMP_SYSFS.c_str());
+    udev_enumerate_scan_devices(enumerate);
+    devices = udev_enumerate_get_list_entry(enumerate);
+
+    udev_list_entry_foreach(dev_list_entry, devices)
+    {
+        const char *path;
+
+        path = udev_list_entry_get_name(dev_list_entry);
+        dev = udev_device_new_from_syspath(udev, path);
+
+        result = atol(udev_device_get_sysattr_value(dev, node.c_str()));
+    }
+
+    udev_enumerate_unref(enumerate);
+    udev_unref(udev);
+    return result;
+}
+
+
 #else //E300_NATIVE
 
 #include "e300_fifo_config.hpp"
@@ -161,4 +198,8 @@ e300_fifo_config_t e300_read_sysfs(void)
     throw uhd::runtime_error("e300_read_sysfs() !E300_NATIVE");
 }
 
+long e300_read_hwmon(const std::string &node)
+{
+    throw uhd::runtime_error("e300_read_temperature() !E300_NATIVE");
+}
 #endif //E300_NATIVE

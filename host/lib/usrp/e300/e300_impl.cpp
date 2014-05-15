@@ -234,6 +234,13 @@ e300_impl::e300_impl(const uhd::device_addr_t &device_addr)
     ////////////////////////////////////////////////////////////////////
     _tree->create<int>(mb_path / "sensors"); //empty TODO
 
+    const std::vector<std::string> xadc_sensors = boost::assign::list_of("temp")("temp_max")("temp_min");
+    BOOST_FOREACH(const std::string &sensor, xadc_sensors)
+    {
+        _tree->create<long>(mb_path / "sensors" / sensor)
+            .publish(boost::bind(&e300_read_hwmon, sensor));
+    }
+
     ////////////////////////////////////////////////////////////////////
     // setup the mboard eeprom
     ////////////////////////////////////////////////////////////////////
