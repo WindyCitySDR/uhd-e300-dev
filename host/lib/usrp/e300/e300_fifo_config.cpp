@@ -87,8 +87,7 @@ struct e300_fifo_poll_waiter
             struct pollfd fds[1];
             fds[0].fd = fd;
             fds[0].events = POLLIN;
-            const int r = ::poll(fds, 1, long(timeout*1000));
-            //std::cout << "r " << r << std::endl;
+            ::poll(fds, 1, long(timeout*1000));
             if (fds[0].revents & POLLIN)
                 ::read(fd, NULL, 0);
 
