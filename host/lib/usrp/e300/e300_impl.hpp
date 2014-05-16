@@ -36,7 +36,8 @@
 #include "ad9361_ctrl.hpp"
 #include "gpio_core_200.hpp"
 
-static const std::string E300_FPGA_FILE_NAME = "usrp_e300_fpga.bin";
+static const std::string E300_FPGA_FILE_NAME = "usrp_e300_fpga.bit";
+static const std::string E300_SPIDEV_DEVICE  = "/dev/spidev0.1";
 
 static std::string E300_SERVER_RX_PORT = "321756";
 static std::string E300_SERVER_TX_PORT = "321757";
