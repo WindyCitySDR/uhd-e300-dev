@@ -22,7 +22,6 @@
 #include <uhd/utils/log.hpp>
 #include <uhd/utils/static.hpp>
 #include <uhd/utils/images.hpp>
-#include <uhd/types/serial.hpp>
 #include <uhd/usrp/dboard_eeprom.hpp>
 #include <uhd/transport/udp_zero_copy.hpp>
 #include <uhd/types/sensors.hpp>
@@ -234,11 +233,14 @@ e300_impl::e300_impl(const uhd::device_addr_t &device_addr)
     ////////////////////////////////////////////////////////////////////
     _tree->create<int>(mb_path / "sensors"); //empty TODO
 
-    const std::vector<std::string> xadc_sensors = boost::assign::list_of("temp")("temp_max")("temp_min");
-    BOOST_FOREACH(const std::string &sensor, xadc_sensors)
-    {
-        _tree->create<long>(mb_path / "sensors" / sensor)
-            .publish(boost::bind(&e300_read_hwmon, sensor));
+
+    if (!_network_mode) {
+        const std::vector<std::string> xadc_sensors = boost::assign::list_of("temp")("temp_max")("temp_min");
+        BOOST_FOREACH(const std::string &sensor, xadc_sensors)
+        {
+            _tree->create<sensor_value_t>(mb_path / "sensors" / sensor)
+                .publish(boost::bind(&e300_impl::get_mb_temp, this, sensor));
+        }
     }
 
     ////////////////////////////////////////////////////////////////////
@@ -589,6 +591,12 @@ void e300_impl::setup_radio(const size_t dspno)
     time64_rb_bases.rb_now = RB64_TIME_NOW;
     time64_rb_bases.rb_pps = RB64_TIME_PPS;
     perif.time64 = time_core_3000::make(perif.ctrl, TOREG(SR_TIME), time64_rb_bases);
+}
+
+uhd::sensor_value_t e300_impl::get_mb_temp(const std::string &which)
+{
+    return sensor_value_t(which,
+        boost::lexical_cast<double>(e300_get_sysfs_attr(E300_TEMP_SYSFS, which)), "C");
 }
 
 ////////////////////////////////////////////////////////////////////////

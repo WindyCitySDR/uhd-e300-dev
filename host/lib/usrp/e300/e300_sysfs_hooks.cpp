@@ -30,33 +30,31 @@
 #include <libudev.h>
 
 #include <boost/format.hpp>
-#include <uhd/utils/msg.hpp>
+#include <boost/lexical_cast.hpp>
 
-static const size_t NPAGES = 8;
+#include <uhd/utils/msg.hpp>
+#include <uhd/exception.hpp>
 
 static const std::string E300_AXI_FPGA_SYSFS = "40000000.axi-fpga";
 static const std::string E300_XDEV_SYSFS = "f8007000.ps7-dev-cfg";
 static const std::string E300_TEMP_SYSFS = "f8007100.ps7-xadc";
 
-static int get_params_from_sysfs(unsigned long *buffer_length,
-                                 unsigned long *control_length,
-                                 unsigned long *phys_addr)
+std::string e300_get_sysfs_attr(const std::string &node, const std::string &attr)
 {
-    struct udev *udev;
-    struct udev_enumerate *enumerate;
-    struct udev_list_entry *devices, *dev_list_entry;
-    struct udev_device *dev;
+    udev *udev;
+    udev_enumerate *enumerate;
+    udev_list_entry *devices, *dev_list_entry;
+    udev_device *dev;
+    std::string retstring;
 
     udev = udev_new();
+
     if (!udev) {
-        printf("Fail\n");
-        return 1;
+        throw uhd::runtime_error("Failed to get udev handle.");
     }
 
-    //TODO read /sys/devices/amba.0/f8007000.devcfg/prog_done for FPGA load
     enumerate = udev_enumerate_new(udev);
-    udev_enumerate_add_match_sysname(enumerate, E300_AXI_FPGA_SYSFS.c_str());
-    //udev_enumerate_add_match_subsystem(enumerate, "amba.0");
+    udev_enumerate_add_match_sysname(enumerate, node.c_str());
     udev_enumerate_scan_devices(enumerate);
     devices = udev_enumerate_get_list_entry(enumerate);
 
@@ -67,65 +65,31 @@ static int get_params_from_sysfs(unsigned long *buffer_length,
         path = udev_list_entry_get_name(dev_list_entry);
         dev = udev_device_new_from_syspath(udev, path);
 
-        UHD_MSG(status) << boost::format("Sys Path: %s") % udev_device_get_syspath(dev)
-                        << std::endl;
-
-        *buffer_length = atol(udev_device_get_sysattr_value(dev, "buffer_length"));
-        *control_length = atol(udev_device_get_sysattr_value(dev, "control_length"));
-        *phys_addr = atol(udev_device_get_sysattr_value(dev, "phys_addr"));
-
-        //printf("buffer_length = %lX\n", *buffer_length);
-        //printf("control_length = %lX\n", *control_length);
-        //printf("phy_addr = %lX\n", *phys_addr);
+       retstring = udev_device_get_sysattr_value(dev, attr.c_str());
     }
 
     udev_enumerate_unref(enumerate);
     udev_unref(udev);
 
-    return 0;
+    return retstring;
+}
+
+static void get_params_from_sysfs(unsigned long *buffer_length,
+                                 unsigned long *control_length,
+                                 unsigned long *phys_addr)
+{
+    *buffer_length  = boost::lexical_cast<unsigned long>(
+         e300_get_sysfs_attr(E300_AXI_FPGA_SYSFS, "buffer_length"));
+    *control_length = boost::lexical_cast<unsigned long>(
+        e300_get_sysfs_attr(E300_AXI_FPGA_SYSFS, "control_length"));
+    *phys_addr = boost::lexical_cast<unsigned long>(
+        e300_get_sysfs_attr(E300_AXI_FPGA_SYSFS, "phys_addr"));
 }
 
 static bool e300_fpga_loaded_successfully(void)
 {
-    struct udev *udev;
-    struct udev_enumerate *enumerate;
-    struct udev_list_entry *devices, *dev_list_entry;
-    struct udev_device *dev;
-
-    udev = udev_new();
-    if (!udev) {
-        printf("Fail\n");
-        return 1;
-    }
-    long result = 0;
-
-    enumerate = udev_enumerate_new(udev);
-    udev_enumerate_add_match_sysname(enumerate, E300_XDEV_SYSFS.c_str());
-    udev_enumerate_scan_devices(enumerate);
-    devices = udev_enumerate_get_list_entry(enumerate);
-
-    udev_list_entry_foreach(dev_list_entry, devices)
-    {
-        const char *path;
-
-        path = udev_list_entry_get_name(dev_list_entry);
-        dev = udev_device_new_from_syspath(udev, path);
-
-        UHD_MSG(status) << boost::format("Sys Path: %s") %  udev_device_get_syspath(dev)
-                        << std::endl;
-
-        result = atol(udev_device_get_sysattr_value(dev, "prog_done"));
-    }
-
-    udev_enumerate_unref(enumerate);
-    udev_unref(udev);
-
-    if (result == 1)
-        return true;
-    else
-        return false;
+    return boost::lexical_cast<bool>(e300_get_sysfs_attr(E300_XDEV_SYSFS, "prog_done"));
 }
-
 
 #include "e300_fifo_config.hpp"
 #include <uhd/exception.hpp>
@@ -143,50 +107,13 @@ e300_fifo_config_t e300_read_sysfs(void)
     unsigned long control_length = 0;
     unsigned long buffer_length = 0;
     unsigned long phys_addr = 0;
-    const int ret = get_params_from_sysfs(&buffer_length, &control_length, &phys_addr);
-    if (ret != 0)
-        throw uhd::runtime_error("E300: get_params_from_sysfs failed!");
+    get_params_from_sysfs(&buffer_length, &control_length, &phys_addr);
 
     config.ctrl_length = control_length;
     config.buff_length = buffer_length;
     config.phys_addr = phys_addr;
     return config;
 }
-
-long e300_read_hwmon(const std::string &node)
-{
-    struct udev *udev;
-    struct udev_enumerate *enumerate;
-    struct udev_list_entry *devices, *dev_list_entry;
-    struct udev_device *dev;
-
-    udev = udev_new();
-    if (!udev) {
-        printf("Fail\n");
-        return 1;
-    }
-    long result = 0;
-
-    enumerate = udev_enumerate_new(udev);
-    udev_enumerate_add_match_sysname(enumerate, E300_TEMP_SYSFS.c_str());
-    udev_enumerate_scan_devices(enumerate);
-    devices = udev_enumerate_get_list_entry(enumerate);
-
-    udev_list_entry_foreach(dev_list_entry, devices)
-    {
-        const char *path;
-
-        path = udev_list_entry_get_name(dev_list_entry);
-        dev = udev_device_new_from_syspath(udev, path);
-
-        result = atol(udev_device_get_sysattr_value(dev, node.c_str()));
-    }
-
-    udev_enumerate_unref(enumerate);
-    udev_unref(udev);
-    return result;
-}
-
 
 #else //E300_NATIVE
 
@@ -198,8 +125,9 @@ e300_fifo_config_t e300_read_sysfs(void)
     throw uhd::runtime_error("e300_read_sysfs() !E300_NATIVE");
 }
 
-long e300_read_hwmon(const std::string &node)
+std::string e300_get_sysfs_attr(const std::string &, const std::string &)
 {
-    throw uhd::runtime_error("e300_read_temperature() !E300_NATIVE");
+    throw uhd::runtime_error("e300_sysfs_attr() !E300_NATIVE");
 }
+
 #endif //E300_NATIVE

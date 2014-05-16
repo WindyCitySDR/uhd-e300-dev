@@ -24,6 +24,7 @@
 #include <uhd/usrp/mboard_eeprom.hpp>
 #include <uhd/usrp/dboard_eeprom.hpp>
 #include <uhd/types/serial.hpp>
+#include <uhd/types/sensors.hpp>
 #include <boost/weak_ptr.hpp>
 #include <boost/thread/mutex.hpp>
 #include "e300_fifo_config.hpp"
@@ -37,6 +38,7 @@
 #include "gpio_core_200.hpp"
 
 static const std::string E300_FPGA_FILE_NAME = "usrp_e300_fpga.bin";
+static const std::string E300_TEMP_SYSFS = "f8007100.ps7-xadc";
 
 static std::string E300_SERVER_RX_PORT = "321756";
 static std::string E300_SERVER_TX_PORT = "321757";
@@ -115,6 +117,8 @@ private:
     ad9361_ctrl_transport::sptr _codec_xport;
     ad9361_ctrl::sptr _codec_ctrl;
     void codec_loopback_self_test(uhd::wb_iface::sptr iface);
+
+    uhd::sensor_value_t get_mb_temp(const std::string &which);
 
     //server stuff for network access
     void run_server(const std::string &port, const std::string &what);
