@@ -62,7 +62,8 @@ void benchmark_rx_rate(uhd::usrp::multi_usrp::sptr usrp, const std::string &rx_c
         try {
           //num_rx_samps += rx_stream->recv(buffs, max_samps_per_packet, md)*rx_stream->get_num_channels();
           num_rx_samps += rx_stream->recv(buffs, max_samps_per_packet, md);
-          std::cout << "num_rx_samps==" << num_rx_samps << std::endl;
+          //std::cout << "num_rx_samps==" << num_rx_samps << std::endl;
+	boost::this_thread::sleep(boost::posix_time::milliseconds(100));
         }
         catch (...) {
           /* apparently, the boost thread interruption can sometimes result in
@@ -114,18 +115,21 @@ void benchmark_tx_rate(uhd::usrp::multi_usrp::sptr usrp, const std::string &tx_c
 
     //setup variables and allocate buffer
     uhd::tx_metadata_t md;
-    const size_t max_samps_per_packet = tx_stream->get_max_num_samps();
+    //const size_t max_samps_per_packet = tx_stream->get_max_num_samps();
+    const size_t max_samps_per_packet = 100;
     std::vector<char> buff(max_samps_per_packet*uhd::convert::get_bytes_per_item(tx_cpu), 0xAA);
     std::vector<const void *> buffs;
     for (size_t ch = 0; ch < tx_stream->get_num_channels(); ch++)
         buffs.push_back(&buff.front()); //same buffer for each channel
     md.has_time_spec = (buffs.size() != 1);
 
-    while (not boost::this_thread::interruption_requested()){
+    int send_calls = 0;
+    while (not boost::this_thread::interruption_requested() and send_calls++ < 100){
         //std::cout << "send!" << std::endl;
         num_tx_samps += tx_stream->send(buffs, max_samps_per_packet, md)*tx_stream->get_num_channels();;
         //std::cout << "num_tx_samps==" << num_tx_samps << std::endl;
         md.has_time_spec = false;
+        boost::this_thread::sleep(boost::posix_time::milliseconds(100));
     }
 
     //send a mini EOB packet
@@ -207,11 +211,11 @@ int UHD_SAFE_MAIN(int argc, char *argv[]){
     //spawn the receive test thread
     {
 	//create a receive streamer
-	uhd::stream_args_t stream_args("sc16", "sc16");
-	stream_args.args["src_addr"] = "0";
-	stream_args.channels = std::vector<size_t>(1, 0);
-	uhd::rx_streamer::sptr rx_stream = usrp->get_rx_stream(stream_args);
-	thread_group.create_thread(boost::bind(&benchmark_rx_rate, usrp, "sc16", rx_stream));
+	//uhd::stream_args_t stream_args("sc16", "sc16");
+	//stream_args.args["src_addr"] = "0";
+	//stream_args.channels = std::vector<size_t>(1, 0);
+	//uhd::rx_streamer::sptr rx_stream = usrp->get_rx_stream(stream_args);
+	//thread_group.create_thread(boost::bind(&benchmark_rx_rate, usrp, "sc16", rx_stream));
     }
 
     //spawn the transmit test thread
@@ -237,6 +241,10 @@ int UHD_SAFE_MAIN(int argc, char *argv[]){
     //interrupt and join the threads
     thread_group.interrupt_all();
     thread_group.join_all();
+
+
+    std::cout << "num_tx_samps == " << num_tx_samps << std::endl;
+    std::cout << "num_rx_samps == " << num_rx_samps << std::endl;
 
     //finished
     std::cout << std::endl << "Done!" << std::endl << std::endl;

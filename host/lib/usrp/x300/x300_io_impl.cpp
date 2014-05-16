@@ -198,7 +198,7 @@ static void handle_rx_flowctrl(const boost::uint32_t sid, zero_copy_if::sptr xpo
 
     //load packet info
     vrt::if_packet_info_t packet_info;
-    packet_info.packet_type = vrt::if_packet_info_t::PACKET_TYPE_CONTEXT;
+    packet_info.packet_type = vrt::if_packet_info_t::PACKET_TYPE_IF_EXT; // FC!
     packet_info.num_payload_words32 = 2;
     packet_info.num_payload_bytes = packet_info.num_payload_words32*sizeof(boost::uint32_t);
     packet_info.packet_count = seq32;
@@ -608,8 +608,8 @@ rx_streamer::sptr x300_impl::get_rx_stream_ce(const uhd::stream_args_t &args_, b
     UHD_LOG << "RX Flow Control Window = " << fc_window << ", RX Flow Control Handler Window = " << fc_handle_window << std::endl;
 
     // Configure flow control (hope this works)
-    mb.nocshell_ctrls[ce_index]->poke32(0x0000, fc_window-1);
-    mb.nocshell_ctrls[ce_index]->poke32(0x0001, fc_window?1:0);
+    mb.nocshell_ctrls[ce_index]->poke32(SR_ADDR(0x0000, 0), fc_window-1);
+    mb.nocshell_ctrls[ce_index]->poke32(SR_ADDR(0x0000, 1), fc_window?1:0);
 
     boost::shared_ptr<boost::uint32_t> seq32(new boost::uint32_t(0));
     //Give the streamer a functor to get the recv_buffer
@@ -628,11 +628,13 @@ rx_streamer::sptr x300_impl::get_rx_stream_ce(const uhd::stream_args_t &args_, b
     );
     //Give the streamer a functor to send flow control messages
     //handle_rx_flowctrl is static and has no lifetime issues
-    my_streamer->set_xport_handle_flowctrl(
-        stream_i, boost::bind(&handle_rx_flowctrl, data_sid, xport.send, mb.if_pkt_is_big_endian, seq32, _1),
-        fc_handle_window,
-        true/*init*/
-    );
+    /*
+     *my_streamer->set_xport_handle_flowctrl(
+     *    stream_i, boost::bind(&handle_rx_flowctrl, data_sid, xport.send, mb.if_pkt_is_big_endian, seq32, _1),
+     *    fc_handle_window,
+     *    true [> init <]
+     *);
+     */
     //Give the streamer a functor issue stream cmd
     //bind requires a rx_vita_core_3000::sptr to add a streamer->framer lifetime dependency
     my_streamer->set_issue_stream_cmd(
@@ -922,9 +924,10 @@ tx_streamer::sptr x300_impl::get_tx_stream_ce(const uhd::stream_args_t &args_, b
     UHD_VAR(xport.send->get_send_frame_size());
     // THIS IS A BUG: get_send_frame_size() will not report the actual packet size if e.g. if spp is set
     //size_t fc_window = get_tx_flow_control_window(xport.send->get_send_frame_size(), device_addr);  //In packets
-    size_t fc_window = 16;
+    size_t fc_window = 4;
     UHD_VAR(fc_window);
-    const size_t fc_handle_window = std::max<size_t>(1, fc_window/X300_TX_FC_RESPONSE_FREQ);
+    //const size_t fc_handle_window = std::max<size_t>(1, fc_window/X300_TX_FC_RESPONSE_FREQ);
+    const size_t fc_handle_window = 2;
     UHD_VAR(fc_handle_window);
 
     UHD_LOG << "TX Flow Control Window = " << fc_window << ", TX Flow Control Handler Window = " << fc_handle_window << std::endl;
