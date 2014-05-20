@@ -211,26 +211,26 @@ int UHD_SAFE_MAIN(int argc, char *argv[]){
     //spawn the receive test thread
     {
 	//create a receive streamer
-	//uhd::stream_args_t stream_args("sc16", "sc16");
-	//stream_args.args["src_addr"] = "0";
-	//stream_args.channels = std::vector<size_t>(1, 0);
-	//uhd::rx_streamer::sptr rx_stream = usrp->get_rx_stream(stream_args);
-	//thread_group.create_thread(boost::bind(&benchmark_rx_rate, usrp, "sc16", rx_stream));
+	uhd::stream_args_t stream_args("sc16", "sc16");
+	stream_args.args["src_addr"] = "0";
+	stream_args.channels = std::vector<size_t>(1, 0);
+	uhd::rx_streamer::sptr rx_stream = usrp->get_rx_stream(stream_args);
+	thread_group.create_thread(boost::bind(&benchmark_rx_rate, usrp, "sc16", rx_stream));
     }
 
     //spawn the transmit test thread
     {
         //create a transmit streamer
-        uhd::stream_args_t stream_args("sc16", "sc16");
-        stream_args.channels = std::vector<size_t>(1, 0);
+	uhd::stream_args_t stream_args("sc16", "sc16");
+	stream_args.channels = std::vector<size_t>(1, 0);
 	stream_args.args["dst_addr"] = "0";
 	stream_args.args["spp"] = "180";
 	stream_args.args["send_buff_size"] = "2048";
-        std::cout << "Getting tx streamer..." << std::endl;
-        uhd::tx_streamer::sptr tx_stream = usrp->get_tx_stream(stream_args);
-        std::cout << "Got tx streamer..." << std::endl;
-        thread_group.create_thread(boost::bind(&benchmark_tx_rate, usrp, "sc16", tx_stream));
-        thread_group.create_thread(boost::bind(&benchmark_tx_rate_async_helper, tx_stream));
+	std::cout << "Getting tx streamer..." << std::endl;
+	uhd::tx_streamer::sptr tx_stream = usrp->get_tx_stream(stream_args);
+	std::cout << "Got tx streamer..." << std::endl;
+	thread_group.create_thread(boost::bind(&benchmark_tx_rate, usrp, "sc16", tx_stream));
+	thread_group.create_thread(boost::bind(&benchmark_tx_rate_async_helper, tx_stream));
     }
 
     //sleep for the required duration

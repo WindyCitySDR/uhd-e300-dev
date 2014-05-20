@@ -46,7 +46,7 @@ public:
             uhd::transport::zero_copy_if::sptr resp_xport,
             const boost::uint32_t sid, const std::string &name) :
             _link_type(vrt::if_packet_info_t::LINK_TYPE_CHDR),
-            _packet_type(vrt::if_packet_info_t::PACKET_TYPE_CONTEXT),
+            _packet_type(vrt::if_packet_info_t::PACKET_TYPE_CMD),
             _bige(big_endian), _ctrl_xport(ctrl_xport),
             _resp_xport(resp_xport), _sid(sid), _name(name), _seq_out(0),
             _timeout(ACK_TIMEOUT),

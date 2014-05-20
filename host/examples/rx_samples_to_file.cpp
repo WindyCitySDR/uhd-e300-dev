@@ -67,7 +67,9 @@ template<typename samp_type> void recv_to_file(
     stream_cmd.num_samps = num_requested_samples;
     stream_cmd.stream_now = true;
     stream_cmd.time_spec = uhd::time_spec_t();
+    std::cout << "Issueing stream cmd" << std::endl;
     rx_stream->issue_stream_cmd(stream_cmd);
+    std::cout << "Done" << std::endl;
     
     boost::system_time start = boost::get_system_time();
     unsigned long long ticks_requested = (long)(time_requested * (double)boost::posix_time::time_duration::ticks_per_second());

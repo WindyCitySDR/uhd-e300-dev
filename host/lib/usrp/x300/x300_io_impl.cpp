@@ -573,6 +573,23 @@ rx_streamer::sptr x300_impl::get_rx_stream_ce(const uhd::stream_args_t &args_, b
     UHD_LOG << boost::format("data_sid = 0x%08x, actual recv_buff_size = %d\n") % data_sid % xport.recv_buff_size << std::endl;
     UHD_MSG(status) << str(boost::format("rx data_sid = 0x%08x") % data_sid) << std::endl;
 
+    if (ce_index == 2) {
+        boost::uint32_t data = (((data_sid >> 16)) & 0xFFFF) | (1 << 16);
+        _mb[mb_index].nocshell_ctrls[ce_index]->poke32(
+            SR_ADDR(0x0000, 8),
+            data
+        );
+        _mb[mb_index].nocshell_ctrls[ce_index]->poke32(
+            SR_ADDR(0x0000, 10),
+            (1<<24)
+        );
+        // This will start stream ZOMFG
+        _mb[mb_index].nocshell_ctrls[ce_index]->poke32(
+            SR_ADDR(0x0000, 9),
+            100
+        );
+    }
+
     // To calculate the max number of samples per packet, we assume the maximum header length
     // to avoid fragmentation should the entire header be used.
     const size_t bpp = xport.recv->get_recv_frame_size() - X300_RX_MAX_HDR_LEN; // bytes per packet
@@ -602,8 +619,11 @@ rx_streamer::sptr x300_impl::get_rx_stream_ce(const uhd::stream_args_t &args_, b
     my_streamer->set_converter(id);
 
     //flow control setup
-    const size_t fc_window = get_rx_flow_control_window(xport.recv->get_recv_frame_size(), xport.recv_buff_size, device_addr);
-    const size_t fc_handle_window = std::max<size_t>(1, fc_window / X300_RX_FC_REQUEST_FREQ);
+    //const size_t fc_window = get_rx_flow_control_window(xport.recv->get_recv_frame_size(), xport.recv_buff_size, device_addr);
+    //const size_t fc_handle_window = std::max<size_t>(1, fc_window / X300_RX_FC_REQUEST_FREQ);
+    const size_t fc_window = 20;
+    const size_t fc_handle_window = 4;
+
 
     UHD_LOG << "RX Flow Control Window = " << fc_window << ", RX Flow Control Handler Window = " << fc_handle_window << std::endl;
 
@@ -628,13 +648,11 @@ rx_streamer::sptr x300_impl::get_rx_stream_ce(const uhd::stream_args_t &args_, b
     );
     //Give the streamer a functor to send flow control messages
     //handle_rx_flowctrl is static and has no lifetime issues
-    /*
-     *my_streamer->set_xport_handle_flowctrl(
-     *    stream_i, boost::bind(&handle_rx_flowctrl, data_sid, xport.send, mb.if_pkt_is_big_endian, seq32, _1),
-     *    fc_handle_window,
-     *    true [> init <]
-     *);
-     */
+    my_streamer->set_xport_handle_flowctrl(
+        stream_i, boost::bind(&handle_rx_flowctrl, data_sid, xport.send, mb.if_pkt_is_big_endian, seq32, _1),
+        fc_handle_window,
+        true /* init */
+    );
     //Give the streamer a functor issue stream cmd
     //bind requires a rx_vita_core_3000::sptr to add a streamer->framer lifetime dependency
     my_streamer->set_issue_stream_cmd(
