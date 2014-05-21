@@ -192,7 +192,13 @@ e300_impl::e300_impl(const uhd::device_addr_t &device_addr)
     else
     {
         radio_perifs_t &perif = _radio_perifs[0];
-        _fifo_iface = e300_fifo_interface::make(e300_read_sysfs());
+        e300_fifo_config_t fifo_cfg;
+        try {
+            fifo_cfg = e300_read_sysfs();_
+        } catch (...) {
+            throw uhd::runtime_error("Failed to get driver parameters from sysfs."):
+        }
+        _fifo_iface = e300_fifo_interface::make(fifo_cfg);
         perif.send_ctrl_xport = _fifo_iface->make_send_xport(1, ctrl_xport_args);
         perif.recv_ctrl_xport = _fifo_iface->make_recv_xport(1, ctrl_xport_args);
         perif.tx_data_xport = _fifo_iface->make_send_xport(0, data_xport_args);

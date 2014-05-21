@@ -66,24 +66,14 @@ std::string e300_get_sysfs_attr(const std::string &node, const std::string &attr
         dev = udev_device_new_from_syspath(udev, path);
 
        retstring = udev_device_get_sysattr_value(dev, attr.c_str());
+       if (retstring.size())
+           break;
     }
 
     udev_enumerate_unref(enumerate);
     udev_unref(udev);
 
     return retstring;
-}
-
-static void get_params_from_sysfs(unsigned long *buffer_length,
-                                 unsigned long *control_length,
-                                 unsigned long *phys_addr)
-{
-    *buffer_length  = boost::lexical_cast<unsigned long>(
-         e300_get_sysfs_attr(E300_AXI_FPGA_SYSFS, "buffer_length"));
-    *control_length = boost::lexical_cast<unsigned long>(
-        e300_get_sysfs_attr(E300_AXI_FPGA_SYSFS, "control_length"));
-    *phys_addr = boost::lexical_cast<unsigned long>(
-        e300_get_sysfs_attr(E300_AXI_FPGA_SYSFS, "phys_addr"));
 }
 
 static bool e300_fpga_loaded_successfully(void)
@@ -104,14 +94,13 @@ e300_fifo_config_t e300_read_sysfs(void)
 
     e300_fifo_config_t config;
 
-    unsigned long control_length = 0;
-    unsigned long buffer_length = 0;
-    unsigned long phys_addr = 0;
-    get_params_from_sysfs(&buffer_length, &control_length, &phys_addr);
+    config.buff_length  = boost::lexical_cast<unsigned long>(
+        e300_get_sysfs_attr(E300_AXI_FPGA_SYSFS, "buffer_length"));
+    config.ctrl_length = boost::lexical_cast<unsigned long>(
+        e300_get_sysfs_attr(E300_AXI_FPGA_SYSFS, "control_length"));
+    config.phys_addr = boost::lexical_cast<unsigned long>(
+        e300_get_sysfs_attr(E300_AXI_FPGA_SYSFS, "phys_addr"));
 
-    config.ctrl_length = control_length;
-    config.buff_length = buffer_length;
-    config.phys_addr = phys_addr;
     return config;
 }
 
