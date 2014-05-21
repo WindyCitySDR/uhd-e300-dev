@@ -17,40 +17,56 @@
 
 #ifdef E300_NATIVE
 
+#include <boost/cstdint.hpp>
+#include <uhd/config.hpp>
+
 // constants coded into the fpga parameters
-#define ZF_CONFIG_BASE 0x40000000
-#define ZF_PAGE_WIDTH 10
-#define H2S_STREAMS_WIDTH 3
-#define H2S_CMDFIFO_DEPTH 10
-#define S2H_STREAMS_WIDTH 3
-#define S2H_CMDFIFO_DEPTH 10
+static const size_t ZF_CONFIG_BASE    = 0x40000000;
+static const size_t ZF_PAGE_WIDTH     = 10;
+static const size_t H2S_STREAMS_WIDTH = 3;
+static const size_t H2S_CMDFIFO_DEPTH = 10;
+static const size_t S2H_STREAMS_WIDTH = 3;
+static const size_t S2H_CMDFIFO_DEPTH = 10;
 
 // calculate more useful constants for this module
-#define ZF_PAGE_SIZE    (1 << ZF_PAGE_WIDTH)
-#define H2S_NUM_STREAMS (1 << H2S_STREAMS_WIDTH)
-#define H2S_NUM_CMDS (1 << H2S_CMDFIFO_DEPTH)
-#define S2H_NUM_STREAMS (1 << S2H_STREAMS_WIDTH)
-#define S2H_NUM_CMDS (1 << S2H_CMDFIFO_DEPTH)
+static const size_t ZF_PAGE_SIZE(1 << ZF_PAGE_WIDTH);
+static const size_t H2S_NUM_STREAMS(1 << H2S_STREAMS_WIDTH);
+static const size_t H2S_NUM_CMDS(1 << H2S_CMDFIFO_DEPTH);
+static const size_t S2H_NUM_STREAMS(1 << S2H_STREAMS_WIDTH);
+static const size_t S2H_NUM_CMDS(1 << S2H_CMDFIFO_DEPTH);
 
 //offsetsinto the arbiter memory map
-#define ARBITER_WR_CLEAR 0
-#define ARBITER_RD_SIG 0
-#define ARBITER_WR_ADDR 4
-#define ARBITER_WR_SIZE 8
-#define ARBITER_WR_STS_RDY 12
-#define ARBITER_WR_STS 16
-#define ARBITER_RB_STATUS 16
-#define ARBITER_RB_STATUS_OCC 20
-#define ARBITER_RB_ADDR_SPACE 24
-#define ARBITER_RB_SIZE_SPACE 28
+static const size_t ARBITER_WR_CLEAR      = 0;
+static const size_t ARBITER_RD_SIG        = 0;
+static const size_t ARBITER_WR_ADDR       = 4;
+static const size_t ARBITER_WR_SIZE       = 8;
+static const size_t ARBITER_WR_STS_RDY    = 12;
+static const size_t ARBITER_WR_STS        = 16;
+static const size_t ARBITER_RB_STATUS     = 16;
+static const size_t ARBITER_RB_STATUS_OCC = 20;
+static const size_t ARBITER_RB_ADDR_SPACE = 24;
+static const size_t ARBITER_RB_SIZE_SPACE = 28;
 
-//helper macros to determine config addrs
-#define S2H_BASE(base) (size_t(base) + (ZF_PAGE_SIZE*0))
-#define H2S_BASE(base) (size_t(base) + (ZF_PAGE_SIZE*1))
-#define DST_BASE(base) (size_t(base) + (ZF_PAGE_SIZE*2))
-#define ZF_STREAM_OFF(which) ((which)*32)
+static UHD_INLINE size_t S2H_BASE(const size_t base)
+{
+    return static_cast<size_t>(base + ZF_PAGE_SIZE * 0);
+}
 
-#include <boost/cstdint.hpp>
+static UHD_INLINE size_t H2S_BASE(const size_t base)
+{
+    return static_cast<size_t>(base + ZF_PAGE_SIZE * 1);
+}
+
+static UHD_INLINE size_t DST_BASE(const size_t base)
+{
+    return static_cast<size_t>(base + ZF_PAGE_SIZE * 2);
+}
+
+static UHD_INLINE size_t ZF_STREAM_OFF(const size_t which)
+{
+    return static_cast<size_t>(which*32);
+}
+
 #include "e300_fifo_config.hpp"
 #include <sys/mman.h> //mmap
 #include <fcntl.h> //open, close
