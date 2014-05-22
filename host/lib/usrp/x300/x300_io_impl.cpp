@@ -541,6 +541,7 @@ rx_streamer::sptr x300_impl::get_rx_stream_ce(const uhd::stream_args_t &args_, b
     UHD_MSG(status) << "ce_index==" << ce_index << std::endl;
     UHD_MSG(status) << "sid_lower==" << sid_lower << std::endl;
     UHD_MSG(status) << "mb_index==" << mb_index << std::endl;
+    _ce_index = ce_index;
 
     // Setup
     mboard_members_t &mb = _mb[mb_index];
@@ -573,20 +574,23 @@ rx_streamer::sptr x300_impl::get_rx_stream_ce(const uhd::stream_args_t &args_, b
     UHD_LOG << boost::format("data_sid = 0x%08x, actual recv_buff_size = %d\n") % data_sid % xport.recv_buff_size << std::endl;
     UHD_MSG(status) << str(boost::format("rx data_sid = 0x%08x") % data_sid) << std::endl;
 
-    if (ce_index == 2) {
-        boost::uint32_t data = (((data_sid >> 16)) & 0xFFFF) | (1 << 16);
+    if (ce_index == 0) {
+        boost::uint32_t data = (((data_sid >> 16)-1) & 0xFFFF) | (1 << 16);
         _mb[mb_index].nocshell_ctrls[ce_index]->poke32(
             SR_ADDR(0x0000, 8),
             data
         );
+    } else if (ce_index == 1) {
+        std::cout << "setting up null source" << std::endl;
+        boost::uint32_t return_sid = (data_sid >> 16) | (data_sid << 16);
+        _mb[mb_index].nocshell_ctrls[ce_index]->poke32(
+            SR_ADDR(0x0000, 8),
+            return_sid
+        );
+        // rate in clock cycles
         _mb[mb_index].nocshell_ctrls[ce_index]->poke32(
             SR_ADDR(0x0000, 10),
-            (1<<24)
-        );
-        // This will start stream ZOMFG
-        _mb[mb_index].nocshell_ctrls[ce_index]->poke32(
-            SR_ADDR(0x0000, 9),
-            100
+            (1<<18)
         );
     }
 
@@ -659,8 +663,12 @@ rx_streamer::sptr x300_impl::get_rx_stream_ce(const uhd::stream_args_t &args_, b
         0, boost::bind(&x300_impl::dummy_issue_stream_command, this, _1)
     );
 
-    //Store a weak pointer to prevent a streamer->x300_impl->streamer circular dependency
+    //Store a weak pointer to prevent a streamer->x300_impl->streamer circular dependency
     mb.ce_rx_streamers[ce_index] = boost::weak_ptr<sph::recv_packet_streamer>(my_streamer);
+
+    //sets all tick and samp rates on this streamer
+    const fs_path mb_path = "/mboards/"+boost::lexical_cast<std::string>(mb_index);
+    _tree->access<double>(mb_path / "tick_rate").update();
 
     return my_streamer;
 }
@@ -668,7 +676,24 @@ rx_streamer::sptr x300_impl::get_rx_stream_ce(const uhd::stream_args_t &args_, b
 // Does nothing
 void x300_impl::dummy_issue_stream_command(const uhd::stream_cmd_t &stream_cmd)
 {
-    return;
+    if (_ce_index != 1) {
+        return;
+    }
+    if (stream_cmd.stream_mode == stream_cmd_t::STREAM_MODE_START_CONTINUOUS) {
+        UHD_MSG(status) << "sending start command on CE " << _ce_index << std::endl;
+        // This will start stream ZOMFG
+        _mb[0].nocshell_ctrls[_ce_index]->poke32(
+            SR_ADDR(0x0000, 9),
+            100
+        );
+    }
+    else if (stream_cmd.stream_mode == stream_cmd_t::STREAM_MODE_STOP_CONTINUOUS) {
+        UHD_MSG(status) << "sending stop command on CE " << _ce_index << std::endl;
+        _mb[0].nocshell_ctrls[_ce_index]->poke32(
+            SR_ADDR(0x0000, 9),
+            0
+        );
+    }
 }
 
 //  This probably wants a ref to the nocshell controller at some point
