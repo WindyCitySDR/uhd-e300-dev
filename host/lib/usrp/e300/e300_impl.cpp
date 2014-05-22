@@ -227,7 +227,7 @@ e300_impl::e300_impl(const uhd::device_addr_t &device_addr)
     _tree->create<std::string>("/name").set("E-Series Device");
     const fs_path mb_path = "/mboards/0";
     _tree->create<std::string>(mb_path / "name").set("E300");
-    _tree->create<std::string>(mb_path / "codename").set("");
+    _tree->create<std::string>(mb_path / "codename").set("Troll");
 
     ////////////////////////////////////////////////////////////////////
     // and do the misc mboard sensors
