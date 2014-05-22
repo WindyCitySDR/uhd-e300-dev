@@ -17,6 +17,8 @@
 
 #ifdef E300_NATIVE
 
+#include <boost/cstdint.hpp>
+
 // constants coded into the fpga parameters
 #define ZF_CONFIG_BASE 0x40000000
 #define ZF_PAGE_WIDTH 10
@@ -47,10 +49,13 @@
 //helper macros to determine config addrs
 #define S2H_BASE(base) (size_t(base) + (ZF_PAGE_SIZE*0))
 #define H2S_BASE(base) (size_t(base) + (ZF_PAGE_SIZE*1))
-#define DST_BASE(base) (size_t(base) + (ZF_PAGE_SIZE*2))
+#define REG_BASE(base) (size_t(base) + (ZF_PAGE_SIZE*2))
+#define DST_BASE(base) (size_t(base) + (ZF_PAGE_SIZE*3))
 #define ZF_STREAM_OFF(which) ((which)*32)
 
-#include <boost/cstdint.hpp>
+// registers for the wb32_iface
+static const size_t SR_CORE_READBACK = 0;
+
 #include "e300_fifo_config.hpp"
 #include <sys/mman.h> //mmap
 #include <fcntl.h> //open, close
@@ -365,6 +370,18 @@ struct e300_fifo_interface_impl : e300_fifo_interface
     uhd::transport::zero_copy_if::sptr make_send_xport(const size_t which_stream, const uhd::device_addr_t &args)
     {
         return this->make_xport(which_stream, args, false);
+    }
+
+    boost::uint32_t peek32(const uhd::wb_iface::wb_addr_type addr)
+    {
+        // setup readback register
+        zf_poke32(REG_BASE(ctrl_space) + SR_CORE_READBACK, addr);
+        return zf_peek32(REG_BASE(ctrl_space));
+    }
+
+    void poke32(const uhd::wb_iface::wb_addr_type addr, const boost::uint32_t data)
+    {
+        zf_poke32(REG_BASE(ctrl_space) + static_cast<size_t>(addr), data);
     }
 
     e300_fifo_config_t config;

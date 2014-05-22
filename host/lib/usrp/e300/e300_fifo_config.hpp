@@ -19,6 +19,7 @@
 #define INCLUDED_E300_FIFO_CONFIG_HPP
 
 #include <uhd/types/device_addr.hpp>
+#include <uhd/types/wb_iface.hpp>
 #include <uhd/transport/zero_copy.hpp>
 #include <boost/enable_shared_from_this.hpp>
 
@@ -31,7 +32,7 @@ struct e300_fifo_config_t
 
 e300_fifo_config_t e300_read_sysfs(void);
 
-struct e300_fifo_interface : boost::enable_shared_from_this<e300_fifo_interface>
+struct e300_fifo_interface : boost::enable_shared_from_this<e300_fifo_interface>, public virtual uhd::wb_iface
 {
     typedef boost::shared_ptr<e300_fifo_interface> sptr;
     static sptr make(const e300_fifo_config_t &config);

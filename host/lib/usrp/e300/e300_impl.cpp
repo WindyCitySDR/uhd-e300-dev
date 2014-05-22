@@ -206,6 +206,10 @@ e300_impl::e300_impl(const uhd::device_addr_t &device_addr)
         boost::this_thread::sleep(boost::posix_time::milliseconds(100));
     }
 
+    // Verify we can talk to the e300 core control registers ...
+    UHD_MSG(status) << "Initializing core control..." << std::endl;
+    this->register_loopback_self_test(_fifo_iface);
+
     ////////////////////////////////////////////////////////////////////
     // optional udp server
     ////////////////////////////////////////////////////////////////////
@@ -219,6 +223,8 @@ e300_impl::e300_impl(const uhd::device_addr_t &device_addr)
         tg.join_all();
         goto e300_impl_begin;
     }
+
+
 
     ////////////////////////////////////////////////////////////////////
     // Initialize the properties tree
