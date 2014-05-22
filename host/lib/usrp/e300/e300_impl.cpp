@@ -22,7 +22,6 @@
 #include <uhd/utils/log.hpp>
 #include <uhd/utils/static.hpp>
 #include <uhd/utils/images.hpp>
-#include <uhd/types/serial.hpp>
 #include <uhd/usrp/dboard_eeprom.hpp>
 #include <uhd/transport/udp_zero_copy.hpp>
 #include <uhd/types/sensors.hpp>
@@ -193,7 +192,13 @@ e300_impl::e300_impl(const uhd::device_addr_t &device_addr)
     else
     {
         radio_perifs_t &perif = _radio_perifs[0];
-        _fifo_iface = e300_fifo_interface::make(e300_read_sysfs());
+        e300_fifo_config_t fifo_cfg;
+        try {
+            fifo_cfg = e300_read_sysfs();
+        } catch (...) {
+            throw uhd::runtime_error("Failed to get driver parameters from sysfs.");
+        }
+        _fifo_iface = e300_fifo_interface::make(fifo_cfg);
         perif.send_ctrl_xport = _fifo_iface->make_send_xport(1, ctrl_xport_args);
         perif.recv_ctrl_xport = _fifo_iface->make_recv_xport(1, ctrl_xport_args);
         perif.tx_data_xport = _fifo_iface->make_send_xport(0, data_xport_args);
@@ -233,6 +238,16 @@ e300_impl::e300_impl(const uhd::device_addr_t &device_addr)
     // and do the misc mboard sensors
     ////////////////////////////////////////////////////////////////////
     _tree->create<int>(mb_path / "sensors"); //empty TODO
+
+
+    if (!_network_mode) {
+        const std::vector<std::string> xadc_sensors = boost::assign::list_of("temp")("temp_max")("temp_min");
+        BOOST_FOREACH(const std::string &sensor, xadc_sensors)
+        {
+            _tree->create<sensor_value_t>(mb_path / "sensors" / sensor)
+                .publish(boost::bind(&e300_impl::get_mb_temp, this, sensor));
+        }
+    }
 
     ////////////////////////////////////////////////////////////////////
     // setup the mboard eeprom
@@ -582,6 +597,12 @@ void e300_impl::setup_radio(const size_t dspno)
     time64_rb_bases.rb_now = RB64_TIME_NOW;
     time64_rb_bases.rb_pps = RB64_TIME_PPS;
     perif.time64 = time_core_3000::make(perif.ctrl, TOREG(SR_TIME), time64_rb_bases);
+}
+
+uhd::sensor_value_t e300_impl::get_mb_temp(const std::string &which)
+{
+    return sensor_value_t(which,
+        boost::lexical_cast<double>(e300_get_sysfs_attr(E300_TEMP_SYSFS, which)), "C");
 }
 
 ////////////////////////////////////////////////////////////////////////
