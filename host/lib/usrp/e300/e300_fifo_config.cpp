@@ -18,43 +18,63 @@
 #ifdef E300_NATIVE
 
 #include <boost/cstdint.hpp>
+#include <uhd/config.hpp>
 
 // constants coded into the fpga parameters
-#define ZF_CONFIG_BASE 0x40000000
-#define ZF_PAGE_WIDTH 10
-#define H2S_STREAMS_WIDTH 3
-#define H2S_CMDFIFO_DEPTH 10
-#define S2H_STREAMS_WIDTH 3
-#define S2H_CMDFIFO_DEPTH 10
+static const size_t ZF_CONFIG_BASE    = 0x40000000;
+static const size_t ZF_PAGE_WIDTH     = 10;
+static const size_t H2S_STREAMS_WIDTH = 3;
+static const size_t H2S_CMDFIFO_DEPTH = 10;
+static const size_t S2H_STREAMS_WIDTH = 3;
+static const size_t S2H_CMDFIFO_DEPTH = 10;
 
 // calculate more useful constants for this module
-#define ZF_PAGE_SIZE    (1 << ZF_PAGE_WIDTH)
-#define H2S_NUM_STREAMS (1 << H2S_STREAMS_WIDTH)
-#define H2S_NUM_CMDS (1 << H2S_CMDFIFO_DEPTH)
-#define S2H_NUM_STREAMS (1 << S2H_STREAMS_WIDTH)
-#define S2H_NUM_CMDS (1 << S2H_CMDFIFO_DEPTH)
+static const size_t ZF_PAGE_SIZE(1 << ZF_PAGE_WIDTH);
+static const size_t H2S_NUM_STREAMS(1 << H2S_STREAMS_WIDTH);
+static const size_t H2S_NUM_CMDS(1 << H2S_CMDFIFO_DEPTH);
+static const size_t S2H_NUM_STREAMS(1 << S2H_STREAMS_WIDTH);
+static const size_t S2H_NUM_CMDS(1 << S2H_CMDFIFO_DEPTH);
 
 //offsetsinto the arbiter memory map
-#define ARBITER_WR_CLEAR 0
-#define ARBITER_RD_SIG 0
-#define ARBITER_WR_ADDR 4
-#define ARBITER_WR_SIZE 8
-#define ARBITER_WR_STS_RDY 12
-#define ARBITER_WR_STS 16
-#define ARBITER_RB_STATUS 16
-#define ARBITER_RB_STATUS_OCC 20
-#define ARBITER_RB_ADDR_SPACE 24
-#define ARBITER_RB_SIZE_SPACE 28
-
-//helper macros to determine config addrs
-#define S2H_BASE(base) (size_t(base) + (ZF_PAGE_SIZE*0))
-#define H2S_BASE(base) (size_t(base) + (ZF_PAGE_SIZE*1))
-#define REG_BASE(base) (size_t(base) + (ZF_PAGE_SIZE*2))
-#define DST_BASE(base) (size_t(base) + (ZF_PAGE_SIZE*3))
-#define ZF_STREAM_OFF(which) ((which)*32)
+static const size_t ARBITER_WR_CLEAR      = 0;
+static const size_t ARBITER_RD_SIG        = 0;
+static const size_t ARBITER_WR_ADDR       = 4;
+static const size_t ARBITER_WR_SIZE       = 8;
+static const size_t ARBITER_WR_STS_RDY    = 12;
+static const size_t ARBITER_WR_STS        = 16;
+static const size_t ARBITER_RB_STATUS     = 16;
+static const size_t ARBITER_RB_STATUS_OCC = 20;
+static const size_t ARBITER_RB_ADDR_SPACE = 24;
+static const size_t ARBITER_RB_SIZE_SPACE = 28;
 
 // registers for the wb32_iface
 static const size_t SR_CORE_READBACK = 0;
+
+
+static UHD_INLINE size_t S2H_BASE(const size_t base)
+{
+    return base + ZF_PAGE_SIZE * 0;
+}
+
+static UHD_INLINE size_t H2S_BASE(const size_t base)
+{
+    return base + ZF_PAGE_SIZE * 1;
+}
+
+static UHD_INLINE size_t REG_BASE(const size_t base)
+{
+    return base + ZF_PAGE_SIZE * 2;
+}
+
+static UHD_INLINE size_t DST_BASE(const size_t base)
+{
+    return base + ZF_PAGE_SIZE * 3;
+}
+
+static UHD_INLINE size_t ZF_STREAM_OFF(const size_t which)
+{
+    return which * 32;
+}
 
 #include "e300_fifo_config.hpp"
 #include <sys/mman.h> //mmap
@@ -107,8 +127,8 @@ struct e300_fifo_poll_waiter
     int fd;
 };
 
-#define DEFAULT_FRAME_SIZE 2048
-#define DEFAULT_NUM_FRAMES 32
+static const size_t DEFAULT_FRAME_SIZE = 2048;
+static const size_t DEFAULT_NUM_FRAMES = 32;
 
 using namespace uhd;
 using namespace uhd::transport;
@@ -121,17 +141,15 @@ struct __mem_addrz_t
 /***********************************************************************
  * peek n' poke mmapped space
  **********************************************************************/
-inline void zf_poke32(const boost::uint32_t addr, const boost::uint32_t data)
+UHD_INLINE void zf_poke32(const boost::uint32_t addr, const boost::uint32_t data)
 {
-    //UHD_MSG(status) << "zf_poke32 0x" << std::hex << addr << std::dec << std::endl;
-    volatile boost::uint32_t *p = (boost::uint32_t *)addr;
+    volatile boost::uint32_t *p = reinterpret_cast<boost::uint32_t *>(addr);
     *p = data;
 }
 
-inline boost::uint32_t zf_peek32(const boost::uint32_t addr)
+UHD_INLINE boost::uint32_t zf_peek32(const boost::uint32_t addr)
 {
-    //UHD_MSG(status) << "zf_peek32 0x" << std::hex << addr << std::dec << std::endl;
-    volatile const boost::uint32_t *p = (const boost::uint32_t *)addr;
+    volatile const boost::uint32_t *p = reinterpret_cast<const boost::uint32_t *>(addr);
     return *p;
 }
 
