@@ -49,22 +49,22 @@ static const size_t ARBITER_RB_SIZE_SPACE = 28;
 
 static UHD_INLINE size_t S2H_BASE(const size_t base)
 {
-    return static_cast<size_t>(base + ZF_PAGE_SIZE * 0);
+    return base + ZF_PAGE_SIZE * 0;
 }
 
 static UHD_INLINE size_t H2S_BASE(const size_t base)
 {
-    return static_cast<size_t>(base + ZF_PAGE_SIZE * 1);
+    return base + ZF_PAGE_SIZE * 1;
 }
 
 static UHD_INLINE size_t DST_BASE(const size_t base)
 {
-    return static_cast<size_t>(base + ZF_PAGE_SIZE * 2);
+    return base + ZF_PAGE_SIZE * 2;
 }
 
 static UHD_INLINE size_t ZF_STREAM_OFF(const size_t which)
 {
-    return static_cast<size_t>(which*32);
+    return which * 32;
 }
 
 #include "e300_fifo_config.hpp"
@@ -118,8 +118,8 @@ struct e300_fifo_poll_waiter
     int fd;
 };
 
-#define DEFAULT_FRAME_SIZE 2048
-#define DEFAULT_NUM_FRAMES 32
+static const size_t DEFAULT_FRAME_SIZE = 2048;
+static const size_t DEFAULT_NUM_FRAMES = 32;
 
 using namespace uhd;
 using namespace uhd::transport;
@@ -132,17 +132,15 @@ struct __mem_addrz_t
 /***********************************************************************
  * peek n' poke mmapped space
  **********************************************************************/
-inline void zf_poke32(const boost::uint32_t addr, const boost::uint32_t data)
+UHD_INLINE void zf_poke32(const boost::uint32_t addr, const boost::uint32_t data)
 {
-    //UHD_MSG(status) << "zf_poke32 0x" << std::hex << addr << std::dec << std::endl;
-    volatile boost::uint32_t *p = (boost::uint32_t *)addr;
+    volatile boost::uint32_t *p = reinterpret_cast<boost::uint32_t *>(addr);
     *p = data;
 }
 
-inline boost::uint32_t zf_peek32(const boost::uint32_t addr)
+UHD_INLINE boost::uint32_t zf_peek32(const boost::uint32_t addr)
 {
-    //UHD_MSG(status) << "zf_peek32 0x" << std::hex << addr << std::dec << std::endl;
-    volatile const boost::uint32_t *p = (const boost::uint32_t *)addr;
+    volatile const boost::uint32_t *p = reinterpret_cast<const boost::uint32_t *>(addr);
     return *p;
 }
 
