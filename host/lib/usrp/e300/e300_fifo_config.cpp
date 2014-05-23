@@ -390,6 +390,11 @@ struct e300_fifo_interface_impl : e300_fifo_interface
         return this->make_xport(which_stream, args, false);
     }
 
+    size_t get_global_regs_base() const
+    {
+        return REG_BASE(ctrl_space);
+    }
+
     boost::uint32_t peek32(const uhd::wb_iface::wb_addr_type addr)
     {
         // setup readback register

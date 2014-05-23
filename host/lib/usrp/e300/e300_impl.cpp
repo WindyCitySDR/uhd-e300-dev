@@ -189,11 +189,15 @@ e300_impl::e300_impl(const uhd::device_addr_t &device_addr)
         zero_copy_if::sptr codec_xport;
         codec_xport = udp_zero_copy::make(device_addr["addr"], E300_SERVER_CODEC_PORT, ctrl_xport_params, dummy_buff_params_out, device_addr);
         _codec_ctrl = ad9361_ctrl::make(ad9361_ctrl_transport::make_zero_copy(codec_xport));
+        zero_copy_if::sptr gregs_xport;
+        gregs_xport = udp_zero_copy::make(device_addr["addr"], E300_SERVER_GREGS_PORT, ctrl_xport_params, dummy_buff_params_out, device_addr);
+        _global_regs = uhd::usrp::e300::global_regs::make(gregs_xport);
     }
     else
     {
         radio_perifs_t &perif = _radio_perifs[0];
         _fifo_iface = e300_fifo_interface::make(e300_read_sysfs());
+        _global_regs = uhd::usrp::e300::global_regs::make(_fifo_iface->get_global_regs_base());
         perif.send_ctrl_xport = _fifo_iface->make_send_xport(1, ctrl_xport_args);
         perif.recv_ctrl_xport = _fifo_iface->make_recv_xport(1, ctrl_xport_args);
         perif.tx_data_xport = _fifo_iface->make_send_xport(0, data_xport_args);
@@ -208,7 +212,7 @@ e300_impl::e300_impl(const uhd::device_addr_t &device_addr)
 
     // Verify we can talk to the e300 core control registers ...
     UHD_MSG(status) << "Initializing core control..." << std::endl;
-    this->register_loopback_self_test(_fifo_iface);
+    this->register_loopback_self_test(_global_regs);
 
     ////////////////////////////////////////////////////////////////////
     // optional udp server
@@ -220,6 +224,7 @@ e300_impl::e300_impl(const uhd::device_addr_t &device_addr)
         tg.create_thread(boost::bind(&e300_impl::run_server, this, E300_SERVER_TX_PORT, "TX"));
         tg.create_thread(boost::bind(&e300_impl::run_server, this, E300_SERVER_CTRL_PORT, "CTRL"));
         tg.create_thread(boost::bind(&e300_impl::run_server, this, E300_SERVER_CODEC_PORT, "CODEC"));
+        tg.create_thread(boost::bind(&e300_impl::run_server, this, E300_SERVER_GREGS_PORT, "GREGS"));
         tg.join_all();
         goto e300_impl_begin;
     }

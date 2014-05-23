@@ -32,12 +32,13 @@ struct e300_fifo_config_t
 
 e300_fifo_config_t e300_read_sysfs(void);
 
-struct e300_fifo_interface : boost::enable_shared_from_this<e300_fifo_interface>, public virtual uhd::wb_iface
+struct e300_fifo_interface : boost::enable_shared_from_this<e300_fifo_interface>
 {
     typedef boost::shared_ptr<e300_fifo_interface> sptr;
     static sptr make(const e300_fifo_config_t &config);
     virtual uhd::transport::zero_copy_if::sptr make_recv_xport(const size_t which_stream, const uhd::device_addr_t &args) = 0;
     virtual uhd::transport::zero_copy_if::sptr make_send_xport(const size_t which_stream, const uhd::device_addr_t &args) = 0;
+    virtual size_t get_global_regs_base(void) const = 0;
 };
 
 #endif /* INCLUDED_E300_FIFO_CONFIG_HPP */

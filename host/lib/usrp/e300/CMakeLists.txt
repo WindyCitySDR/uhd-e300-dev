@@ -34,6 +34,7 @@ IF(ENABLE_E300)
         ${CMAKE_CURRENT_SOURCE_DIR}/e300_sysfs_hooks.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/e300_network.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/e300_spidev.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/e300_global_regs.cpp
     )
     LIBUHD_APPEND_SOURCES(${E300_SOURCES})
     IF(UDEV_FOUND)
