@@ -17,6 +17,7 @@
 
 #include <uhd/config.hpp>
 #include "e300_impl.hpp"
+#include "e300_spi.hpp"
 
 #ifdef E300_NATIVE
 #include <uhd/exception.hpp>
@@ -28,8 +29,9 @@
 #include <linux/types.h>
 #include <linux/spi/spidev.h>
 
+namespace uhd { namespace usrp { namespace e300 {
 
-class spidev_impl : public uhd::spi_iface
+class spidev_impl : public spi
 {
 public:
 
@@ -110,13 +112,14 @@ private:
     boost::uint16_t _delay;
 };
 
-uhd::spi_iface::sptr e300_impl::make_spidev(const std::string &device)
+spi::sptr spi::make(const std::string &device)
 {
-    return uhd::spi_iface::sptr(new spidev_impl(device));
+    return spi::sptr(new spidev_impl(device));
 }
 #else
-uhd::spi_iface::sptr e300_impl::make_spidev(const std::string &)
+spi::sptr spi::make(const std::string &)
 {
-    throw uhd::runtime_error("e300_impl::make_spidev() !E300_NATIVE");
+    throw uhd::runtime_error("spi::make() !E300_NATIVE");
 }
 #endif //E300_NATIVE
+}}};

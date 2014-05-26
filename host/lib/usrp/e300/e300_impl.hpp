@@ -146,8 +146,6 @@ private:
     void update_antenna_sel(const std::string &fe, const std::string &ant);
     void update_fe_lo_freq(const std::string &fe, const double freq);
     void update_active_frontends(void);
-
-    uhd::spi_iface::sptr make_spidev(const std::string &device);
 };
 
 #endif /* INCLUDED_E300_IMPL_HPP */
