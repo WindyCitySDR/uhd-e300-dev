@@ -54,6 +54,24 @@ void x300_impl::update_tick_rate(mboard_members_t &mb, const double rate)
             boost::dynamic_pointer_cast<sph::send_packet_streamer>(mb.tx_streamers[dspno].lock());
         if (my_streamer) my_streamer->set_tick_rate(rate);
     }
+    //////// RFNOC ///////////////
+    BOOST_FOREACH(const size_t &ce_no, mb.ce_rx_streamers.keys())
+    {
+        UHD_MSG(status) << "setting ce rx streamer " << ce_no << " rate to " << rate << std::endl;
+        boost::shared_ptr<sph::recv_packet_streamer> my_streamer =
+            boost::dynamic_pointer_cast<sph::recv_packet_streamer>(mb.ce_rx_streamers[ce_no].lock());
+        if (my_streamer) my_streamer->set_tick_rate(rate);
+        if (my_streamer) my_streamer->set_samp_rate(rate);
+    }
+    BOOST_FOREACH(const size_t &ce_no, mb.ce_tx_streamers.keys())
+    {
+        UHD_MSG(status) << "setting ce tx streamer " << ce_no << std::endl;
+        boost::shared_ptr<sph::send_packet_streamer> my_streamer =
+            boost::dynamic_pointer_cast<sph::send_packet_streamer>(mb.ce_tx_streamers[ce_no].lock());
+        if (my_streamer) my_streamer->set_tick_rate(rate);
+        if (my_streamer) my_streamer->set_samp_rate(rate);
+    }
+    //////// RFNOC ///////////////
 }
 
 void x300_impl::update_rx_samp_rate(mboard_members_t &mb, const size_t dspno, const double rate)
@@ -189,12 +207,15 @@ static void handle_rx_flowctrl(const boost::uint32_t sid, zero_copy_if::sptr xpo
     }
     boost::uint32_t *pkt = buff->cast<boost::uint32_t *>();
 
+
     //recover seq32
     boost::uint32_t &seq32 = *seq32_state;
     const size_t seq12 = seq32 & 0xfff;
     if (last_seq < seq12) seq32 += (1 << 12);
     seq32 &= ~0xfff;
     seq32 |= last_seq;
+
+    UHD_MSG(status) << "sending flow ctrl packet, acking " << std::dec << last_seq;
 
     //load packet info
     vrt::if_packet_info_t packet_info;
@@ -220,6 +241,15 @@ static void handle_rx_flowctrl(const boost::uint32_t sid, zero_copy_if::sptr xpo
     //load payload
     pkt[packet_info.num_header_words32+0] = uhd::htonx<boost::uint32_t>(0);
     pkt[packet_info.num_header_words32+1] = uhd::htonx<boost::uint32_t>(seq32);
+
+    std::cout << "  SID=" << std::hex << sid << " hdr bits=" << packet_info.packet_type << " seq32=" << seq32 << std::endl;
+    std::cout << "num_packet_words32: " << packet_info.num_packet_words32 << std::endl;
+    for (size_t i = 0; i < packet_info.num_packet_words32; i++) {
+        std::cout << str(boost::format("0x%08x") % pkt[i]) << " ";
+        if (i % 2) {
+            std::cout << std::endl;
+        }
+    }
 
     //send the buffer over the interface
     buff->commit(sizeof(boost::uint32_t)*(packet_info.num_packet_words32));
@@ -663,11 +693,12 @@ rx_streamer::sptr x300_impl::get_rx_stream_ce(const uhd::stream_args_t &args_, b
         0, boost::bind(&x300_impl::dummy_issue_stream_command, this, _1)
     );
 
-    //Store a weak pointer to prevent a streamer->x300_impl->streamer circular dependency
+    //Store a weak pointer to prevent a streamer->x300_impl->streamer circular dependency
     mb.ce_rx_streamers[ce_index] = boost::weak_ptr<sph::recv_packet_streamer>(my_streamer);
 
     //sets all tick and samp rates on this streamer
     const fs_path mb_path = "/mboards/"+boost::lexical_cast<std::string>(mb_index);
+    UHD_MSG(status) << "updating tick rate" << std::endl;
     _tree->access<double>(mb_path / "tick_rate").update();
 
     return my_streamer;

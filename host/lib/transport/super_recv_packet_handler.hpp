@@ -132,6 +132,7 @@ public:
 
     //! Set the rate of ticks per second
     void set_tick_rate(const double rate){
+	    UHD_MSG(status) << "setting tick rate in streamer" << std::endl;
         _tick_rate = rate;
     }
 

@@ -87,9 +87,10 @@ void benchmark_rx_rate(uhd::usrp::multi_usrp::sptr usrp, const std::string &rx_c
             {
               // check
               boost::uint16_t *check_this = reinterpret_cast<boost::uint16_t *>(&buff[0]);
-              if (check_this[0] != 0xAA00) {
-                      std::cout << "data error: " << std::hex << check_this << std::endl;
-              }
+	      std::cout << "Packet: " << std::hex << check_this << std::endl;
+              //if (check_this[0] != 0xAA00) {
+                      //std::cout << "data error: " << std::hex << check_this << std::endl;
+              //}
             }
             break;
 
@@ -249,8 +250,8 @@ int UHD_SAFE_MAIN(int argc, char *argv[]){
     thread_group.join_all();
 
 
-    std::cout << "num_tx_samps == " << num_tx_samps << std::endl;
-    std::cout << "num_rx_samps == " << num_rx_samps << std::endl;
+    std::cout << "num_tx_samps == " << std::dec << num_tx_samps << std::endl;
+    std::cout << "num_rx_samps == " << std::dec << num_rx_samps << std::endl;
 
     //finished
     std::cout << std::endl << "Done!" << std::endl << std::endl;
