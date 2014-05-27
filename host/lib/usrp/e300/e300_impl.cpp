@@ -301,11 +301,11 @@ e300_impl::e300_impl(const uhd::device_addr_t &device_addr)
     const std::vector<std::string> gpio_attrs = boost::assign::list_of("CTRL")("DDR")("OUT")("ATR_0X")("ATR_RX")("ATR_TX")("ATR_XX");
     BOOST_FOREACH(const std::string &attr, gpio_attrs)
     {
-        _tree->create<boost::uint8_t>(mb_path / "gpio" / "INT0" / attr)
-            .set(0)
-            .subscribe(boost::bind(&e300_impl::set_internal_gpio, this, fp_gpio, attr, _1));
+        _tree->create<boost::uint32_t>(mb_path / "gpio" / "FP0" / attr)
+            .subscribe(boost::bind(&e300_impl::set_internal_gpio, this, fp_gpio, attr, _1))
+            .set(0);
     }
-    _tree->create<boost::uint8_t>(mb_path / "gpio" / "INT0" / "READBACK")
+    _tree->create<boost::uint8_t>(mb_path / "gpio" / "FP0" / "READBACK")
         .publish(boost::bind(&e300_impl::get_internal_gpio, this, fp_gpio, "READBACK"));
 
 
@@ -438,7 +438,7 @@ boost::uint8_t e300_impl::get_internal_gpio(gpio_core_200::sptr gpio, const std:
     return boost::uint32_t(gpio->read_gpio(dboard_iface::UNIT_RX));
 }
 
-void e300_impl::set_internal_gpio(gpio_core_200::sptr gpio, const std::string &attr, const boost::uint8_t value)
+void e300_impl::set_internal_gpio(gpio_core_200::sptr gpio, const std::string &attr, const boost::uint32_t value)
 {
     if (attr == "CTRL")
         return gpio->set_pin_ctrl(dboard_iface::UNIT_RX, value);

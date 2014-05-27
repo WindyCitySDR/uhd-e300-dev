@@ -154,7 +154,7 @@ private:
 
     boost::uint8_t get_internal_gpio(gpio_core_200::sptr, const std::string &);
 
-    void set_internal_gpio(gpio_core_200::sptr gpio, const std::string &attr, const boost::uint8_t value);
+    void set_internal_gpio(gpio_core_200::sptr gpio, const std::string &attr, const boost::uint32_t value);
 };
 
 #endif /* INCLUDED_E300_IMPL_HPP */
