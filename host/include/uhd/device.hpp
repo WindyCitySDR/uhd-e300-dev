@@ -91,6 +91,17 @@ public:
      */
     virtual tx_streamer::sptr get_tx_stream(const stream_args_t &args) = 0;
 
+    /*!
+     * \param dst Who gets this command (radio0, ce1, ...)
+     * \param type Type of command (setup_radio, poke)
+     * \param arg1 First command arg (for poke: settings register)
+     * \param arg2 Second command arg (for poke: register value)
+     */
+    boost::uint32_t rfnoc_cmd(
+		    const std::string &dst, const std::string &type,
+		    boost::uint32_t arg1=0, boost::uint32_t arg2=0) { return 0; };
+
+
     //! Get access to the underlying property structure
     uhd::property_tree::sptr get_tree(void) const;
 

@@ -148,6 +148,13 @@ void x300_impl::update_subdev_spec(const std::string &tx_rx, const size_t mb_i, 
 /***********************************************************************
  * VITA stuff
  **********************************************************************/
+#ifdef BOOST_BIG_ENDIAN
+    #define BE_MACRO(x) (x)
+    #define LE_MACRO(x) uhd::byteswap(x)
+#else
+    #define BE_MACRO(x) uhd::byteswap(x)
+    #define LE_MACRO(x) (x)
+#endif
 static void x300_if_hdr_unpack_be(
     const boost::uint32_t *packet_buff,
     vrt::if_packet_info_t &if_packet_info
@@ -215,11 +222,11 @@ static void handle_rx_flowctrl(const boost::uint32_t sid, zero_copy_if::sptr xpo
     seq32 &= ~0xfff;
     seq32 |= last_seq;
 
-    UHD_MSG(status) << "sending flow ctrl packet, acking " << std::dec << last_seq;
+    //UHD_MSG(status) << "sending flow ctrl packet, acking " << std::dec << last_seq;
 
     //load packet info
     vrt::if_packet_info_t packet_info;
-    packet_info.packet_type = vrt::if_packet_info_t::PACKET_TYPE_IF_EXT; // FC!
+    packet_info.packet_type = vrt::if_packet_info_t::PACKET_TYPE_FC; // FC!
     packet_info.num_payload_words32 = 2;
     packet_info.num_payload_bytes = packet_info.num_payload_words32*sizeof(boost::uint32_t);
     packet_info.packet_count = seq32;
@@ -242,14 +249,17 @@ static void handle_rx_flowctrl(const boost::uint32_t sid, zero_copy_if::sptr xpo
     pkt[packet_info.num_header_words32+0] = uhd::htonx<boost::uint32_t>(0);
     pkt[packet_info.num_header_words32+1] = uhd::htonx<boost::uint32_t>(seq32);
 
-    std::cout << "  SID=" << std::hex << sid << " hdr bits=" << packet_info.packet_type << " seq32=" << seq32 << std::endl;
-    std::cout << "num_packet_words32: " << packet_info.num_packet_words32 << std::endl;
-    for (size_t i = 0; i < packet_info.num_packet_words32; i++) {
-        std::cout << str(boost::format("0x%08x") % pkt[i]) << " ";
-        if (i % 2) {
-            std::cout << std::endl;
-        }
-    }
+    // hardcode bits
+    pkt[0] = (pkt[0] & 0xFFFFFF00) | 0x00000040;
+
+    //std::cout << "  SID=" << std::hex << sid << " hdr bits=" << packet_info.packet_type << " seq32=" << seq32 << std::endl;
+    //std::cout << "num_packet_words32: " << packet_info.num_packet_words32 << std::endl;
+    //for (size_t i = 0; i < packet_info.num_packet_words32; i++) {
+        //std::cout << str(boost::format("0x%08x") % pkt[i]) << " ";
+        //if (i % 2) {
+            //std::cout << std::endl;
+        //}
+    //}
 
     //send the buffer over the interface
     buff->commit(sizeof(boost::uint32_t)*(packet_info.num_packet_words32));
@@ -605,10 +615,22 @@ rx_streamer::sptr x300_impl::get_rx_stream_ce(const uhd::stream_args_t &args_, b
     UHD_MSG(status) << str(boost::format("rx data_sid = 0x%08x") % data_sid) << std::endl;
 
     if (ce_index == 0) {
-        boost::uint32_t data = (((data_sid >> 16)-1) & 0xFFFF) | (1 << 16);
+        boost::uint32_t data = (((data_sid >> 16)) & 0xFFFF) | (1 << 16);
+        std::cout << "setting converter sid dst to " << std::hex << data << std::endl;
         _mb[mb_index].nocshell_ctrls[ce_index]->poke32(
             SR_ADDR(0x0000, 8),
             data
+        );
+        std::cout << "setting null source sid to " << std::hex << (0x02140000 | (data_sid & 0xFFFF)) << std::endl;
+        // Set up null source
+        _mb[mb_index].nocshell_ctrls[1]->poke32(
+            SR_ADDR(0x0000, 8),
+            0x02140000 | (data_sid & 0xFFFF)
+        );
+        // rate in clock cycles
+        _mb[mb_index].nocshell_ctrls[1]->poke32(
+            SR_ADDR(0x0000, 10),
+            0 // (1<<12)
         );
     } else if (ce_index == 1) {
         std::cout << "setting up null source" << std::endl;
@@ -653,17 +675,26 @@ rx_streamer::sptr x300_impl::get_rx_stream_ce(const uhd::stream_args_t &args_, b
     my_streamer->set_converter(id);
 
     //flow control setup
-    //const size_t fc_window = get_rx_flow_control_window(xport.recv->get_recv_frame_size(), xport.recv_buff_size, device_addr);
+    const size_t fc_window = get_rx_flow_control_window(xport.recv->get_recv_frame_size(), xport.recv_buff_size, device_addr);
     //const size_t fc_handle_window = std::max<size_t>(1, fc_window / X300_RX_FC_REQUEST_FREQ);
-    const size_t fc_window = 20;
-    const size_t fc_handle_window = 4;
+    //const size_t fc_window = 500;
+    const size_t fc_handle_window = 20;
+    UHD_MSG(status) << "host buffer for rx fc " << fc_window << std::endl;
+
 
 
     UHD_LOG << "RX Flow Control Window = " << fc_window << ", RX Flow Control Handler Window = " << fc_handle_window << std::endl;
 
     // Configure flow control (hope this works)
-    mb.nocshell_ctrls[ce_index]->poke32(SR_ADDR(0x0000, 0), fc_window-1);
-    mb.nocshell_ctrls[ce_index]->poke32(SR_ADDR(0x0000, 1), fc_window?1:0);
+    mb.nocshell_ctrls[0]->poke32(SR_ADDR(0x0000, 0), fc_window-1);
+    mb.nocshell_ctrls[0]->poke32(SR_ADDR(0x0000, 1), fc_window?1:0);
+    mb.nocshell_ctrls[1]->poke32(SR_ADDR(0x0000, 0), 8);
+    mb.nocshell_ctrls[1]->poke32(SR_ADDR(0x0000, 1), 1);
+    { // configure flow control, normally: perif.deframer->configure_flow_control(0/*cycs off*/, fc_handle_window);
+        size_t pkts_per_up = 4;
+        mb.nocshell_ctrls[0]->poke32(SR_ADDR(0x0000, 2), 0); // cycs off
+        mb.nocshell_ctrls[0]->poke32(SR_ADDR(0x0000, 3), (1 << 31) | ((pkts_per_up) & 0xffff));
+    }
 
     boost::shared_ptr<boost::uint32_t> seq32(new boost::uint32_t(0));
     //Give the streamer a functor to get the recv_buffer
@@ -692,6 +723,7 @@ rx_streamer::sptr x300_impl::get_rx_stream_ce(const uhd::stream_args_t &args_, b
     my_streamer->set_issue_stream_cmd(
         0, boost::bind(&x300_impl::dummy_issue_stream_command, this, _1)
     );
+    my_streamer->set_xport_chan_sid(stream_i, true, data_sid);
 
     //Store a weak pointer to prevent a streamer->x300_impl->streamer circular dependency
     mb.ce_rx_streamers[ce_index] = boost::weak_ptr<sph::recv_packet_streamer>(my_streamer);
@@ -704,23 +736,25 @@ rx_streamer::sptr x300_impl::get_rx_stream_ce(const uhd::stream_args_t &args_, b
     return my_streamer;
 }
 
-// Does nothing
+
+//////////////// RFNOC ////////////////////////////////
 void x300_impl::dummy_issue_stream_command(const uhd::stream_cmd_t &stream_cmd)
 {
-    if (_ce_index != 1) {
+    UHD_MSG(status) << "entering dummy_issue_stream_command " << std::endl;
+    if (_ce_index != 1 and _ce_index != 0) {
         return;
     }
     if (stream_cmd.stream_mode == stream_cmd_t::STREAM_MODE_START_CONTINUOUS) {
-        UHD_MSG(status) << "sending start command on CE " << _ce_index << std::endl;
+        UHD_MSG(status) << "sending start command on CE " << 1 << std::endl;
         // This will start stream ZOMFG
-        _mb[0].nocshell_ctrls[_ce_index]->poke32(
+        _mb[0].nocshell_ctrls[1]->poke32(
             SR_ADDR(0x0000, 9),
-            100
+            50
         );
     }
     else if (stream_cmd.stream_mode == stream_cmd_t::STREAM_MODE_STOP_CONTINUOUS) {
-        UHD_MSG(status) << "sending stop command on CE " << _ce_index << std::endl;
-        _mb[0].nocshell_ctrls[_ce_index]->poke32(
+        UHD_MSG(status) << "sending stop command on CE " << 1 << std::endl;
+        _mb[0].nocshell_ctrls[1]->poke32(
             SR_ADDR(0x0000, 9),
             0
         );
@@ -732,6 +766,56 @@ void x300_impl::handle_overflow_ce(boost::weak_ptr<uhd::rx_streamer> streamer)
 {
     return;
 }
+
+
+boost::uint32_t x300_impl::rfnoc_cmd(
+		    const std::string &dst, const std::string &type,
+		    boost::uint32_t arg1, boost::uint32_t arg2)
+{
+    if (dst == "ce0" or dst == "ce1" or dst == "ce2") {
+        size_t ce_index = boost::lexical_cast<size_t>(dst[2]);
+        if (type != "" and type != "poke") {
+            throw uhd::value_error("x300_impl::rfnoc_cmd only supports poke on CEs");
+        }
+        UHD_MSG(status) << "Setting register " << std::dec << arg1 << " on CE " << ce_index << " to " << std::hex << arg2 << std::dec << std::endl;
+        _mb[0].nocshell_ctrls[ce_index]->poke32(
+            SR_ADDR(0x0000, arg1),
+            arg2
+        );
+        return 0;
+    }
+    else if (dst == "radio_rx0") {
+        if (type == "setup_radio") {
+            UHD_MSG(status) << "Setting radio0, spp=" << arg1 << ", SID=" << std::hex << arg2 << std::dec << std::endl;
+            uhd::stream_args_t args;
+            args.otw_format = "sc16";
+            args.cpu_format = "sc16";
+            radio_perifs_t &perif = _mb[0].radio_perifs[0];
+            size_t spp = arg1;
+            perif.framer->clear();
+            perif.framer->set_nsamps_per_packet(spp); //seems to be a good place to set this
+            perif.framer->set_sid(arg2);
+            perif.framer->setup(args);
+            perif.ddc->setup(args);
+            return 0;
+        }
+    }
+    else if (dst == "radio_tx0") {
+        if (type == "setup_radio") {
+            uhd::stream_args_t args;
+            args.otw_format = "sc16";
+            args.cpu_format = "sc16";
+            radio_perifs_t &perif = _mb[0].radio_perifs[0];
+            perif.deframer->clear();
+            perif.deframer->setup(args);
+            perif.duc->setup(args);
+            return 0;
+        }
+    }
+    throw uhd::value_error("x300_impl::rfnoc_cmd got unknown dst");
+    return 0;
+}
+//////////////// RFNOC ////////////////////////////////
 
 void x300_impl::handle_overflow(x300_impl::radio_perifs_t &perif, boost::weak_ptr<uhd::rx_streamer> streamer)
 {

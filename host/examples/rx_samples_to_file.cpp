@@ -292,7 +292,7 @@ int UHD_SAFE_MAIN(int argc, char *argv[]){
         if(vm.count("int-n")) tune_request.args = uhd::device_addr_t("mode_n=integer");
 		usrp->set_rx_freq(tune_request);
 		std::cout << boost::format("Actual RX Freq: %f MHz...") % (usrp->get_rx_freq()/1e6) << std::endl << std::endl;
-	}
+    }
 
     //set the rf gain
     if (vm.count("gain")){

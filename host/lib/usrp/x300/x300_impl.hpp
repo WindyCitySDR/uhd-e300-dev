@@ -159,6 +159,9 @@ public:
     void dummy_issue_stream_command(const uhd::stream_cmd_t &stream_cmd);
     void handle_overflow_ce(boost::weak_ptr<uhd::rx_streamer> streamer);
     int _ce_index;
+    boost::uint32_t rfnoc_cmd(
+		    const std::string &dst, const std::string &type,
+		    boost::uint32_t arg1=0, boost::uint32_t arg2=0);
     ///////////// RFNOC ////////////////////////
 
     //support old async call

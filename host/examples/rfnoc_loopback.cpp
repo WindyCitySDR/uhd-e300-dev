@@ -86,8 +86,8 @@ void benchmark_rx_rate(uhd::usrp::multi_usrp::sptr usrp, const std::string &rx_c
             }
             {
               // check
-              boost::uint16_t *check_this = reinterpret_cast<boost::uint16_t *>(&buff[0]);
-	      std::cout << "Packet: " << std::hex << check_this << std::endl;
+              boost::uint16_t *check_this = reinterpret_cast<boost::uint16_t *>(buffs[0]);
+	      //std::cout << "Packet: " << std::hex << check_this[0] << " " << check_this[1] << std::endl;
               //if (check_this[0] != 0xAA00) {
                       //std::cout << "data error: " << std::hex << check_this << std::endl;
               //}
@@ -219,7 +219,7 @@ int UHD_SAFE_MAIN(int argc, char *argv[]){
     {
 	//create a receive streamer
 	uhd::stream_args_t stream_args("sc16", "sc16");
-	stream_args.args["src_addr"] = "1";
+	stream_args.args["src_addr"] = "0";
 	stream_args.channels = std::vector<size_t>(1, 0);
 	uhd::rx_streamer::sptr rx_stream = usrp->get_rx_stream(stream_args);
 	thread_group.create_thread(boost::bind(&benchmark_rx_rate, usrp, "sc16", rx_stream));
@@ -249,6 +249,7 @@ int UHD_SAFE_MAIN(int argc, char *argv[]){
     thread_group.interrupt_all();
     thread_group.join_all();
 
+    boost::this_thread::sleep(boost::posix_time::seconds(2));
 
     std::cout << "num_tx_samps == " << std::dec << num_tx_samps << std::endl;
     std::cout << "num_rx_samps == " << std::dec << num_rx_samps << std::endl;
