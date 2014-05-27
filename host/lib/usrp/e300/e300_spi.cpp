@@ -116,7 +116,10 @@ spi::sptr spi::make(const std::string &device)
 {
     return spi::sptr(new spidev_impl(device));
 }
+}}};
 #else
+namespace uhd { namespace usrp { namespace e300 {
+
 spi::sptr spi::make(const std::string &)
 {
     throw uhd::runtime_error("spi::make() !E300_NATIVE");
