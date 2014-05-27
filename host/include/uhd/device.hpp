@@ -97,7 +97,7 @@ public:
      * \param arg1 First command arg (for poke: settings register)
      * \param arg2 Second command arg (for poke: register value)
      */
-    boost::uint32_t rfnoc_cmd(
+    virtual boost::uint32_t rfnoc_cmd(
 		    const std::string &dst, const std::string &type,
 		    boost::uint32_t arg1=0, boost::uint32_t arg2=0) { return 0; };
 

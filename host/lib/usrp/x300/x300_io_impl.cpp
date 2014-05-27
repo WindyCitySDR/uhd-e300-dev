@@ -614,37 +614,37 @@ rx_streamer::sptr x300_impl::get_rx_stream_ce(const uhd::stream_args_t &args_, b
     UHD_LOG << boost::format("data_sid = 0x%08x, actual recv_buff_size = %d\n") % data_sid % xport.recv_buff_size << std::endl;
     UHD_MSG(status) << str(boost::format("rx data_sid = 0x%08x") % data_sid) << std::endl;
 
-    if (ce_index == 0) {
-        boost::uint32_t data = (((data_sid >> 16)) & 0xFFFF) | (1 << 16);
-        std::cout << "setting converter sid dst to " << std::hex << data << std::endl;
-        _mb[mb_index].nocshell_ctrls[ce_index]->poke32(
-            SR_ADDR(0x0000, 8),
-            data
-        );
-        std::cout << "setting null source sid to " << std::hex << (0x02140000 | (data_sid & 0xFFFF)) << std::endl;
-        // Set up null source
-        _mb[mb_index].nocshell_ctrls[1]->poke32(
-            SR_ADDR(0x0000, 8),
-            0x02140000 | (data_sid & 0xFFFF)
-        );
-        // rate in clock cycles
-        _mb[mb_index].nocshell_ctrls[1]->poke32(
-            SR_ADDR(0x0000, 10),
-            0 // (1<<12)
-        );
-    } else if (ce_index == 1) {
-        std::cout << "setting up null source" << std::endl;
-        boost::uint32_t return_sid = (data_sid >> 16) | (data_sid << 16);
-        _mb[mb_index].nocshell_ctrls[ce_index]->poke32(
-            SR_ADDR(0x0000, 8),
-            return_sid
-        );
-        // rate in clock cycles
-        _mb[mb_index].nocshell_ctrls[ce_index]->poke32(
-            SR_ADDR(0x0000, 10),
-            (1<<18)
-        );
-    }
+    //if (ce_index == 0) {
+        //boost::uint32_t data = (((data_sid >> 16)) & 0xFFFF) | (1 << 16);
+        //std::cout << "setting converter sid dst to " << std::hex << data << std::endl;
+        //_mb[mb_index].nocshell_ctrls[ce_index]->poke32(
+            //SR_ADDR(0x0000, 8),
+            //data
+        //);
+        //std::cout << "setting null source sid to " << std::hex << (0x02140000 | (data_sid & 0xFFFF)) << std::endl;
+        //// Set up null source
+        //_mb[mb_index].nocshell_ctrls[1]->poke32(
+            //SR_ADDR(0x0000, 8),
+            //0x02140000 | (data_sid & 0xFFFF)
+        //);
+        //// rate in clock cycles
+        //_mb[mb_index].nocshell_ctrls[1]->poke32(
+            //SR_ADDR(0x0000, 10),
+            //0 // (1<<12)
+        //);
+    //} else if (ce_index == 1) {
+        //std::cout << "setting up null source" << std::endl;
+        //boost::uint32_t return_sid = (data_sid >> 16) | (data_sid << 16);
+        //_mb[mb_index].nocshell_ctrls[ce_index]->poke32(
+            //SR_ADDR(0x0000, 8),
+            //return_sid
+        //);
+        //// rate in clock cycles
+        //_mb[mb_index].nocshell_ctrls[ce_index]->poke32(
+            //SR_ADDR(0x0000, 10),
+            //(1<<18)
+        //);
+    //}
 
     // To calculate the max number of samples per packet, we assume the maximum header length
     // to avoid fragmentation should the entire header be used.
@@ -681,20 +681,18 @@ rx_streamer::sptr x300_impl::get_rx_stream_ce(const uhd::stream_args_t &args_, b
     const size_t fc_handle_window = 20;
     UHD_MSG(status) << "host buffer for rx fc " << fc_window << std::endl;
 
-
-
     UHD_LOG << "RX Flow Control Window = " << fc_window << ", RX Flow Control Handler Window = " << fc_handle_window << std::endl;
 
     // Configure flow control (hope this works)
-    mb.nocshell_ctrls[0]->poke32(SR_ADDR(0x0000, 0), fc_window-1);
-    mb.nocshell_ctrls[0]->poke32(SR_ADDR(0x0000, 1), fc_window?1:0);
-    mb.nocshell_ctrls[1]->poke32(SR_ADDR(0x0000, 0), 8);
-    mb.nocshell_ctrls[1]->poke32(SR_ADDR(0x0000, 1), 1);
-    { // configure flow control, normally: perif.deframer->configure_flow_control(0/*cycs off*/, fc_handle_window);
-        size_t pkts_per_up = 4;
-        mb.nocshell_ctrls[0]->poke32(SR_ADDR(0x0000, 2), 0); // cycs off
-        mb.nocshell_ctrls[0]->poke32(SR_ADDR(0x0000, 3), (1 << 31) | ((pkts_per_up) & 0xffff));
-    }
+    //mb.nocshell_ctrls[0]->poke32(SR_ADDR(0x0000, 0), fc_window-1);
+    //mb.nocshell_ctrls[0]->poke32(SR_ADDR(0x0000, 1), fc_window?1:0);
+    //mb.nocshell_ctrls[1]->poke32(SR_ADDR(0x0000, 0), 8);
+    //mb.nocshell_ctrls[1]->poke32(SR_ADDR(0x0000, 1), 1);
+    //{ // configure flow control, normally: perif.deframer->configure_flow_control(0[>cycs off<], fc_handle_window);
+        //size_t pkts_per_up = 4;
+        //mb.nocshell_ctrls[0]->poke32(SR_ADDR(0x0000, 2), 0); // cycs off
+        //mb.nocshell_ctrls[0]->poke32(SR_ADDR(0x0000, 3), (1 << 31) | ((pkts_per_up) & 0xffff));
+    //}
 
     boost::shared_ptr<boost::uint32_t> seq32(new boost::uint32_t(0));
     //Give the streamer a functor to get the recv_buffer
@@ -777,7 +775,7 @@ boost::uint32_t x300_impl::rfnoc_cmd(
         if (type != "" and type != "poke") {
             throw uhd::value_error("x300_impl::rfnoc_cmd only supports poke on CEs");
         }
-        UHD_MSG(status) << "Setting register " << std::dec << arg1 << " on CE " << ce_index << " to " << std::hex << arg2 << std::dec << std::endl;
+        UHD_MSG(status) << "Setting register " << std::dec << arg1 << " on CE " << ce_index << " to " << str(boost::format("0x%08x") % arg2) << std::endl;
         _mb[0].nocshell_ctrls[ce_index]->poke32(
             SR_ADDR(0x0000, arg1),
             arg2
@@ -785,8 +783,8 @@ boost::uint32_t x300_impl::rfnoc_cmd(
         return 0;
     }
     else if (dst == "radio_rx0") {
-        if (type == "setup_radio") {
-            UHD_MSG(status) << "Setting radio0, spp=" << arg1 << ", SID=" << std::hex << arg2 << std::dec << std::endl;
+        if (type == "setup_dsp") {
+            UHD_MSG(status) << "Setting radio0, spp=" << arg1 << ", SID=" << str(boost::format("0x%08x") % arg2) << std::endl;
             uhd::stream_args_t args;
             args.otw_format = "sc16";
             args.cpu_format = "sc16";
@@ -799,9 +797,25 @@ boost::uint32_t x300_impl::rfnoc_cmd(
             perif.ddc->setup(args);
             return 0;
         }
+        else if (type == "setup_fc") {
+            UHD_MSG(status) << "Setting radio0, downstream buffer size =" << arg1 << std::endl;
+            radio_perifs_t &perif = _mb[0].radio_perifs[0];
+            perif.framer->configure_flow_control(arg1);
+            return 0;
+        }
+        else if (type == "stream_cmd") {
+            UHD_MSG(status) << "Stream cmd to radio0 " << arg1 << std::endl;
+            radio_perifs_t &perif = _mb[0].radio_perifs[0];
+            uhd::stream_cmd_t stream_cmd(arg1 == 97 ? uhd::stream_cmd_t::STREAM_MODE_START_CONTINUOUS : uhd::stream_cmd_t::STREAM_MODE_STOP_CONTINUOUS);
+            stream_cmd.stream_now = true;
+            stream_cmd.time_spec = uhd::time_spec_t();
+            perif.framer->issue_stream_command(stream_cmd);
+            return 0;
+        }
+        throw uhd::value_error("x300_impl::rfnoc_cmd got invalid cmd type");
     }
     else if (dst == "radio_tx0") {
-        if (type == "setup_radio") {
+        if (type == "setup_dsp") {
             uhd::stream_args_t args;
             args.otw_format = "sc16";
             args.cpu_format = "sc16";
@@ -811,6 +825,7 @@ boost::uint32_t x300_impl::rfnoc_cmd(
             perif.duc->setup(args);
             return 0;
         }
+        throw uhd::value_error("x300_impl::rfnoc_cmd got invalid cmd type");
     }
     throw uhd::value_error("x300_impl::rfnoc_cmd got unknown dst");
     return 0;
