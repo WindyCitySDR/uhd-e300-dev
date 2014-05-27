@@ -24,6 +24,7 @@
 #include <uhd/usrp/mboard_eeprom.hpp>
 #include <uhd/usrp/dboard_eeprom.hpp>
 #include <uhd/types/serial.hpp>
+#include <uhd/types/sensors.hpp>
 #include <boost/weak_ptr.hpp>
 #include <boost/thread/mutex.hpp>
 #include "e300_fifo_config.hpp"
@@ -39,6 +40,7 @@
 #include "e300_global_regs.hpp"
 
 static const std::string E300_FPGA_FILE_NAME = "usrp_e300_fpga.bit";
+static const std::string E300_TEMP_SYSFS = "f8007100.ps7-xadc";
 static const std::string E300_SPIDEV_DEVICE  = "/dev/spidev0.1";
 
 static std::string E300_SERVER_RX_PORT = "321756";
@@ -120,6 +122,8 @@ private:
     ad9361_ctrl::sptr _codec_ctrl;
     void codec_loopback_self_test(uhd::wb_iface::sptr iface);
 
+    uhd::sensor_value_t get_mb_temp(const std::string &which);
+
     //server stuff for network access
     void run_server(const std::string &port, const std::string &what);
 
@@ -146,7 +150,6 @@ private:
     void update_fe_lo_freq(const std::string &fe, const double freq);
     void update_active_frontends(void);
 
-    uhd::spi_iface::sptr make_spidev(const std::string &device);
     uhd::usrp::e300::global_regs::sptr _global_regs;
 };
 
