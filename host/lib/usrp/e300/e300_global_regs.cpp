@@ -24,9 +24,6 @@
 
 namespace uhd { namespace usrp { namespace e300 {
 
-// registers for the wb32_iface
-static const size_t SR_CORE_READBACK = 0;
-
 class global_regs_local_impl : public global_regs
 {
 public:
@@ -41,7 +38,7 @@ public:
     boost::uint32_t peek32(const uhd::wb_iface::wb_addr_type addr)
     {
         // setup readback register
-        _poke32(_ctrl_base + SR_CORE_READBACK, addr);
+        _poke32(_ctrl_base + global_regs::SR_CORE_READBACK, addr);
         return _peek32(_ctrl_base);
     }
 

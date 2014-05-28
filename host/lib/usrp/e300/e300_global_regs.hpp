@@ -37,6 +37,15 @@ public:
 
     static sptr make(const size_t ctrl_base);
     static sptr make(uhd::transport::zero_copy_if::sptr xport);
+
+    static const size_t SR_CORE_READBACK = 0;
+    static const size_t SR_CORE_PPS_SEL  = 4;
+    static const size_t SR_CORE_PPS_TEST = 28;
+
+    static const size_t RB32_CORE_TEST    = 0;
+    static const size_t RB32_CORE_PPS_SEL = 1;
+    static const size_t RB32_CORE_COMPAT  = 2;
+    static const size_t RB32_CORE_GITHASH = 3;
 };
 
 }}};

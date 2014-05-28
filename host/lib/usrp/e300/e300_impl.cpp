@@ -221,6 +221,17 @@ e300_impl::e300_impl(const uhd::device_addr_t &device_addr)
     UHD_MSG(status) << "Initializing core control..." << std::endl;
     this->register_loopback_self_test(_global_regs);
 
+    // TODO: Put this in the right place
+    const boost::uint32_t git_hash = _global_regs->peek32(uhd::usrp::e300::global_regs::RB32_CORE_GITHASH);
+    const boost::uint32_t compat = _global_regs->peek32(uhd::usrp::e300::global_regs::RB32_CORE_COMPAT);
+    UHD_MSG(status) << "Getting version information... " << std::flush;
+    UHD_MSG(status) << boost::format("%u.%02d (git %7x%s)")
+        % (compat & 0xff) % ((compat & 0xff00) >> 8)
+        % (git_hash & 0x0FFFFFFF)
+        % ((git_hash & 0xF000000) ? "-dirty" : "") << std::endl;
+
+
+
     ////////////////////////////////////////////////////////////////////
     // optional udp server
     ////////////////////////////////////////////////////////////////////
