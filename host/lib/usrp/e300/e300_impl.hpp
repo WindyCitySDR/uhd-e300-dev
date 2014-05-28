@@ -84,8 +84,7 @@ private:
     struct radio_perifs_t
     {
         radio_ctrl_core_3000::sptr ctrl;
-        gpio_core_200_32wo::sptr atr0;
-        gpio_core_200_32wo::sptr atr1;
+        gpio_core_200_32wo::sptr atr;
         time_core_3000::sptr time64;
         rx_vita_core_3000::sptr framer;
         rx_dsp_core_3000::sptr ddc;

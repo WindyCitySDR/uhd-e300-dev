@@ -436,8 +436,8 @@ e300_impl::e300_impl(const uhd::device_addr_t &device_addr)
         device_addr.cast<double>("master_clock_rate", E300_DEFAULT_TICK_RATE));
     //_codec_ctrl->set_active_chains(false, false, false, false);
 
-    _tree->access<subdev_spec_t>(mb_path / "rx_subdev_spec").set(subdev_spec_t("A:RX2"));
-    _tree->access<subdev_spec_t>(mb_path / "tx_subdev_spec").set(subdev_spec_t("A:TX2"));
+    _tree->access<subdev_spec_t>(mb_path / "rx_subdev_spec").set(subdev_spec_t("A:RX1"));
+    _tree->access<subdev_spec_t>(mb_path / "tx_subdev_spec").set(subdev_spec_t("A:TX1"));
 
     _tree->access<std::string>(mb_path / "clock_source" / "value").set("internal");
     _tree->access<std::string>(mb_path / "time_source" / "value").set("none");
@@ -602,8 +602,7 @@ void e300_impl::setup_radio(const size_t dspno)
     ////////////////////////////////////////////////////////////////////
     perif.ctrl = radio_ctrl_core_3000::make(false/*lilE*/, perif.send_ctrl_xport, perif.recv_ctrl_xport, 1 | (1 << 16));
     this->register_loopback_self_test(perif.ctrl);
-    perif.atr0 = gpio_core_200_32wo::make(perif.ctrl, TOREG(SR_GPIO));
-    perif.atr1 = gpio_core_200_32wo::make(perif.ctrl, TOREG(SR_GPIO2));
+    perif.atr = gpio_core_200_32wo::make(perif.ctrl, TOREG(SR_GPIO));
 
     ////////////////////////////////////////////////////////////////////
     // create rx dsp control objects
@@ -840,9 +839,11 @@ void e300_impl::update_atrs(const size_t &fe)
     */
 
     //load actual values into atr registers
-    gpio_core_200_32wo::sptr atr = (fe == 0)? _radio_perifs[0].atr0 : _radio_perifs[0].atr1;
-    atr->set_atr_reg(dboard_iface::ATR_REG_IDLE, oo_reg);
-    atr->set_atr_reg(dboard_iface::ATR_REG_RX_ONLY, rx_reg);
-    atr->set_atr_reg(dboard_iface::ATR_REG_TX_ONLY, tx_reg);
-    atr->set_atr_reg(dboard_iface::ATR_REG_FULL_DUPLEX, fd_reg);
+    if (!fe) {
+        gpio_core_200_32wo::sptr atr = _radio_perifs[fe].atr;
+        atr->set_atr_reg(dboard_iface::ATR_REG_IDLE, oo_reg);
+        atr->set_atr_reg(dboard_iface::ATR_REG_RX_ONLY, rx_reg);
+        atr->set_atr_reg(dboard_iface::ATR_REG_TX_ONLY, tx_reg);
+        atr->set_atr_reg(dboard_iface::ATR_REG_FULL_DUPLEX, fd_reg);
+    }
 }
