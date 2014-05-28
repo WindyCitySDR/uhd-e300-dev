@@ -564,6 +564,7 @@ rx_streamer::sptr x300_impl::get_rx_stream_ce(const uhd::stream_args_t &args_, b
     UHD_ASSERT_THROW(mb_index < _mb.size());
 
     // Find the right CE TODO this is ugly
+    src_addr = 1;
     size_t ce_index = src_addr;
     boost::uint8_t sid_lower;
     switch (src_addr) { // Right now this is ce index (should this be sid? TODO)
@@ -625,12 +626,13 @@ rx_streamer::sptr x300_impl::get_rx_stream_ce(const uhd::stream_args_t &args_, b
         //// Set up null source
         //_mb[mb_index].nocshell_ctrls[1]->poke32(
             //SR_ADDR(0x0000, 8),
-            //0x02140000 | (data_sid & 0xFFFF)
+            ////0x02140000 | (data_sid & 0xFFFF)
+            //((data_sid >> 16) & 0xFFFF) | 0x02140000
         //);
         //// rate in clock cycles
         //_mb[mb_index].nocshell_ctrls[1]->poke32(
             //SR_ADDR(0x0000, 10),
-            //0 // (1<<12)
+            //(1<<8)
         //);
     //} else if (ce_index == 1) {
         //std::cout << "setting up null source" << std::endl;
@@ -678,15 +680,15 @@ rx_streamer::sptr x300_impl::get_rx_stream_ce(const uhd::stream_args_t &args_, b
     const size_t fc_window = get_rx_flow_control_window(xport.recv->get_recv_frame_size(), xport.recv_buff_size, device_addr);
     //const size_t fc_handle_window = std::max<size_t>(1, fc_window / X300_RX_FC_REQUEST_FREQ);
     //const size_t fc_window = 500;
-    const size_t fc_handle_window = 20;
+    const size_t fc_handle_window = 5;
     UHD_MSG(status) << "host buffer for rx fc " << fc_window << std::endl;
 
     UHD_LOG << "RX Flow Control Window = " << fc_window << ", RX Flow Control Handler Window = " << fc_handle_window << std::endl;
 
-    // Configure flow control (hope this works)
+    //// Configure flow control (hope this works)
     //mb.nocshell_ctrls[0]->poke32(SR_ADDR(0x0000, 0), fc_window-1);
     //mb.nocshell_ctrls[0]->poke32(SR_ADDR(0x0000, 1), fc_window?1:0);
-    //mb.nocshell_ctrls[1]->poke32(SR_ADDR(0x0000, 0), 8);
+    //mb.nocshell_ctrls[1]->poke32(SR_ADDR(0x0000, 0), 50);
     //mb.nocshell_ctrls[1]->poke32(SR_ADDR(0x0000, 1), 1);
     //{ // configure flow control, normally: perif.deframer->configure_flow_control(0[>cycs off<], fc_handle_window);
         //size_t pkts_per_up = 4;
@@ -770,17 +772,36 @@ boost::uint32_t x300_impl::rfnoc_cmd(
 		    const std::string &dst, const std::string &type,
 		    boost::uint32_t arg1, boost::uint32_t arg2)
 {
+    mboard_members_t &mb = _mb[0];
     if (dst == "ce0" or dst == "ce1" or dst == "ce2") {
         size_t ce_index = boost::lexical_cast<size_t>(dst[2]);
-        if (type != "" and type != "poke") {
-            throw uhd::value_error("x300_impl::rfnoc_cmd only supports poke on CEs");
+        if (type == "poke") {
+            UHD_MSG(status) << "Setting register " << std::dec << arg1 << " on CE " << ce_index << " to " << str(boost::format("0x%08x") % arg2) << std::endl;
+            mb.nocshell_ctrls[ce_index]->poke32(SR_ADDR(0x0000, arg1), arg2);
+            return 0;
         }
-        UHD_MSG(status) << "Setting register " << std::dec << arg1 << " on CE " << ce_index << " to " << str(boost::format("0x%08x") % arg2) << std::endl;
-        _mb[0].nocshell_ctrls[ce_index]->poke32(
-            SR_ADDR(0x0000, arg1),
-            arg2
-        );
-        return 0;
+        else if (type == "set_fc") {
+            if (arg1) {
+                UHD_MSG(status) << "Activating downstream flow control for CE " << ce_index << ". Downstream block buffer size: " << arg1 << " packets." << std::endl;
+                mb.nocshell_ctrls[ce_index]->poke32(SR_ADDR(0x0000, 0), arg1);
+                mb.nocshell_ctrls[ce_index]->poke32(SR_ADDR(0x0000, 1), 1);
+            } else {
+                UHD_MSG(status) << "Disabling downstream flow control for CE " << ce_index << "." << std::endl;
+                mb.nocshell_ctrls[ce_index]->poke32(SR_ADDR(0x0000, 0), 0);
+                mb.nocshell_ctrls[ce_index]->poke32(SR_ADDR(0x0000, 1), 0);
+            }
+            if (arg2) {
+                UHD_MSG(status) << "Activating upstream flow control for CE " << ce_index << ". Send ACKs every " << arg2 << " packets." << std::endl;
+                mb.nocshell_ctrls[ce_index]->poke32(SR_ADDR(0x0000, 2), 0); // cycs off
+                mb.nocshell_ctrls[ce_index]->poke32(SR_ADDR(0x0000, 3), (1 << 31) | ((arg2) & 0xffff));
+            } else {
+                UHD_MSG(status) << "Disabling upstream flow control for CE " << ce_index << "." << std::endl;
+                mb.nocshell_ctrls[ce_index]->poke32(SR_ADDR(0x0000, 2), 0);
+                mb.nocshell_ctrls[ce_index]->poke32(SR_ADDR(0x0000, 3), 0);
+            }
+            return 0;
+        }
+        throw uhd::value_error("x300_impl::rfnoc_cmd only supports poke and setup_fc on CEs");
     }
     else if (dst == "radio_rx0") {
         if (type == "setup_dsp") {
@@ -788,7 +809,7 @@ boost::uint32_t x300_impl::rfnoc_cmd(
             uhd::stream_args_t args;
             args.otw_format = "sc16";
             args.cpu_format = "sc16";
-            radio_perifs_t &perif = _mb[0].radio_perifs[0];
+            radio_perifs_t &perif = mb.radio_perifs[0];
             size_t spp = arg1;
             perif.framer->clear();
             perif.framer->set_nsamps_per_packet(spp); //seems to be a good place to set this
@@ -799,13 +820,13 @@ boost::uint32_t x300_impl::rfnoc_cmd(
         }
         else if (type == "setup_fc") {
             UHD_MSG(status) << "Setting radio0, downstream buffer size =" << arg1 << std::endl;
-            radio_perifs_t &perif = _mb[0].radio_perifs[0];
+            radio_perifs_t &perif = mb.radio_perifs[0];
             perif.framer->configure_flow_control(arg1);
             return 0;
         }
         else if (type == "stream_cmd") {
             UHD_MSG(status) << "Stream cmd to radio0 " << arg1 << std::endl;
-            radio_perifs_t &perif = _mb[0].radio_perifs[0];
+            radio_perifs_t &perif = mb.radio_perifs[0];
             uhd::stream_cmd_t stream_cmd(arg1 == 97 ? uhd::stream_cmd_t::STREAM_MODE_START_CONTINUOUS : uhd::stream_cmd_t::STREAM_MODE_STOP_CONTINUOUS);
             stream_cmd.stream_now = true;
             stream_cmd.time_spec = uhd::time_spec_t();
@@ -819,7 +840,7 @@ boost::uint32_t x300_impl::rfnoc_cmd(
             uhd::stream_args_t args;
             args.otw_format = "sc16";
             args.cpu_format = "sc16";
-            radio_perifs_t &perif = _mb[0].radio_perifs[0];
+            radio_perifs_t &perif = mb.radio_perifs[0];
             perif.deframer->clear();
             perif.deframer->setup(args);
             perif.duc->setup(args);
@@ -1042,7 +1063,6 @@ tx_streamer::sptr x300_impl::get_tx_stream_ce(const uhd::stream_args_t &args_, b
     }
     UHD_ASSERT_THROW(ce_index <= 2);
     UHD_MSG(status) << "ce_index==" << ce_index << std::endl;
-    UHD_MSG(status) << "sid_lower==" << sid_lower << std::endl;
     UHD_MSG(status) << "mb_index==" << mb_index << std::endl;
 
     // Setup

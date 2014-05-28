@@ -68,7 +68,7 @@ void benchmark_rx_rate(uhd::usrp::multi_usrp::sptr usrp, const std::string &rx_c
           //num_rx_samps += rx_stream->recv(buffs, max_samps_per_packet, md)*rx_stream->get_num_channels();
           num_rx_samps += rx_stream->recv(buffs, max_samps_per_packet, md);
           //std::cout << "num_rx_samps==" << num_rx_samps << std::endl;
-	boost::this_thread::sleep(boost::posix_time::milliseconds(100));
+	//boost::this_thread::sleep(boost::posix_time::milliseconds(100));
         }
         catch (...) {
           /* apparently, the boost thread interruption can sometimes result in

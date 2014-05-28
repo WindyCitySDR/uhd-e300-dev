@@ -21,6 +21,7 @@
 SET(example_sources
     benchmark_rate.cpp
     network_relay.cpp
+    rfnoc_rx_app.cpp
     rx_multi_samples.cpp
     rx_samples_to_file.cpp
     rx_samples_to_file_thru_filter.cpp
