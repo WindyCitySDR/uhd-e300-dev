@@ -813,6 +813,8 @@ void e300_impl::update_atrs(const size_t &fe)
         | (rx_bandsels << RX_BANDSEL)
         | (rx_bandsel_b << RXB_BANDSEL)
         | (rx_bandsel_c << RXC_BANDSEL)
+        | ((settings.rx_enb? 1 : 0) << ST_RX_ENABLE)
+        | ((settings.tx_enb? 1 : 0) << ST_TX_ENABLE)
     ;
     const int tx_enables = 0
         | (tx_enable_a << TX_ENABLEA)

@@ -46,6 +46,8 @@ localparam RB32_FP_GPIO         = 32;
 localparam RB64_CODEC_READBACK  = 40;
 localparam RB32_RADIO_NUM       = 48;
 
+localparam ST_RX_ENABLE = 20;
+localparam ST_TX_ENABLE = 19;
 localparam LED_TXRX_TX = 18;
 localparam LED_TXRX_RX = 17;
 localparam LED_RX_RX = 16;
