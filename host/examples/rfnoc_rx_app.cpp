@@ -35,6 +35,7 @@ void sig_int_handler(int){stop_signal_called = true;}
 
 
 ////////////////////////// APPS /////////////////////////////////////////////////////
+////////////////////////// APP1: null source -> host ////////////////////////////////
 void run_app_null_source_to_host(
     uhd::usrp::multi_usrp::sptr usrp,
     const std::string &file,
@@ -42,9 +43,17 @@ void run_app_null_source_to_host(
     double time_requested = 0.0,
     bool bw_summary = false,
     bool stats = false,
-    bool null = false
+    bool null = false,
+    boost::uint32_t rate_factor = 12,
+    boost::uint32_t lines_per_packet = 50
 ){
     std::cout << "===== NOTE: This app requires a null source on CE1. =========" << std::endl;
+    rate_factor &= 0xFFFF;
+    if (lines_per_packet == 0) {
+        lines_per_packet = 50;
+    } else if (lines_per_packet > 175) {
+        lines_per_packet = 175;
+    }
     unsigned long long num_total_samps = 0;
     // Create a receive streamer to CE1
     uhd::stream_args_t stream_args("sc16", "sc16");
@@ -55,22 +64,28 @@ void run_app_null_source_to_host(
     boost::uint32_t data_sid = rx_stream->get_sid(0);
     // Configure null source:
     usrp->get_device()->rfnoc_cmd(
-            "ce1", "poke",
-            8, // Register 8: Set SID
-            0x02140000 /* 2.20 */ | ((data_sid >> 16) & 0xFFFF)
-    );
-    usrp->get_device()->rfnoc_cmd(
-            "ce1", "poke",
-            10, // Register 10: Rate
-            (1<<10) // Rate in clock cycles (max 16 bits)
-    );
-    usrp->get_device()->rfnoc_cmd(
             "ce1", "set_fc",
             20000, // Host buffer: This is pretty big
             0 // No upstream block
     );
+    usrp->get_device()->rfnoc_cmd(
+            "ce1", "poke",
+            8, // Register 8: Set SID
+            0x02140000 /* 2.20 */ | ((data_sid >> 16) & 0xFFFF)
+    );
+    std::cout << "Setting lines per packet to " << lines_per_packet << " => Packet size: " << lines_per_packet * 8 << " Bytes, " << lines_per_packet * 2 << " Samples." << std::endl;
+    usrp->get_device()->rfnoc_cmd(
+            "ce1", "poke",
+            9, // Register 9: Lines per packet
+            lines_per_packet
+    );
+    std::cout << "Setting divider to " << rate_factor << ", ~" << (160.0 * 8.0 / (rate_factor + 1)) << " MByte/s" << std::endl;
+    usrp->get_device()->rfnoc_cmd(
+            "ce1", "poke",
+            10, // Register 10: Rate
+            rate_factor // Rate in clock cycles (max 16 bits)
+    );
 
-    size_t lines_per_packet = 50;
     size_t bytes_per_packet = lines_per_packet * 8;
     size_t samples_per_packet = bytes_per_packet / 4;
 
@@ -84,8 +99,8 @@ void run_app_null_source_to_host(
     std::cout << "Sending command to start streaming:" << std::endl;
     usrp->get_device()->rfnoc_cmd(
             "ce1", "poke",
-            9, // Register 9: Lines per packet
-            lines_per_packet
+            0x0B, // Register 11: Enable
+            true
     );
     std::cout << "Done" << std::endl;
 
@@ -94,26 +109,28 @@ void run_app_null_source_to_host(
     boost::posix_time::time_duration ticks_diff;
     boost::system_time last_update = start;
     unsigned long long last_update_samps = 0;
+    size_t n_packets = 0;
 
     while(not stop_signal_called and (num_requested_samples != num_total_samps or num_requested_samples == 0)) {
         boost::system_time now = boost::get_system_time();
         size_t num_rx_samps = rx_stream->recv(&buff.front(), buff.size(), md, 3.0);
+        if (num_rx_samps) {
+            n_packets += num_rx_samps / samples_per_packet;
+	}
 
         if (md.error_code == uhd::rx_metadata_t::ERROR_CODE_TIMEOUT) {
             std::cout << boost::format("Timeout while streaming") << std::endl;
             boost::this_thread::sleep(boost::posix_time::milliseconds(100));
-            continue;
         }
         if (md.error_code != uhd::rx_metadata_t::ERROR_CODE_NONE){
             std::string error = str(boost::format("Receiver error: %s") % md.strerror());
             std::cerr << error << std::endl;
-            continue;
         }
 
         num_total_samps += num_rx_samps;
 
         if (outfile.is_open())
-            outfile.write((const char*)&buff.front(), num_rx_samps);
+            outfile.write((const char*)&buff.front(), num_rx_samps * 4);
 
         if (bw_summary) {
             last_update_samps += num_rx_samps;
@@ -128,18 +145,18 @@ void run_app_null_source_to_host(
         }
 
         ticks_diff = now - start;
-            if (ticks_requested > 0){
-                if ((unsigned long long)ticks_diff.ticks() > ticks_requested)
-                    break;
-            }
+        if (ticks_requested > 0){
+            if ((unsigned long long)ticks_diff.ticks() > ticks_requested)
+                break;
+        }
     } // end while
 
-    // Setup streaming
+    // Stop streaming
     std::cout << "Sending command to stop streaming:" << std::endl;
     usrp->get_device()->rfnoc_cmd(
             "ce1", "poke",
-            9, // Register 9: Lines per packet
-            0
+            0x0B, // Register 11: Enable
+            false
     );
     std::cout << "Done" << std::endl;
 
@@ -154,10 +171,252 @@ void run_app_null_source_to_host(
     if (stats) {
         std::cout << std::endl;
         double t = (double)ticks_diff.ticks() / (double)boost::posix_time::time_duration::ticks_per_second();
+        std::cout << boost::format("Received %d packets in %f seconds") % n_packets % t << std::endl;
         std::cout << boost::format("Received %d bytes in %f seconds") % (num_total_samps*4) % t << std::endl;
         double r = (double)num_total_samps / t;
-        std::cout << boost::format("%f Msps") % (r/1e6) << std::endl;
+        std::cout << boost::format("%f MByte/s") % (r/1e6*4) << std::endl;
     }
+}
+
+////////////////////////// APP2: null source -> 8/16 converter -> host ////////////////////
+void run_app_null_source_converter_host(
+    uhd::usrp::multi_usrp::sptr usrp,
+    const std::string &file,
+    unsigned long long num_requested_samples,
+    double time_requested = 0.0,
+    bool bw_summary = false,
+    bool stats = false,
+    bool null = false,
+    boost::uint32_t rate_factor = 12,
+    boost::uint32_t lines_per_packet = 50
+){
+    std::cout << "===== NOTE: This app requires a null source on CE1 and a converter on CE0. =========" << std::endl;
+    rate_factor &= 0xFFFF;
+    if (lines_per_packet == 0) {
+        lines_per_packet = 50;
+    } else if (lines_per_packet > 175) {
+        lines_per_packet = 175;
+    }
+
+    size_t bytes_per_packet = lines_per_packet * 8;
+    size_t samples_per_packet = bytes_per_packet / 4;
+    double expected_rate = (160.0 * 8.0 / (rate_factor + 1)) * 2; // *2 'cause of converter
+
+    unsigned long long num_total_samps = 0;
+
+    // Create a receive streamer to CE0
+    uhd::stream_args_t stream_args("sc16", "sc16");
+    stream_args.args["src_addr"] = "0"; // 0 is converter
+    stream_args.channels = std::vector<size_t>(1, 0);
+    uhd::rx_streamer::sptr rx_stream = usrp->get_rx_stream(stream_args);
+    // Get sid for this connection (channel 0 because there's only 1 channel):
+    boost::uint32_t data_sid = rx_stream->get_sid(0);
+
+    // Configure null source:
+    // Configure null source:
+    usrp->get_device()->rfnoc_cmd(
+            "ce1", "set_fc",
+            7500/bytes_per_packet, // CE0 has 8k buffer
+            0 // No upstream block
+    );
+    usrp->get_device()->rfnoc_cmd(
+            "ce1", "poke",
+            8, // Register 8: Set SID
+            0x02140210 /* 2.20 to 2.16 */
+    );
+    std::cout << "Setting lines per packet to " << lines_per_packet << " => Packet size: " << lines_per_packet * 8 << " Bytes, " << lines_per_packet * 2 << " Samples." << std::endl;
+    usrp->get_device()->rfnoc_cmd(
+            "ce1", "poke",
+            9, // Register 9: Lines per packet
+            lines_per_packet
+    );
+    std::cout << "Setting divider to " << rate_factor << ", ~" << expected_rate << " MByte/s" << std::endl;
+    usrp->get_device()->rfnoc_cmd(
+            "ce1", "poke",
+            10, // Register 10: Rate
+            rate_factor // Rate in clock cycles (max 16 bits)
+    );
+
+    // Configure converter
+    std::cout << "Converter will send to address " << str(boost::format("0x%08x") % ((data_sid >> 16) & 0xFFFF)) << std::endl;
+    usrp->get_device()->rfnoc_cmd(
+            "ce0", "poke",
+            8, // Register 8: Set SID
+	    (1<<16) /* use SID */ | ((data_sid >> 16) & 0xFFFF) /* send to our streamer */
+    );
+    usrp->get_device()->rfnoc_cmd(
+            "ce0", "set_fc",
+            20000, // Host has a large buffer
+            2 // Report every 2nd packet to CE0
+    );
+
+    uhd::rx_metadata_t md;
+    std::vector<std::complex<short> > buff(samples_per_packet*2);
+    std::ofstream outfile;
+    if (not null)
+        outfile.open(file.c_str(), std::ofstream::binary);
+
+    // Setup streaming
+    std::cout << "Sending command to start streaming:" << std::endl;
+    usrp->get_device()->rfnoc_cmd(
+            "ce1", "poke",
+            0x0B, // Register 11: Enable
+            true
+    );
+    std::cout << "Done" << std::endl;
+
+    boost::system_time start = boost::get_system_time();
+    unsigned long long ticks_requested = (long)(time_requested * (double)boost::posix_time::time_duration::ticks_per_second());
+    boost::posix_time::time_duration ticks_diff;
+    boost::system_time last_update = start;
+    unsigned long long last_update_samps = 0;
+    size_t n_packets = 0;
+
+    while(not stop_signal_called and (num_requested_samples != num_total_samps or num_requested_samples == 0)) {
+        boost::system_time now = boost::get_system_time();
+        size_t num_rx_samps = rx_stream->recv(&buff.front(), buff.size(), md, 3.0);
+        if (num_rx_samps) {
+            n_packets += num_rx_samps / samples_per_packet;
+	}
+
+        if (md.error_code == uhd::rx_metadata_t::ERROR_CODE_TIMEOUT) {
+            std::cout << boost::format("Timeout while streaming") << std::endl;
+            boost::this_thread::sleep(boost::posix_time::milliseconds(100));
+        }
+        if (md.error_code != uhd::rx_metadata_t::ERROR_CODE_NONE){
+            std::string error = str(boost::format("Receiver error: %s") % md.strerror());
+            std::cerr << error << std::endl;
+        }
+
+        num_total_samps += num_rx_samps;
+
+        if (outfile.is_open())
+            outfile.write((const char*)&buff.front(), num_rx_samps*4);
+
+        if (bw_summary) {
+            last_update_samps += num_rx_samps;
+            boost::posix_time::time_duration update_diff = now - last_update;
+            if (update_diff.ticks() > boost::posix_time::time_duration::ticks_per_second()) {
+                double t = (double)update_diff.ticks() / (double)boost::posix_time::time_duration::ticks_per_second();
+                double r = (double)last_update_samps * 4.0 / t;
+                std::cout << boost::format("\t%f MByte/s") % (r/1e6) << std::endl;
+                last_update_samps = 0;
+                last_update = now;
+            }
+        }
+
+        ticks_diff = now - start;
+        if (ticks_requested > 0){
+            if ((unsigned long long)ticks_diff.ticks() > ticks_requested)
+                break;
+        }
+    } // end while
+
+    // Stop streaming
+    std::cout << "Sending command to stop streaming:" << std::endl;
+    usrp->get_device()->rfnoc_cmd(
+            "ce1", "poke",
+            0x0B, // Register 11: Enable
+            false
+    );
+    std::cout << "Done" << std::endl;
+
+    // Run recv until nothing is left
+    int num_post_samps = 0;
+    do {
+        num_post_samps = rx_stream->recv(&buff.front(), buff.size(), md, 3.0);
+    } while(num_post_samps and md.error_code == uhd::rx_metadata_t::ERROR_CODE_NONE);
+
+    if (outfile.is_open())
+        outfile.close();
+    if (stats) {
+        std::cout << std::endl;
+        double t = (double)ticks_diff.ticks() / (double)boost::posix_time::time_duration::ticks_per_second();
+        std::cout << boost::format("Received %d packets in %f seconds") % n_packets % t << std::endl;
+        std::cout << boost::format("Received %d bytes in %f seconds") % (num_total_samps*4) % t << std::endl;
+        double r = (double)num_total_samps / t;
+        std::cout << boost::format("%f MByte/s") % (r/1e6*4) << "  (Expected: " << expected_rate << " MByte/s)" << std::endl;
+    }
+}
+
+////////////////////////// APP2: null source -> null sink ////////////////////////////////
+void run_app_null_source_to_null_sink(
+    uhd::usrp::multi_usrp::sptr usrp,
+    const std::string &file,
+    double time_requested = 0.0,
+    bool bw_summary = false,
+    bool stats = false,
+    bool null = false,
+    boost::uint32_t rate_factor = 12,
+    boost::uint32_t lines_per_packet = 50
+){
+    std::cout << "=== NOTE: This app requires a null source on CE1 and a null sink on CE2 =======" << std::endl;
+    rate_factor &= 0xFFFF;
+    if (lines_per_packet == 0) {
+        lines_per_packet = 50;
+    } else if (lines_per_packet > 175) {
+        lines_per_packet = 175;
+    }
+    if (time_requested == 0.0) {
+        time_requested = 10;
+        std::cout << "Setting req'd time to " << time_requested << "s" << std::endl;
+    }
+    size_t bytes_per_packet = lines_per_packet * 8;
+    size_t samples_per_packet = bytes_per_packet / 4;
+
+    // Configure null source:
+    usrp->get_device()->rfnoc_cmd(
+            "ce1", "set_fc",
+            7000/bytes_per_packet, // We have 8k buffer
+            0 // No upstream block
+    );
+    usrp->get_device()->rfnoc_cmd(
+            "ce1", "poke",
+            8, // Register 8: Set SID
+            0x02140218 /* 2.20 to 2.24*/
+    );
+    std::cout << "Setting lines per packet to " << lines_per_packet << " => Packet size: " << lines_per_packet * 8 << " Bytes, " << lines_per_packet * 2 << " Samples." << std::endl;
+    usrp->get_device()->rfnoc_cmd(
+            "ce1", "poke",
+            9, // Register 9: Lines per packet
+            lines_per_packet
+    );
+    std::cout << "Setting divider to " << rate_factor << ", ~" << (160.0 * 8.0 / (rate_factor + 1)) << " MByte/s" << std::endl;
+    usrp->get_device()->rfnoc_cmd(
+            "ce1", "poke",
+            10, // Register 10: Rate
+            rate_factor // Rate in clock cycles (max 16 bits)
+    );
+    // Configure null sink
+    usrp->get_device()->rfnoc_cmd(
+            "ce2", "set_fc",
+            0, // No downstream block
+            2 // Report every 2nd block
+    );
+
+    // Setup streaming
+    std::cout << "Sending command to start streaming:" << std::endl;
+    usrp->get_device()->rfnoc_cmd(
+            "ce1", "poke",
+            0x0B, // Register 11: Enable
+            true
+    );
+    std::cout << "Done" << std::endl;
+
+    std::cout << "Sleeping for " << time_requested << " s..." << std::endl;
+    boost::this_thread::sleep(boost::posix_time::seconds(time_requested));
+
+    // Stop streaming
+    std::cout << "Sending command to stop streaming:" << std::endl;
+    usrp->get_device()->rfnoc_cmd(
+            "ce1", "poke",
+            0x0B, // Register 11: Enable
+            false
+    );
+    std::cout << "Done" << std::endl;
+
+    // Sleep for a little bit to allow gunk to propagate
+    boost::this_thread::sleep(boost::posix_time::milliseconds(100));
 }
 
 ///////////////////// HELPER FUNCTIONS ////////////////////////////////////////////////////
@@ -216,6 +475,7 @@ int UHD_SAFE_MAIN(int argc, char *argv[])
     std::string args, file, type, ant, subdev, ref, app;
     size_t total_num_samps, spb;
     double rate, freq, gain, total_time, setup_time;
+    boost::uint32_t app_arg1, app_arg2;
 
     //setup the program options
     po::options_description desc("Allowed options");
@@ -223,6 +483,8 @@ int UHD_SAFE_MAIN(int argc, char *argv[])
         ("help", "help message")
         ("args", po::value<std::string>(&args)->default_value(""), "multi uhd device address args")
         ("app", po::value<std::string>(&app)->default_value(""), "which app to run")
+        ("app_arg1", po::value<boost::uint32_t>(&app_arg1)->default_value(0), "app argument 1")
+        ("app_arg2", po::value<boost::uint32_t>(&app_arg2)->default_value(0), "app argument 2")
         ("file", po::value<std::string>(&file)->default_value("usrp_samples.dat"), "name of the file to write binary samples to")
         ("nsamps", po::value<size_t>(&total_num_samps)->default_value(0), "total number of samples to receive")
         ("time", po::value<double>(&total_time)->default_value(0), "total number of seconds to receive")
@@ -317,7 +579,22 @@ int UHD_SAFE_MAIN(int argc, char *argv[])
     if (app == "null_source_to_host") {
         run_app_null_source_to_host(
             usrp, file, total_num_samps, total_time, bw_summary,
-            stats, null
+            stats, null,
+	    app_arg1, app_arg2
+        );
+    }
+    else if (app == "null_source_converter_host") {
+        run_app_null_source_converter_host(
+            usrp, file, total_num_samps, total_time, bw_summary,
+            stats, null,
+	    app_arg1, app_arg2
+        );
+    }
+    else if (app == "null_source_to_null_sink") {
+        run_app_null_source_to_null_sink(
+            usrp, file, total_time, bw_summary,
+            stats, null,
+	    app_arg1, app_arg2
         );
     }
     else {

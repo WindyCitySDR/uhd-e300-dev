@@ -564,7 +564,6 @@ rx_streamer::sptr x300_impl::get_rx_stream_ce(const uhd::stream_args_t &args_, b
     UHD_ASSERT_THROW(mb_index < _mb.size());
 
     // Find the right CE TODO this is ugly
-    src_addr = 1;
     size_t ce_index = src_addr;
     boost::uint8_t sid_lower;
     switch (src_addr) { // Right now this is ce index (should this be sid? TODO)
@@ -579,8 +578,7 @@ rx_streamer::sptr x300_impl::get_rx_stream_ce(const uhd::stream_args_t &args_, b
             break;
     }
     UHD_ASSERT_THROW(ce_index <= 2);
-    UHD_MSG(status) << "ce_index==" << ce_index << std::endl;
-    UHD_MSG(status) << "sid_lower==" << sid_lower << std::endl;
+    UHD_MSG(status) << "Creating streamer to CE " << ce_index << std::endl;
     UHD_MSG(status) << "mb_index==" << mb_index << std::endl;
     _ce_index = ce_index;
 
@@ -678,12 +676,12 @@ rx_streamer::sptr x300_impl::get_rx_stream_ce(const uhd::stream_args_t &args_, b
 
     //flow control setup
     const size_t fc_window = get_rx_flow_control_window(xport.recv->get_recv_frame_size(), xport.recv_buff_size, device_addr);
-    //const size_t fc_handle_window = std::max<size_t>(1, fc_window / X300_RX_FC_REQUEST_FREQ);
+    const size_t fc_handle_window = std::max<size_t>(1, fc_window / X300_RX_FC_REQUEST_FREQ);
     //const size_t fc_window = 500;
-    const size_t fc_handle_window = 5;
-    UHD_MSG(status) << "host buffer for rx fc " << fc_window << std::endl;
+    //const size_t fc_handle_window = 5;
 
-    UHD_LOG << "RX Flow Control Window = " << fc_window << ", RX Flow Control Handler Window = " << fc_handle_window << std::endl;
+    //UHD_LOG << "RX Flow Control Window = " << fc_window << ", RX Flow Control Handler Window = " << fc_handle_window << std::endl;
+    UHD_MSG(status) << "RX Flow Control Window = " << fc_window << ", RX Flow Control Handler Window = " << fc_handle_window << std::endl;
 
     //// Configure flow control (hope this works)
     //mb.nocshell_ctrls[0]->poke32(SR_ADDR(0x0000, 0), fc_window-1);
@@ -783,6 +781,8 @@ boost::uint32_t x300_impl::rfnoc_cmd(
         else if (type == "set_fc") {
             if (arg1) {
                 UHD_MSG(status) << "Activating downstream flow control for CE " << ce_index << ". Downstream block buffer size: " << arg1 << " packets." << std::endl;
+                mb.nocshell_ctrls[ce_index]->poke32(SR_ADDR(0x0000, 1), 0);
+                boost::this_thread::sleep(boost::posix_time::milliseconds(1000));
                 mb.nocshell_ctrls[ce_index]->poke32(SR_ADDR(0x0000, 0), arg1);
                 mb.nocshell_ctrls[ce_index]->poke32(SR_ADDR(0x0000, 1), 1);
             } else {
