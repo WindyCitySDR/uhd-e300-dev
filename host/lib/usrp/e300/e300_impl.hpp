@@ -100,7 +100,7 @@ private:
         boost::weak_ptr<uhd::rx_streamer> rx_streamer;
         boost::weak_ptr<uhd::tx_streamer> tx_streamer;
     };
-    radio_perifs_t _radio_perifs[1]; //TODO 1 for now
+    radio_perifs_t _radio_perifs[2];
     void setup_radio(const size_t which_radio);
 
     double _tick_rate;

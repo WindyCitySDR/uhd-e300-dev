@@ -195,7 +195,6 @@ e300_impl::e300_impl(const uhd::device_addr_t &device_addr)
     }
     else
     {
-        radio_perifs_t &perif = _radio_perifs[0];
         e300_fifo_config_t fifo_cfg;
         try {
             fifo_cfg = e300_read_sysfs();
@@ -205,12 +204,17 @@ e300_impl::e300_impl(const uhd::device_addr_t &device_addr)
         _fifo_iface = e300_fifo_interface::make(fifo_cfg);
         _global_regs = uhd::usrp::e300::global_regs::make(_fifo_iface->get_global_regs_base());
 
-        perif.send_ctrl_xport = _fifo_iface->make_send_xport(1, ctrl_xport_args);
-        perif.recv_ctrl_xport = _fifo_iface->make_recv_xport(1, ctrl_xport_args);
-        perif.tx_data_xport = _fifo_iface->make_send_xport(0, data_xport_args);
-        perif.tx_flow_xport = _fifo_iface->make_recv_xport(0, ctrl_xport_args);
-        perif.rx_data_xport = _fifo_iface->make_recv_xport(2, data_xport_args);
-        perif.rx_flow_xport = _fifo_iface->make_send_xport(2, ctrl_xport_args);
+        size_t fe = 0;
+        BOOST_FOREACH(radio_perifs_t &perif, _radio_perifs)
+        {
+            size_t fe_shift = ((fe++) << 2);
+            perif.send_ctrl_xport = _fifo_iface->make_send_xport(1 | fe_shift, ctrl_xport_args);
+            perif.recv_ctrl_xport = _fifo_iface->make_recv_xport(1 | fe_shift, ctrl_xport_args);
+            perif.tx_data_xport   = _fifo_iface->make_send_xport(0 | fe_shift, data_xport_args);
+            perif.tx_flow_xport   = _fifo_iface->make_recv_xport(0 | fe_shift, ctrl_xport_args);
+            perif.rx_data_xport   = _fifo_iface->make_recv_xport(2 | fe_shift, data_xport_args);
+            perif.rx_flow_xport   = _fifo_iface->make_send_xport(2 | fe_shift, ctrl_xport_args);
+        }
         _codec_xport = ad9361_ctrl_transport::make_software_spi(AD9361_E300, uhd::usrp::e300::spi::make(E300_SPIDEV_DEVICE), 1);
         _codec_ctrl = ad9361_ctrl::make(_codec_xport);
         // This is horrible ... why do I have to sleep here?
@@ -299,10 +303,13 @@ e300_impl::e300_impl(const uhd::device_addr_t &device_addr)
     // setup radios
     ////////////////////////////////////////////////////////////////////
     this->setup_radio(0);
-    //TODO this->setup_radio(1);
+    this->setup_radio(1);
 
     _codec_ctrl->data_port_loopback(true);
-    this->codec_loopback_self_test(_radio_perifs[0].ctrl);
+    BOOST_FOREACH(radio_perifs_t &_radio_perif, _radio_perifs)
+    {
+        this->codec_loopback_self_test(_radio_perif.ctrl);
+    }
     _codec_ctrl->data_port_loopback(false);
 
     ////////////////////////////////////////////////////////////////////
@@ -326,11 +333,11 @@ e300_impl::e300_impl(const uhd::device_addr_t &device_addr)
     _tree->create<time_spec_t>(mb_path / "time" / "now")
         .publish(boost::bind(&time_core_3000::get_time_now, _radio_perifs[0].time64))
         .subscribe(boost::bind(&time_core_3000::set_time_now, _radio_perifs[0].time64, _1))
-        ;//.subscribe(boost::bind(&time_core_3000::set_time_now, _radio_perifs[1].time64, _1));
+        .subscribe(boost::bind(&time_core_3000::set_time_now, _radio_perifs[1].time64, _1));
     _tree->create<time_spec_t>(mb_path / "time" / "pps")
         .publish(boost::bind(&time_core_3000::get_time_last_pps, _radio_perifs[0].time64))
         .subscribe(boost::bind(&time_core_3000::set_time_next_pps, _radio_perifs[0].time64, _1))
-        ;//.subscribe(boost::bind(&time_core_3000::set_time_next_pps, _radio_perifs[1].time64, _1));
+        .subscribe(boost::bind(&time_core_3000::set_time_next_pps, _radio_perifs[1].time64, _1));
     //setup time source props
     _tree->create<std::string>(mb_path / "time_source" / "value")
         .subscribe(boost::bind(&e300_impl::update_time_source, this, _1));
@@ -600,7 +607,13 @@ void e300_impl::setup_radio(const size_t dspno)
     ////////////////////////////////////////////////////////////////////
     // radio control
     ////////////////////////////////////////////////////////////////////
-    perif.ctrl = radio_ctrl_core_3000::make(false/*lilE*/, perif.send_ctrl_xport, perif.recv_ctrl_xport, 1 | (1 << 16));
+    const int streamno = 1 | (dspno << 2);
+    perif.ctrl = radio_ctrl_core_3000::make(false/*lilE*/,
+                                            perif.send_ctrl_xport,
+                                            perif.recv_ctrl_xport,
+                                            streamno | (streamno << 16),
+                                            dspno ? "1" : "0"
+                                            );
     this->register_loopback_self_test(perif.ctrl);
     perif.atr = gpio_core_200_32wo::make(perif.ctrl, TOREG(SR_GPIO));
 
@@ -839,11 +852,9 @@ void e300_impl::update_atrs(const size_t &fe)
     */
 
     //load actual values into atr registers
-    if (!fe) {
-        gpio_core_200_32wo::sptr atr = _radio_perifs[fe].atr;
-        atr->set_atr_reg(dboard_iface::ATR_REG_IDLE, oo_reg);
-        atr->set_atr_reg(dboard_iface::ATR_REG_RX_ONLY, rx_reg);
-        atr->set_atr_reg(dboard_iface::ATR_REG_TX_ONLY, tx_reg);
-        atr->set_atr_reg(dboard_iface::ATR_REG_FULL_DUPLEX, fd_reg);
-    }
+    gpio_core_200_32wo::sptr atr = _radio_perifs[fe].atr;
+    atr->set_atr_reg(dboard_iface::ATR_REG_IDLE, oo_reg);
+    atr->set_atr_reg(dboard_iface::ATR_REG_RX_ONLY, rx_reg);
+    atr->set_atr_reg(dboard_iface::ATR_REG_TX_ONLY, tx_reg);
+    atr->set_atr_reg(dboard_iface::ATR_REG_FULL_DUPLEX, fd_reg);
 }
