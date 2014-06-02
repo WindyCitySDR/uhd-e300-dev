@@ -1086,7 +1086,7 @@ tx_streamer::sptr x300_impl::get_tx_stream_ce(const uhd::stream_args_t &args_, b
 
     // To calculate the max number of samples per packet, we assume the maximum header length
     // to avoid fragmentation should the entire header be used.
-    const size_t bpp = xport.send->get_send_frame_size() - X300_TX_MAX_HDR_LEN;
+    size_t bpp = xport.send->get_send_frame_size() - X300_TX_MAX_HDR_LEN;
     const size_t bpi = convert::get_bytes_per_item(args.otw_format);
     const size_t spp = unsigned(args.args.cast<double>("spp", bpp/bpi));
     bpp = spp * bpi;

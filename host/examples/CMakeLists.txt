@@ -24,7 +24,7 @@ SET(example_sources
     rfnoc_app.cpp
     rx_multi_samples.cpp
     rx_samples_to_file.cpp
-    rx_samples_to_file_thru_filter.cpp
+    #rx_samples_to_file_thru_filter.cpp
     rx_samples_to_udp.cpp
     rx_timed_samples.cpp
     test_dboard_coercion.cpp
