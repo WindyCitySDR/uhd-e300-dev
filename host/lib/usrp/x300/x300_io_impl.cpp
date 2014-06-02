@@ -1076,20 +1076,22 @@ tx_streamer::sptr x300_impl::get_tx_stream_ce(const uhd::stream_args_t &args_, b
     UHD_LOG << "creating tx stream " << device_addr.to_string() << std::endl;
     both_xports_t xport = this->make_transport(mb_index, sid_lower, 0x00, device_addr, data_sid);
     UHD_LOG << boost::format("data_sid = 0x%08x\n") % data_sid << std::endl;
-    if (ce_index == 0) {
-        boost::uint32_t data = (((data_sid >> 16)-1) & 0xFFFF) | (1 << 16);
-        _mb[mb_index].nocshell_ctrls[ce_index]->poke32(
-            SR_ADDR(0x0000, 8),
-            data
-        );
-    }
+    //if (ce_index == 0) {
+        //boost::uint32_t data = (((data_sid >> 16)-1) & 0xFFFF) | (1 << 16);
+        //_mb[mb_index].nocshell_ctrls[ce_index]->poke32(
+            //SR_ADDR(0x0000, 8),
+            //data
+        //);
+    //}
 
     // To calculate the max number of samples per packet, we assume the maximum header length
     // to avoid fragmentation should the entire header be used.
     const size_t bpp = xport.send->get_send_frame_size() - X300_TX_MAX_HDR_LEN;
     const size_t bpi = convert::get_bytes_per_item(args.otw_format);
     const size_t spp = unsigned(args.args.cast<double>("spp", bpp/bpi));
+    bpp = spp * bpi;
     UHD_MSG(status) << "spp==" << spp << std::endl;
+    UHD_MSG(status) << "bpp==" << bpp << std::endl;
 
     //make the new streamer given the samples per packet
     if (not my_streamer) my_streamer = boost::make_shared<sph::send_packet_streamer>(spp);
@@ -1110,14 +1112,14 @@ tx_streamer::sptr x300_impl::get_tx_stream_ce(const uhd::stream_args_t &args_, b
     id.num_inputs = 1;
     id.output_format = args.otw_format + "_item32_" + conv_endianness;
     id.num_outputs = 1;
-    UHD_MSG(status) << "convert id " << id.to_pp_string() << std::endl;
+    UHD_MSG(status) << "converter id " << id.to_pp_string() << std::endl;
     my_streamer->set_converter(id);
 
     //flow control setup
     UHD_VAR(xport.send->get_send_frame_size());
     // THIS IS A BUG: get_send_frame_size() will not report the actual packet size if e.g. if spp is set
     //size_t fc_window = get_tx_flow_control_window(xport.send->get_send_frame_size(), device_addr);  //In packets
-    size_t fc_window = 4;
+    size_t fc_window = 8000 / (bpp+8);
     UHD_VAR(fc_window);
     //const size_t fc_handle_window = std::max<size_t>(1, fc_window/X300_TX_FC_RESPONSE_FREQ);
     const size_t fc_handle_window = 2;
@@ -1125,14 +1127,14 @@ tx_streamer::sptr x300_impl::get_tx_stream_ce(const uhd::stream_args_t &args_, b
 
     UHD_LOG << "TX Flow Control Window = " << fc_window << ", TX Flow Control Handler Window = " << fc_handle_window << std::endl;
 
-    { // configure flow control, normally: perif.deframer->configure_flow_control(0/*cycs off*/, fc_handle_window);
-        size_t cycs_per_up = 0;
-        size_t pkts_per_up = fc_handle_window;
-        if (cycs_per_up == 0) mb.nocshell_ctrls[ce_index]->poke32(SR_ADDR(0x0000, 2), 0);
-        else mb.nocshell_ctrls[ce_index]->poke32(SR_ADDR(0x0000, 2), (1 << 31) | ((cycs_per_up) & 0xffffff));
-        if (pkts_per_up == 0) mb.nocshell_ctrls[ce_index]->poke32(SR_ADDR(0x0000, 3), 0);
-        else mb.nocshell_ctrls[ce_index]->poke32(SR_ADDR(0x0000, 3), (1 << 31) | ((pkts_per_up) & 0xffff));
-    }
+    //{ // configure flow control, normally: perif.deframer->configure_flow_control(0[>cycs off<], fc_handle_window);
+        //size_t cycs_per_up = 0;
+        //size_t pkts_per_up = fc_handle_window;
+        //if (cycs_per_up == 0) mb.nocshell_ctrls[ce_index]->poke32(SR_ADDR(0x0000, 2), 0);
+        //else mb.nocshell_ctrls[ce_index]->poke32(SR_ADDR(0x0000, 2), (1 << 31) | ((cycs_per_up) & 0xffffff));
+        //if (pkts_per_up == 0) mb.nocshell_ctrls[ce_index]->poke32(SR_ADDR(0x0000, 3), 0);
+        //else mb.nocshell_ctrls[ce_index]->poke32(SR_ADDR(0x0000, 3), (1 << 31) | ((pkts_per_up) & 0xffff));
+    //}
 
     boost::shared_ptr<x300_tx_fc_guts_t> guts(new x300_tx_fc_guts_t());
     guts->stream_channel = 0;

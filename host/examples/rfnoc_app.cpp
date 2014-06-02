@@ -194,8 +194,8 @@ void run_app_null_source_converter_host(
     rate_factor &= 0xFFFF;
     if (lines_per_packet == 0) {
         lines_per_packet = 50;
-    } else if (lines_per_packet > 175) {
-        lines_per_packet = 175;
+    } else if (lines_per_packet > 180) {
+        lines_per_packet = 180;
     }
 
     size_t bytes_per_packet = lines_per_packet * 8;
@@ -339,6 +339,88 @@ void run_app_null_source_converter_host(
     }
 }
 
+////////////////////////// APP: host -> null sink ////////////////////
+void run_app_host_to_null_sink(
+    uhd::usrp::multi_usrp::sptr usrp,
+    const std::string &file,
+    unsigned long long num_requested_samples,
+    double time_requested = 0.0,
+    bool bw_summary = false,
+    bool stats = false,
+    bool null = false,
+    boost::uint32_t bytes_per_packet = 1400,
+    boost::uint32_t lines_per_packet = 50
+){
+    std::cout << "===== NOTE: This app requires a null sink on CE2. =========" << std::endl;
+    size_t samples_per_packet = bytes_per_packet / 4;
+    bytes_per_packet = samples_per_packet * 4;
+    std::cout << "Bytes per packet: " << bytes_per_packet << std::endl;
+
+    unsigned long long num_total_samps = 0;
+
+    // Create a transmit streamer to CE2
+    uhd::stream_args_t stream_args("sc16", "sc16");
+    stream_args.args["src_addr"] = "2";
+    stream_args.channels = std::vector<size_t>(1, 0);
+    uhd::tx_streamer::sptr tx_stream = usrp->get_tx_stream(stream_args);
+    // Get sid for this connection (channel 0 because there's only 1 channel):
+    boost::uint32_t data_sid = tx_stream->get_sid(0);
+
+    // Configure null sink:
+    usrp->get_device()->rfnoc_cmd(
+            "ce2", "set_fc",
+            0, // No downstream block
+            2 // Report every 2nd packet
+    );
+
+    uhd::tx_metadata_t md;
+    std::vector<std::complex<short> > buff(samples_per_packet);
+
+    boost::system_time start = boost::get_system_time();
+    unsigned long long ticks_requested = (long)(time_requested * (double)boost::posix_time::time_duration::ticks_per_second());
+    boost::posix_time::time_duration ticks_diff;
+    boost::system_time last_update = start;
+    unsigned long long last_update_samps = 0;
+    size_t n_packets = 0;
+
+    while(not stop_signal_called and (num_requested_samples != num_total_samps or num_requested_samples == 0)) {
+        boost::system_time now = boost::get_system_time();
+        size_t num_tx_samps = tx_stream->send(&buff.front(), buff.size(), md, 3.0);
+	if (num_tx_samps < buff.size()) {
+            std::cout << "Timeout!" << std::endl;
+	}
+        num_total_samps += num_tx_samps;
+
+        if (bw_summary) {
+            last_update_samps += num_tx_samps;
+            boost::posix_time::time_duration update_diff = now - last_update;
+            if (update_diff.ticks() > boost::posix_time::time_duration::ticks_per_second()) {
+                double t = (double)update_diff.ticks() / (double)boost::posix_time::time_duration::ticks_per_second();
+                double r = (double)last_update_samps * 4.0 / t;
+                std::cout << boost::format("\t%f MByte/s") % (r/1e6) << std::endl;
+                last_update_samps = 0;
+                last_update = now;
+            }
+        }
+
+        ticks_diff = now - start;
+        if (ticks_requested > 0){
+            if ((unsigned long long)ticks_diff.ticks() > ticks_requested)
+                break;
+        }
+    } // end while
+
+    if (stats) {
+        std::cout << std::endl;
+        double t = (double)ticks_diff.ticks() / (double)boost::posix_time::time_duration::ticks_per_second();
+        std::cout << boost::format("Received %d packets in %f seconds") % n_packets % t << std::endl;
+        std::cout << boost::format("Received %d bytes in %f seconds") % (num_total_samps*4) % t << std::endl;
+        double r = (double)num_total_samps / t;
+        std::cout << boost::format("%f MByte/s") % (r/1e6*4) << std::endl;
+    }
+}
+
+
 ////////////////////////// APP2: null source -> null sink ////////////////////////////////
 void run_app_null_source_to_null_sink(
     uhd::usrp::multi_usrp::sptr usrp,
@@ -418,6 +500,7 @@ void run_app_null_source_to_null_sink(
     // Sleep for a little bit to allow gunk to propagate
     boost::this_thread::sleep(boost::posix_time::milliseconds(100));
 }
+
 
 ///////////////////// HELPER FUNCTIONS ////////////////////////////////////////////////////
 typedef boost::function<uhd::sensor_value_t (const std::string&)> get_sensor_fn_t;
@@ -592,6 +675,13 @@ int UHD_SAFE_MAIN(int argc, char *argv[])
     }
     else if (app == "null_source_to_null_sink") {
         run_app_null_source_to_null_sink(
+            usrp, file, total_time, bw_summary,
+            stats, null,
+	    app_arg1, app_arg2
+        );
+    }
+    else if (app == "host_to_null_sink") {
+        run_app_host_to_null_sink(
             usrp, file, total_time, bw_summary,
             stats, null,
 	    app_arg1, app_arg2
