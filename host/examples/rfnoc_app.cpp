@@ -207,16 +207,17 @@ void run_app_null_source_converter_host(
     // Create a receive streamer to CE0
     uhd::stream_args_t stream_args("sc16", "sc16");
     stream_args.args["src_addr"] = "0"; // 0 is converter
+    stream_args.args["fc_pkts_per_ack"] = "1000"; // ack every Nth packet
     stream_args.channels = std::vector<size_t>(1, 0);
     uhd::rx_streamer::sptr rx_stream = usrp->get_rx_stream(stream_args);
     // Get sid for this connection (channel 0 because there's only 1 channel):
     boost::uint32_t data_sid = rx_stream->get_sid(0);
 
     // Configure null source:
-    // Configure null source:
     usrp->get_device()->rfnoc_cmd(
             "ce1", "set_fc",
-            7500/bytes_per_packet, // CE0 has 8k buffer
+            //7500/bytes_per_packet, // CE0 has 8k buffer
+            10,
             0 // No upstream block
     );
     usrp->get_device()->rfnoc_cmd(
@@ -274,10 +275,13 @@ void run_app_null_source_converter_host(
 
     while(not stop_signal_called and (num_requested_samples != num_total_samps or num_requested_samples == 0)) {
         boost::system_time now = boost::get_system_time();
-        size_t num_rx_samps = rx_stream->recv(&buff.front(), buff.size(), md, 3.0);
+        size_t num_rx_samps = rx_stream->recv(&buff.front(), buff.size(), md, 3.0, true);
+        //if (num_rx_samps) {
+            //n_packets += num_rx_samps / samples_per_packet;
+	//}
         if (num_rx_samps) {
-            n_packets += num_rx_samps / samples_per_packet;
-	}
+            n_packets++;
+        }
 
         if (md.error_code == uhd::rx_metadata_t::ERROR_CODE_TIMEOUT) {
             std::cout << boost::format("Timeout while streaming") << std::endl;
@@ -507,6 +511,156 @@ void run_app_null_source_to_null_sink(
     boost::this_thread::sleep(boost::posix_time::milliseconds(100));
 }
 
+////////////////////////// APP: radio -> filter -> host ////////////////////
+void run_app_radio_filter_host(
+    uhd::usrp::multi_usrp::sptr usrp,
+    const std::string &file,
+    unsigned long long num_requested_samples,
+    double time_requested = 0.0,
+    bool bw_summary = false,
+    bool stats = false,
+    bool null = false,
+    boost::uint32_t _sampling_rate = 0,
+    boost::uint32_t _frequency = 0
+){
+    std::cout << "===== NOTE: This app requires a radio and a filter on CE1. =========" << std::endl;
+    if (_sampling_rate == 0) {
+        _sampling_rate = 1000000;
+    }
+    if (_frequency == 0) {
+        _frequency = 100;
+    }
+    double sampling_rate = (double) _sampling_rate;
+    double frequency = (double) _frequency;
+    size_t samples_per_packet = 360;
+
+    std::cout << "Setting rate to: " << sampling_rate/1e6 << " Msps" << std::endl;
+    usrp->set_rx_rate(sampling_rate, 0);
+    std::cout << "Setting frequency to: " << frequency << " MHz" << std::endl;
+    usrp->set_rx_freq(frequency*1e6, 0);
+    //usrp->set_rx_subdev_spec("A:A);
+
+    // Create a receive streamer to CE1 (filter)
+    uhd::stream_args_t stream_args("sc16", "sc16");
+    stream_args.args["src_addr"] = "1"; // 1 is filter
+    //stream_args.args["fc_pkts_per_ack"] = "1000"; // ack every Nth packet
+    stream_args.channels = std::vector<size_t>(1, 0);
+    uhd::rx_streamer::sptr rx_stream = usrp->get_rx_stream(stream_args);
+    // Get sid for this connection (channel 0 because there's only 1 channel):
+    boost::uint32_t data_sid = rx_stream->get_sid(0);
+
+    // Configure filter:
+    usrp->get_device()->rfnoc_cmd(
+            "ce1", "poke",
+            8, // Register 8: Set SID
+            0x02140000 | ((data_sid >> 16) & 0xFFFF) /* 2.20 to host */
+    );
+
+    // Configure radio
+    usrp->get_device()->rfnoc_cmd(
+            "radio_rx0", "setup_dsp",
+            samples_per_packet,
+            0x02090214 // 2.9 -> 2.20 (to filter, CE1)
+    );
+    usrp->get_device()->rfnoc_cmd(
+            "radio_rx0", "setup_fc",
+            5
+    );
+
+    uhd::rx_metadata_t md;
+    std::vector<std::complex<short> > buff(samples_per_packet);
+    std::ofstream outfile;
+    if (not null)
+        outfile.open(file.c_str(), std::ofstream::binary);
+
+    // Setup streaming
+    std::cout << "Sending command to start streaming:" << std::endl;
+    usrp->get_device()->rfnoc_cmd(
+            "radio_rx0", "stream_cmd",
+            uhd::stream_cmd_t::STREAM_MODE_START_CONTINUOUS,
+            true
+    );
+    std::cout << "Done" << std::endl;
+
+    // Start loop
+    boost::system_time start = boost::get_system_time();
+    unsigned long long ticks_requested = (long)(time_requested * (double)boost::posix_time::time_duration::ticks_per_second());
+    boost::posix_time::time_duration ticks_diff;
+    boost::system_time last_update = start;
+    unsigned long long last_update_samps = 0;
+    size_t n_packets = 0;
+    unsigned long long num_total_samps = 0;
+    while(not stop_signal_called and (num_requested_samples != num_total_samps or num_requested_samples == 0)) {
+        boost::system_time now = boost::get_system_time();
+        size_t num_rx_samps = rx_stream->recv(&buff.front(), buff.size(), md, 3.0, true);
+        //if (num_rx_samps) {
+            //n_packets += num_rx_samps / samples_per_packet;
+	//}
+        if (num_rx_samps) {
+            n_packets++;
+        }
+
+        if (md.error_code == uhd::rx_metadata_t::ERROR_CODE_TIMEOUT) {
+            std::cout << boost::format("Timeout while streaming") << std::endl;
+            boost::this_thread::sleep(boost::posix_time::milliseconds(100));
+            break;
+        }
+        if (md.error_code != uhd::rx_metadata_t::ERROR_CODE_NONE){
+            std::string error = str(boost::format("Receiver error: %s") % md.strerror());
+            std::cerr << error << std::endl;
+            break;
+        }
+
+        num_total_samps += num_rx_samps;
+
+        if (outfile.is_open())
+            outfile.write((const char*)&buff.front(), num_rx_samps*4);
+
+        if (bw_summary) {
+            last_update_samps += num_rx_samps;
+            boost::posix_time::time_duration update_diff = now - last_update;
+            if (update_diff.ticks() > boost::posix_time::time_duration::ticks_per_second()) {
+                double t = (double)update_diff.ticks() / (double)boost::posix_time::time_duration::ticks_per_second();
+                double r = (double)last_update_samps * 4.0 / t;
+                std::cout << boost::format("\t%f MByte/s") % (r/1e6) << std::endl;
+                last_update_samps = 0;
+                last_update = now;
+            }
+        }
+
+        ticks_diff = now - start;
+        if (ticks_requested > 0){
+            if ((unsigned long long)ticks_diff.ticks() > ticks_requested)
+                break;
+        }
+    } // end while
+
+    // Setup streaming
+    std::cout << "Sending command to start streaming:" << std::endl;
+    usrp->get_device()->rfnoc_cmd(
+            "radio_rx0", "stream_cmd",
+            uhd::stream_cmd_t::STREAM_MODE_STOP_CONTINUOUS,
+            true
+    );
+    std::cout << "Done" << std::endl;
+
+    // Run recv until nothing is left
+    int num_post_samps = 0;
+    do {
+        num_post_samps = rx_stream->recv(&buff.front(), buff.size(), md, 3.0);
+    } while(num_post_samps and md.error_code == uhd::rx_metadata_t::ERROR_CODE_NONE);
+
+    if (outfile.is_open())
+        outfile.close();
+    if (stats) {
+        std::cout << std::endl;
+        double t = (double)ticks_diff.ticks() / (double)boost::posix_time::time_duration::ticks_per_second();
+        std::cout << boost::format("Received %d packets in %f seconds") % n_packets % t << std::endl;
+        std::cout << boost::format("Received %d bytes in %f seconds") % (num_total_samps*4) % t << std::endl;
+        double r = (double)num_total_samps / t;
+        std::cout << boost::format("%f Msps") % (r/1e6) << "  (Expected: " << sampling_rate << " Msps)" << std::endl;
+    }
+}
 
 ///////////////////// HELPER FUNCTIONS ////////////////////////////////////////////////////
 typedef boost::function<uhd::sensor_value_t (const std::string&)> get_sensor_fn_t;
@@ -691,6 +845,13 @@ int UHD_SAFE_MAIN(int argc, char *argv[])
             usrp, file, total_num_samps, total_time, bw_summary,
             stats, null,
 	    app_arg1
+        );
+    }
+    else if (app == "radio_filter_host") {
+        run_app_radio_filter_host(
+            usrp, file, total_num_samps, total_time, bw_summary,
+            stats, null,
+	    app_arg1, app_arg2
         );
     }
     else {

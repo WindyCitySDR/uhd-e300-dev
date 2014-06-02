@@ -207,6 +207,7 @@ static size_t get_rx_flow_control_window(size_t frame_size, size_t sw_buff_size,
 
 static void handle_rx_flowctrl(const boost::uint32_t sid, zero_copy_if::sptr xport, bool big_endian, boost::shared_ptr<boost::uint32_t> seq32_state, const size_t last_seq)
 {
+    static size_t fc_pkt_count = 0;
     managed_send_buffer::sptr buff = xport->get_send_buff(0.0);
     if (not buff)
     {
@@ -222,7 +223,7 @@ static void handle_rx_flowctrl(const boost::uint32_t sid, zero_copy_if::sptr xpo
     seq32 &= ~0xfff;
     seq32 |= last_seq;
 
-    //UHD_MSG(status) << "sending flow ctrl packet, acking " << std::dec << last_seq;
+    UHD_MSG(status) << "sending flow ctrl packet " << fc_pkt_count++ << ", acking " << std::dec << last_seq << "(seq32==" << std::hex << seq32 << ")" << std::dec << std::endl;
 
     //load packet info
     vrt::if_packet_info_t packet_info;
@@ -676,9 +677,8 @@ rx_streamer::sptr x300_impl::get_rx_stream_ce(const uhd::stream_args_t &args_, b
 
     //flow control setup
     const size_t fc_window = get_rx_flow_control_window(xport.recv->get_recv_frame_size(), xport.recv_buff_size, device_addr);
-    const size_t fc_handle_window = std::max<size_t>(1, fc_window / X300_RX_FC_REQUEST_FREQ);
-    //const size_t fc_window = 500;
-    //const size_t fc_handle_window = 5;
+    //const size_t fc_handle_window = std::max<size_t>(1, fc_window / X300_RX_FC_REQUEST_FREQ);
+    const size_t fc_handle_window = unsigned(args.args.cast<double>("fc_pkts_per_ack", std::max<size_t>(1, fc_window / X300_RX_FC_REQUEST_FREQ)));
 
     //UHD_LOG << "RX Flow Control Window = " << fc_window << ", RX Flow Control Handler Window = " << fc_handle_window << std::endl;
     UHD_MSG(status) << "RX Flow Control Window = " << fc_window << ", RX Flow Control Handler Window = " << fc_handle_window << std::endl;
@@ -781,8 +781,8 @@ boost::uint32_t x300_impl::rfnoc_cmd(
         else if (type == "set_fc") {
             if (arg1) {
                 UHD_MSG(status) << "Activating downstream flow control for CE " << ce_index << ". Downstream block buffer size: " << arg1 << " packets." << std::endl;
-                mb.nocshell_ctrls[ce_index]->poke32(SR_ADDR(0x0000, 1), 0);
-                boost::this_thread::sleep(boost::posix_time::milliseconds(1000));
+                //mb.nocshell_ctrls[ce_index]->poke32(SR_ADDR(0x0000, 1), 0);
+                //boost::this_thread::sleep(boost::posix_time::milliseconds(1000));
                 mb.nocshell_ctrls[ce_index]->poke32(SR_ADDR(0x0000, 0), arg1);
                 mb.nocshell_ctrls[ce_index]->poke32(SR_ADDR(0x0000, 1), 1);
             } else {
@@ -827,6 +827,11 @@ boost::uint32_t x300_impl::rfnoc_cmd(
         else if (type == "stream_cmd") {
             UHD_MSG(status) << "Stream cmd to radio0 " << arg1 << std::endl;
             radio_perifs_t &perif = mb.radio_perifs[0];
+            if (arg1 == 97) {
+                UHD_MSG(status) << "STREAM_MODE_START_CONTINUOUS " << arg1 << std::endl;
+            } else {
+                UHD_MSG(status) << "STREAM_MODE_STOP_CONTINUOUS " << arg1 << std::endl;
+            }
             uhd::stream_cmd_t stream_cmd(arg1 == 97 ? uhd::stream_cmd_t::STREAM_MODE_START_CONTINUOUS : uhd::stream_cmd_t::STREAM_MODE_STOP_CONTINUOUS);
             stream_cmd.stream_now = true;
             stream_cmd.time_spec = uhd::time_spec_t();
