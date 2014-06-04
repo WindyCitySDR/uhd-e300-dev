@@ -1,5 +1,5 @@
 //
-// Copyright 2010-2011,2014 Ettus Research LLC
+// Copyright 2014 Ettus Research LLC
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -220,6 +220,11 @@ void run_app_null_source_converter_host(
             10,
             0 // No upstream block
     );
+    //usrp->get_device()->rfnoc_cmd(
+            //"ce1", "poke",
+            //2, // Cycles FC
+            //(1<<2) [> 2.20 to 2.16 <]
+    //);
     usrp->get_device()->rfnoc_cmd(
             "ce1", "poke",
             8, // Register 8: Set SID
@@ -248,7 +253,7 @@ void run_app_null_source_converter_host(
     usrp->get_device()->rfnoc_cmd(
             "ce0", "set_fc",
             20000, // Host has a large buffer
-            2 // Report every 2nd packet to CE0
+            1 // How often we report FC (every Nth packet)
     );
 
     uhd::rx_metadata_t md;
@@ -324,12 +329,19 @@ void run_app_null_source_converter_host(
             false
     );
     std::cout << "Done" << std::endl;
+    // Test responsiveness of CE0
+    usrp->get_device()->rfnoc_cmd(
+            "ce0", "poke",
+            8, // Register 8: Set SID
+	    (1<<16) /* use SID */ | ((data_sid >> 16) & 0xFFFF) /* send to our streamer */
+    );
 
     // Run recv until nothing is left
     int num_post_samps = 0;
     do {
         num_post_samps = rx_stream->recv(&buff.front(), buff.size(), md, 3.0);
     } while(num_post_samps and md.error_code == uhd::rx_metadata_t::ERROR_CODE_NONE);
+    boost::this_thread::sleep(boost::posix_time::seconds(2));
 
     if (outfile.is_open())
         outfile.close();
@@ -532,7 +544,7 @@ void run_app_radio_filter_host(
     }
     double sampling_rate = (double) _sampling_rate;
     double frequency = (double) _frequency;
-    size_t samples_per_packet = 360;
+    size_t samples_per_packet = 100;
 
     std::cout << "Setting rate to: " << sampling_rate/1e6 << " Msps" << std::endl;
     usrp->set_rx_rate(sampling_rate, 0);
@@ -560,11 +572,11 @@ void run_app_radio_filter_host(
     usrp->get_device()->rfnoc_cmd(
             "radio_rx0", "setup_dsp",
             samples_per_packet,
-            0x02090214 // 2.9 -> 2.20 (to filter, CE1)
+            0x020a0214 // 2.9 -> 2.20 (to filter, CE1)
     );
     usrp->get_device()->rfnoc_cmd(
             "radio_rx0", "setup_fc",
-            5
+            8000/(samples_per_packet*4) - 2
     );
 
     uhd::rx_metadata_t md;

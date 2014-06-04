@@ -243,7 +243,7 @@ private:
             }
             catch(const std::exception &ex)
             {
-                UHD_MSG(error) << "Radio ctrl bad VITA packet: " << ex.what() << std::endl;
+                UHD_MSG(error) << "NOCSHELL ctrl bad VITA packet: " << ex.what() << std::endl;
                 if (buff){
                     UHD_VAR(buff->size());
                 }
@@ -268,7 +268,7 @@ private:
             }
             catch(const std::exception &ex)
             {
-                throw uhd::io_error(str(boost::format("Radio ctrl (%s) packet parse error - %s") % _name % ex.what()));
+                throw uhd::io_error(str(boost::format("NOCSHELL ctrl (%s) packet parse error - %s") % _name % ex.what()));
             }
 
             //return the readback value

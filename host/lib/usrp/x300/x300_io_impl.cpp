@@ -223,7 +223,7 @@ static void handle_rx_flowctrl(const boost::uint32_t sid, zero_copy_if::sptr xpo
     seq32 &= ~0xfff;
     seq32 |= last_seq;
 
-    UHD_MSG(status) << "sending flow ctrl packet " << fc_pkt_count++ << ", acking " << std::dec << last_seq << "(seq32==" << std::hex << seq32 << ")" << std::dec << std::endl;
+    //UHD_MSG(status) << "sending flow ctrl packet " << fc_pkt_count++ << ", acking " << std::dec << last_seq << "(seq32==" << std::hex << seq32 << ")" << std::dec << std::endl;
 
     //load packet info
     vrt::if_packet_info_t packet_info;
