@@ -373,7 +373,10 @@ e300_impl::e300_impl(const uhd::device_addr_t &device_addr)
         const fs_path rf_fe_path = mb_path / "dboards" / "A" / (x+"x_frontends") / fe_name;
 
         _tree->create<std::string>(rf_fe_path / "name").set(fe_name);
-        _tree->create<int>(rf_fe_path / "sensors"); //empty TODO
+        _tree->create<int>(rf_fe_path / "sensors");
+        _tree->create<sensor_value_t>(rf_fe_path / "sensors" / "lo_locked")
+            .publish(boost::bind(&e300_impl::get_fe_pll_lock, this, x == "T"));
+
         BOOST_FOREACH(const std::string &name, ad9361_ctrl::get_gain_names(fe_name))
         {
             _tree->create<meta_range_t>(rf_fe_path / "gains" / name / "range")
@@ -465,6 +468,14 @@ void e300_impl::set_internal_gpio(gpio_core_200::sptr gpio, const std::string &a
         return gpio->set_atr_reg(dboard_iface::UNIT_RX, dboard_iface::ATR_REG_TX_ONLY, value);
     else if (attr == "ATR_XX")
         return gpio->set_atr_reg(dboard_iface::UNIT_RX, dboard_iface::ATR_REG_FULL_DUPLEX, value);
+}
+
+uhd::sensor_value_t e300_impl::get_fe_pll_lock(const bool is_tx)
+{
+    const boost::uint32_t st =
+        _global_regs->peek32(uhd::usrp::e300::global_regs::RB32_CORE_PLL);
+    const bool locked = is_tx ? st & 0x1 : st & 0x2;
+    return sensor_value_t("LO", locked, "locked", "unlocked");
 }
 
 e300_impl::~e300_impl(void)

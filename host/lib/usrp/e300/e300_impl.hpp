@@ -123,6 +123,7 @@ private:
     void codec_loopback_self_test(uhd::wb_iface::sptr iface);
 
     uhd::sensor_value_t get_mb_temp(const std::string &which);
+    uhd::sensor_value_t get_fe_pll_lock(const bool is_tx);
 
     //server stuff for network access
     void run_server(const std::string &port, const std::string &what);

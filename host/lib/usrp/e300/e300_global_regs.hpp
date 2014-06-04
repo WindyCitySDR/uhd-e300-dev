@@ -46,6 +46,7 @@ public:
     static const size_t RB32_CORE_PPS_SEL = 1;
     static const size_t RB32_CORE_COMPAT  = 2;
     static const size_t RB32_CORE_GITHASH = 3;
+    static const size_t RB32_CORE_PLL     = 4;
 };
 
 }}};

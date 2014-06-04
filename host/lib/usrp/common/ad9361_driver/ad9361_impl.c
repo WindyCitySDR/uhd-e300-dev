@@ -1551,7 +1551,7 @@ void init_ad9361(uint64_t handle) {
     write_ad9361_reg(device, 0x01D, 0x01); // AuxADC Setup (Decimation/Enable)
 
     /* Setup control outputs. */
-    write_ad9361_reg(device, 0x035, 0x07);
+    write_ad9361_reg(device, 0x035, 0x01);
     write_ad9361_reg(device, 0x036, 0xFF);
 
     /* Setup GPO */
