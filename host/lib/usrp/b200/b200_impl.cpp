@@ -578,7 +578,7 @@ void b200_impl::setup_radio(const size_t dspno)
         _tree->create<std::string>(rf_fe_path / "name").set("FE-"+key);
         _tree->create<int>(rf_fe_path / "sensors");
         _tree->create<sensor_value_t>(rf_fe_path / "sensors" / "lo_locked")
-            .publish(boost::bind(&b200_impl::get_fe_pll_locked, this, !direction));
+            .publish(boost::bind(&b200_impl::get_fe_pll_locked, this, x == "tx"));
 
         BOOST_FOREACH(const std::string &name, ad9361_ctrl::get_gain_names(key))
         {

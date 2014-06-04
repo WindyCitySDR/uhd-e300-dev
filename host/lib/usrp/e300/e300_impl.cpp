@@ -375,7 +375,7 @@ e300_impl::e300_impl(const uhd::device_addr_t &device_addr)
         _tree->create<std::string>(rf_fe_path / "name").set(fe_name);
         _tree->create<int>(rf_fe_path / "sensors");
         _tree->create<sensor_value_t>(rf_fe_path / "sensors" / "lo_locked")
-            .publish(boost::bind(&e300_impl::get_fe_pll_lock, this, x == "T"));
+            .publish(boost::bind(&e300_impl::get_fe_pll_lock, this, x == "t"));
 
         BOOST_FOREACH(const std::string &name, ad9361_ctrl::get_gain_names(fe_name))
         {
