@@ -142,8 +142,8 @@ e300_impl::e300_impl(const uhd::device_addr_t &device_addr)
             device_addr.get("fpga", E300_FPGA_FILE_NAME)
         );
 
-        //load fpga image - its super fast
-        this->load_fpga_image(e300_fpga_image);
+        if (not device_addr.has_key("no_reload_fpga"))
+            this->load_fpga_image(e300_fpga_image);
     }
 
     ////////////////////////////////////////////////////////////////////
