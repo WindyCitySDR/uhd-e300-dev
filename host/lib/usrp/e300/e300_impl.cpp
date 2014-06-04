@@ -199,7 +199,7 @@ e300_impl::e300_impl(const uhd::device_addr_t &device_addr)
         e300_fifo_config_t fifo_cfg;
         try {
             fifo_cfg = e300_read_sysfs();
-        } catch (...) {
+        } catch (uhd::lookup_error &e) {
             throw uhd::runtime_error("Failed to get driver parameters from sysfs.");
         }
         _fifo_iface = e300_fifo_interface::make(fifo_cfg);

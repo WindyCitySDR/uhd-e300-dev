@@ -422,7 +422,7 @@ e300_fifo_interface::sptr e300_fifo_interface::make(const e300_fifo_config_t &co
 
 e300_fifo_interface::sptr e300_fifo_interface::make(const e300_fifo_config_t &)
 {
-    throw uhd::runtime_error("e300_fifo_interface::make() !E300_NATIVE");
+    throw uhd::assertion_error("e300_fifo_interface::make() !E300_NATIVE");
 }
 
 #endif //E300_NATIVE

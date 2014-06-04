@@ -50,7 +50,7 @@ std::string e300_get_sysfs_attr(const std::string &node, const std::string &attr
     udev = udev_new();
 
     if (!udev) {
-        throw uhd::runtime_error("Failed to get udev handle.");
+        throw uhd::lookup_error("Failed to get udev handle.");
     }
 
     enumerate = udev_enumerate_new(udev);
@@ -111,12 +111,12 @@ e300_fifo_config_t e300_read_sysfs(void)
 
 e300_fifo_config_t e300_read_sysfs(void)
 {
-    throw uhd::runtime_error("e300_read_sysfs() !E300_NATIVE");
+    throw uhd::assertion_error("e300_read_sysfs() !E300_NATIVE");
 }
 
 std::string e300_get_sysfs_attr(const std::string &, const std::string &)
 {
-    throw uhd::runtime_error("e300_sysfs_attr() !E300_NATIVE");
+    throw uhd::assertion_error("e300_sysfs_attr() !E300_NATIVE");
 }
 
 #endif //E300_NATIVE
