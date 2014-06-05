@@ -16,6 +16,7 @@
 //
 
 #include "e300_impl.hpp"
+#include "e300_spi.hpp"
 #include "e300_regs.hpp"
 
 #include <uhd/utils/msg.hpp>
@@ -141,8 +142,8 @@ e300_impl::e300_impl(const uhd::device_addr_t &device_addr)
             device_addr.get("fpga", E300_FPGA_FILE_NAME)
         );
 
-        //load fpga image - its super fast
-        this->load_fpga_image(e300_fpga_image);
+        if (not device_addr.has_key("no_reload_fpga"))
+            this->load_fpga_image(e300_fpga_image);
     }
 
     ////////////////////////////////////////////////////////////////////
@@ -188,6 +189,9 @@ e300_impl::e300_impl(const uhd::device_addr_t &device_addr)
         zero_copy_if::sptr codec_xport;
         codec_xport = udp_zero_copy::make(device_addr["addr"], E300_SERVER_CODEC_PORT, ctrl_xport_params, dummy_buff_params_out, device_addr);
         _codec_ctrl = ad9361_ctrl::make(ad9361_ctrl_transport::make_zero_copy(codec_xport));
+        zero_copy_if::sptr gregs_xport;
+        gregs_xport = udp_zero_copy::make(device_addr["addr"], E300_SERVER_GREGS_PORT, ctrl_xport_params, dummy_buff_params_out, device_addr);
+        _global_regs = uhd::usrp::e300::global_regs::make(gregs_xport);
     }
     else
     {
@@ -199,17 +203,34 @@ e300_impl::e300_impl(const uhd::device_addr_t &device_addr)
             throw uhd::runtime_error("Failed to get driver parameters from sysfs.");
         }
         _fifo_iface = e300_fifo_interface::make(fifo_cfg);
+        _global_regs = uhd::usrp::e300::global_regs::make(_fifo_iface->get_global_regs_base());
+
         perif.send_ctrl_xport = _fifo_iface->make_send_xport(1, ctrl_xport_args);
         perif.recv_ctrl_xport = _fifo_iface->make_recv_xport(1, ctrl_xport_args);
         perif.tx_data_xport = _fifo_iface->make_send_xport(0, data_xport_args);
         perif.tx_flow_xport = _fifo_iface->make_recv_xport(0, ctrl_xport_args);
         perif.rx_data_xport = _fifo_iface->make_recv_xport(2, data_xport_args);
         perif.rx_flow_xport = _fifo_iface->make_send_xport(2, ctrl_xport_args);
-        _codec_xport = ad9361_ctrl_transport::make_software_spi(AD9361_E300, make_spidev(E300_SPIDEV_DEVICE), 1);
+        _codec_xport = ad9361_ctrl_transport::make_software_spi(AD9361_E300, uhd::usrp::e300::spi::make(E300_SPIDEV_DEVICE), 1);
         _codec_ctrl = ad9361_ctrl::make(_codec_xport);
         // This is horrible ... why do I have to sleep here?
         boost::this_thread::sleep(boost::posix_time::milliseconds(100));
     }
+
+    // Verify we can talk to the e300 core control registers ...
+    UHD_MSG(status) << "Initializing core control..." << std::endl;
+    this->register_loopback_self_test(_global_regs);
+
+    // TODO: Put this in the right place
+    const boost::uint32_t git_hash = _global_regs->peek32(uhd::usrp::e300::global_regs::RB32_CORE_GITHASH);
+    const boost::uint32_t compat = _global_regs->peek32(uhd::usrp::e300::global_regs::RB32_CORE_COMPAT);
+    UHD_MSG(status) << "Getting version information... " << std::flush;
+    UHD_MSG(status) << boost::format("%u.%02d (git %7x%s)")
+        % (compat & 0xff) % ((compat & 0xff00) >> 8)
+        % (git_hash & 0x0FFFFFFF)
+        % ((git_hash & 0xF000000) ? "-dirty" : "") << std::endl;
+
+
 
     ////////////////////////////////////////////////////////////////////
     // optional udp server
@@ -221,9 +242,12 @@ e300_impl::e300_impl(const uhd::device_addr_t &device_addr)
         tg.create_thread(boost::bind(&e300_impl::run_server, this, E300_SERVER_TX_PORT, "TX"));
         tg.create_thread(boost::bind(&e300_impl::run_server, this, E300_SERVER_CTRL_PORT, "CTRL"));
         tg.create_thread(boost::bind(&e300_impl::run_server, this, E300_SERVER_CODEC_PORT, "CODEC"));
+        tg.create_thread(boost::bind(&e300_impl::run_server, this, E300_SERVER_GREGS_PORT, "GREGS"));
         tg.join_all();
         goto e300_impl_begin;
     }
+
+
 
     ////////////////////////////////////////////////////////////////////
     // Initialize the properties tree
@@ -272,15 +296,29 @@ e300_impl::e300_impl(const uhd::device_addr_t &device_addr)
     _codec_ctrl->set_clock_rate(50e6);
 
     ////////////////////////////////////////////////////////////////////
-    // setup radio goo
+    // setup radios
     ////////////////////////////////////////////////////////////////////
     this->setup_radio(0);
     //TODO this->setup_radio(1);
 
-
     _codec_ctrl->data_port_loopback(true);
     this->codec_loopback_self_test(_radio_perifs[0].ctrl);
     _codec_ctrl->data_port_loopback(false);
+
+    ////////////////////////////////////////////////////////////////////
+    // internal gpios
+    ////////////////////////////////////////////////////////////////////
+    gpio_core_200::sptr fp_gpio = gpio_core_200::make(_radio_perifs[0].ctrl, TOREG(SR_FP_GPIO), RB32_FP_GPIO);
+    const std::vector<std::string> gpio_attrs = boost::assign::list_of("CTRL")("DDR")("OUT")("ATR_0X")("ATR_RX")("ATR_TX")("ATR_XX");
+    BOOST_FOREACH(const std::string &attr, gpio_attrs)
+    {
+        _tree->create<boost::uint32_t>(mb_path / "gpio" / "FP0" / attr)
+            .subscribe(boost::bind(&e300_impl::set_internal_gpio, this, fp_gpio, attr, _1))
+            .set(0);
+    }
+    _tree->create<boost::uint8_t>(mb_path / "gpio" / "FP0" / "READBACK")
+        .publish(boost::bind(&e300_impl::get_internal_gpio, this, fp_gpio, "READBACK"));
+
 
     ////////////////////////////////////////////////////////////////////
     // register the time keepers - only one can be the highlander
@@ -406,6 +444,29 @@ e300_impl::e300_impl(const uhd::device_addr_t &device_addr)
 
 }
 
+boost::uint8_t e300_impl::get_internal_gpio(gpio_core_200::sptr gpio, const std::string &)
+{
+    return boost::uint32_t(gpio->read_gpio(dboard_iface::UNIT_RX));
+}
+
+void e300_impl::set_internal_gpio(gpio_core_200::sptr gpio, const std::string &attr, const boost::uint32_t value)
+{
+    if (attr == "CTRL")
+        return gpio->set_pin_ctrl(dboard_iface::UNIT_RX, value);
+    else if (attr == "DDR")
+        return gpio->set_gpio_ddr(dboard_iface::UNIT_RX, value);
+    else if (attr == "OUT")
+        return gpio->set_gpio_out(dboard_iface::UNIT_RX, value);
+    else if (attr == "ATR_0X")
+        return gpio->set_atr_reg(dboard_iface::UNIT_RX, dboard_iface::ATR_REG_IDLE, value);
+    else if (attr == "ATR_RX")
+        return gpio->set_atr_reg(dboard_iface::UNIT_RX, dboard_iface::ATR_REG_RX_ONLY, value);
+    else if (attr == "ATR_TX")
+        return gpio->set_atr_reg(dboard_iface::UNIT_RX, dboard_iface::ATR_REG_TX_ONLY, value);
+    else if (attr == "ATR_XX")
+        return gpio->set_atr_reg(dboard_iface::UNIT_RX, dboard_iface::ATR_REG_FULL_DUPLEX, value);
+}
+
 e300_impl::~e300_impl(void)
 {
     /* NOP */
@@ -414,9 +475,9 @@ e300_impl::~e300_impl(void)
 double e300_impl::set_tick_rate(const double rate)
 {
     const size_t factor = 1.0;//((_fe_enb_map["RX1"] and _fe_enb_map["RX2"]) or (_fe_enb_map["TX1"] and _fe_enb_map["TX2"]))? 2:1;
-    UHD_MSG(status) << "asking for clock rate " << rate/1e6 << " MHz\n";
+    UHD_MSG(status) << "Asking for clock rate " << rate/1e6 << " MHz\n";
     _tick_rate = _codec_ctrl->set_clock_rate(rate/factor)*factor;
-    UHD_MSG(status) << "actually got clock rate " << _tick_rate/1e6 << " MHz\n";
+    UHD_MSG(status) << "Actually got clock rate " << _tick_rate/1e6 << " MHz\n";
 
     BOOST_FOREACH(radio_perifs_t &perif, _radio_perifs)
     {

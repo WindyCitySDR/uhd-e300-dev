@@ -47,6 +47,10 @@ static const size_t ARBITER_RB_STATUS_OCC = 20;
 static const size_t ARBITER_RB_ADDR_SPACE = 24;
 static const size_t ARBITER_RB_SIZE_SPACE = 28;
 
+// registers for the wb32_iface
+static const size_t SR_CORE_READBACK = 0;
+
+
 static UHD_INLINE size_t S2H_BASE(const size_t base)
 {
     return base + ZF_PAGE_SIZE * 0;
@@ -57,9 +61,14 @@ static UHD_INLINE size_t H2S_BASE(const size_t base)
     return base + ZF_PAGE_SIZE * 1;
 }
 
-static UHD_INLINE size_t DST_BASE(const size_t base)
+static UHD_INLINE size_t REG_BASE(const size_t base)
 {
     return base + ZF_PAGE_SIZE * 2;
+}
+
+static UHD_INLINE size_t DST_BASE(const size_t base)
+{
+    return base + ZF_PAGE_SIZE * 3;
 }
 
 static UHD_INLINE size_t ZF_STREAM_OFF(const size_t which)
@@ -176,9 +185,9 @@ struct e300_fifo_mb : managed_buffer
  * transport
  **********************************************************************/
 template <typename BaseClass>
-struct e300_transport : zero_copy_if
+class e300_transport : public zero_copy_if
 {
-
+public:
     e300_transport(
         boost::shared_ptr<void> allocator,
         const __mem_addrz_t &addrs,
@@ -278,6 +287,7 @@ struct e300_transport : zero_copy_if
         return _frame_size;
     }
 
+private:
     boost::shared_ptr<void> _allocator;
     const __mem_addrz_t _addrs;
     const size_t _num_frames;
@@ -290,107 +300,114 @@ struct e300_transport : zero_copy_if
 /***********************************************************************
  * memory mapping
  **********************************************************************/
-struct e300_fifo_interface_impl : e300_fifo_interface
+class e300_fifo_interface_impl : public virtual e300_fifo_interface
 {
+public:
     e300_fifo_interface_impl(const e300_fifo_config_t &config):
-        config(config),
-        bytes_in_use(0),
-        recv_entries_in_use(0),
-        send_entries_in_use(0)
+        _config(config),
+        _bytes_in_use(0),
+        _recv_entries_in_use(0),
+        _send_entries_in_use(0)
     {
         //open the file descriptor to our kernel module
         const std::string dev = "/dev/axi_fpga";
-        fd = ::open(dev.c_str(), O_RDWR|O_SYNC);
-        if (fd < 0)
+        _fd = ::open(dev.c_str(), O_RDWR|O_SYNC);
+        if (_fd < 0)
         {
             throw uhd::runtime_error("e300: failed to open " + dev);
         }
 
         //mmap the control and data regions into virtual space
-        //UHD_VAR(config.ctrl_length);
-        //UHD_VAR(config.buff_length);
-        //UHD_VAR(config.phys_addr);
-        buff = ::mmap(NULL, config.ctrl_length + config.buff_length, PROT_READ|PROT_WRITE, MAP_SHARED, fd, 0);
-        if (buff == MAP_FAILED)
+        //UHD_VAR(_config.ctrl_length);
+        //UHD_VAR(_config.buff_length);
+        //UHD_VAR(_config.phys_addr);
+        _buff = ::mmap(NULL, _config.ctrl_length + _config.buff_length, PROT_READ|PROT_WRITE, MAP_SHARED, _fd, 0);
+        if (_buff == MAP_FAILED)
         {
-            ::close(fd);
+            ::close(_fd);
             throw uhd::runtime_error("e300: failed to mmap " + dev);
         }
 
         //segment the memory according to zynq fifo arbiter
-        ctrl_space = size_t(buff);
-        data_space = size_t(buff) + config.ctrl_length;
+        _ctrl_space = size_t(_buff);
+        _data_space = size_t(_buff) + _config.ctrl_length;
 
         //zero out the data region
-        std::memset((void *)data_space, 0, config.buff_length);
+        std::memset((void *)_data_space, 0, _config.buff_length);
 
-        //create a poll waiter for the transports
-        waiter = new e300_fifo_poll_waiter(fd);
+        //create a poll _waiter for the transports
+        _waiter = new e300_fifo_poll_waiter(_fd);
     }
 
-    ~e300_fifo_interface_impl(void)
+    virtual ~e300_fifo_interface_impl(void)
     {
-        delete waiter;
+        delete _waiter;
         UHD_LOG << "cleanup: munmap" << std::endl;
-        ::munmap(buff, config.ctrl_length + config.buff_length);
-        ::close(fd);
+        ::munmap(_buff, _config.ctrl_length + _config.buff_length);
+        ::close(_fd);
     }
 
-    uhd::transport::zero_copy_if::sptr make_xport(const size_t which_stream, const uhd::device_addr_t &args, const bool is_recv)
+    uhd::transport::zero_copy_if::sptr make_recv_xport(const size_t which_stream, const uhd::device_addr_t &args)
     {
-        boost::mutex::scoped_lock lock(setup_mutex);
+        return this->_make_xport(which_stream, args, true);
+    }
+
+    uhd::transport::zero_copy_if::sptr make_send_xport(const size_t which_stream, const uhd::device_addr_t &args)
+    {
+        return this->_make_xport(which_stream, args, false);
+    }
+
+private:
+    uhd::transport::zero_copy_if::sptr _make_xport(const size_t which_stream, const uhd::device_addr_t &args, const bool is_recv)
+    {
+        boost::mutex::scoped_lock lock(_setup_mutex);
 
         const size_t frame_size(size_t(args.cast<double>((is_recv)? "recv_frame_size" : "send_frame_size", DEFAULT_FRAME_SIZE)));
         const size_t num_frames(size_t(args.cast<double>((is_recv)? "num_recv_frames" : "num_send_frames", DEFAULT_NUM_FRAMES)));
-        size_t &entries_in_use = (is_recv)? recv_entries_in_use : send_entries_in_use;
+        size_t &entries_in_use = (is_recv)? _recv_entries_in_use : _send_entries_in_use;
 
         __mem_addrz_t addrs;
         addrs.which = which_stream;
-        addrs.phys = config.phys_addr + bytes_in_use;
-        addrs.data = data_space + bytes_in_use;
-        addrs.ctrl = ((is_recv)? S2H_BASE(ctrl_space) : H2S_BASE(ctrl_space)) + ZF_STREAM_OFF(which_stream);
+        addrs.phys = _config.phys_addr + _bytes_in_use;
+        addrs.data = _data_space + _bytes_in_use;
+        addrs.ctrl = ((is_recv)? S2H_BASE(_ctrl_space) : H2S_BASE(_ctrl_space)) + ZF_STREAM_OFF(which_stream);
 
         uhd::transport::zero_copy_if::sptr xport;
-        if (is_recv) xport.reset(new e300_transport<managed_recv_buffer>(shared_from_this(), addrs, num_frames, frame_size, waiter, is_recv));
-        else         xport.reset(new e300_transport<managed_send_buffer>(shared_from_this(), addrs, num_frames, frame_size, waiter, is_recv));
+        if (is_recv) xport.reset(new e300_transport<managed_recv_buffer>(shared_from_this(), addrs, num_frames, frame_size, _waiter, is_recv));
+        else         xport.reset(new e300_transport<managed_send_buffer>(shared_from_this(), addrs, num_frames, frame_size, _waiter, is_recv));
 
-        bytes_in_use += num_frames*frame_size;
+        _bytes_in_use += num_frames*frame_size;
         entries_in_use += num_frames;
 
-        UHD_ASSERT_THROW(recv_entries_in_use <= S2H_NUM_CMDS);
-        UHD_ASSERT_THROW(send_entries_in_use <= H2S_NUM_CMDS);
-        UHD_ASSERT_THROW(bytes_in_use <= config.buff_length);
+        UHD_ASSERT_THROW(_recv_entries_in_use <= S2H_NUM_CMDS);
+        UHD_ASSERT_THROW(_send_entries_in_use <= H2S_NUM_CMDS);
+        UHD_ASSERT_THROW(_bytes_in_use <= _config.buff_length);
 
         //program the dest table based on the stream
         //TODO make this part of SID allocation
         if (is_recv)
         {
-            zf_poke32(DST_BASE(ctrl_space) + which_stream*4, which_stream);
+            zf_poke32(DST_BASE(_ctrl_space) + which_stream*4, which_stream);
         }
 
         return xport;
     }
 
-    uhd::transport::zero_copy_if::sptr make_recv_xport(const size_t which_stream, const uhd::device_addr_t &args)
+    size_t get_global_regs_base() const
     {
-        return this->make_xport(which_stream, args, true);
+        return REG_BASE(_ctrl_space);
     }
 
-    uhd::transport::zero_copy_if::sptr make_send_xport(const size_t which_stream, const uhd::device_addr_t &args)
-    {
-        return this->make_xport(which_stream, args, false);
-    }
-
-    e300_fifo_config_t config;
-    e300_fifo_poll_waiter *waiter;
-    size_t bytes_in_use;
-    int fd;
-    void *buff;
-    size_t ctrl_space;
-    size_t data_space;
-    size_t recv_entries_in_use;
-    size_t send_entries_in_use;
-    boost::mutex setup_mutex;
+    e300_fifo_config_t _config;
+    e300_fifo_poll_waiter *_waiter;
+    size_t _bytes_in_use;
+    int _fd;
+    void *_buff;
+    size_t _ctrl_space;
+    size_t _data_space;
+    size_t _recv_entries_in_use;
+    size_t _send_entries_in_use;
+    boost::mutex _setup_mutex;
 };
 
 e300_fifo_interface::sptr e300_fifo_interface::make(const e300_fifo_config_t &config)

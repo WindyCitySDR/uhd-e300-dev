@@ -184,6 +184,54 @@ static void e300_codec_ctrl_tunnel(
     *running = false;
 }
 
+static void e300_global_regs_tunnel(
+    const std::string &name,
+    boost::shared_ptr<asio::ip::udp::socket> socket,
+    uhd::usrp::e300::global_regs::sptr regs,
+    asio::ip::udp::endpoint *endpoint,
+    bool *running
+)
+{
+    UHD_ASSERT_THROW(regs);
+    asio::ip::udp::endpoint _endpoint;
+    try
+    {
+        while (*running)
+        {
+            uint8_t in_buff[16] = {};
+
+            const size_t num_bytes = socket->receive_from(asio::buffer(in_buff), *endpoint);
+
+            if (num_bytes < 16) {
+                std::cout << "Received short packet: " << num_bytes << std::endl;
+                continue;
+            }
+
+            uhd::usrp::e300::global_regs_transaction_t *in =
+                reinterpret_cast<uhd::usrp::e300::global_regs_transaction_t *>(in_buff);
+
+            if(in->is_poke) {
+                regs->poke32(in->addr, in->data);
+            }
+            else {
+                in->data = regs->peek32(in->addr);
+                socket->send_to(asio::buffer(in_buff, 16), *endpoint);
+            }
+        }
+    }
+    catch(const std::exception &ex)
+    {
+        UHD_MSG(error) << "e300_gregs_tunnel exit " << name << " " << ex.what() << std::endl;
+    }
+    catch(...)
+    {
+        UHD_MSG(error) << "e300_gregs_tunnel exit " << name << std::endl;
+    }
+    UHD_MSG(status) << "e300_gregs_tunnel exit " << name << std::endl;
+    *running = false;
+}
+
+
 /***********************************************************************
  * The TCP server itself
  **********************************************************************/
@@ -232,6 +280,11 @@ void e300_impl::run_server(const std::string &port, const std::string &what)
             {
                 tg.create_thread(boost::bind(&e300_codec_ctrl_tunnel, "CODEC tunnel", socket, _codec_xport, &endpoint, &running));
             }
+            if (what == "GREGS")
+            {
+                tg.create_thread(boost::bind(&e300_global_regs_tunnel, "GREGS tunnel", socket, _global_regs, &endpoint, &running));
+            }
+
 
             tg.join_all();
             socket->close();

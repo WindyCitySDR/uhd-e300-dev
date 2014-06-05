@@ -37,6 +37,8 @@
 #include "ad9361_ctrl.hpp"
 #include "gpio_core_200.hpp"
 
+#include "e300_global_regs.hpp"
+
 static const std::string E300_FPGA_FILE_NAME = "usrp_e300_fpga.bit";
 static const std::string E300_TEMP_SYSFS = "f8007100.ps7-xadc";
 static const std::string E300_SPIDEV_DEVICE  = "/dev/spidev0.1";
@@ -45,6 +47,7 @@ static std::string E300_SERVER_RX_PORT = "321756";
 static std::string E300_SERVER_TX_PORT = "321757";
 static std::string E300_SERVER_CTRL_PORT = "321758";
 static std::string E300_SERVER_CODEC_PORT = "321759";
+static std::string E300_SERVER_GREGS_PORT = "321760";
 
 static const double E300_DEFAULT_TICK_RATE = 32e6;
 
@@ -147,7 +150,11 @@ private:
     void update_fe_lo_freq(const std::string &fe, const double freq);
     void update_active_frontends(void);
 
-    uhd::spi_iface::sptr make_spidev(const std::string &device);
+    uhd::usrp::e300::global_regs::sptr _global_regs;
+
+    boost::uint8_t get_internal_gpio(gpio_core_200::sptr, const std::string &);
+
+    void set_internal_gpio(gpio_core_200::sptr gpio, const std::string &attr, const boost::uint32_t value);
 };
 
 #endif /* INCLUDED_E300_IMPL_HPP */
