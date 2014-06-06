@@ -223,7 +223,7 @@ static void handle_rx_flowctrl(const boost::uint32_t sid, zero_copy_if::sptr xpo
     seq32 &= ~0xfff;
     seq32 |= last_seq;
 
-    //UHD_MSG(status) << "sending flow ctrl packet " << fc_pkt_count++ << ", acking " << std::dec << last_seq << "(seq32==" << std::hex << seq32 << ")" << std::dec << std::endl;
+    UHD_MSG(status) << "sending flow ctrl packet " << fc_pkt_count++ << ", acking " << str(boost::format("%04d\tseq32==0x%08x") % last_seq % seq32) << std::endl;
 
     //load packet info
     vrt::if_packet_info_t packet_info;
@@ -579,7 +579,9 @@ rx_streamer::sptr x300_impl::get_rx_stream_ce(const uhd::stream_args_t &args_, b
             break;
     }
     UHD_ASSERT_THROW(ce_index <= 2);
-    UHD_MSG(status) << "Creating streamer to CE " << ce_index << std::endl;
+    if (ce_index <= 2) {
+        UHD_MSG(status) << "Creating streamer to CE " << ce_index << std::endl;
+    }
     UHD_MSG(status) << "mb_index==" << mb_index << std::endl;
     _ce_index = ce_index;
 

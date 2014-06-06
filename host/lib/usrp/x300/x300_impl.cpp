@@ -857,7 +857,7 @@ void x300_impl::setup_mb(const size_t mb_i, const uhd::device_addr_t &dev_addr)
     const boost::uint8_t ce_map[] = {X300_XB_DST_CE0, X300_XB_DST_CE1, X300_XB_DST_CE2};
     for (size_t i = 0; i < 3; i++) {
         boost::uint32_t ctrl_sid;
-        UHD_MSG(status) << "Setting up NoC-Shell Control #" << i << std::endl;
+        UHD_MSG(status) << str(boost::format("Setting up NoC-Shell Control #%d (SID: 0x%08x)") % i % ctrl_sid) << std::endl;
         both_xports_t xport = this->make_transport(
             mb_i, // mb index
             ce_map[i], // destination (top 6 bits of local part of sid)
