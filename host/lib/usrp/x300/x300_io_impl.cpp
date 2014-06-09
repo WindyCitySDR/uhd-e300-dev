@@ -802,7 +802,7 @@ boost::uint32_t x300_impl::rfnoc_cmd(
                 mb.nocshell_ctrls[ce_index]->poke32(SR_ADDR(0x0000, 3), 0);
             }
             UHD_MSG(status) << "Resetting fc counters." << std::endl;
-            mb.nocshell_ctrls[ce_index]->poke32(SR_ADDR(0x0000, 5), 0);
+            mb.nocshell_ctrls[ce_index]->poke32(SR_ADDR(0x0000, 4), 0);
             return 0;
         }
         throw uhd::value_error("x300_impl::rfnoc_cmd only supports poke and setup_fc on CEs");
