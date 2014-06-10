@@ -905,6 +905,127 @@ void run_app_radio_filter_host(
     }
 }
 
+////////////////////////// APP: host -> filter -> radio ////////////////////
+void run_app_host_filter_radio(
+    uhd::usrp::multi_usrp::sptr usrp,
+    const std::string &file,
+    unsigned long long num_requested_samples,
+    double time_requested = 0.0,
+    bool bw_summary = false,
+    bool stats = false,
+    bool null = false,
+    boost::uint32_t _sampling_rate = 0,
+    boost::uint32_t _frequency = 0
+){
+    std::cout << "===== NOTE: This app requires a radio and a filter on CE1. =========" << std::endl;
+    if (_sampling_rate == 0) {
+        _sampling_rate = 1000000;
+    }
+    if (_frequency == 0) {
+        _frequency = 100;
+    }
+    double sampling_rate = (double) _sampling_rate;
+    double frequency = (double) _frequency;
+    size_t samples_per_packet = 300;
+    size_t bytes_per_packet = 4 * samples_per_packet;
+    std::cout << "Setting rate to: " << sampling_rate/1e6 << " Msps" << std::endl;
+    usrp->set_tx_rate(sampling_rate, 0);
+    std::cout << "Setting frequency to: " << frequency << " MHz" << std::endl;
+    usrp->set_tx_freq(frequency*1e6, 0);
+    //usrp->set_rx_subdev_spec("A:A);
+
+    // Choose CE:
+    std::string ce_id = "ce2";
+
+    // Create a transmit streamer to CE
+    uhd::stream_args_t stream_args("sc16", "sc16");
+    stream_args.args["dst_addr"] = ce_id[2];
+    stream_args.channels = std::vector<size_t>(1, 0);
+    uhd::tx_streamer::sptr tx_stream = usrp->get_tx_stream(stream_args);
+    // Get sid for this connection (channel 0 because there's only 1 channel):
+    boost::uint32_t data_sid = tx_stream->get_sid(0);
+    boost::uint32_t ce_address = data_sid & 0xFFFF;
+    std::cout << str(boost::format("Using SID: 0x%08x") % data_sid) << std::endl;
+    std::cout << str(boost::format("CE address: 0x%04x") % ce_address) << std::endl;
+
+    // Configure filter:
+    usrp->get_device()->rfnoc_cmd(
+            ce_id, "poke",
+            8, // Register 8: Set SID
+            (ce_address << 16) | 0x0208 // CE to Radio 2.8
+    );
+    usrp->get_device()->rfnoc_cmd(
+            ce_id, "set_fc",
+            500000/4/samples_per_packet, // Radio has large buffer
+            2 // Report every 2nd packet
+    );
+    // Configure radio:
+    usrp->get_device()->rfnoc_cmd(
+            "radio_tx0", "setup_fc",
+            500000/4/samples_per_packet/8
+    );
+
+    uhd::tx_metadata_t md;
+    std::vector<std::complex<short> > buff(samples_per_packet);
+
+    unsigned long long num_total_samps = 0;
+    boost::system_time start = boost::get_system_time();
+    unsigned long long ticks_requested = (long)(time_requested * (double)boost::posix_time::time_duration::ticks_per_second());
+    boost::posix_time::time_duration ticks_diff;
+    boost::system_time last_update = start;
+    unsigned long long last_update_samps = 0;
+    size_t n_packets = 0;
+
+    std::ifstream infile;
+    infile.open(file.c_str(), std::ifstream::binary);
+
+    while(
+        not stop_signal_called
+        and (num_requested_samples != num_total_samps or num_requested_samples == 0)
+        and (ticks_requested == 0 or (unsigned long long)ticks_diff.ticks() <= ticks_requested)
+    ) {
+        if (infile.eof()) {
+            infile.clear();
+            infile.seekg(0);
+        }
+        infile.read((char *) &buff[0], bytes_per_packet);
+
+        boost::system_time now = boost::get_system_time();
+        size_t num_tx_samps = tx_stream->send(&buff.front(), infile.gcount() / 4, md, 3.0);
+	if (num_tx_samps < buff.size()) {
+            std::cout << "Timeout!" << std::endl;
+	}
+        if (num_tx_samps) {
+            n_packets++; // We always send 1 pkt per send call
+        }
+        num_total_samps += num_tx_samps;
+
+        if (bw_summary) {
+            last_update_samps += num_tx_samps;
+            boost::posix_time::time_duration update_diff = now - last_update;
+            if (update_diff.ticks() > boost::posix_time::time_duration::ticks_per_second()) {
+                double t = (double)update_diff.ticks() / (double)boost::posix_time::time_duration::ticks_per_second();
+                double r = (double)last_update_samps * 4.0 / t;
+                std::cout << boost::format("\t%f MByte/s") % (r/1e6) << std::endl;
+                last_update_samps = 0;
+                last_update = now;
+            }
+        }
+
+        ticks_diff = now - start;
+    } // end while
+    // Send EOB
+
+    if (stats) {
+        std::cout << std::endl;
+        double t = (double)ticks_diff.ticks() / (double)boost::posix_time::time_duration::ticks_per_second();
+        std::cout << boost::format("Transmitted %d packets in %f seconds") % n_packets % t << std::endl;
+        std::cout << boost::format("Transmitted %d bytes in %f seconds") % (num_total_samps*4) % t << std::endl;
+        double r = (double)num_total_samps / t;
+        std::cout << boost::format("%f MByte/s") % (r/1e6*4) << std::endl;
+    }
+}
+
 ///////////////////// HELPER FUNCTIONS ////////////////////////////////////////////////////
 typedef boost::function<uhd::sensor_value_t (const std::string&)> get_sensor_fn_t;
 
@@ -1100,6 +1221,13 @@ int UHD_SAFE_MAIN(int argc, char *argv[])
     }
     else if (app == "radio_filter_host") {
         run_app_radio_filter_host(
+            usrp, file, total_num_samps, total_time, bw_summary,
+            stats, null,
+	    app_arg1, app_arg2
+        );
+    }
+    else if (app == "host_filter_radio") {
+        run_app_host_filter_radio(
             usrp, file, total_num_samps, total_time, bw_summary,
             stats, null,
 	    app_arg1, app_arg2
