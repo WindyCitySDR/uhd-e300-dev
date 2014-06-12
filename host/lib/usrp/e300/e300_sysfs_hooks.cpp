@@ -37,7 +37,6 @@
 
 static const std::string E300_AXI_FPGA_SYSFS = "40000000.axi-fpga";
 static const std::string E300_XDEV_SYSFS = "f8007000.ps7-dev-cfg";
-static const std::string E300_TEMP_SYSFS = "f8007100.ps7-xadc";
 
 std::string e300_get_sysfs_attr(const std::string &node, const std::string &attr)
 {
