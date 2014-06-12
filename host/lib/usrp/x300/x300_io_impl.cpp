@@ -552,7 +552,6 @@ rx_streamer::sptr x300_impl::get_rx_stream_ce(const uhd::stream_args_t &args_, b
         throw uhd::value_error("x300_impl::get_rx_stream_ce only supports otw_format sc16");
     }
     args.otw_format = "sc16";
-    args.cpu_format = "sc16";
 
     boost::shared_ptr<sph::recv_packet_streamer> my_streamer;
 
@@ -638,6 +637,7 @@ rx_streamer::sptr x300_impl::get_rx_stream_ce(const uhd::stream_args_t &args_, b
     id.num_inputs = 1;
     id.output_format = args.cpu_format;
     id.num_outputs = 1;
+    UHD_MSG(status) << "RX Streamer: Selecting converter " << id.to_pp_string() << std::endl;
     my_streamer->set_converter(id);
 
     //flow control setup
@@ -647,17 +647,6 @@ rx_streamer::sptr x300_impl::get_rx_stream_ce(const uhd::stream_args_t &args_, b
 
     //UHD_LOG << "RX Flow Control Window = " << fc_window << ", RX Flow Control Handler Window = " << fc_handle_window << std::endl;
     UHD_MSG(status) << "RX Flow Control Window = " << fc_window << ", RX Flow Control Handler Window = " << fc_handle_window << std::endl;
-
-    //// Configure flow control (hope this works)
-    //mb.nocshell_ctrls[0]->poke32(SR_ADDR(0x0000, 0), fc_window-1);
-    //mb.nocshell_ctrls[0]->poke32(SR_ADDR(0x0000, 1), fc_window?1:0);
-    //mb.nocshell_ctrls[1]->poke32(SR_ADDR(0x0000, 0), 50);
-    //mb.nocshell_ctrls[1]->poke32(SR_ADDR(0x0000, 1), 1);
-    //{ // configure flow control, normally: perif.deframer->configure_flow_control(0[>cycs off<], fc_handle_window);
-        //size_t pkts_per_up = 4;
-        //mb.nocshell_ctrls[0]->poke32(SR_ADDR(0x0000, 2), 0); // cycs off
-        //mb.nocshell_ctrls[0]->poke32(SR_ADDR(0x0000, 3), (1 << 31) | ((pkts_per_up) & 0xffff));
-    //}
 
     boost::shared_ptr<boost::uint32_t> seq32(new boost::uint32_t(0));
     //Give the streamer a functor to get the recv_buffer
