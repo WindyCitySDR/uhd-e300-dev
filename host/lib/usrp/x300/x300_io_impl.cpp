@@ -551,10 +551,6 @@ rx_streamer::sptr x300_impl::get_rx_stream_ce(const uhd::stream_args_t &args_, b
     {
         throw uhd::value_error("x300_impl::get_rx_stream_ce only supports otw_format sc16");
     }
-    if (not args.cpu_format.empty() and args.cpu_format != "sc16")
-    {
-        throw uhd::value_error("x300_impl::get_rx_stream_ce only supports cpu_format sc16");
-    }
     args.otw_format = "sc16";
     args.cpu_format = "sc16";
 
@@ -615,39 +611,6 @@ rx_streamer::sptr x300_impl::get_rx_stream_ce(const uhd::stream_args_t &args_, b
     both_xports_t xport = this->make_transport(mb_index, sid_lower, 0x00, device_addr, data_sid);
     UHD_LOG << boost::format("data_sid = 0x%08x, actual recv_buff_size = %d\n") % data_sid % xport.recv_buff_size << std::endl;
     UHD_MSG(status) << str(boost::format("rx data_sid = 0x%08x") % data_sid) << std::endl;
-
-    //if (ce_index == 0) {
-        //boost::uint32_t data = (((data_sid >> 16)) & 0xFFFF) | (1 << 16);
-        //std::cout << "setting converter sid dst to " << std::hex << data << std::endl;
-        //_mb[mb_index].nocshell_ctrls[ce_index]->poke32(
-            //SR_ADDR(0x0000, 8),
-            //data
-        //);
-        //std::cout << "setting null source sid to " << std::hex << (0x02140000 | (data_sid & 0xFFFF)) << std::endl;
-        //// Set up null source
-        //_mb[mb_index].nocshell_ctrls[1]->poke32(
-            //SR_ADDR(0x0000, 8),
-            ////0x02140000 | (data_sid & 0xFFFF)
-            //((data_sid >> 16) & 0xFFFF) | 0x02140000
-        //);
-        //// rate in clock cycles
-        //_mb[mb_index].nocshell_ctrls[1]->poke32(
-            //SR_ADDR(0x0000, 10),
-            //(1<<8)
-        //);
-    //} else if (ce_index == 1) {
-        //std::cout << "setting up null source" << std::endl;
-        //boost::uint32_t return_sid = (data_sid >> 16) | (data_sid << 16);
-        //_mb[mb_index].nocshell_ctrls[ce_index]->poke32(
-            //SR_ADDR(0x0000, 8),
-            //return_sid
-        //);
-        //// rate in clock cycles
-        //_mb[mb_index].nocshell_ctrls[ce_index]->poke32(
-            //SR_ADDR(0x0000, 10),
-            //(1<<18)
-        //);
-    //}
 
     // To calculate the max number of samples per packet, we assume the maximum header length
     // to avoid fragmentation should the entire header be used.

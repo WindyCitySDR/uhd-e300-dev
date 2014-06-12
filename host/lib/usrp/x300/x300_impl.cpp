@@ -924,7 +924,8 @@ void x300_impl::setup_radio(const size_t mb_i, const std::string &slot_name)
     ////////////////////////////////////////////////////////////////////
     boost::uint8_t dest = (radio_index == 0)? X300_XB_DST_R0 : X300_XB_DST_R1;
     boost::uint32_t ctrl_sid;
-    both_xports_t xport = this->make_transport(mb_i, dest, X300_RADIO_DEST_PREFIX_CTRL, device_addr_t(), ctrl_sid);
+    //both_xports_t xport = this->make_transport(mb_i, dest, X300_RADIO_DEST_PREFIX_CTRL, device_addr_t(), ctrl_sid);
+    both_xports_t xport = this->make_transport(mb_i, dest, 0x00, device_addr_t(), ctrl_sid);
     UHD_MSG(status) << "Radio " << radio_index << " Ctrl SID: " << str(boost::format("0x%08x") % ctrl_sid) << std::endl;
     perif.ctrl = radio_ctrl_core_3000::make(mb.if_pkt_is_big_endian, xport.recv, xport.send, ctrl_sid, slot_name);
     perif.ctrl->poke32(TOREG(SR_MISC_OUTS), (1 << 2)); //reset adc + dac
