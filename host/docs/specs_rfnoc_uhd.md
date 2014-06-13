@@ -1,4 +1,4 @@
-
+vim: ft=markdown:
 # 1. Feature Definition
 
 These improvements/extensions to the UHD API will allow users to work with RFNoC blocks on the FPGA of a Generation 3 device (at the moment: X300, E300).
@@ -25,36 +25,68 @@ such as:
 * Access to the crossbar
 * Querying SIDs of connections, and addresses of components (e.g. which SID is the controller for block 1 using, what's the address of block 2)
 
-* Also, why not change stuff (FIXME)
+Another shortcoming is the existence of many hardcoded constants in the current code base.
 
-* Too many hardcoded constants
+Also, since some major changes are necessary to facilitate building RFNoC-based applications, it would be a good time to
+change or clean up some other items.
 
 
 #### 1.2.1.1 Backward compatibility
 
-* Maintain where possible 
-* Mostly unchanged!
+Maintaining backward compatibility will not always be possible, but careful design can go a long way towards
+maintaining backward compatibility.
 
 ### 1.2.2 What is required of such a new API?
 
-* The ability to create a streamer (rx or tx)
-* peek/poke settings registers
-* User-defined blocks, e.g. FFT -> User can change forward/reverse through set_fft_direction() on the controller class
+* Arbitrarily define channels to go to any endpoint
+* The ability to create a streamer on any channel (doesn't have to go to radio)
+* peek/poke settings registers on blocks
+* Common settings must be accessible through simpler API calls than explicit register settings
+* Must be extensible, so user-written blocks can have their own API calls (e.g. if the user implementes a filter with variable taps,
+  allow them to have a function to set taps instead of forcing them to use pokes
+* Debugging features:
+** Print a list of all known SIDs, along with an identifier of who's using them
 
-* Debugging: List all known SIDs
+### 1.2.3 Use Case: Receiving through a filter block
+
+An example of this would be the case where the signal coming from the radio is filtered first, on the device,
+then sent to the host:
+
+```
++-------+     +------+           +------+
+|       | AXI |      |  Ethernet |      |
+| Radio +-----> FIR  +-----------> Host |
+|       |     |      |           |      |
++-------+     +------+           +------+
+```
+
+This requires the following steps:
+* Configure radio to send to a specific address (not host)
+* Run all necessary radio configuration steps (initialize clock, set frequency, ...)
+* Set up flow control on radio and FIR filter block
+* Open a rx stream from host to FIR
+* Optional: Configure the FIR filter taps
 
 
-### 1.2.3 Use Case: Receiving through an intermediate block
+### 1.2.4 Use Case: Welch Spectral Estimator
 
-An example of this would be the case where the signal coming from the radio is filtered first, on the device.
+* On the device:
+** FFT (Vector-based!)
+** Mag-Square (Data type change!)
+** Averaging (Block with history)
 
-Example Use Cases
+### 1.2.5 Use Case: 802.11a Receiver
+
+* Entire demodulation done on the FPGA
+
+### 1.2.6 Other use cases
 
 * Regular streaming
 * +MIMO
 * Simple flow graphs on FPGA
-* User-defined blocks, e.g. FFT -> User can change forward/reverse through set_fft_direction() on the controller class
+* User-defined blocks, e.g. FFT -> User can change forward/reverse through `set_fft_direction()` on the controller class
 * Multi-device
+
 
 ## 1.3 Additional Requirements
 
@@ -71,7 +103,8 @@ Example Use Cases
 * Readback registers to query:
 ** Block type (this needs a special bit whether or not it's using the NoC-Shell)
 ** Input buffer size (for flow control)
-
+** Input Data Type
+** Output Data Type
 
 ### 1.3.2 FPGA Changes / General
 
@@ -102,7 +135,7 @@ unchanged. However, the configuration of the radios is replaced by the following
 
 1. Query all ports on the crossbar to find out what type of block is connected
 2. Create a block controller object for every block, and allocate a SID. This block controller object is of type
-   nocshell_control, and is specialized towards the functionality of every block (i.e., it has different functions
+   `rfnoc_block` (see below), and is specialized towards the functionality of every block (i.e., it has different functions
    for a radio block than for an FFT block).
 3. Every block's controller object extends the property tree
 
@@ -111,12 +144,33 @@ that need setting up (e.g., filter taps might need initializing, ...).
 
 ## 2.2 Accessing Blocks
 
-For controlling purposes, it will be necessary to allow users to access blocks for purposes
-other than streaming. To stay in tune with current UHD design, using the property tree would be the correct choice
-for this.
+For controlling purposes, it is necessary to allow users to access blocks for purposes
+other than streaming. Two mechanisms will be made available:
+
+1. Property Tree based control
+
+To stay in tune with current UHD design, using the property tree is be the correct choice.
+At initialization, every block controller object gets the opportunity to populate the property tree.
+
+For the radios, this allows to maintain backward compabitility, as they can simply populate the property
+tree in the same way they had so far. For other objects, they may populate the tree under the following
+path:
+
+    /mboards/MB_INDEX/rfnoc/PORT/
+
+Where `MB_INDEX` is the board index (as before), and `PORT` is the local port number on the crossbar.
+The following properties must be set:
+
+    /block_type
+    /input_type
+    /output_type
+    /input_buffer_size
+
+*Note:* Radios must also populate these elements, although they may also populate other paths in the property tree!
+
+2. Direct access to the block controller objects
 
 
-/mboards/0/xbar/8/fft_direction
 
 However, it can be helpful to be able to access blocks directly. For this purpose
 
