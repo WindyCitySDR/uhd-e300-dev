@@ -339,55 +339,54 @@ void run_app_null_source_converter_host(
 
     unsigned long long num_total_samps = 0;
 
+    std::string null_src_ce = "ce0";
+    std::string other_ce = "ce1";
+
     // Create a receive streamer to CE0
     uhd::stream_args_t stream_args("sc16", "sc16");
-    stream_args.args["src_addr"] = "0"; // 0 is converter
-    //stream_args.args["fc_pkts_per_ack"] = "1024"; // ack every Nth packet
-    //std::cout << stream_args.args["fc_pkts_per_ack"] << " <- args" << std::endl;
+    stream_args.args["src_addr"] = other_ce[2]; // 0 is converter
     stream_args.channels = std::vector<size_t>(1, 0);
     uhd::rx_streamer::sptr rx_stream = usrp->get_rx_stream(stream_args);
     // Get sid for this connection (channel 0 because there's only 1 channel):
     boost::uint32_t data_sid = rx_stream->get_sid(0);
+    boost::uint32_t other_ce_address = data_sid & 0xFFFF;
+    std::cout << "Other CE Address: " << str(boost::format("0x%04x") % other_ce_address) << std::endl;
+    boost::uint32_t null_source_address = 0x0210 + boost::lexical_cast<int>(null_src_ce[2]) * 4;
+    std::cout << "Null Source Address: " << str(boost::format("0x%04x") % null_source_address) << std::endl;
 
     // Configure null source:
     usrp->get_device()->rfnoc_cmd(
-            "ce1", "set_fc",
-            //7500/bytes_per_packet, // CE0 has 8k buffer
-            10,
+            null_src_ce, "set_fc",
+            7500/bytes_per_packet, // CE0 has 8k buffer
             0 // No upstream block
     );
-    //usrp->get_device()->rfnoc_cmd(
-            //"ce1", "poke",
-            //2, // Cycles FC
-            //(1<<2) [> Every Nth cycle <]
-    //);
     usrp->get_device()->rfnoc_cmd(
-            "ce1", "poke",
+            null_src_ce, "poke",
             8, // Register 8: Set SID
-            0x02140210 /* 2.20 to 2.16 */
+            (null_source_address << 16) | other_ce_address
     );
     std::cout << "Setting lines per packet to " << lines_per_packet << " => Packet size: " << lines_per_packet * 8 << " Bytes, " << lines_per_packet * 2 << " Samples." << std::endl;
     usrp->get_device()->rfnoc_cmd(
-            "ce1", "poke",
+            null_src_ce, "poke",
             9, // Register 9: Lines per packet
             lines_per_packet
     );
     std::cout << "Setting divider to " << rate_factor << ", ~" << expected_rate << " MByte/s" << std::endl;
     usrp->get_device()->rfnoc_cmd(
-            "ce1", "poke",
+            null_src_ce, "poke",
             10, // Register 10: Rate
             rate_factor // Rate in clock cycles (max 16 bits)
     );
 
-    // Configure converter
-    std::cout << "Converter will send to address " << str(boost::format("0x%08x") % ((data_sid >> 16) & 0xFFFF)) << std::endl;
+    // Configure other block
+    std::cout << "Second CE will send to address " << str(boost::format("0x%08x") % ((data_sid >> 16) & 0xFFFF)) << std::endl;
     usrp->get_device()->rfnoc_cmd(
-            "ce0", "poke",
+            other_ce, "poke",
             8, // Register 8: Set SID
 	    (1<<16) /* use SID */ | ((data_sid >> 16) & 0xFFFF) /* send to our streamer */
     );
     usrp->get_device()->rfnoc_cmd(
-            "ce0", "set_fc",
+            other_ce, "set_fc",
             20000, // Host has a large buffer
             2 // How often we report FC (every Nth packet)
     );
@@ -401,7 +400,7 @@ void run_app_null_source_converter_host(
     // Setup streaming
     std::cout << "Sending command to start streaming:" << std::endl;
     usrp->get_device()->rfnoc_cmd(
-            "ce1", "poke",
+            null_src_ce, "poke",
             0x0B, // Register 11: Enable
             true
     );
@@ -460,17 +459,11 @@ void run_app_null_source_converter_host(
     // Stop streaming
     std::cout << "Sending command to stop streaming:" << std::endl;
     usrp->get_device()->rfnoc_cmd(
-            "ce1", "poke",
+            null_src_ce, "poke",
             0x0B, // Register 11: Enable
             false
     );
     std::cout << "Done" << std::endl;
-    // Test responsiveness of CE0
-    usrp->get_device()->rfnoc_cmd(
-            "ce0", "poke",
-            8, // Register 8: Set SID
-	    (1<<16) /* use SID */ | ((data_sid >> 16) & 0xFFFF) /* send to our streamer */
-    );
 
     // Run recv until nothing is left
     int num_post_samps = 0;

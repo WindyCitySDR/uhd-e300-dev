@@ -783,12 +783,26 @@ boost::uint32_t x300_impl::rfnoc_cmd(
         else if (type == "stream_cmd") {
             UHD_MSG(status) << "Stream cmd to radio0 " << arg1 << std::endl;
             radio_perifs_t &perif = mb.radio_perifs[0];
-            if (arg1 == 97) {
-                UHD_MSG(status) << "STREAM_MODE_START_CONTINUOUS " << arg1 << std::endl;
-            } else {
-                UHD_MSG(status) << "STREAM_MODE_STOP_CONTINUOUS " << arg1 << std::endl;
+            uhd::stream_cmd_t stream_cmd(
+                    arg1 == uhd::stream_cmd_t::STREAM_MODE_START_CONTINUOUS ? uhd::stream_cmd_t::STREAM_MODE_START_CONTINUOUS : 
+                    arg1 == uhd::stream_cmd_t::STREAM_MODE_STOP_CONTINUOUS ? uhd::stream_cmd_t::STREAM_MODE_START_CONTINUOUS : 
+                    uhd::stream_cmd_t::STREAM_MODE_NUM_SAMPS_AND_DONE
+            );
+            UHD_MSG(status) << stream_cmd.stream_mode << std::endl;
+            switch (arg1) {
+                case 97:
+                    UHD_MSG(status) << "STREAM_MODE_START_CONTINUOUS " << arg1<< std::endl;
+                    break;
+
+                case 100:
+                    UHD_MSG(status) << "STREAM_MODE_STOP_CONTINUOUS " << arg1<< std::endl;
+                    break;
+
+                case 111:
+                    UHD_MSG(status) << "STREAM_MODE_NUM_SAMPS_AND_DONE " << arg1<< std::endl;
+                    stream_cmd.num_samps = arg2;
+                    break;
             }
-            uhd::stream_cmd_t stream_cmd(arg1 == 97 ? uhd::stream_cmd_t::STREAM_MODE_START_CONTINUOUS : uhd::stream_cmd_t::STREAM_MODE_STOP_CONTINUOUS);
             stream_cmd.stream_now = true;
             stream_cmd.time_spec = uhd::time_spec_t();
             perif.framer->issue_stream_command(stream_cmd);
