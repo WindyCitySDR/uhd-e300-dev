@@ -19,7 +19,7 @@
 #define INCLUDED_X300_IMPL_HPP
 
 #include <uhd/property_tree.hpp>
-#include <uhd/device.hpp>
+#include <uhd/device3.hpp>
 #include <uhd/usrp/mboard_eeprom.hpp>
 #include <uhd/usrp/dboard_manager.hpp>
 #include <uhd/usrp/dboard_eeprom.hpp>
@@ -143,7 +143,7 @@ uhd::uart_iface::sptr x300_make_uart_iface(uhd::wb_iface::sptr iface);
 uhd::wb_iface::sptr x300_make_ctrl_iface_enet(uhd::transport::udp_simple::sptr udp);
 uhd::wb_iface::sptr x300_make_ctrl_iface_pcie(uhd::niusrprio::niriok_proxy& drv_proxy);
 
-class x300_impl : public uhd::device
+class x300_impl : public uhd::device3
 {
 public:
     typedef uhd::transport::bounded_buffer<uhd::async_metadata_t> async_md_type;

@@ -30,6 +30,7 @@
 #include <boost/foreach.hpp>
 #include <boost/format.hpp>
 #include <cmath>
+#include <memory>
 
 using namespace uhd;
 using namespace uhd::usrp;
@@ -252,6 +253,10 @@ public:
 
     device::sptr get_device(void){
         return _dev;
+    }
+
+    device3::sptr get_device3(void){
+        return boost::dynamic_pointer_cast<uhd::device3>(_dev);
     }
 
     dict<std::string, std::string> get_usrp_rx_info(size_t chan){

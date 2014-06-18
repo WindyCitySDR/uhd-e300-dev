@@ -57,12 +57,12 @@ void benchmark_rx_rate(uhd::usrp::multi_usrp::sptr usrp, const std::string &rx_c
 
     std::cout << "Configuring block..." << std::endl;
     std::string ce = "ce" + ce_select;
-    usrp->get_device()->rfnoc_cmd(
+    usrp->get_device3()->rfnoc_cmd(
             ce, "poke",
             8, // Register 8: Set SID
 	    (1<<16) /* use SID */ | host_address
     );
-    usrp->get_device()->rfnoc_cmd(
+    usrp->get_device3()->rfnoc_cmd(
             ce, "set_fc",
             20000, // Host has a large buffer
             2 // How often we report FC (every Nth packet)

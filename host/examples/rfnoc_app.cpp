@@ -63,24 +63,24 @@ void run_app_null_source_to_host(
     // Get sid for this connection (channel 0 because there's only 1 channel):
     boost::uint32_t data_sid = rx_stream->get_sid(0);
     // Configure null source:
-    usrp->get_device()->rfnoc_cmd(
+    usrp->get_device3()->rfnoc_cmd(
             "ce1", "set_fc",
             20000, // Host buffer: This is pretty big
             0 // No upstream block
     );
-    usrp->get_device()->rfnoc_cmd(
+    usrp->get_device3()->rfnoc_cmd(
             "ce1", "poke",
             8, // Register 8: Set SID
             0x02140000 /* 2.20 */ | ((data_sid >> 16) & 0xFFFF)
     );
     std::cout << "Setting lines per packet to " << lines_per_packet << " => Packet size: " << lines_per_packet * 8 << " Bytes, " << lines_per_packet * 2 << " Samples." << std::endl;
-    usrp->get_device()->rfnoc_cmd(
+    usrp->get_device3()->rfnoc_cmd(
             "ce1", "poke",
             9, // Register 9: Lines per packet
             lines_per_packet
     );
     std::cout << "Setting divider to " << rate_factor << ", ~" << (160.0 * 8.0 / (rate_factor + 1)) << " MByte/s" << std::endl;
-    usrp->get_device()->rfnoc_cmd(
+    usrp->get_device3()->rfnoc_cmd(
             "ce1", "poke",
             10, // Register 10: Rate
             rate_factor // Rate in clock cycles (max 16 bits)
@@ -97,7 +97,7 @@ void run_app_null_source_to_host(
 
     // Setup streaming
     std::cout << "Sending command to start streaming:" << std::endl;
-    usrp->get_device()->rfnoc_cmd(
+    usrp->get_device3()->rfnoc_cmd(
             "ce1", "poke",
             0x0B, // Register 11: Enable
             true
@@ -153,7 +153,7 @@ void run_app_null_source_to_host(
 
     // Stop streaming
     std::cout << "Sending command to stop streaming:" << std::endl;
-    usrp->get_device()->rfnoc_cmd(
+    usrp->get_device3()->rfnoc_cmd(
             "ce1", "poke",
             0x0B, // Register 11: Enable
             false
@@ -216,12 +216,12 @@ void run_app_radio_to_host(
     boost::uint32_t data_sid = rx_stream->get_sid(0);
 
     // Configure radio
-    usrp->get_device()->rfnoc_cmd(
+    usrp->get_device3()->rfnoc_cmd(
             "radio_rx0", "setup_dsp",
             samples_per_packet,
             0x020a0000 | ((data_sid >> 16) & 0xFFFF) // 2.10 -> 2.20 (to filter, CE1)
     );
-    usrp->get_device()->rfnoc_cmd(
+    usrp->get_device3()->rfnoc_cmd(
             "radio_rx0", "setup_fc",
             20000
     );
@@ -234,7 +234,7 @@ void run_app_radio_to_host(
 
     // Setup streaming
     std::cout << "Sending command to start streaming:" << std::endl;
-    usrp->get_device()->rfnoc_cmd(
+    usrp->get_device3()->rfnoc_cmd(
             "radio_rx0", "stream_cmd",
             uhd::stream_cmd_t::STREAM_MODE_START_CONTINUOUS,
             true
@@ -288,7 +288,7 @@ void run_app_radio_to_host(
 
     // Stop streaming
     std::cout << "Sending command to start streaming:" << std::endl;
-    usrp->get_device()->rfnoc_cmd(
+    usrp->get_device3()->rfnoc_cmd(
             "radio_rx0", "stream_cmd",
             uhd::stream_cmd_t::STREAM_MODE_STOP_CONTINUOUS,
             true
@@ -355,24 +355,24 @@ void run_app_null_source_converter_host(
     std::cout << "Null Source Address: " << str(boost::format("0x%04x") % null_source_address) << std::endl;
 
     // Configure null source:
-    usrp->get_device()->rfnoc_cmd(
+    usrp->get_device3()->rfnoc_cmd(
             null_src_ce, "set_fc",
             7500/bytes_per_packet, // CE0 has 8k buffer
             0 // No upstream block
     );
-    usrp->get_device()->rfnoc_cmd(
+    usrp->get_device3()->rfnoc_cmd(
             null_src_ce, "poke",
             8, // Register 8: Set SID
             (null_source_address << 16) | other_ce_address
     );
     std::cout << "Setting lines per packet to " << lines_per_packet << " => Packet size: " << lines_per_packet * 8 << " Bytes, " << lines_per_packet * 2 << " Samples." << std::endl;
-    usrp->get_device()->rfnoc_cmd(
+    usrp->get_device3()->rfnoc_cmd(
             null_src_ce, "poke",
             9, // Register 9: Lines per packet
             lines_per_packet
     );
     std::cout << "Setting divider to " << rate_factor << ", ~" << expected_rate << " MByte/s" << std::endl;
-    usrp->get_device()->rfnoc_cmd(
+    usrp->get_device3()->rfnoc_cmd(
             null_src_ce, "poke",
             10, // Register 10: Rate
             rate_factor // Rate in clock cycles (max 16 bits)
@@ -380,12 +380,12 @@ void run_app_null_source_converter_host(
 
     // Configure other block
     std::cout << "Second CE will send to address " << str(boost::format("0x%08x") % ((data_sid >> 16) & 0xFFFF)) << std::endl;
-    usrp->get_device()->rfnoc_cmd(
+    usrp->get_device3()->rfnoc_cmd(
             other_ce, "poke",
             8, // Register 8: Set SID
 	    (1<<16) /* use SID */ | ((data_sid >> 16) & 0xFFFF) /* send to our streamer */
     );
-    usrp->get_device()->rfnoc_cmd(
+    usrp->get_device3()->rfnoc_cmd(
             other_ce, "set_fc",
             20000, // Host has a large buffer
             2 // How often we report FC (every Nth packet)
@@ -399,7 +399,7 @@ void run_app_null_source_converter_host(
 
     // Setup streaming
     std::cout << "Sending command to start streaming:" << std::endl;
-    usrp->get_device()->rfnoc_cmd(
+    usrp->get_device3()->rfnoc_cmd(
             null_src_ce, "poke",
             0x0B, // Register 11: Enable
             true
@@ -458,7 +458,7 @@ void run_app_null_source_converter_host(
 
     // Stop streaming
     std::cout << "Sending command to stop streaming:" << std::endl;
-    usrp->get_device()->rfnoc_cmd(
+    usrp->get_device3()->rfnoc_cmd(
             null_src_ce, "poke",
             0x0B, // Register 11: Enable
             false
@@ -515,7 +515,7 @@ void run_app_host_to_null_sink(
     std::cout << str(boost::format("Using SID: 0x%08x") % data_sid) << std::endl;
 
     // Configure null sink:
-    usrp->get_device()->rfnoc_cmd(
+    usrp->get_device3()->rfnoc_cmd(
             "ce2", "set_fc",
             0, // No downstream block
             2 // Report every 2nd packet
@@ -598,30 +598,30 @@ void run_app_null_source_to_null_sink(
     size_t samples_per_packet = bytes_per_packet / 4;
 
     // Configure null source:
-    usrp->get_device()->rfnoc_cmd(
+    usrp->get_device3()->rfnoc_cmd(
             "ce1", "set_fc",
             7000/bytes_per_packet, // We have 8k buffer
             0 // No upstream block
     );
-    usrp->get_device()->rfnoc_cmd(
+    usrp->get_device3()->rfnoc_cmd(
             "ce1", "poke",
             8, // Register 8: Set SID
             0x02140218 /* 2.20 to 2.24*/
     );
     std::cout << "Setting lines per packet to " << lines_per_packet << " => Packet size: " << lines_per_packet * 8 << " Bytes, " << lines_per_packet * 2 << " Samples." << std::endl;
-    usrp->get_device()->rfnoc_cmd(
+    usrp->get_device3()->rfnoc_cmd(
             "ce1", "poke",
             9, // Register 9: Lines per packet
             lines_per_packet
     );
     std::cout << "Setting divider to " << rate_factor << ", ~" << (160.0 * 8.0 / (rate_factor + 1)) << " MByte/s" << std::endl;
-    usrp->get_device()->rfnoc_cmd(
+    usrp->get_device3()->rfnoc_cmd(
             "ce1", "poke",
             10, // Register 10: Rate
             rate_factor // Rate in clock cycles (max 16 bits)
     );
     // Configure null sink
-    usrp->get_device()->rfnoc_cmd(
+    usrp->get_device3()->rfnoc_cmd(
             "ce2", "set_fc",
             0, // No downstream block
             2 // Report every 2nd block
@@ -629,7 +629,7 @@ void run_app_null_source_to_null_sink(
 
     // Setup streaming
     std::cout << "Sending command to start streaming:" << std::endl;
-    usrp->get_device()->rfnoc_cmd(
+    usrp->get_device3()->rfnoc_cmd(
             "ce1", "poke",
             0x0B, // Register 11: Enable
             true
@@ -641,7 +641,7 @@ void run_app_null_source_to_null_sink(
 
     // Stop streaming
     std::cout << "Sending command to stop streaming:" << std::endl;
-    usrp->get_device()->rfnoc_cmd(
+    usrp->get_device3()->rfnoc_cmd(
             "ce1", "poke",
             0x0B, // Register 11: Enable
             false
@@ -678,41 +678,41 @@ void run_app_null_source_converter_null_sink(
     size_t samples_per_packet = bytes_per_packet / 4;
 
     // Configure null source:
-    usrp->get_device()->rfnoc_cmd(
+    usrp->get_device3()->rfnoc_cmd(
             "ce1", "set_fc",
             7000/bytes_per_packet, // We have 8k buffer
             0 // No upstream block
     );
-    usrp->get_device()->rfnoc_cmd(
+    usrp->get_device3()->rfnoc_cmd(
             "ce1", "poke",
             8, // Register 8: Set SID
             0x02140210 /* 2.20 to 2.16*/
     );
     std::cout << "Setting lines per packet to " << lines_per_packet << " => Packet size: " << lines_per_packet * 8 << " Bytes, " << lines_per_packet * 2 << " Samples." << std::endl;
-    usrp->get_device()->rfnoc_cmd(
+    usrp->get_device3()->rfnoc_cmd(
             "ce1", "poke",
             9, // Register 9: Lines per packet
             lines_per_packet
     );
     std::cout << "Setting divider to " << rate_factor << ", ~" << (160.0 * 8.0 / (rate_factor + 1)) << " MByte/s" << std::endl;
-    usrp->get_device()->rfnoc_cmd(
+    usrp->get_device3()->rfnoc_cmd(
             "ce1", "poke",
             10, // Register 10: Rate
             rate_factor // Rate in clock cycles (max 16 bits)
     );
     // Configure converter
-    usrp->get_device()->rfnoc_cmd(
+    usrp->get_device3()->rfnoc_cmd(
             "ce0", "set_fc",
             7000/bytes_per_packet, // No downstream block
             2 // Report every 2nd block
     );
-    usrp->get_device()->rfnoc_cmd(
+    usrp->get_device3()->rfnoc_cmd(
             "ce0", "poke",
             8, // Register 8: Set SID
 	    (1<<16) /* use SID */ | (0x0218 & 0xFFFF) /* send to null sink 2.24 */
     );
     // Configure null sink
-    usrp->get_device()->rfnoc_cmd(
+    usrp->get_device3()->rfnoc_cmd(
             "ce2", "set_fc",
             0, // No downstream block
             2 // Report every 2nd block
@@ -720,7 +720,7 @@ void run_app_null_source_converter_null_sink(
 
     // Setup streaming
     std::cout << "Sending command to start streaming:" << std::endl;
-    usrp->get_device()->rfnoc_cmd(
+    usrp->get_device3()->rfnoc_cmd(
             "ce1", "poke",
             0x0B, // Register 11: Enable
             true
@@ -732,7 +732,7 @@ void run_app_null_source_converter_null_sink(
 
     // Stop streaming
     std::cout << "Sending command to stop streaming:" << std::endl;
-    usrp->get_device()->rfnoc_cmd(
+    usrp->get_device3()->rfnoc_cmd(
             "ce1", "poke",
             0x0B, // Register 11: Enable
             false
@@ -785,24 +785,24 @@ void run_app_radio_filter_host(
     std::cout << str(boost::format("CE Address: 0x%04x") % ce_address) << std::endl;
 
     // Configure radio
-    usrp->get_device()->rfnoc_cmd(
+    usrp->get_device3()->rfnoc_cmd(
             "radio_rx0", "setup_dsp",
             samples_per_packet,
             0x02080000 | ce_address // 2.10 -> CE
     );
-    usrp->get_device()->rfnoc_cmd(
+    usrp->get_device3()->rfnoc_cmd(
             "radio_rx0", "setup_fc",
             8000/(samples_per_packet*4) - 2
     );
 
     // Configure filter:
-    usrp->get_device()->rfnoc_cmd(
+    usrp->get_device3()->rfnoc_cmd(
             ce_select, "poke",
             8, // Register 8: Set SID
             //(data_sid >> 16) | (data_sid << 16) // Reverse host SID
             (1<<16)  | ((data_sid >> 16) & 0xFFFF) /* send to our streamer */
     );
-    usrp->get_device()->rfnoc_cmd(
+    usrp->get_device3()->rfnoc_cmd(
             ce_select, "set_fc",
             20000, // Host buffer: This is pretty big
             2 // Report every Nth packet
@@ -816,7 +816,7 @@ void run_app_radio_filter_host(
 
     // Setup streaming
     std::cout << "Sending command to start streaming:" << std::endl;
-    usrp->get_device()->rfnoc_cmd(
+    usrp->get_device3()->rfnoc_cmd(
             "radio_rx0", "stream_cmd",
             uhd::stream_cmd_t::STREAM_MODE_START_CONTINUOUS,
             true
@@ -878,7 +878,7 @@ void run_app_radio_filter_host(
 
     // Setup streaming
     std::cout << "Sending command to start streaming:" << std::endl;
-    usrp->get_device()->rfnoc_cmd(
+    usrp->get_device3()->rfnoc_cmd(
             "radio_rx0", "stream_cmd",
             uhd::stream_cmd_t::STREAM_MODE_STOP_CONTINUOUS,
             true
@@ -950,35 +950,35 @@ void run_app_radio_2ce_host(
     std::cout << str(boost::format("Second CE Address: 0x%04x") % ce2_address) << std::endl;
 
     // Configure radio
-    usrp->get_device()->rfnoc_cmd(
+    usrp->get_device3()->rfnoc_cmd(
             "radio_rx0", "setup_dsp",
             samples_per_packet,
             0x02080000 | ce1_address // 2.10 -> CE
     );
-    usrp->get_device()->rfnoc_cmd(
+    usrp->get_device3()->rfnoc_cmd(
             "radio_rx0", "setup_fc",
             8000/(samples_per_packet*4) - 2
     );
 
     // Configure first CE:
-    usrp->get_device()->rfnoc_cmd(
+    usrp->get_device3()->rfnoc_cmd(
             ce_select1, "poke",
             8, // Register 8: Set SID
             (1<<16)  | ce2_address
     );
-    usrp->get_device()->rfnoc_cmd(
+    usrp->get_device3()->rfnoc_cmd(
             ce_select1, "set_fc",
             8000/(samples_per_packet*4) - 2,
             2 // Report every Nth packet
     );
 
     // Configure second CE:
-    usrp->get_device()->rfnoc_cmd(
+    usrp->get_device3()->rfnoc_cmd(
             ce_select2, "poke",
             8, // Register 8: Set SID
             (1<<16)  | ((data_sid >> 16) & 0xFFFF)
     );
-    usrp->get_device()->rfnoc_cmd(
+    usrp->get_device3()->rfnoc_cmd(
             ce_select2, "set_fc",
             20000,
             2 // Report every Nth packet
@@ -992,7 +992,7 @@ void run_app_radio_2ce_host(
 
     // Setup streaming
     std::cout << "Sending command to start streaming:" << std::endl;
-    usrp->get_device()->rfnoc_cmd(
+    usrp->get_device3()->rfnoc_cmd(
             "radio_rx0", "stream_cmd",
             uhd::stream_cmd_t::STREAM_MODE_START_CONTINUOUS,
             true
@@ -1054,7 +1054,7 @@ void run_app_radio_2ce_host(
 
     // Setup streaming
     std::cout << "Sending command to start streaming:" << std::endl;
-    usrp->get_device()->rfnoc_cmd(
+    usrp->get_device3()->rfnoc_cmd(
             "radio_rx0", "stream_cmd",
             uhd::stream_cmd_t::STREAM_MODE_STOP_CONTINUOUS,
             true
@@ -1123,18 +1123,18 @@ void run_app_host_filter_radio(
     std::cout << str(boost::format("CE address: 0x%04x") % ce_address) << std::endl;
 
     // Configure filter:
-    usrp->get_device()->rfnoc_cmd(
+    usrp->get_device3()->rfnoc_cmd(
             ce_id, "poke",
             8, // Register 8: Set SID
             (ce_address << 16) | 0x0208 // CE to Radio 2.8
     );
-    usrp->get_device()->rfnoc_cmd(
+    usrp->get_device3()->rfnoc_cmd(
             ce_id, "set_fc",
             500000/4/samples_per_packet, // Radio has large buffer
             2 // Report every 2nd packet
     );
     // Configure radio:
-    usrp->get_device()->rfnoc_cmd(
+    usrp->get_device3()->rfnoc_cmd(
             "radio_tx0", "setup_fc",
             500000/4/samples_per_packet/8
     );

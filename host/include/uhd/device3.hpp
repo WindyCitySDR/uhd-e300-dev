@@ -28,6 +28,7 @@ namespace uhd {
 class UHD_API device3 : public uhd::device {
 
   public:
+    typedef boost::shared_ptr<device3> sptr;
 
     /*! \brief Returns a block controller class for an RFNoC block.
      *
