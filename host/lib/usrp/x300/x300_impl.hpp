@@ -51,7 +51,7 @@
 #include "recv_packet_demuxer_3000.hpp"
 
 ///////////// RFNOC /////////////////////
-#include "nocshell_ctrl_core.hpp"
+#include "block_ctrl.hpp"
 ///////////// RFNOC /////////////////////
 
 static const std::string X300_FW_FILE_NAME  = "usrp_x300_fw.bin";
@@ -244,7 +244,7 @@ private:
         gpio_core_200::sptr fp_gpio;
 
 	///////////// RFNOC /////////////////////
-	nocshell_ctrl_core::sptr nocshell_ctrls[3];
+	block_ctrl::sptr nocshell_ctrls[3];
 	///////////// RFNOC /////////////////////
 
         //clock control register bits

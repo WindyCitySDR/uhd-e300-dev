@@ -866,7 +866,7 @@ void x300_impl::setup_mb(const size_t mb_i, const uhd::device_addr_t &dev_addr)
             ctrl_sid // sid (output)
         );
         UHD_LOG << "NoC-Shell " << i << boost::format("ctrl_sid = 0x%08x\n") % ctrl_sid << std::endl;
-        mb.nocshell_ctrls[i] = nocshell_ctrl_core::make(
+        mb.nocshell_ctrls[i] = block_ctrl::make(
             mb.if_pkt_is_big_endian,
             xport.send, xport.recv,
             ctrl_sid,

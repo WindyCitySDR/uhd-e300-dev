@@ -1,5 +1,5 @@
 //
-// Copyright 2012-2013 Ettus Research LLC
+// Copyright 2014 Ettus Research LLC
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -15,7 +15,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 //
 
-#include "nocshell_ctrl_core.hpp"
+#include "block_ctrl.hpp"
 #include "async_packet_handler.hpp"
 #include <uhd/exception.hpp>
 #include <uhd/utils/msg.hpp>
@@ -37,11 +37,11 @@ static const double ACK_TIMEOUT = 2.0; //supposed to be worst case practical tim
 static const double MASSIVE_TIMEOUT = 10.0; //for when we wait on a timed command
 static const size_t SR_READBACK = 32;
 
-class nocshell_ctrl_core_impl: public nocshell_ctrl_core
+class block_ctrl_impl: public block_ctrl
 {
 public:
 
-    nocshell_ctrl_core_impl(const bool big_endian,
+    block_ctrl_impl(const bool big_endian,
             uhd::transport::zero_copy_if::sptr ctrl_xport,
             uhd::transport::zero_copy_if::sptr resp_xport,
             const boost::uint32_t sid, const std::string &name) :
@@ -53,7 +53,7 @@ public:
 	    _resp_queue(128/*max response msgs*/),
             _resp_queue_size(_resp_xport ? _resp_xport->get_num_recv_frames() : 3)
     {
-        UHD_LOG<< "nocshell_ctrl_core_impl() " << _name << std::endl;
+        UHD_LOG<< "block_ctrl_impl() " << _name << std::endl;
         if (resp_xport)
         {
             while (resp_xport->get_recv_buff(0.0)) {} //flush
@@ -63,9 +63,9 @@ public:
         //this->set_tick_rate(1.0); //something possible but bogus
     }
 
-    ~nocshell_ctrl_core_impl(void)
+    ~block_ctrl_impl(void)
     {
-        UHD_LOG << "~nocshell_ctrl_core_impl() " << _name << std::endl;
+        UHD_LOG << "~block_ctrl_impl() " << _name << std::endl;
         _timeout = ACK_TIMEOUT; //reset timeout to something small
         UHD_SAFE_CALL(
             this->peek32(0);//dummy peek with the purpose of ack'ing all packets
@@ -338,11 +338,11 @@ private:
     const size_t _resp_queue_size;
 };
 
-nocshell_ctrl_core::sptr nocshell_ctrl_core::make(const bool big_endian,
+block_ctrl::sptr block_ctrl::make(const bool big_endian,
         zero_copy_if::sptr ctrl_xport, zero_copy_if::sptr resp_xport,
         const boost::uint32_t sid, const std::string &name)
 {
     return sptr(
-            new nocshell_ctrl_core_impl(big_endian, ctrl_xport, resp_xport,
+            new block_ctrl_impl(big_endian, ctrl_xport, resp_xport,
                     sid, name));
 }

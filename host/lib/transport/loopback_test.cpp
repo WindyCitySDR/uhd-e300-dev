@@ -17,7 +17,7 @@
 
 #include "loopback_test.hpp"
 #include <iostream>
-#include "nocshell_ctrl_core.hpp"
+#include "block_ctrl.hpp"
 
 namespace uhd { namespace transport {
 

@@ -15,8 +15,8 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 //
 
-#ifndef INCLUDED_LIBUHD_USRP_NOCSHELL_CTRL_HPP
-#define INCLUDED_LIBUHD_USRP_NOCSHELL_CTRL_HPP
+#ifndef INCLUDED_LIBUHD_BLOCK_CTRL_HPP
+#define INCLUDED_LIBUHD_BLOCK_CTRL_HPP
 
 #include <uhd/utils/msg_task.hpp>
 //#include <uhd/types/time_spec.hpp>
@@ -29,10 +29,10 @@
 /*!
  * Provide access to peek, poke for noc shell ctrl modules
  */
-class nocshell_ctrl_core : public uhd::wb_iface
+class block_ctrl : public uhd::wb_iface
 {
 public:
-    typedef boost::shared_ptr<nocshell_ctrl_core> sptr;
+    typedef boost::shared_ptr<block_ctrl> sptr;
 
     //! Make a new control object
     static sptr make(
@@ -56,4 +56,4 @@ public:
     //virtual void set_tick_rate(const double rate) = 0;
 };
 
-#endif /* INCLUDED_LIBUHD_USRP_NOCSHELL_CTRL_HPP */
+#endif /* INCLUDED_LIBUHD_BLOCK_CTRL_HPP */
