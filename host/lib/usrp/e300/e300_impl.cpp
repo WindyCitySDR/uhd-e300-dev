@@ -142,8 +142,8 @@ e300_impl::e300_impl(const uhd::device_addr_t &device_addr)
             device_addr.get("fpga", E300_FPGA_FILE_NAME)
         );
 
-        //load fpga image - its super fast
-        this->load_fpga_image(e300_fpga_image);
+        if (not device_addr.has_key("no_reload_fpga"))
+            this->load_fpga_image(e300_fpga_image);
     }
 
     ////////////////////////////////////////////////////////////////////
@@ -198,7 +198,7 @@ e300_impl::e300_impl(const uhd::device_addr_t &device_addr)
         e300_fifo_config_t fifo_cfg;
         try {
             fifo_cfg = e300_read_sysfs();
-        } catch (...) {
+        } catch (uhd::lookup_error &e) {
             throw uhd::runtime_error("Failed to get driver parameters from sysfs.");
         }
         _fifo_iface = e300_fifo_interface::make(fifo_cfg);
@@ -269,11 +269,11 @@ e300_impl::e300_impl(const uhd::device_addr_t &device_addr)
 
 
     if (!_network_mode) {
-        const std::vector<std::string> xadc_sensors = boost::assign::list_of("temp")("temp_max")("temp_min");
+        const std::vector<std::string> xadc_sensors = boost::assign::list_of("temp");
         BOOST_FOREACH(const std::string &sensor, xadc_sensors)
         {
             _tree->create<sensor_value_t>(mb_path / "sensors" / sensor)
-                .publish(boost::bind(&e300_impl::get_mb_temp, this, sensor));
+                .publish(boost::bind(&e300_impl::get_mb_temp, this));
         }
     }
 
@@ -672,10 +672,12 @@ void e300_impl::setup_radio(const size_t dspno)
     perif.time64 = time_core_3000::make(perif.ctrl, TOREG(SR_TIME), time64_rb_bases);
 }
 
-uhd::sensor_value_t e300_impl::get_mb_temp(const std::string &which)
+uhd::sensor_value_t e300_impl::get_mb_temp(void)
 {
-    return sensor_value_t(which,
-        boost::lexical_cast<double>(e300_get_sysfs_attr(E300_TEMP_SYSFS, which)), "C");
+    double scale = boost::lexical_cast<double>(e300_get_sysfs_attr(E300_TEMP_SYSFS, "in_temp0_scale"));
+    unsigned long raw = boost::lexical_cast<unsigned long>(e300_get_sysfs_attr(E300_TEMP_SYSFS, "in_temp0_raw"));
+    unsigned long offset = boost::lexical_cast<unsigned long>(e300_get_sysfs_attr(E300_TEMP_SYSFS, "in_temp0_offset"));
+    return sensor_value_t("temp", (raw + offset) * scale / 1e3, "C");
 }
 
 ////////////////////////////////////////////////////////////////////////

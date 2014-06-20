@@ -37,7 +37,6 @@
 
 static const std::string E300_AXI_FPGA_SYSFS = "40000000.axi-fpga";
 static const std::string E300_XDEV_SYSFS = "f8007000.ps7-dev-cfg";
-static const std::string E300_TEMP_SYSFS = "f8007100.ps7-xadc";
 
 std::string e300_get_sysfs_attr(const std::string &node, const std::string &attr)
 {
@@ -50,7 +49,7 @@ std::string e300_get_sysfs_attr(const std::string &node, const std::string &attr
     udev = udev_new();
 
     if (!udev) {
-        throw uhd::runtime_error("Failed to get udev handle.");
+        throw uhd::lookup_error("Failed to get udev handle.");
     }
 
     enumerate = udev_enumerate_new(udev);
@@ -111,12 +110,12 @@ e300_fifo_config_t e300_read_sysfs(void)
 
 e300_fifo_config_t e300_read_sysfs(void)
 {
-    throw uhd::runtime_error("e300_read_sysfs() !E300_NATIVE");
+    throw uhd::assertion_error("e300_read_sysfs() !E300_NATIVE");
 }
 
 std::string e300_get_sysfs_attr(const std::string &, const std::string &)
 {
-    throw uhd::runtime_error("e300_sysfs_attr() !E300_NATIVE");
+    throw uhd::assertion_error("e300_sysfs_attr() !E300_NATIVE");
 }
 
 #endif //E300_NATIVE

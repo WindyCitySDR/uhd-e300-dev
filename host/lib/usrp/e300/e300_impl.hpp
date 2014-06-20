@@ -40,7 +40,7 @@
 #include "e300_global_regs.hpp"
 
 static const std::string E300_FPGA_FILE_NAME = "usrp_e300_fpga.bit";
-static const std::string E300_TEMP_SYSFS = "f8007100.ps7-xadc";
+static const std::string E300_TEMP_SYSFS = "iio:device0";
 static const std::string E300_SPIDEV_DEVICE  = "/dev/spidev0.1";
 
 static std::string E300_SERVER_RX_PORT = "321756";
@@ -121,7 +121,7 @@ private:
     ad9361_ctrl::sptr _codec_ctrl;
     void codec_loopback_self_test(uhd::wb_iface::sptr iface);
 
-    uhd::sensor_value_t get_mb_temp(const std::string &which);
+    uhd::sensor_value_t get_mb_temp(void);
 
     //server stuff for network access
     void run_server(const std::string &port, const std::string &what);

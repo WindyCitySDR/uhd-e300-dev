@@ -122,7 +122,7 @@ namespace uhd { namespace usrp { namespace e300 {
 
 spi::sptr spi::make(const std::string &)
 {
-    throw uhd::runtime_error("spi::make() !E300_NATIVE");
+    throw uhd::assertion_error("spi::make() !E300_NATIVE");
 }
 }}};
 #endif //E300_NATIVE
