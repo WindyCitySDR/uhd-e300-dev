@@ -53,6 +53,21 @@ static const double E300_DEFAULT_TICK_RATE = 32e6;
 
 static const double E300_RX_SW_BUFF_FULLNESS = 0.5;        //Buffer should be half full
 
+// crossbar settings
+static const boost::uint8_t E300_RADIO_DEST_PREFIX_TX   = 0;
+static const boost::uint8_t E300_RADIO_DEST_PREFIX_CTRL = 1;
+static const boost::uint8_t E300_RADIO_DEST_PREFIX_RX   = 2;
+
+static const boost::uint8_t E300_XB_DST_AXI = 0;
+static const boost::uint8_t E300_XB_DST_R0  = 1;
+static const boost::uint8_t E300_XB_DST_R1  = 2;
+static const boost::uint8_t E300_XB_DST_CE0 = 3;
+static const boost::uint8_t E300_XB_DST_CE1 = 4;
+
+static const boost::uint8_t E300_DEVICE_THERE = 2;
+static const boost::uint8_t E300_DEVICE_HERE  = 0;
+
+
 /*!
  * USRP-E300 implementation guts:
  * The implementation details are encapsulated here.
@@ -102,6 +117,17 @@ private:
     };
     radio_perifs_t _radio_perifs[2];
     void setup_radio(const size_t which_radio);
+
+    size_t _sid_framer;
+    struct sid_config_t
+    {
+        boost::uint8_t router_addr_there;
+        boost::uint8_t dst_prefix; //2bits
+        boost::uint8_t router_dst_there;
+        boost::uint8_t router_dst_here;
+    };
+
+    boost::uint32_t allocate_sid(const sid_config_t &config);
 
     double _tick_rate;
     double get_tick_rate(void){return _tick_rate;}

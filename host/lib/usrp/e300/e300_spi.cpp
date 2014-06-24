@@ -16,7 +16,6 @@
 //
 
 #include <uhd/config.hpp>
-#include "e300_impl.hpp"
 #include "e300_spi.hpp"
 
 #ifdef E300_NATIVE

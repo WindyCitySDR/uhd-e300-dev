@@ -292,10 +292,24 @@ rx_streamer::sptr e300_impl::get_rx_stream(const uhd::stream_args_t &args_)
     }
     args.otw_format = "sc16";
     args.channels = args.channels.empty()? std::vector<size_t>(1, 0) : args.channels;
-    const boost::uint32_t data_sid = 2 | (2 << 16);
+
+    boost::shared_ptr<sph::recv_packet_streamer> my_streamer;
 
     const size_t i = args.channels[0];
     radio_perifs_t &perif = _radio_perifs[i];
+
+    // TODO: DSP MAP, multi channel
+    const size_t radio_index = i;
+
+    sid_config_t config;
+    config.router_addr_there = E300_DEVICE_THERE;
+    config.dst_prefix        = E300_RADIO_DEST_PREFIX_RX;
+    config.router_dst_there  = radio_index ? E300_XB_DST_R0 : E300_XB_DST_R1;
+    config.router_dst_here   = E300_XB_DST_AXI;
+    boost::uint32_t data_sid = this->allocate_sid(config);
+
+    UHD_MSG(status) << boost::format("RX stream with SID %ld") % data_sid << std::endl;
+
 
     //calculate packet size
     static const size_t hdr_size = 0
@@ -310,7 +324,9 @@ rx_streamer::sptr e300_impl::get_rx_stream(const uhd::stream_args_t &args_)
     const size_t spp = unsigned(args.args.cast<double>("spp", bpp/bpi));
 
     //make the new streamer given the samples per packet
-    boost::shared_ptr<sph::recv_packet_streamer> my_streamer = boost::make_shared<sph::recv_packet_streamer>(spp);
+    if (not my_streamer)
+        my_streamer = boost::make_shared<sph::recv_packet_streamer>(spp);
+    my_streamer->resize(args.channels.size());
 
     //init some streamer stuff
     my_streamer->set_vrt_unpacker(&e300_if_hdr_unpack_le);
@@ -369,25 +385,41 @@ tx_streamer::sptr e300_impl::get_tx_stream(const uhd::stream_args_t &args_)
     }
     args.otw_format = "sc16";
     args.channels = args.channels.empty()? std::vector<size_t>(1, 0) : args.channels;
-    const boost::uint32_t data_sid = 0 | (0 << 16);
+
+    boost::shared_ptr<sph::send_packet_streamer> my_streamer;
 
     const size_t i = args.channels[0];
     radio_perifs_t &perif = _radio_perifs[i];
+
+    // TODO: DSP MAP, multi channel
+    const size_t radio_index = i;
+
+    //allocate sid
+    sid_config_t config;
+    config.router_addr_there = E300_DEVICE_THERE;
+    config.dst_prefix        = E300_RADIO_DEST_PREFIX_TX;
+    config.router_dst_there  = radio_index ? E300_XB_DST_R0 : E300_XB_DST_R1;
+    config.router_dst_here   = E300_XB_DST_AXI;
+    boost::uint32_t data_sid = this->allocate_sid(config);
+
+    UHD_MSG(status) << boost::format("TX stream with SID %ld") % data_sid << std::endl;
 
     //calculate packet size
     static const size_t hdr_size = 0
         + vrt::num_vrl_words32*sizeof(boost::uint32_t)
         + vrt::max_if_hdr_words32*sizeof(boost::uint32_t)
-        //+ sizeof(vrt::if_packet_info_t().tlr) //forced to have trailer
+        + sizeof(vrt::if_packet_info_t().tlr) //forced to have trailer
         - sizeof(vrt::if_packet_info_t().cid) //no class id ever used
         - sizeof(vrt::if_packet_info_t().tsi) //no int time ever used
     ;
-    const size_t bpp = perif.tx_data_xport->get_send_frame_size() - hdr_size;
+    const size_t bpp = perif.rx_data_xport->get_recv_frame_size() - hdr_size;
     const size_t bpi = convert::get_bytes_per_item(args.otw_format);
     const size_t spp = unsigned(args.args.cast<double>("spp", bpp/bpi));
 
     //make the new streamer given the samples per packet
-    boost::shared_ptr<sph::send_packet_streamer> my_streamer = boost::make_shared<sph::send_packet_streamer>(spp);
+    if (not my_streamer)
+        my_streamer = boost::make_shared<sph::send_packet_streamer>(spp);
+    my_streamer->resize(args.channels.size());
 
     //init some streamer stuff
     my_streamer->set_vrt_packer(&e300_if_hdr_pack_le);

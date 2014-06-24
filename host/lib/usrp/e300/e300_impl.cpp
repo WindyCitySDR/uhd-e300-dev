@@ -129,7 +129,7 @@ UHD_STATIC_BLOCK(register_e300_device)
 /***********************************************************************
  * Structors
  **********************************************************************/
-e300_impl::e300_impl(const uhd::device_addr_t &device_addr)
+e300_impl::e300_impl(const uhd::device_addr_t &device_addr) : _sid_framer(0)
 {
     e300_impl_begin:
     ////////////////////////////////////////////////////////////////////
@@ -562,6 +562,48 @@ void e300_impl::codec_loopback_self_test(wb_iface::sptr iface)
     iface->poke32(TOREG(SR_CODEC_IDLE), 0);
 }
 
+boost::uint32_t e300_impl::allocate_sid(const sid_config_t &config)
+{
+    const boost::uint32_t stream = (config.dst_prefix | (config.router_dst_there << 2)) & 0xff;
+
+    const boost::uint32_t sid = 0
+        | (E300_DEVICE_HERE << 24)
+        | (_sid_framer << 16)
+        | (config.router_addr_there << 8)
+        | (stream << 0)
+    ;
+    UHD_MSG(status) << std::hex
+        << " sid 0x" << sid
+        << " framer 0x" << _sid_framer
+        << " stream 0x" << stream
+        << " router_dst_there 0x" << int(config.router_dst_there)
+        << " router_addr_there 0x" << int(config.router_addr_there)
+        << std::dec << std::endl;
+
+    // Program the E300 to recognize it's own local address.
+    _global_regs->poke32(TOREG(uhd::usrp::e300::global_regs::SR_CORE_XB_LOCAL), config.router_addr_there);
+
+    // Program CAM entry for outgoing packets matching a E300 resource (e.g. Radio).
+    // This type of packet matches the XB_LOCAL address and is looked up in the upper
+    // half of the CAM
+    _global_regs->poke32(uhd::usrp::e300::SR_ADDR(uhd::usrp::e300::global_regs::SR_CORE_XBAR, 256 + stream),
+                         config.router_dst_there);
+
+    // Program CAM entry for returning packets to us (for example GR host via zynq_fifo)
+    // This type of packet does not match the XB_LOCAL address and is looked up in the lower half of the CAM
+    _global_regs->poke32(uhd::usrp::e300::SR_ADDR(uhd::usrp::e300::global_regs::SR_CORE_XBAR, E300_DEVICE_HERE),
+                         config.router_dst_here);
+
+    UHD_MSG(status) << std::hex
+        << "done router config for sid 0x" << sid
+        << std::dec << std::endl;
+
+    //increment for next setup
+    _sid_framer++;
+
+    return sid;
+}
+
 void e300_impl::update_time_source(const std::string &)
 {
 }
@@ -605,13 +647,23 @@ void e300_impl::setup_radio(const size_t dspno)
     const fs_path mb_path = "/mboards/0";
 
     ////////////////////////////////////////////////////////////////////
+    // crossbar config for ctrl xports
+    ////////////////////////////////////////////////////////////////////
+    sid_config_t config;
+    config.router_addr_there = E300_DEVICE_THERE;
+    config.dst_prefix        = E300_RADIO_DEST_PREFIX_CTRL;
+    config.router_dst_there  = dspno ? E300_XB_DST_R0 : E300_XB_DST_R1;
+    config.router_dst_here   = E300_XB_DST_AXI;
+    boost::uint32_t ctrl_sid = this->allocate_sid(config);
+
+
+    ////////////////////////////////////////////////////////////////////
     // radio control
     ////////////////////////////////////////////////////////////////////
-    const int streamno = 1 | (dspno << 2);
     perif.ctrl = radio_ctrl_core_3000::make(false/*lilE*/,
                                             perif.send_ctrl_xport,
                                             perif.recv_ctrl_xport,
-                                            streamno | (streamno << 16),
+                                            ctrl_sid,
                                             dspno ? "1" : "0"
                                             );
     this->register_loopback_self_test(perif.ctrl);

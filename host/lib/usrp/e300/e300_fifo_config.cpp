@@ -383,13 +383,6 @@ private:
         UHD_ASSERT_THROW(_send_entries_in_use <= H2S_NUM_CMDS);
         UHD_ASSERT_THROW(_bytes_in_use <= _config.buff_length);
 
-        //program the dest table based on the stream
-        //TODO make this part of SID allocation
-        if (is_recv)
-        {
-            zf_poke32(DST_BASE(_ctrl_space) + which_stream*4, which_stream);
-        }
-
         return xport;
     }
 
