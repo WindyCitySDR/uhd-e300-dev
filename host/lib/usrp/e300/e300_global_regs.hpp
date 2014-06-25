@@ -42,7 +42,13 @@ public:
     static const size_t SR_CORE_PPS_SEL  = 4;
     static const size_t SR_CORE_PPS_TEST = 28;
     static const size_t SR_CORE_XB_LOCAL = 32;
-    static const size_t SR_CORE_XBAR     = 40;
+
+    // leave some room for registers,
+    // xbar starts with an offset of one
+    // 1K page. A part of which is used for
+    // DST_LOOKUP for DST_LOOKUP
+
+    static const size_t SR_CORE_XBAR      = 2048;
 
     static const size_t RB32_CORE_TEST    = 0;
     static const size_t RB32_CORE_PPS_SEL = 1;
@@ -51,9 +57,9 @@ public:
     static const size_t RB32_CORE_XBAR    = 4;
 };
 
-UHD_INLINE size_t SR_ADDR(const size_t base, const size_t offset)
+UHD_INLINE boost::uint32_t XB_ADDR(const boost::uint32_t addr)
 {
-    return base + 4 * offset;
+    return global_regs::SR_CORE_XBAR + (addr << 2);
 }
 
 }}};
