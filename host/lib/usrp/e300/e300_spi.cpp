@@ -16,10 +16,10 @@
 //
 
 #include <uhd/config.hpp>
+#include <uhd/exception.hpp>
 #include "e300_spi.hpp"
 
 #ifdef E300_NATIVE
-#include <uhd/exception.hpp>
 #include <boost/thread.hpp>
 #include <boost/format.hpp>
 
