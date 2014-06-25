@@ -357,6 +357,11 @@ public:
         return this->_make_xport(which_stream, args, false);
     }
 
+    size_t get_global_regs_base() const
+    {
+        return REG_BASE(_ctrl_space);
+    }
+
 private:
     uhd::transport::zero_copy_if::sptr _make_xport(const size_t which_stream, const uhd::device_addr_t &args, const bool is_recv)
     {
@@ -391,11 +396,6 @@ private:
         }
 
         return xport;
-    }
-
-    size_t get_global_regs_base() const
-    {
-        return REG_BASE(_ctrl_space);
     }
 
     e300_fifo_config_t _config;
