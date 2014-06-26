@@ -145,6 +145,8 @@ private:
 
     boost::uint32_t allocate_sid(const sid_config_t &config);
 
+    void _setup_dest_mapping(const boost::uint32_t sid, const size_t which_stream);
+
     double _tick_rate;
     double get_tick_rate(void){return _tick_rate;}
     double set_tick_rate(const double rate);

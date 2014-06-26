@@ -610,6 +610,11 @@ boost::uint32_t e300_impl::allocate_sid(const sid_config_t &config)
     return sid;
 }
 
+void e300_impl::_setup_dest_mapping(const boost::uint32_t sid, const size_t which_stream)
+{
+    _global_regs->poke32(uhd::usrp::e300::DST_ADDR(sid & 0xff), which_stream);
+}
+
 void e300_impl::update_time_source(const std::string &)
 {
 }
@@ -661,9 +666,9 @@ void e300_impl::setup_radio(const size_t dspno)
     config.router_dst_there  = dspno ? E300_XB_DST_R1 : E300_XB_DST_R0;
     config.router_dst_here   = E300_XB_DST_AXI;
     boost::uint32_t ctrl_sid = this->allocate_sid(config);
-    _fifo_iface->setup_dest_mapping(ctrl_sid,
-                                    dspno ? E300_R1_CTRL_STREAM
-                                          : E300_R0_CTRL_STREAM);
+    this->_setup_dest_mapping(ctrl_sid,
+                              dspno ? E300_R1_CTRL_STREAM
+                                    : E300_R0_CTRL_STREAM);
 
 
     ////////////////////////////////////////////////////////////////////

@@ -48,6 +48,7 @@ public:
     // 1K page. A part of which is used for
     // DST_LOOKUP for DST_LOOKUP
 
+    static const size_t SR_CORE_DST       = 1024;
     static const size_t SR_CORE_XBAR      = 2048;
 
     static const size_t RB32_CORE_TEST    = 0;
@@ -60,6 +61,11 @@ public:
 UHD_INLINE boost::uint32_t XB_ADDR(const boost::uint32_t addr)
 {
     return global_regs::SR_CORE_XBAR + (addr << 2);
+}
+
+UHD_INLINE boost::uint32_t DST_ADDR(const boost::uint32_t addr)
+{
+    return global_regs::SR_CORE_DST + (addr << 2);
 }
 
 }}};
