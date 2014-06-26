@@ -204,17 +204,23 @@ e300_impl::e300_impl(const uhd::device_addr_t &device_addr) : _sid_framer(0)
         _fifo_iface = e300_fifo_interface::make(fifo_cfg);
         _global_regs = uhd::usrp::e300::global_regs::make(_fifo_iface->get_global_regs_base());
 
-        size_t fe = 0;
-        BOOST_FOREACH(radio_perifs_t &perif, _radio_perifs)
-        {
-            size_t fe_shift = ((fe++) << 2);
-            perif.send_ctrl_xport = _fifo_iface->make_send_xport(1 | fe_shift, ctrl_xport_args);
-            perif.recv_ctrl_xport = _fifo_iface->make_recv_xport(1 | fe_shift, ctrl_xport_args);
-            perif.tx_data_xport   = _fifo_iface->make_send_xport(0 | fe_shift, data_xport_args);
-            perif.tx_flow_xport   = _fifo_iface->make_recv_xport(0 | fe_shift, ctrl_xport_args);
-            perif.rx_data_xport   = _fifo_iface->make_recv_xport(2 | fe_shift, data_xport_args);
-            perif.rx_flow_xport   = _fifo_iface->make_send_xport(2 | fe_shift, ctrl_xport_args);
-        }
+        // static mapping, boooohhhhhh
+        radio_perifs_t &perif = _radio_perifs[0];
+        perif.send_ctrl_xport = _fifo_iface->make_send_xport(E300_R0_CTRL_STREAM, ctrl_xport_args);
+        perif.recv_ctrl_xport = _fifo_iface->make_recv_xport(E300_R0_CTRL_STREAM, ctrl_xport_args);
+        perif.tx_data_xport   = _fifo_iface->make_send_xport(E300_R0_TX_DATA_STREAM, data_xport_args);
+        perif.tx_flow_xport   = _fifo_iface->make_recv_xport(E300_R0_TX_DATA_STREAM, ctrl_xport_args);
+        perif.rx_data_xport   = _fifo_iface->make_recv_xport(E300_R0_RX_DATA_STREAM, data_xport_args);
+        perif.rx_flow_xport   = _fifo_iface->make_send_xport(E300_R0_RX_DATA_STREAM, ctrl_xport_args);
+
+        perif = _radio_perifs[1];
+        perif.send_ctrl_xport = _fifo_iface->make_send_xport(E300_R1_CTRL_STREAM, ctrl_xport_args);
+        perif.recv_ctrl_xport = _fifo_iface->make_recv_xport(E300_R1_CTRL_STREAM, ctrl_xport_args);
+        perif.tx_data_xport   = _fifo_iface->make_send_xport(E300_R1_TX_DATA_STREAM, data_xport_args);
+        perif.tx_flow_xport   = _fifo_iface->make_recv_xport(E300_R1_TX_DATA_STREAM, ctrl_xport_args);
+        perif.rx_data_xport   = _fifo_iface->make_recv_xport(E300_R1_RX_DATA_STREAM, data_xport_args);
+        perif.rx_flow_xport   = _fifo_iface->make_send_xport(E300_R1_RX_DATA_STREAM, ctrl_xport_args);
+
         _codec_xport = ad9361_ctrl_transport::make_software_spi(AD9361_E300, uhd::usrp::e300::spi::make(E300_SPIDEV_DEVICE), 1);
         _codec_ctrl = ad9361_ctrl::make(_codec_xport);
         // This is horrible ... why do I have to sleep here?
@@ -655,6 +661,9 @@ void e300_impl::setup_radio(const size_t dspno)
     config.router_dst_there  = dspno ? E300_XB_DST_R1 : E300_XB_DST_R0;
     config.router_dst_here   = E300_XB_DST_AXI;
     boost::uint32_t ctrl_sid = this->allocate_sid(config);
+    _fifo_iface->setup_dest_mapping(ctrl_sid,
+                                    dspno ? E300_R1_CTRL_STREAM
+                                          : E300_R0_CTRL_STREAM);
 
 
     ////////////////////////////////////////////////////////////////////

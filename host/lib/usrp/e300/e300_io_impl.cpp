@@ -307,6 +307,9 @@ rx_streamer::sptr e300_impl::get_rx_stream(const uhd::stream_args_t &args_)
     config.router_dst_there  = radio_index ? E300_XB_DST_R1 : E300_XB_DST_R0;
     config.router_dst_here   = E300_XB_DST_AXI;
     boost::uint32_t data_sid = this->allocate_sid(config);
+    _fifo_iface->setup_dest_mapping(data_sid,
+                                    radio_index ? E300_R1_RX_DATA_STREAM
+                                                : E300_R0_RX_DATA_STREAM);
 
     UHD_MSG(status) << boost::format("RX stream with SID %ld") % data_sid << std::endl;
 
@@ -401,6 +404,9 @@ tx_streamer::sptr e300_impl::get_tx_stream(const uhd::stream_args_t &args_)
     config.router_dst_there  = radio_index ? E300_XB_DST_R1 : E300_XB_DST_R0;
     config.router_dst_here   = E300_XB_DST_AXI;
     boost::uint32_t data_sid = this->allocate_sid(config);
+    _fifo_iface->setup_dest_mapping(data_sid,
+                                    radio_index ? E300_R1_TX_DATA_STREAM
+                                                : E300_R0_TX_DATA_STREAM);
 
     UHD_MSG(status) << boost::format("TX stream with SID %ld") % data_sid << std::endl;
 

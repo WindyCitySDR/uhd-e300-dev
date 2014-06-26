@@ -67,6 +67,22 @@ static const boost::uint8_t E300_XB_DST_CE1 = 4;
 static const boost::uint8_t E300_DEVICE_THERE = 2;
 static const boost::uint8_t E300_DEVICE_HERE  = 0;
 
+static const boost::uint8_t E300_STREAM_EP0 = E300_RADIO_DEST_PREFIX_TX  | (E300_XB_DST_R0 << 2);
+static const boost::uint8_t E300_STREAM_EP1 = E300_RADIO_DEST_PREFIX_CTRL| (E300_XB_DST_R0 << 2);
+static const boost::uint8_t E300_STREAM_EP2 = E300_RADIO_DEST_PREFIX_RX  | (E300_XB_DST_R0 << 2);
+
+static const boost::uint8_t E300_STREAM_EP4 = E300_RADIO_DEST_PREFIX_TX  | (E300_XB_DST_R1 << 2);
+static const boost::uint8_t E300_STREAM_EP5 = E300_RADIO_DEST_PREFIX_CTRL| (E300_XB_DST_R1 << 2);
+static const boost::uint8_t E300_STREAM_EP6 = E300_RADIO_DEST_PREFIX_RX  | (E300_XB_DST_R1 << 2);
+
+static const size_t E300_R0_CTRL_STREAM    = (0 << 2) | E300_RADIO_DEST_PREFIX_CTRL;
+static const size_t E300_R0_TX_DATA_STREAM = (0 << 2) | E300_RADIO_DEST_PREFIX_TX;
+static const size_t E300_R0_RX_DATA_STREAM = (0 << 2) | E300_RADIO_DEST_PREFIX_RX;
+
+static const size_t E300_R1_CTRL_STREAM    = (1 << 2) | E300_RADIO_DEST_PREFIX_CTRL;
+static const size_t E300_R1_TX_DATA_STREAM = (1 << 2) | E300_RADIO_DEST_PREFIX_TX;
+static const size_t E300_R1_RX_DATA_STREAM = (1 << 2) | E300_RADIO_DEST_PREFIX_RX;
+
 
 /*!
  * USRP-E300 implementation guts:
@@ -180,6 +196,31 @@ private:
     boost::uint8_t get_internal_gpio(gpio_core_200::sptr, const std::string &);
 
     void set_internal_gpio(gpio_core_200::sptr gpio, const std::string &attr, const boost::uint32_t value);
+
+    UHD_INLINE size_t get_stream_from_dst(boost::uint8_t dst) const
+    {
+        switch(dst) {
+            case E300_STREAM_EP0:
+                return 0;
+
+            case E300_STREAM_EP1:
+                return 1;
+
+            case E300_STREAM_EP2:
+                return 2;
+
+            case E300_STREAM_EP4:
+                return 4;
+
+            case E300_STREAM_EP5:
+                return 5;
+
+            case E300_STREAM_EP6:
+                return 6;
+            default:
+                throw uhd::lookup_error(str(boost::format("No endpoint for destination %lx") % dst));
+        };
+    }
 };
 
 #endif /* INCLUDED_E300_IMPL_HPP */
