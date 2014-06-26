@@ -581,17 +581,17 @@ boost::uint32_t e300_impl::allocate_sid(const sid_config_t &config)
         << std::dec << std::endl;
 
     // Program the E300 to recognize it's own local address.
-    _global_regs->poke32(TOREG(uhd::usrp::e300::global_regs::SR_CORE_XB_LOCAL), config.router_addr_there);
+    _global_regs->poke32(uhd::usrp::e300::global_regs::SR_CORE_XB_LOCAL, config.router_addr_there);
 
     // Program CAM entry for outgoing packets matching a E300 resource (e.g. Radio).
     // This type of packet matches the XB_LOCAL address and is looked up in the upper
     // half of the CAM
-    _global_regs->poke32(uhd::usrp::e300::SR_ADDR(uhd::usrp::e300::global_regs::SR_CORE_XBAR, 256 + stream),
+    _global_regs->poke32(uhd::usrp::e300::XB_ADDR(256 + stream),
                          config.router_dst_there);
 
     // Program CAM entry for returning packets to us (for example GR host via zynq_fifo)
     // This type of packet does not match the XB_LOCAL address and is looked up in the lower half of the CAM
-    _global_regs->poke32(uhd::usrp::e300::SR_ADDR(uhd::usrp::e300::global_regs::SR_CORE_XBAR, E300_DEVICE_HERE),
+    _global_regs->poke32(uhd::usrp::e300::XB_ADDR(E300_DEVICE_HERE),
                          config.router_dst_here);
 
     UHD_MSG(status) << std::hex
