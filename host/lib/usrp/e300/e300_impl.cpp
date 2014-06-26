@@ -652,7 +652,7 @@ void e300_impl::setup_radio(const size_t dspno)
     sid_config_t config;
     config.router_addr_there = E300_DEVICE_THERE;
     config.dst_prefix        = E300_RADIO_DEST_PREFIX_CTRL;
-    config.router_dst_there  = dspno ? E300_XB_DST_R0 : E300_XB_DST_R1;
+    config.router_dst_there  = dspno ? E300_XB_DST_R1 : E300_XB_DST_R0;
     config.router_dst_here   = E300_XB_DST_AXI;
     boost::uint32_t ctrl_sid = this->allocate_sid(config);
 

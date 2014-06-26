@@ -304,7 +304,7 @@ rx_streamer::sptr e300_impl::get_rx_stream(const uhd::stream_args_t &args_)
     sid_config_t config;
     config.router_addr_there = E300_DEVICE_THERE;
     config.dst_prefix        = E300_RADIO_DEST_PREFIX_RX;
-    config.router_dst_there  = radio_index ? E300_XB_DST_R0 : E300_XB_DST_R1;
+    config.router_dst_there  = radio_index ? E300_XB_DST_R1 : E300_XB_DST_R0;
     config.router_dst_here   = E300_XB_DST_AXI;
     boost::uint32_t data_sid = this->allocate_sid(config);
 
@@ -398,7 +398,7 @@ tx_streamer::sptr e300_impl::get_tx_stream(const uhd::stream_args_t &args_)
     sid_config_t config;
     config.router_addr_there = E300_DEVICE_THERE;
     config.dst_prefix        = E300_RADIO_DEST_PREFIX_TX;
-    config.router_dst_there  = radio_index ? E300_XB_DST_R0 : E300_XB_DST_R1;
+    config.router_dst_there  = radio_index ? E300_XB_DST_R1 : E300_XB_DST_R0;
     config.router_dst_here   = E300_XB_DST_AXI;
     boost::uint32_t data_sid = this->allocate_sid(config);
 
