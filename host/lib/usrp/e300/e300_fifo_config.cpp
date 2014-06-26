@@ -362,6 +362,12 @@ public:
         return REG_BASE(_ctrl_space);
     }
 
+    void setup_dest_mapping(const boost::uint32_t sid, const size_t which_stream)
+    {
+        //program the dest table based on the stream
+        zf_poke32(DST_BASE(_ctrl_space) + which_stream*4, sid & 0xf);
+    }
+
 private:
     uhd::transport::zero_copy_if::sptr _make_xport(const size_t which_stream, const uhd::device_addr_t &args, const bool is_recv)
     {

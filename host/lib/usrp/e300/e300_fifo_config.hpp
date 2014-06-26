@@ -40,6 +40,7 @@ struct e300_fifo_interface : boost::enable_shared_from_this<e300_fifo_interface>
     virtual uhd::transport::zero_copy_if::sptr make_recv_xport(const size_t which_stream, const uhd::device_addr_t &args) = 0;
     virtual uhd::transport::zero_copy_if::sptr make_send_xport(const size_t which_stream, const uhd::device_addr_t &args) = 0;
     virtual size_t get_global_regs_base(void) const = 0;
+    virtual void setup_dest_mapping(const boost::uint32_t sid, const size_t which_stream) = 0;
 };
 
 #endif /* INCLUDED_E300_FIFO_CONFIG_HPP */
