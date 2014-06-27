@@ -372,9 +372,9 @@ rx_streamer::sptr e300_impl::get_rx_stream(const uhd::stream_args_t &args_)
         my_streamer->set_xport_chan_get_buff(stream_i, boost::bind(
             &zero_copy_if::get_recv_buff, perif.rx_data_xport, _1
         ), true /*flush*/);
-        my_streamer->set_overflow_handler(stream_i, boost::bind(
-            &rx_vita_core_3000::handle_overflow, perif.framer
-        ));
+        my_streamer->set_overflow_handler(stream_i,
+            boost::bind(&rx_vita_core_3000::handle_overflow, perif.framer)
+        );
 
         //setup flow control
         const size_t fc_window = perif.rx_data_xport->get_num_recv_frames();
