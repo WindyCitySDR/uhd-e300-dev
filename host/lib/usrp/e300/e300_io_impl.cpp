@@ -294,79 +294,81 @@ rx_streamer::sptr e300_impl::get_rx_stream(const uhd::stream_args_t &args_)
     args.channels = args.channels.empty()? std::vector<size_t>(1, 0) : args.channels;
 
     boost::shared_ptr<sph::recv_packet_streamer> my_streamer;
+    for (size_t stream_i = 0; stream_i < args.channels.size(); stream_i++)
+    {
 
-    const size_t i = args.channels[0];
-    radio_perifs_t &perif = _radio_perifs[i];
+        const size_t radio_index = _tree->access<std::vector<size_t> >("/mboards/0/rx_chan_dsp_mapping")
+                                            .get().at(args.channels[stream_i]);
 
-    // TODO: DSP MAP, multi channel
-    const size_t radio_index = i;
+        radio_perifs_t &perif = _radio_perifs[radio_index];
 
-    sid_config_t config;
-    config.router_addr_there = E300_DEVICE_THERE;
-    config.dst_prefix        = E300_RADIO_DEST_PREFIX_RX;
-    config.router_dst_there  = radio_index ? E300_XB_DST_R1 : E300_XB_DST_R0;
-    config.router_dst_here   = E300_XB_DST_AXI;
-    boost::uint32_t data_sid = this->allocate_sid(config);
-    this->_setup_dest_mapping(data_sid,
-                              radio_index ? E300_R1_RX_DATA_STREAM
-                                          : E300_R0_RX_DATA_STREAM);
+        sid_config_t config;
+        config.router_addr_there = E300_DEVICE_THERE;
+        config.dst_prefix        = E300_RADIO_DEST_PREFIX_RX;
+        config.router_dst_there  = radio_index ? E300_XB_DST_R1 : E300_XB_DST_R0;
+        config.router_dst_here   = E300_XB_DST_AXI;
+        boost::uint32_t data_sid = this->allocate_sid(config);
+        this->_setup_dest_mapping(data_sid,
+                                  radio_index ? E300_R1_RX_DATA_STREAM
+                                              : E300_R0_RX_DATA_STREAM);
 
-    //calculate packet size
-    static const size_t hdr_size = 0
-        + vrt::num_vrl_words32*sizeof(boost::uint32_t)
-        + vrt::max_if_hdr_words32*sizeof(boost::uint32_t)
-        + sizeof(vrt::if_packet_info_t().tlr) //forced to have trailer
-        - sizeof(vrt::if_packet_info_t().cid) //no class id ever used
-        - sizeof(vrt::if_packet_info_t().tsi) //no int time ever used
-    ;
-    const size_t bpp = perif.rx_data_xport->get_recv_frame_size() - hdr_size;
-    const size_t bpi = convert::get_bytes_per_item(args.otw_format);
-    const size_t spp = unsigned(args.args.cast<double>("spp", bpp/bpi));
+        //calculate packet size
+        static const size_t hdr_size = 0
+            + vrt::num_vrl_words32*sizeof(boost::uint32_t)
+            + vrt::max_if_hdr_words32*sizeof(boost::uint32_t)
+            + sizeof(vrt::if_packet_info_t().tlr) //forced to have trailer
+            - sizeof(vrt::if_packet_info_t().cid) //no class id ever used
+            - sizeof(vrt::if_packet_info_t().tsi) //no int time ever used
+        ;
+        const size_t bpp = perif.rx_data_xport->get_recv_frame_size() - hdr_size;
+        const size_t bpi = convert::get_bytes_per_item(args.otw_format);
+        const size_t spp = unsigned(args.args.cast<double>("spp", bpp/bpi));
 
-    //make the new streamer given the samples per packet
-    if (not my_streamer)
-        my_streamer = boost::make_shared<sph::recv_packet_streamer>(spp);
-    my_streamer->resize(args.channels.size());
+        //make the new streamer given the samples per packet
+        if (not my_streamer)
+            my_streamer = boost::make_shared<sph::recv_packet_streamer>(spp);
+        my_streamer->resize(args.channels.size());
 
-    //init some streamer stuff
-    my_streamer->set_vrt_unpacker(&e300_if_hdr_unpack_le);
+        //init some streamer stuff
+        my_streamer->set_vrt_unpacker(&e300_if_hdr_unpack_le);
 
-    //set the converter
-    uhd::convert::id_type id;
-    id.input_format = args.otw_format + "_item32_le";
-    id.num_inputs = 1;
-    id.output_format = args.cpu_format;
-    id.num_outputs = 1;
-    my_streamer->set_converter(id);
+        //set the converter
+        uhd::convert::id_type id;
+        id.input_format = args.otw_format + "_item32_le";
+        id.num_inputs = 1;
+        id.output_format = args.cpu_format;
+        id.num_outputs = 1;
+        my_streamer->set_converter(id);
 
-    perif.framer->set_nsamps_per_packet(spp); //seems to be a good place to set this
-    perif.framer->set_sid((data_sid << 16) | (data_sid >> 16));
-    perif.framer->setup(args);
-    perif.ddc->setup(args);
-    my_streamer->set_xport_chan_get_buff(0, boost::bind(
-        &zero_copy_if::get_recv_buff, perif.rx_data_xport, _1
-    ), true /*flush*/);
-    my_streamer->set_overflow_handler(0, boost::bind(
-        &rx_vita_core_3000::handle_overflow, perif.framer
-    ));
+        perif.framer->set_nsamps_per_packet(spp); //seems to be a good place to set this
+        perif.framer->set_sid((data_sid << 16) | (data_sid >> 16));
+        perif.framer->setup(args);
+        perif.ddc->setup(args);
+        my_streamer->set_xport_chan_get_buff(0, boost::bind(
+            &zero_copy_if::get_recv_buff, perif.rx_data_xport, _1
+        ), true /*flush*/);
+        my_streamer->set_overflow_handler(0, boost::bind(
+            &rx_vita_core_3000::handle_overflow, perif.framer
+        ));
 
-    //setup flow control
-    const size_t fc_window = perif.rx_data_xport->get_num_recv_frames();
-    perif.framer->configure_flow_control(fc_window);
-    boost::shared_ptr<boost::uint32_t> seq32(new boost::uint32_t(0));
-    my_streamer->set_xport_handle_flowctrl(0, boost::bind(
-        &handle_rx_flowctrl, data_sid, perif.rx_flow_xport, seq32, _1
-    ), static_cast<size_t>(static_cast<double>(fc_window) * E300_RX_SW_BUFF_FULLNESS), true/*init*/);
+        //setup flow control
+        const size_t fc_window = perif.rx_data_xport->get_num_recv_frames();
+        perif.framer->configure_flow_control(fc_window);
+        boost::shared_ptr<boost::uint32_t> seq32(new boost::uint32_t(0));
+        my_streamer->set_xport_handle_flowctrl(0, boost::bind(
+            &handle_rx_flowctrl, data_sid, perif.rx_flow_xport, seq32, _1
+        ), static_cast<size_t>(static_cast<double>(fc_window) * E300_RX_SW_BUFF_FULLNESS), true/*init*/);
 
-    my_streamer->set_issue_stream_cmd(0, boost::bind(
-        &rx_vita_core_3000::issue_stream_command, perif.framer, _1
-    ));
-    perif.rx_streamer = my_streamer; //store weak pointer
+        my_streamer->set_issue_stream_cmd(0, boost::bind(
+            &rx_vita_core_3000::issue_stream_command, perif.framer, _1
+        ));
+        perif.rx_streamer = my_streamer; //store weak pointer
 
-    //sets all tick and samp rates on this streamer
-    this->update_tick_rate(this->get_tick_rate());
-    _tree->access<double>(str(boost::format("/mboards/0/rx_dsps/%u/rate/value") % 0)).update();
+        //sets all tick and samp rates on this streamer
+        this->update_tick_rate(this->get_tick_rate());
+        _tree->access<double>(str(boost::format("/mboards/0/rx_dsps/%u/rate/value") % 0)).update();
 
+    }
     return my_streamer;
 }
 
@@ -388,73 +390,77 @@ tx_streamer::sptr e300_impl::get_tx_stream(const uhd::stream_args_t &args_)
 
     boost::shared_ptr<sph::send_packet_streamer> my_streamer;
 
-    const size_t i = args.channels[0];
-    radio_perifs_t &perif = _radio_perifs[i];
+    for (size_t stream_i = 0; stream_i < args.channels.size(); stream_i++)
+    {
 
-    // TODO: DSP MAP, multi channel
-    const size_t radio_index = i;
+        const size_t radio_index = _tree->access<std::vector<size_t> >("/mboards/0/tx_chan_dsp_mapping")
+                                            .get().at(args.channels[stream_i]);
 
-    //allocate sid
-    sid_config_t config;
-    config.router_addr_there = E300_DEVICE_THERE;
-    config.dst_prefix        = E300_RADIO_DEST_PREFIX_TX;
-    config.router_dst_there  = radio_index ? E300_XB_DST_R1 : E300_XB_DST_R0;
-    config.router_dst_here   = E300_XB_DST_AXI;
-    boost::uint32_t data_sid = this->allocate_sid(config);
-    this->_setup_dest_mapping(data_sid,
-                              radio_index ? E300_R1_TX_DATA_STREAM
-                                          : E300_R0_TX_DATA_STREAM);
+        radio_perifs_t &perif = _radio_perifs[radio_index];
 
-    //calculate packet size
-    static const size_t hdr_size = 0
-        + vrt::num_vrl_words32*sizeof(boost::uint32_t)
-        + vrt::max_if_hdr_words32*sizeof(boost::uint32_t)
-        + sizeof(vrt::if_packet_info_t().tlr) //forced to have trailer
-        - sizeof(vrt::if_packet_info_t().cid) //no class id ever used
-        - sizeof(vrt::if_packet_info_t().tsi) //no int time ever used
-    ;
-    const size_t bpp = perif.rx_data_xport->get_recv_frame_size() - hdr_size;
-    const size_t bpi = convert::get_bytes_per_item(args.otw_format);
-    const size_t spp = unsigned(args.args.cast<double>("spp", bpp/bpi));
 
-    //make the new streamer given the samples per packet
-    if (not my_streamer)
-        my_streamer = boost::make_shared<sph::send_packet_streamer>(spp);
-    my_streamer->resize(args.channels.size());
+        //allocate sid
+        sid_config_t config;
+        config.router_addr_there = E300_DEVICE_THERE;
+        config.dst_prefix        = E300_RADIO_DEST_PREFIX_TX;
+        config.router_dst_there  = radio_index ? E300_XB_DST_R1 : E300_XB_DST_R0;
+        config.router_dst_here   = E300_XB_DST_AXI;
+        boost::uint32_t data_sid = this->allocate_sid(config);
+        this->_setup_dest_mapping(data_sid,
+                                  radio_index ? E300_R1_TX_DATA_STREAM
+                                              : E300_R0_TX_DATA_STREAM);
 
-    //init some streamer stuff
-    my_streamer->set_vrt_packer(&e300_if_hdr_pack_le);
+        //calculate packet size
+        static const size_t hdr_size = 0
+            + vrt::num_vrl_words32*sizeof(boost::uint32_t)
+            + vrt::max_if_hdr_words32*sizeof(boost::uint32_t)
+            + sizeof(vrt::if_packet_info_t().tlr) //forced to have trailer
+            - sizeof(vrt::if_packet_info_t().cid) //no class id ever used
+            - sizeof(vrt::if_packet_info_t().tsi) //no int time ever used
+        ;
+        const size_t bpp = perif.rx_data_xport->get_recv_frame_size() - hdr_size;
+        const size_t bpi = convert::get_bytes_per_item(args.otw_format);
+        const size_t spp = unsigned(args.args.cast<double>("spp", bpp/bpi));
 
-    //set the converter
-    uhd::convert::id_type id;
-    id.input_format = args.cpu_format;
-    id.num_inputs = 1;
-    id.output_format = args.otw_format + "_item32_le";
-    id.num_outputs = 1;
-    my_streamer->set_converter(id);
+        //make the new streamer given the samples per packet
+        if (not my_streamer)
+            my_streamer = boost::make_shared<sph::send_packet_streamer>(spp);
+        my_streamer->resize(args.channels.size());
 
-    perif.deframer->setup(args);
-    perif.duc->setup(args);
+        //init some streamer stuff
+        my_streamer->set_vrt_packer(&e300_if_hdr_pack_le);
 
-    //flow control setup
-    const size_t fc_window = perif.tx_data_xport->get_num_send_frames();
-    perif.deframer->configure_flow_control(0/*cycs off*/, fc_window/8/*pkts*/);
-    boost::shared_ptr<e300_tx_fc_guts_t> guts(new e300_tx_fc_guts_t());
-    task::sptr task = task::make(boost::bind(&handle_tx_async_msgs, guts, perif.tx_flow_xport));
+        //set the converter
+        uhd::convert::id_type id;
+        id.input_format = args.cpu_format;
+        id.num_inputs = 1;
+        id.output_format = args.otw_format + "_item32_le";
+        id.num_outputs = 1;
+        my_streamer->set_converter(id);
 
-    my_streamer->set_xport_chan_get_buff(0, boost::bind(
-        &get_tx_buff_with_flowctrl, task, guts, perif.tx_data_xport, fc_window, _1
-    ));
-    my_streamer->set_async_receiver(boost::bind(
-        &bounded_buffer<async_metadata_t>::pop_with_timed_wait, &(guts->async_queue), _1, _2
-    ));
-    my_streamer->set_xport_chan_sid(0, true, data_sid);
-    my_streamer->set_enable_trailer(false); //TODO not implemented trailer support yet
-    perif.tx_streamer = my_streamer; //store weak pointer
+        perif.deframer->setup(args);
+        perif.duc->setup(args);
 
-    //sets all tick and samp rates on this streamer
-    this->update_tick_rate(this->get_tick_rate());
-    _tree->access<double>(str(boost::format("/mboards/0/tx_dsps/%u/rate/value") % 0)).update();
+        //flow control setup
+        const size_t fc_window = perif.tx_data_xport->get_num_send_frames();
+        perif.deframer->configure_flow_control(0/*cycs off*/, fc_window/8/*pkts*/);
+        boost::shared_ptr<e300_tx_fc_guts_t> guts(new e300_tx_fc_guts_t());
+        task::sptr task = task::make(boost::bind(&handle_tx_async_msgs, guts, perif.tx_flow_xport));
+
+        my_streamer->set_xport_chan_get_buff(0, boost::bind(
+            &get_tx_buff_with_flowctrl, task, guts, perif.tx_data_xport, fc_window, _1
+        ));
+        my_streamer->set_async_receiver(boost::bind(
+            &bounded_buffer<async_metadata_t>::pop_with_timed_wait, &(guts->async_queue), _1, _2
+        ));
+        my_streamer->set_xport_chan_sid(0, true, data_sid);
+        my_streamer->set_enable_trailer(false); //TODO not implemented trailer support yet
+        perif.tx_streamer = my_streamer; //store weak pointer
+
+        //sets all tick and samp rates on this streamer
+        this->update_tick_rate(this->get_tick_rate());
+        _tree->access<double>(str(boost::format("/mboards/0/tx_dsps/%u/rate/value") % 0)).update();
+    }
 
     return my_streamer;
 }

@@ -430,6 +430,14 @@ e300_impl::e300_impl(const uhd::device_addr_t &device_addr) : _sid_framer(0)
     ////////////////////////////////////////////////////////////////////
     // create frontend mapping
     ////////////////////////////////////////////////////////////////////
+
+     std::vector<size_t> default_map(2, 0);
+     default_map[0] = 0; // set A->0
+     default_map[1] = 1; // set B->1, even if there's only A
+
+    _tree->create<std::vector<size_t> >(mb_path / "rx_chan_dsp_mapping").set(default_map);
+    _tree->create<std::vector<size_t> >(mb_path / "tx_chan_dsp_mapping").set(default_map);
+
     _tree->create<subdev_spec_t>(mb_path / "rx_subdev_spec")
         .set(subdev_spec_t())
         .subscribe(boost::bind(&e300_impl::update_rx_subdev_spec, this, _1));
