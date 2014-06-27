@@ -311,9 +311,6 @@ rx_streamer::sptr e300_impl::get_rx_stream(const uhd::stream_args_t &args_)
                               radio_index ? E300_R1_RX_DATA_STREAM
                                           : E300_R0_RX_DATA_STREAM);
 
-    UHD_MSG(status) << boost::format("RX stream with SID %ld") % data_sid << std::endl;
-
-
     //calculate packet size
     static const size_t hdr_size = 0
         + vrt::num_vrl_words32*sizeof(boost::uint32_t)
@@ -407,8 +404,6 @@ tx_streamer::sptr e300_impl::get_tx_stream(const uhd::stream_args_t &args_)
     this->_setup_dest_mapping(data_sid,
                               radio_index ? E300_R1_TX_DATA_STREAM
                                           : E300_R0_TX_DATA_STREAM);
-
-    UHD_MSG(status) << boost::format("TX stream with SID %ld") % data_sid << std::endl;
 
     //calculate packet size
     static const size_t hdr_size = 0

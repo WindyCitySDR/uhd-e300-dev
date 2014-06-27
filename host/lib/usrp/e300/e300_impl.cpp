@@ -576,7 +576,7 @@ boost::uint32_t e300_impl::allocate_sid(const sid_config_t &config)
         | (config.router_addr_there << 8)
         | (stream << 0)
     ;
-    UHD_MSG(status) << std::hex
+    UHD_LOG << std::hex
         << " sid 0x" << sid
         << " framer 0x" << _sid_framer
         << " stream 0x" << stream
@@ -598,7 +598,7 @@ boost::uint32_t e300_impl::allocate_sid(const sid_config_t &config)
     _global_regs->poke32(uhd::usrp::e300::XB_ADDR(E300_DEVICE_HERE),
                          config.router_dst_here);
 
-    UHD_MSG(status) << std::hex
+    UHD_LOG << std::hex
         << "done router config for sid 0x" << sid
         << std::dec << std::endl;
 
@@ -610,6 +610,8 @@ boost::uint32_t e300_impl::allocate_sid(const sid_config_t &config)
 
 void e300_impl::_setup_dest_mapping(const boost::uint32_t sid, const size_t which_stream)
 {
+    UHD_LOG << boost::format("Setting up dest map for 0x%lx to be stream %d")
+                                     % (sid & 0xff) % which_stream << std::endl;
     _global_regs->poke32(uhd::usrp::e300::DST_ADDR(sid & 0xff), which_stream);
 }
 
