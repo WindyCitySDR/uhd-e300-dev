@@ -239,7 +239,10 @@ static void handle_tx_async_msgs(boost::shared_ptr<e300_tx_fc_guts_t> guts, zero
 
     //fill in the async metadata
     async_metadata_t metadata;
-    load_metadata_from_buff(uhd::wtohx<boost::uint32_t>, metadata, if_packet_info, packet_buff, 61.44e6/*FIXME set from rate update*/);
+    load_metadata_from_buff(uhd::wtohx<boost::uint32_t>,
+                            metadata, if_packet_info, packet_buff,
+                            61.44e6/*FIXME set from rate update*/);
+
     guts->async_queue.push_with_pop_on_full(metadata);
     standard_async_msg_prints(metadata);
 }
@@ -438,6 +441,7 @@ tx_streamer::sptr e300_impl::get_tx_stream(const uhd::stream_args_t &args_)
         id.num_outputs = 1;
         my_streamer->set_converter(id);
 
+        perif.deframer->clear();
         perif.deframer->setup(args);
         perif.duc->setup(args);
 
@@ -453,7 +457,7 @@ tx_streamer::sptr e300_impl::get_tx_stream(const uhd::stream_args_t &args_)
         my_streamer->set_async_receiver(boost::bind(
             &bounded_buffer<async_metadata_t>::pop_with_timed_wait, &(guts->async_queue), _1, _2
         ));
-        my_streamer->set_xport_chan_sid(0, true, data_sid);
+        my_streamer->set_xport_chan_sid(stream_i, true, data_sid);
         my_streamer->set_enable_trailer(false); //TODO not implemented trailer support yet
         perif.tx_streamer = my_streamer; //store weak pointer
 
