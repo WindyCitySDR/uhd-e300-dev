@@ -23,6 +23,7 @@
 #include <uhd/usrp/subdev_spec.hpp>
 #include <uhd/usrp/mboard_eeprom.hpp>
 #include <uhd/usrp/dboard_eeprom.hpp>
+#include <uhd/transport/bounded_buffer.hpp>
 #include <uhd/types/serial.hpp>
 #include <uhd/types/sensors.hpp>
 #include <boost/weak_ptr.hpp>
@@ -92,6 +93,10 @@ public:
     boost::mutex _stream_spawn_mutex;
     uhd::rx_streamer::sptr get_rx_stream(const uhd::stream_args_t &);
     uhd::tx_streamer::sptr get_tx_stream(const uhd::stream_args_t &);
+
+    typedef uhd::transport::bounded_buffer<uhd::async_metadata_t> async_md_type;
+    boost::shared_ptr<async_md_type> _async_md;
+
     bool recv_async_msg(uhd::async_metadata_t &, double);
 
 private:

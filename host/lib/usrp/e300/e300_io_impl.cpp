@@ -198,15 +198,22 @@ static void handle_rx_flowctrl(const boost::uint32_t sid, zero_copy_if::sptr xpo
 struct e300_tx_fc_guts_t
 {
     e300_tx_fc_guts_t(void):
+        stream_channel(0),
+        device_channel(0),
         last_seq_out(0),
         last_seq_ack(0),
-        seq_queue(1),
-        async_queue(1000){}
+        seq_queue(1){}
+    size_t stream_channel;
+    size_t device_channel;
     size_t last_seq_out;
     size_t last_seq_ack;
     bounded_buffer<size_t> seq_queue;
-    bounded_buffer<async_metadata_t> async_queue;
+    boost::shared_ptr<e300_impl::async_md_type> async_queue;
+    boost::shared_ptr<e300_impl::async_md_type> old_async_queue;
 };
+
+#define E300_ASYNC_EVENT_CODE_FLOW_CTRL 0
+
 
 static void handle_tx_async_msgs(boost::shared_ptr<e300_tx_fc_guts_t> guts, zero_copy_if::sptr xport)
 {
@@ -241,10 +248,24 @@ static void handle_tx_async_msgs(boost::shared_ptr<e300_tx_fc_guts_t> guts, zero
     async_metadata_t metadata;
     load_metadata_from_buff(uhd::wtohx<boost::uint32_t>,
                             metadata, if_packet_info, packet_buff,
-                            61.44e6/*FIXME set from rate update*/);
+                            61.44e6/*FIXME set from rate update*/, guts->stream_channel);
 
-    guts->async_queue.push_with_pop_on_full(metadata);
-    standard_async_msg_prints(metadata);
+    //The FC response and the burst ack are two indicators that the radio
+    //consumed packets. Use them to update the FC metadata
+    if (metadata.event_code == E300_ASYNC_EVENT_CODE_FLOW_CTRL or
+        metadata.event_code == async_metadata_t::EVENT_CODE_BURST_ACK
+    ) {
+        const size_t seq = metadata.user_payload[0];
+        guts->seq_queue.push_with_pop_on_full(seq);
+    }
+
+    //FC responses don't propagate up to the user so filter them here
+    if (metadata.event_code != E300_ASYNC_EVENT_CODE_FLOW_CTRL) {
+        guts->async_queue->push_with_pop_on_full(metadata);
+        metadata.channel = guts->device_channel;
+        guts->old_async_queue->push_with_pop_on_full(metadata);
+        standard_async_msg_prints(metadata);
+    }
 }
 
 static managed_send_buffer::sptr get_tx_buff_with_flowctrl(
@@ -264,7 +285,10 @@ static managed_send_buffer::sptr get_tx_buff_with_flowctrl(
     }
 
     managed_send_buffer::sptr buff = xport->get_send_buff(timeout);
-    if (buff) guts->last_seq_out++; //update seq, this will actually be a send
+    if (buff) {
+        guts->last_seq_out++; //update seq, this will actually be a send
+    }
+
     return buff;
 }
 
@@ -273,11 +297,9 @@ static managed_send_buffer::sptr get_tx_buff_with_flowctrl(
  **********************************************************************/
 bool e300_impl::recv_async_msg(
     async_metadata_t &async_metadata, double timeout
-){
-    boost::shared_ptr<sph::send_packet_streamer> my_streamer =
-        boost::dynamic_pointer_cast<sph::send_packet_streamer>(_radio_perifs[0].tx_streamer.lock());
-    if (my_streamer) return my_streamer->recv_async_msg(async_metadata, timeout);
-    return false;
+)
+{
+    return _async_md->pop_with_timed_wait(async_metadata, timeout);
 }
 
 /***********************************************************************
@@ -347,10 +369,10 @@ rx_streamer::sptr e300_impl::get_rx_stream(const uhd::stream_args_t &args_)
         perif.framer->set_sid((data_sid << 16) | (data_sid >> 16));
         perif.framer->setup(args);
         perif.ddc->setup(args);
-        my_streamer->set_xport_chan_get_buff(0, boost::bind(
+        my_streamer->set_xport_chan_get_buff(stream_i, boost::bind(
             &zero_copy_if::get_recv_buff, perif.rx_data_xport, _1
         ), true /*flush*/);
-        my_streamer->set_overflow_handler(0, boost::bind(
+        my_streamer->set_overflow_handler(stream_i, boost::bind(
             &rx_vita_core_3000::handle_overflow, perif.framer
         ));
 
@@ -391,11 +413,14 @@ tx_streamer::sptr e300_impl::get_tx_stream(const uhd::stream_args_t &args_)
     args.otw_format = "sc16";
     args.channels = args.channels.empty()? std::vector<size_t>(1, 0) : args.channels;
 
+    //shared async queue for all channels in streamer
+    boost::shared_ptr<async_md_type> async_md(new async_md_type(1000/*messages deep*/));
+
     boost::shared_ptr<sph::send_packet_streamer> my_streamer;
 
     for (size_t stream_i = 0; stream_i < args.channels.size(); stream_i++)
     {
-
+        const size_t chan = args.channels[stream_i];
         const size_t radio_index = _tree->access<std::vector<size_t> >("/mboards/0/tx_chan_dsp_mapping")
                                             .get().at(args.channels[stream_i]);
 
@@ -449,14 +474,21 @@ tx_streamer::sptr e300_impl::get_tx_stream(const uhd::stream_args_t &args_)
         const size_t fc_window = perif.tx_data_xport->get_num_send_frames();
         perif.deframer->configure_flow_control(0/*cycs off*/, fc_window/8/*pkts*/);
         boost::shared_ptr<e300_tx_fc_guts_t> guts(new e300_tx_fc_guts_t());
+        guts->stream_channel = stream_i;
+        guts->device_channel = chan;
+        guts->async_queue = async_md;
+        guts->old_async_queue = _async_md;
+
         task::sptr task = task::make(boost::bind(&handle_tx_async_msgs, guts, perif.tx_flow_xport));
 
-        my_streamer->set_xport_chan_get_buff(0, boost::bind(
-            &get_tx_buff_with_flowctrl, task, guts, perif.tx_data_xport, fc_window, _1
-        ));
-        my_streamer->set_async_receiver(boost::bind(
-            &bounded_buffer<async_metadata_t>::pop_with_timed_wait, &(guts->async_queue), _1, _2
-        ));
+        my_streamer->set_xport_chan_get_buff(
+            stream_i,
+            boost::bind(&get_tx_buff_with_flowctrl, task, guts, perif.tx_data_xport, fc_window, _1)
+        );
+
+        my_streamer->set_async_receiver(
+            boost::bind(&async_md_type::pop_with_timed_wait, async_md, _1, _2)
+        );
         my_streamer->set_xport_chan_sid(stream_i, true, data_sid);
         my_streamer->set_enable_trailer(false); //TODO not implemented trailer support yet
         perif.tx_streamer = my_streamer; //store weak pointer

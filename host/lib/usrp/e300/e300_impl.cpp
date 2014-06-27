@@ -131,6 +131,8 @@ UHD_STATIC_BLOCK(register_e300_device)
  **********************************************************************/
 e300_impl::e300_impl(const uhd::device_addr_t &device_addr) : _sid_framer(0)
 {
+    _async_md.reset(new async_md_type(1000/*messages deep*/));
+
     e300_impl_begin:
     ////////////////////////////////////////////////////////////////////
     // load the fpga image
