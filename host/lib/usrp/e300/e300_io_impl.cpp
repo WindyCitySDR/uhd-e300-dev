@@ -151,10 +151,18 @@ static void e300_if_hdr_pack_le(
 /***********************************************************************
  * RX flow control handler
  **********************************************************************/
+struct e300_rx_fc_cache_t
+{
+    e300_rx_fc_cache_t():
+        last_seq_in(0){}
+    size_t last_seq_in;
+};
+
+
 static void handle_rx_flowctrl(
     const boost::uint32_t sid,
     zero_copy_if::sptr xport,
-    boost::shared_ptr<boost::uint32_t> seq32_state,
+    boost::shared_ptr<e300_rx_fc_cache_t> fc_cache,
     const size_t last_seq)
 {
     static const size_t RXFC_PACKET_LEN_IN_WORDS    = 2;
@@ -169,7 +177,7 @@ static void handle_rx_flowctrl(
     boost::uint32_t *pkt = buff->cast<boost::uint32_t *>();
 
     //recover seq32
-    boost::uint32_t &seq_sw = *seq32_state;
+    size_t& seq_sw = fc_cache->last_seq_in;
     const size_t seq_hw = seq_sw & HW_SEQ_NUM_MASK;
     if (last_seq < seq_hw)
         seq_sw += (HW_SEQ_NUM_MASK + 1);
@@ -394,9 +402,9 @@ rx_streamer::sptr e300_impl::get_rx_stream(const uhd::stream_args_t &args_)
         //setup flow control
         const size_t fc_window = perif.rx_data_xport->get_num_recv_frames();
         perif.framer->configure_flow_control(fc_window);
-        boost::shared_ptr<boost::uint32_t> seq32(new boost::uint32_t(0));
+        boost::shared_ptr<e300_rx_fc_cache_t> fc_cache(new e300_rx_fc_cache_t());
         my_streamer->set_xport_handle_flowctrl(stream_i,
-            boost::bind(&handle_rx_flowctrl, data_sid, perif.rx_flow_xport, seq32, _1),
+            boost::bind(&handle_rx_flowctrl, data_sid, perif.rx_flow_xport, fc_cache, _1),
             static_cast<size_t>(static_cast<double>(fc_window) * E300_RX_SW_BUFF_FULLNESS),
             true/*init*/);
 
