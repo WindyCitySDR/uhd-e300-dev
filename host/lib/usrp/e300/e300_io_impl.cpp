@@ -31,6 +31,8 @@ using namespace uhd;
 using namespace uhd::usrp;
 using namespace uhd::transport;
 
+static const boost::uint32_t HW_SEQ_NUM_MASK = 0xfff;
+
 /***********************************************************************
  * update streamer rates
  **********************************************************************/
@@ -149,8 +151,16 @@ static void e300_if_hdr_pack_le(
 /***********************************************************************
  * RX flow control handler
  **********************************************************************/
-static void handle_rx_flowctrl(const boost::uint32_t sid, zero_copy_if::sptr xport, boost::shared_ptr<boost::uint32_t> seq32_state, const size_t last_seq)
+static void handle_rx_flowctrl(
+    const boost::uint32_t sid,
+    zero_copy_if::sptr xport,
+    boost::shared_ptr<boost::uint32_t> seq32_state,
+    const size_t last_seq)
 {
+    static const size_t RXFC_PACKET_LEN_IN_WORDS    = 2;
+    static const size_t RXFC_CMD_CODE_OFFSET        = 0;
+    static const size_t RXFC_SEQ_NUM_OFFSET         = 1;
+
     managed_send_buffer::sptr buff = xport->get_send_buff(1.0);
     if (not buff)
     {
@@ -159,18 +169,19 @@ static void handle_rx_flowctrl(const boost::uint32_t sid, zero_copy_if::sptr xpo
     boost::uint32_t *pkt = buff->cast<boost::uint32_t *>();
 
     //recover seq32
-    boost::uint32_t &seq32 = *seq32_state;
-    const size_t seq12 = seq32 & 0xfff;
-    if (last_seq < seq12) seq32 += (1 << 12);
-    seq32 &= ~0xfff;
-    seq32 |= last_seq;
+    boost::uint32_t &seq_sw = *seq32_state;
+    const size_t seq_hw = seq_sw & HW_SEQ_NUM_MASK;
+    if (last_seq < seq_hw)
+        seq_sw += (HW_SEQ_NUM_MASK + 1);
+    seq_sw &= ~HW_SEQ_NUM_MASK;
+    seq_sw |= last_seq;
 
     //load packet info
     vrt::if_packet_info_t packet_info;
     packet_info.packet_type = vrt::if_packet_info_t::PACKET_TYPE_CONTEXT;
-    packet_info.num_payload_words32 = 2;
+    packet_info.num_payload_words32 = RXFC_PACKET_LEN_IN_WORDS;
     packet_info.num_payload_bytes = packet_info.num_payload_words32*sizeof(boost::uint32_t);
-    packet_info.packet_count = 0;
+    packet_info.packet_count = seq_sw;
     packet_info.sob = false;
     packet_info.eob = false;
     packet_info.sid = sid;
@@ -184,8 +195,8 @@ static void handle_rx_flowctrl(const boost::uint32_t sid, zero_copy_if::sptr xpo
     e300_if_hdr_pack_le(pkt, packet_info);
 
     //load payload
-    pkt[packet_info.num_header_words32+0] = uhd::htowx<boost::uint32_t>(0);
-    pkt[packet_info.num_header_words32+1] = uhd::htowx<boost::uint32_t>(seq32);
+    pkt[packet_info.num_header_words32+RXFC_CMD_CODE_OFFSET] = uhd::htowx<boost::uint32_t>(0);
+    pkt[packet_info.num_header_words32+RXFC_SEQ_NUM_OFFSET] = uhd::htowx<boost::uint32_t>(seq_sw);
 
     //send the buffer over the interface
     buff->commit(sizeof(boost::uint32_t)*(packet_info.num_packet_words32));
@@ -281,8 +292,8 @@ static managed_send_buffer::sptr get_tx_buff_with_flowctrl(
 ){
     while (true)
     {
-        const size_t delta = (fc_cache->last_seq_out & 0xfff) - (fc_cache->last_seq_ack & 0xfff);
-        if ((delta & 0xfff) <= fc_window) break;
+        const size_t delta = (fc_cache->last_seq_out & HW_SEQ_NUM_MASK) - (fc_cache->last_seq_ack & HW_SEQ_NUM_MASK);
+        if ((delta & HW_SEQ_NUM_MASK) <= fc_window) break;
 
         const bool ok = fc_cache->seq_queue.pop_with_timed_wait(fc_cache->last_seq_ack, timeout);
         if (not ok) return managed_send_buffer::sptr(); //timeout waiting for flow control
