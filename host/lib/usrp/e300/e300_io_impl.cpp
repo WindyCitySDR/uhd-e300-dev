@@ -195,9 +195,9 @@ static void handle_rx_flowctrl(const boost::uint32_t sid, zero_copy_if::sptr xpo
 /***********************************************************************
  * TX flow control handler
  **********************************************************************/
-struct e300_tx_fc_guts_t
+struct e300_tx_fc_cache_t
 {
-    e300_tx_fc_guts_t(void):
+    e300_tx_fc_cache_t(void):
         stream_channel(0),
         device_channel(0),
         last_seq_out(0),
@@ -214,8 +214,12 @@ struct e300_tx_fc_guts_t
 
 #define E300_ASYNC_EVENT_CODE_FLOW_CTRL 0
 
+typedef boost::function<double(void)> tick_rate_retriever_t;
 
-static void handle_tx_async_msgs(boost::shared_ptr<e300_tx_fc_guts_t> guts, zero_copy_if::sptr xport)
+
+static void handle_tx_async_msgs(boost::shared_ptr<e300_tx_fc_cache_t> fc_cache,
+                                 zero_copy_if::sptr xport,
+                                 boost::function<double(void)> get_tick_rate)
 {
     managed_recv_buffer::sptr buff = xport->get_recv_buff();
     if (not buff) return;
@@ -240,7 +244,7 @@ static void handle_tx_async_msgs(boost::shared_ptr<e300_tx_fc_guts_t> guts, zero
     if (uhd::wtohx(packet_buff[if_packet_info.num_header_words32+0]) == 0)
     {
         const size_t seq = uhd::wtohx(packet_buff[if_packet_info.num_header_words32+1]);
-        guts->seq_queue.push_with_haste(seq);
+        fc_cache->seq_queue.push_with_haste(seq);
         return;
     }
 
@@ -248,7 +252,7 @@ static void handle_tx_async_msgs(boost::shared_ptr<e300_tx_fc_guts_t> guts, zero
     async_metadata_t metadata;
     load_metadata_from_buff(uhd::wtohx<boost::uint32_t>,
                             metadata, if_packet_info, packet_buff,
-                            61.44e6/*FIXME set from rate update*/, guts->stream_channel);
+                            get_tick_rate(), fc_cache->stream_channel);
 
     //The FC response and the burst ack are two indicators that the radio
     //consumed packets. Use them to update the FC metadata
@@ -256,37 +260,37 @@ static void handle_tx_async_msgs(boost::shared_ptr<e300_tx_fc_guts_t> guts, zero
         metadata.event_code == async_metadata_t::EVENT_CODE_BURST_ACK
     ) {
         const size_t seq = metadata.user_payload[0];
-        guts->seq_queue.push_with_pop_on_full(seq);
+        fc_cache->seq_queue.push_with_pop_on_full(seq);
     }
 
     //FC responses don't propagate up to the user so filter them here
     if (metadata.event_code != E300_ASYNC_EVENT_CODE_FLOW_CTRL) {
-        guts->async_queue->push_with_pop_on_full(metadata);
-        metadata.channel = guts->device_channel;
-        guts->old_async_queue->push_with_pop_on_full(metadata);
+        fc_cache->async_queue->push_with_pop_on_full(metadata);
+        metadata.channel = fc_cache->device_channel;
+        fc_cache->old_async_queue->push_with_pop_on_full(metadata);
         standard_async_msg_prints(metadata);
     }
 }
 
 static managed_send_buffer::sptr get_tx_buff_with_flowctrl(
     task::sptr /*holds ref*/,
-    boost::shared_ptr<e300_tx_fc_guts_t> guts,
+    boost::shared_ptr<e300_tx_fc_cache_t> fc_cache,
     zero_copy_if::sptr xport,
     const size_t fc_window,
     const double timeout
 ){
     while (true)
     {
-        const size_t delta = (guts->last_seq_out & 0xfff) - (guts->last_seq_ack & 0xfff);
+        const size_t delta = (fc_cache->last_seq_out & 0xfff) - (fc_cache->last_seq_ack & 0xfff);
         if ((delta & 0xfff) <= fc_window) break;
 
-        const bool ok = guts->seq_queue.pop_with_timed_wait(guts->last_seq_ack, timeout);
+        const bool ok = fc_cache->seq_queue.pop_with_timed_wait(fc_cache->last_seq_ack, timeout);
         if (not ok) return managed_send_buffer::sptr(); //timeout waiting for flow control
     }
 
     managed_send_buffer::sptr buff = xport->get_send_buff(timeout);
     if (buff) {
-        guts->last_seq_out++; //update seq, this will actually be a send
+        fc_cache->last_seq_out++; //update seq, this will actually be a send
     }
 
     return buff;
@@ -474,17 +478,21 @@ tx_streamer::sptr e300_impl::get_tx_stream(const uhd::stream_args_t &args_)
         //flow control setup
         const size_t fc_window = perif.tx_data_xport->get_num_send_frames();
         perif.deframer->configure_flow_control(0/*cycs off*/, fc_window/8/*pkts*/);
-        boost::shared_ptr<e300_tx_fc_guts_t> guts(new e300_tx_fc_guts_t());
-        guts->stream_channel = stream_i;
-        guts->device_channel = chan;
-        guts->async_queue = async_md;
-        guts->old_async_queue = _async_md;
+        boost::shared_ptr<e300_tx_fc_cache_t> fc_cache(new e300_tx_fc_cache_t());
+        fc_cache->stream_channel = stream_i;
+        fc_cache->device_channel = chan;
+        fc_cache->async_queue = async_md;
+        fc_cache->old_async_queue = _async_md;
 
-        task::sptr task = task::make(boost::bind(&handle_tx_async_msgs, guts, perif.tx_flow_xport));
+        tick_rate_retriever_t get_tick_rate_fn = boost::bind(&e300_impl::get_tick_rate, this);
+
+        task::sptr task = task::make(boost::bind(&handle_tx_async_msgs,
+                                                 fc_cache, perif.tx_flow_xport,
+                                                 get_tick_rate_fn));
 
         my_streamer->set_xport_chan_get_buff(
             stream_i,
-            boost::bind(&get_tx_buff_with_flowctrl, task, guts, perif.tx_data_xport, fc_window, _1)
+            boost::bind(&get_tx_buff_with_flowctrl, task, fc_cache, perif.tx_data_xport, fc_window, _1)
         );
 
         my_streamer->set_async_receiver(
