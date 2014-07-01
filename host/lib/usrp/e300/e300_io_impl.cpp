@@ -241,7 +241,8 @@ static void handle_tx_async_msgs(boost::shared_ptr<e300_tx_fc_cache_t> fc_cache,
                                  boost::function<double(void)> get_tick_rate)
 {
     managed_recv_buffer::sptr buff = xport->get_recv_buff();
-    if (not buff) return;
+    if (not buff)
+        return;
 
     //extract packet info
     vrt::if_packet_info_t if_packet_info;
@@ -301,10 +302,12 @@ static managed_send_buffer::sptr get_tx_buff_with_flowctrl(
     while (true)
     {
         const size_t delta = (fc_cache->last_seq_out & HW_SEQ_NUM_MASK) - (fc_cache->last_seq_ack & HW_SEQ_NUM_MASK);
-        if ((delta & HW_SEQ_NUM_MASK) <= fc_window) break;
+        if ((delta & HW_SEQ_NUM_MASK) <= fc_window)
+            break;
 
         const bool ok = fc_cache->seq_queue.pop_with_timed_wait(fc_cache->last_seq_ack, timeout);
-        if (not ok) return managed_send_buffer::sptr(); //timeout waiting for flow control
+        if (not ok)
+            return managed_send_buffer::sptr(); //timeout waiting for flow control
     }
 
     managed_send_buffer::sptr buff = xport->get_send_buff(timeout);
