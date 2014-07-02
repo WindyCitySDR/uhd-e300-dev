@@ -313,14 +313,14 @@ e300_impl::e300_impl(const uhd::device_addr_t &device_addr) : _sid_framer(0)
 
     _codec_ctrl->data_port_loopback(true);
 
-    // Radio 0 loopback through Catalina
+    // Radio 0 loopback through AD9361
     _fe_control_settings[0].rx_enb = true;
     _fe_control_settings[0].tx_enb = true;
     _fe_control_settings[1].rx_enb = false;
     _fe_control_settings[1].tx_enb = false;
     this->update_active_frontends();
     this->codec_loopback_self_test(_radio_perifs[0].ctrl);
-    // Radio 1 loopback through Catalina
+    // Radio 1 loopback through AD9361
     _fe_control_settings[0].rx_enb = false;
     _fe_control_settings[0].tx_enb = false;
     _fe_control_settings[1].rx_enb = true;
