@@ -51,11 +51,11 @@ public:
     static const size_t SR_CORE_DST       = 1024;
     static const size_t SR_CORE_XBAR      = 2048;
 
-    static const size_t RB32_CORE_TEST    = 0;
     static const size_t RB32_CORE_PPS_SEL = 1;
     static const size_t RB32_CORE_COMPAT  = 2;
     static const size_t RB32_CORE_GITHASH = 3;
     static const size_t RB32_CORE_XBAR    = 4;
+    static const size_t RB32_CORE_TEST    = 24;
 };
 
 UHD_INLINE boost::uint32_t XB_ADDR(const boost::uint32_t addr)
