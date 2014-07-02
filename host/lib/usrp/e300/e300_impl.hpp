@@ -46,9 +46,15 @@ static const std::string E300_FPGA_FILE_NAME = "usrp_e300_fpga.bit";
 static const std::string E300_TEMP_SYSFS = "iio:device0";
 static const std::string E300_SPIDEV_DEVICE  = "/dev/spidev0.1";
 
-static std::string E300_SERVER_RX_PORT = "321756";
-static std::string E300_SERVER_TX_PORT = "321757";
-static std::string E300_SERVER_CTRL_PORT = "321758";
+static std::string E300_SERVER_RX_PORT0 = "321756";
+static std::string E300_SERVER_TX_PORT0 = "321757";
+static std::string E300_SERVER_CTRL_PORT0 = "321758";
+
+static std::string E300_SERVER_RX_PORT1 = "321856";
+static std::string E300_SERVER_TX_PORT1 = "321857";
+static std::string E300_SERVER_CTRL_PORT1 = "321858";
+
+
 static std::string E300_SERVER_CODEC_PORT = "321759";
 static std::string E300_SERVER_GREGS_PORT = "321760";
 
@@ -186,12 +192,6 @@ private: // methods
     // sensors
     uhd::sensor_value_t _get_mb_temp(void);
 
-    // server stuff for network access
-    void _update_atrs(const size_t &fe);
-    void _update_antenna_sel(const std::string &fe, const std::string &ant);
-    void _update_fe_lo_freq(const std::string &fe, const double freq);
-    void _update_active_frontends(void);
-
     // internal gpios
     boost::uint8_t _get_internal_gpio(
         gpio_core_200::sptr,
@@ -203,7 +203,10 @@ private: // methods
         const boost::uint32_t value);
 
     // server stuff for network access
-    void run_server(const std::string &port, const std::string &what);
+    void _run_server(
+        const std::string &port,
+        const std::string &what,
+        const size_t fe);
 
 private: // members
     bool                        _network_mode;

@@ -237,7 +237,10 @@ static void e300_global_regs_tunnel(
 /***********************************************************************
  * The TCP server itself
  **********************************************************************/
-void e300_impl::run_server(const std::string &port, const std::string &what)
+void e300_impl::_run_server(
+    const std::string &port,
+    const std::string &what,
+    const size_t fe)
 {
     asio::io_service io_service;
     asio::ip::udp::resolver resolver(io_service);
@@ -262,7 +265,7 @@ void e300_impl::run_server(const std::string &port, const std::string &what)
             //socket->set_option(option);
             boost::thread_group tg;
             bool running = true;
-            radio_perifs_t &perif = _radio_perifs[0];
+            radio_perifs_t &perif = _radio_perifs[fe];
             if (what == "RX")
             {
                 tg.create_thread(boost::bind(&e300_recv_tunnel, "RX data tunnel", perif.rx_data_xport, socket, &endpoint, &running));

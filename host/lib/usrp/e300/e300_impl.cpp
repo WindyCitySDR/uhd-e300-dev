@@ -179,12 +179,22 @@ e300_impl::e300_impl(const uhd::device_addr_t &device_addr) : _sid_framer(0)
     if (_network_mode)
     {
         radio_perifs_t &perif = _radio_perifs[0];
-        perif.send_ctrl_xport = udp_zero_copy::make(device_addr["addr"], E300_SERVER_CTRL_PORT, ctrl_xport_params, dummy_buff_params_out, device_addr);
+        perif.send_ctrl_xport = udp_zero_copy::make(device_addr["addr"], E300_SERVER_CTRL_PORT0, ctrl_xport_params, dummy_buff_params_out, device_addr);
         perif.recv_ctrl_xport = perif.send_ctrl_xport;
-        perif.tx_data_xport = udp_zero_copy::make(device_addr["addr"], E300_SERVER_TX_PORT, data_xport_params, dummy_buff_params_out, device_addr);
+        perif.tx_data_xport = udp_zero_copy::make(device_addr["addr"], E300_SERVER_TX_PORT0, data_xport_params, dummy_buff_params_out, device_addr);
         perif.tx_flow_xport = perif.tx_data_xport;
-        perif.rx_data_xport = udp_zero_copy::make(device_addr["addr"], E300_SERVER_RX_PORT, data_xport_params, dummy_buff_params_out, device_addr);
+        perif.rx_data_xport = udp_zero_copy::make(device_addr["addr"], E300_SERVER_RX_PORT0, data_xport_params, dummy_buff_params_out, device_addr);
         perif.rx_flow_xport = perif.rx_data_xport;
+
+
+        radio_perifs_t &perif1 = _radio_perifs[1];
+        perif1.send_ctrl_xport = udp_zero_copy::make(device_addr["addr"], E300_SERVER_CTRL_PORT1, ctrl_xport_params, dummy_buff_params_out, device_addr);
+        perif1.recv_ctrl_xport = perif1.send_ctrl_xport;
+        perif1.tx_data_xport = udp_zero_copy::make(device_addr["addr"], E300_SERVER_TX_PORT1, data_xport_params, dummy_buff_params_out, device_addr);
+        perif1.tx_flow_xport = perif1.tx_data_xport;
+        perif1.rx_data_xport = udp_zero_copy::make(device_addr["addr"], E300_SERVER_RX_PORT1, data_xport_params, dummy_buff_params_out, device_addr);
+        perif1.rx_flow_xport = perif1.rx_data_xport;
+
         zero_copy_if::sptr codec_xport;
         codec_xport = udp_zero_copy::make(device_addr["addr"], E300_SERVER_CODEC_PORT, ctrl_xport_params, dummy_buff_params_out, device_addr);
         _codec_ctrl = ad9361_ctrl::make(ad9361_ctrl_transport::make_zero_copy(codec_xport));
@@ -245,11 +255,17 @@ e300_impl::e300_impl(const uhd::device_addr_t &device_addr) : _sid_framer(0)
     if (device_addr.has_key("server"))
     {
         boost::thread_group tg;
-        tg.create_thread(boost::bind(&e300_impl::run_server, this, E300_SERVER_RX_PORT, "RX"));
-        tg.create_thread(boost::bind(&e300_impl::run_server, this, E300_SERVER_TX_PORT, "TX"));
-        tg.create_thread(boost::bind(&e300_impl::run_server, this, E300_SERVER_CTRL_PORT, "CTRL"));
-        tg.create_thread(boost::bind(&e300_impl::run_server, this, E300_SERVER_CODEC_PORT, "CODEC"));
-        tg.create_thread(boost::bind(&e300_impl::run_server, this, E300_SERVER_GREGS_PORT, "GREGS"));
+        tg.create_thread(boost::bind(&e300_impl::_run_server, this, E300_SERVER_RX_PORT0, "RX",0));
+        tg.create_thread(boost::bind(&e300_impl::_run_server, this, E300_SERVER_TX_PORT0, "TX",0));
+        tg.create_thread(boost::bind(&e300_impl::_run_server, this, E300_SERVER_CTRL_PORT0, "CTRL",0));
+
+        tg.create_thread(boost::bind(&e300_impl::_run_server, this, E300_SERVER_RX_PORT1, "RX",1));
+        tg.create_thread(boost::bind(&e300_impl::_run_server, this, E300_SERVER_TX_PORT1, "TX",1));
+        tg.create_thread(boost::bind(&e300_impl::_run_server, this, E300_SERVER_CTRL_PORT1, "CTRL",1));
+
+
+        tg.create_thread(boost::bind(&e300_impl::_run_server, this, E300_SERVER_CODEC_PORT, "CODEC", 0 /*don't care */));
+        tg.create_thread(boost::bind(&e300_impl::_run_server, this, E300_SERVER_GREGS_PORT, "GREGS", 0 /*don't care */));
         tg.join_all();
         goto e300_impl_begin;
     }
