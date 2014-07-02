@@ -31,6 +31,8 @@ using namespace uhd;
 using namespace uhd::usrp;
 using namespace uhd::transport;
 
+namespace uhd { namespace usrp { namespace e300 {
+
 static const boost::uint32_t HW_SEQ_NUM_MASK = 0xfff;
 
 /***********************************************************************
@@ -531,3 +533,4 @@ tx_streamer::sptr e300_impl::get_tx_stream(const uhd::stream_args_t &args_)
 
     return my_streamer;
 }
+}}} // namespace

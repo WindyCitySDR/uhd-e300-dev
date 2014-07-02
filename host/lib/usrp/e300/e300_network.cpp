@@ -28,6 +28,8 @@ using namespace uhd;
 using namespace uhd::transport;
 namespace asio = boost::asio;
 
+namespace uhd { namespace usrp { namespace e300 {
+
 static const size_t E300_NETWORK_DEBUG = false;
 
 static inline bool wait_for_recv_ready(int sock_fd, const size_t timeout_ms)
@@ -293,3 +295,4 @@ void e300_impl::run_server(const std::string &port, const std::string &what)
         catch(...){}
     }
 }
+}}} // namespace

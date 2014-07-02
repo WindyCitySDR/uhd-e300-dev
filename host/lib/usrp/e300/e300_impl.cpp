@@ -40,6 +40,8 @@ using namespace uhd::transport;
 namespace fs = boost::filesystem;
 namespace asio = boost::asio;
 
+namespace uhd { namespace usrp { namespace e300 {
+
 /***********************************************************************
  * Discovery
  **********************************************************************/
@@ -121,11 +123,6 @@ static device::sptr e300_make(const device_addr_t &device_addr)
     return device::sptr(new e300_impl(device_addr));
 }
 
-UHD_STATIC_BLOCK(register_e300_device)
-{
-    device::register_device(&e300_find, &e300_make);
-}
-
 /***********************************************************************
  * Structors
  **********************************************************************/
@@ -193,7 +190,7 @@ e300_impl::e300_impl(const uhd::device_addr_t &device_addr) : _sid_framer(0)
         _codec_ctrl = ad9361_ctrl::make(ad9361_ctrl_transport::make_zero_copy(codec_xport));
         zero_copy_if::sptr gregs_xport;
         gregs_xport = udp_zero_copy::make(device_addr["addr"], E300_SERVER_GREGS_PORT, ctrl_xport_params, dummy_buff_params_out, device_addr);
-        _global_regs = uhd::usrp::e300::global_regs::make(gregs_xport);
+        _global_regs = global_regs::make(gregs_xport);
     }
     else
     {
@@ -204,7 +201,7 @@ e300_impl::e300_impl(const uhd::device_addr_t &device_addr) : _sid_framer(0)
             throw uhd::runtime_error("Failed to get driver parameters from sysfs.");
         }
         _fifo_iface = e300_fifo_interface::make(fifo_cfg);
-        _global_regs = uhd::usrp::e300::global_regs::make(_fifo_iface->get_global_regs_base());
+        _global_regs = global_regs::make(_fifo_iface->get_global_regs_base());
 
         // static mapping, boooohhhhhh
         _radio_perifs[0].send_ctrl_xport = _fifo_iface->make_send_xport(E300_R0_CTRL_STREAM, ctrl_xport_args);
@@ -221,7 +218,7 @@ e300_impl::e300_impl(const uhd::device_addr_t &device_addr) : _sid_framer(0)
         _radio_perifs[1].rx_data_xport   = _fifo_iface->make_recv_xport(E300_R1_RX_DATA_STREAM, data_xport_args);
         _radio_perifs[1].rx_flow_xport   = _fifo_iface->make_send_xport(E300_R1_RX_DATA_STREAM, ctrl_xport_args);
 
-        _codec_xport = ad9361_ctrl_transport::make_software_spi(AD9361_E300, uhd::usrp::e300::spi::make(E300_SPIDEV_DEVICE), 1);
+        _codec_xport = ad9361_ctrl_transport::make_software_spi(AD9361_E300, spi::make(E300_SPIDEV_DEVICE), 1);
         _codec_ctrl = ad9361_ctrl::make(_codec_xport);
         // This is horrible ... why do I have to sleep here?
         boost::this_thread::sleep(boost::posix_time::milliseconds(100));
@@ -232,8 +229,8 @@ e300_impl::e300_impl(const uhd::device_addr_t &device_addr) : _sid_framer(0)
     this->register_loopback_self_test(_global_regs);
 
     // TODO: Put this in the right place
-    const boost::uint32_t git_hash = _global_regs->peek32(uhd::usrp::e300::global_regs::RB32_CORE_GITHASH);
-    const boost::uint32_t compat = _global_regs->peek32(uhd::usrp::e300::global_regs::RB32_CORE_COMPAT);
+    const boost::uint32_t git_hash = _global_regs->peek32(global_regs::RB32_CORE_GITHASH);
+    const boost::uint32_t compat = _global_regs->peek32(global_regs::RB32_CORE_COMPAT);
     UHD_MSG(status) << "Getting version information... " << std::flush;
     UHD_MSG(status) << boost::format("%u.%02d (git %7x%s)")
         % (compat & 0xff) % ((compat & 0xff00) >> 8)
@@ -607,17 +604,17 @@ boost::uint32_t e300_impl::allocate_sid(const sid_config_t &config)
         << std::dec << std::endl;
 
     // Program the E300 to recognize it's own local address.
-    _global_regs->poke32(uhd::usrp::e300::global_regs::SR_CORE_XB_LOCAL, config.router_addr_there);
+    _global_regs->poke32(global_regs::SR_CORE_XB_LOCAL, config.router_addr_there);
 
     // Program CAM entry for outgoing packets matching a E300 resource (e.g. Radio).
     // This type of packet matches the XB_LOCAL address and is looked up in the upper
     // half of the CAM
-    _global_regs->poke32(uhd::usrp::e300::XB_ADDR(256 + stream),
+    _global_regs->poke32(XB_ADDR(256 + stream),
                          config.router_dst_there);
 
     // Program CAM entry for returning packets to us (for example GR host via zynq_fifo)
     // This type of packet does not match the XB_LOCAL address and is looked up in the lower half of the CAM
-    _global_regs->poke32(uhd::usrp::e300::XB_ADDR(E300_DEVICE_HERE),
+    _global_regs->poke32(XB_ADDR(E300_DEVICE_HERE),
                          config.router_dst_here);
 
     UHD_LOG << std::hex
@@ -634,7 +631,7 @@ void e300_impl::_setup_dest_mapping(const boost::uint32_t sid, const size_t whic
 {
     UHD_LOG << boost::format("Setting up dest map for 0x%lx to be stream %d")
                                      % (sid & 0xff) % which_stream << std::endl;
-    _global_regs->poke32(uhd::usrp::e300::DST_ADDR(sid & 0xff), which_stream);
+    _global_regs->poke32(DST_ADDR(sid & 0xff), which_stream);
 }
 
 void e300_impl::update_time_source(const std::string &)
@@ -949,4 +946,11 @@ void e300_impl::update_atrs(const size_t &fe)
     atr->set_atr_reg(dboard_iface::ATR_REG_RX_ONLY, rx_reg);
     atr->set_atr_reg(dboard_iface::ATR_REG_TX_ONLY, tx_reg);
     atr->set_atr_reg(dboard_iface::ATR_REG_FULL_DUPLEX, fd_reg);
+}
+
+}}} // namespace
+
+UHD_STATIC_BLOCK(register_e300_device)
+{
+    device::register_device(&uhd::usrp::e300::e300_find, &uhd::usrp::e300::e300_make);
 }

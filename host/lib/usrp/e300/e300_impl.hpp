@@ -40,6 +40,8 @@
 
 #include "e300_global_regs.hpp"
 
+namespace uhd { namespace usrp { namespace e300 {
+
 static const std::string E300_FPGA_FILE_NAME = "usrp_e300_fpga.bit";
 static const std::string E300_TEMP_SYSFS = "iio:device0";
 static const std::string E300_SPIDEV_DEVICE  = "/dev/spidev0.1";
@@ -190,11 +192,13 @@ private:
     void update_fe_lo_freq(const std::string &fe, const double freq);
     void update_active_frontends(void);
 
-    uhd::usrp::e300::global_regs::sptr _global_regs;
+    global_regs::sptr _global_regs;
 
     boost::uint8_t get_internal_gpio(gpio_core_200::sptr, const std::string &);
 
     void set_internal_gpio(gpio_core_200::sptr gpio, const std::string &attr, const boost::uint32_t value);
 };
+
+}}} // namespace
 
 #endif /* INCLUDED_E300_IMPL_HPP */
