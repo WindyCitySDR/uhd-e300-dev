@@ -101,16 +101,17 @@ public:
 
     bool recv_async_msg(uhd::async_metadata_t &, double);
 
-private:
-    bool _network_mode;
+private: // types
+    // sid convenience struct
+    struct sid_config_t
+    {
+        boost::uint8_t router_addr_there;
+        boost::uint8_t dst_prefix; //2bits
+        boost::uint8_t router_dst_there;
+        boost::uint8_t router_dst_here;
+    };
 
-    void load_fpga_image(const std::string &path);
-
-    e300_fifo_interface::sptr _fifo_iface;
-
-    void register_loopback_self_test(uhd::wb_iface::sptr iface);
-
-    //perifs in the radio core
+    // perifs in the radio core
     struct radio_perifs_t
     {
         radio_ctrl_core_3000::sptr ctrl;
@@ -130,44 +131,6 @@ private:
         boost::weak_ptr<uhd::rx_streamer> rx_streamer;
         boost::weak_ptr<uhd::tx_streamer> tx_streamer;
     };
-    radio_perifs_t _radio_perifs[2];
-    void setup_radio(const size_t which_radio);
-
-    size_t _sid_framer;
-    struct sid_config_t
-    {
-        boost::uint8_t router_addr_there;
-        boost::uint8_t dst_prefix; //2bits
-        boost::uint8_t router_dst_there;
-        boost::uint8_t router_dst_here;
-    };
-
-    boost::uint32_t allocate_sid(const sid_config_t &config);
-
-    void _setup_dest_mapping(const boost::uint32_t sid, const size_t which_stream);
-
-    double _tick_rate;
-    double get_tick_rate(void){return _tick_rate;}
-    double set_tick_rate(const double rate);
-
-    void update_tick_rate(const double);
-    void update_rx_samp_rate(const size_t, const double);
-    void update_tx_samp_rate(const size_t, const double);
-
-    void update_time_source(const std::string &);
-    void update_clock_source(const std::string &);
-
-    void update_rx_subdev_spec(const uhd::usrp::subdev_spec_t &spec);
-    void update_tx_subdev_spec(const uhd::usrp::subdev_spec_t &spec);
-
-    ad9361_ctrl_transport::sptr _codec_xport;
-    ad9361_ctrl::sptr _codec_ctrl;
-    void codec_loopback_self_test(uhd::wb_iface::sptr iface);
-
-    uhd::sensor_value_t get_mb_temp(void);
-
-    //server stuff for network access
-    void run_server(const std::string &port, const std::string &what);
 
     //frontend cache so we can update gpios
     struct fe_control_settings_t
@@ -186,17 +149,72 @@ private:
         double rx_freq;
         double tx_freq;
     };
-    fe_control_settings_t _fe_control_settings[2];
-    void update_atrs(const size_t &fe);
-    void update_antenna_sel(const std::string &fe, const std::string &ant);
-    void update_fe_lo_freq(const std::string &fe, const double freq);
-    void update_active_frontends(void);
 
-    global_regs::sptr _global_regs;
+private: // methods
+    void _load_fpga_image(const std::string &path);
 
-    boost::uint8_t get_internal_gpio(gpio_core_200::sptr, const std::string &);
+    void _register_loopback_self_test(uhd::wb_iface::sptr iface);
 
-    void set_internal_gpio(gpio_core_200::sptr gpio, const std::string &attr, const boost::uint32_t value);
+    void _setup_radio(const size_t which_radio);
+
+    boost::uint32_t _allocate_sid(const sid_config_t &config);
+
+    void _setup_dest_mapping(
+        const boost::uint32_t sid,
+        const size_t which_stream);
+
+    double _get_tick_rate(void){return _tick_rate;}
+    double _set_tick_rate(const double rate);
+
+    void _update_tick_rate(const double);
+    void _update_rx_samp_rate(const size_t, const double);
+    void _update_tx_samp_rate(const size_t, const double);
+
+    void _update_time_source(const std::string &);
+    void _update_clock_source(const std::string &);
+
+    void _update_rx_subdev_spec(const uhd::usrp::subdev_spec_t &spec);
+    void _update_tx_subdev_spec(const uhd::usrp::subdev_spec_t &spec);
+
+    void _codec_loopback_self_test(uhd::wb_iface::sptr iface);
+
+    void _update_atrs(const size_t &fe);
+    void _update_antenna_sel(const std::string &fe, const std::string &ant);
+    void _update_fe_lo_freq(const std::string &fe, const double freq);
+    void _update_active_frontends(void);
+
+    // sensors
+    uhd::sensor_value_t _get_mb_temp(void);
+
+    // server stuff for network access
+    void _update_atrs(const size_t &fe);
+    void _update_antenna_sel(const std::string &fe, const std::string &ant);
+    void _update_fe_lo_freq(const std::string &fe, const double freq);
+    void _update_active_frontends(void);
+
+    // internal gpios
+    boost::uint8_t _get_internal_gpio(
+        gpio_core_200::sptr,
+        const std::string &);
+
+    void _set_internal_gpio(
+        gpio_core_200::sptr gpio,
+        const std::string &attr,
+        const boost::uint32_t value);
+
+    // server stuff for network access
+    void run_server(const std::string &port, const std::string &what);
+
+private: // members
+    bool                        _network_mode;
+    e300_fifo_interface::sptr   _fifo_iface;
+    size_t                      _sid_framer;
+    radio_perifs_t              _radio_perifs[2];
+    double                      _tick_rate;
+    ad9361_ctrl_transport::sptr _codec_xport;
+    ad9361_ctrl::sptr           _codec_ctrl;
+    fe_control_settings_t       _fe_control_settings[2];
+    global_regs::sptr           _global_regs;
 };
 
 }}} // namespace

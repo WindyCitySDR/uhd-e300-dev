@@ -38,7 +38,7 @@ static const boost::uint32_t HW_SEQ_NUM_MASK = 0xfff;
 /***********************************************************************
  * update streamer rates
  **********************************************************************/
-void e300_impl::update_tick_rate(const double rate)
+void e300_impl::_update_tick_rate(const double rate)
 {
     BOOST_FOREACH(radio_perifs_t &perif, _radio_perifs)
     {
@@ -56,14 +56,14 @@ void e300_impl::update_tick_rate(const double rate)
     }
 }
 
-void e300_impl::update_rx_samp_rate(const size_t dspno, const double rate)
+void e300_impl::_update_rx_samp_rate(const size_t dspno, const double rate)
 {
     boost::shared_ptr<sph::recv_packet_streamer> my_streamer =
         boost::dynamic_pointer_cast<sph::recv_packet_streamer>(_radio_perifs[dspno].rx_streamer.lock());
     if (my_streamer) my_streamer->set_samp_rate(rate);
 }
 
-void e300_impl::update_tx_samp_rate(const size_t dspno, const double rate)
+void e300_impl::_update_tx_samp_rate(const size_t dspno, const double rate)
 {
     boost::shared_ptr<sph::send_packet_streamer> my_streamer =
         boost::dynamic_pointer_cast<sph::send_packet_streamer>(_radio_perifs[dspno].tx_streamer.lock());
@@ -73,7 +73,7 @@ void e300_impl::update_tx_samp_rate(const size_t dspno, const double rate)
 /***********************************************************************
  * frontend selection
  **********************************************************************/
-void e300_impl::update_rx_subdev_spec(const uhd::usrp::subdev_spec_t &spec)
+void e300_impl::_update_rx_subdev_spec(const uhd::usrp::subdev_spec_t &spec)
 {
     //sanity checking
     if (spec.size()) validate_subdev_spec(_tree, spec, "rx");
@@ -99,10 +99,10 @@ void e300_impl::update_rx_subdev_spec(const uhd::usrp::subdev_spec_t &spec)
         _fe_control_settings[1].rx_enb = true;
     }
 
-    this->update_active_frontends();
+    this->_update_active_frontends();
 }
 
-void e300_impl::update_tx_subdev_spec(const uhd::usrp::subdev_spec_t &spec)
+void e300_impl::_update_tx_subdev_spec(const uhd::usrp::subdev_spec_t &spec)
 {
     //sanity checking
     if (spec.size()) validate_subdev_spec(_tree, spec, "tx");
@@ -128,7 +128,7 @@ void e300_impl::update_tx_subdev_spec(const uhd::usrp::subdev_spec_t &spec)
         _fe_control_settings[1].tx_enb = true;
     }
 
-    this->update_active_frontends();
+    this->_update_active_frontends();
 }
 
 /***********************************************************************
@@ -360,7 +360,7 @@ rx_streamer::sptr e300_impl::get_rx_stream(const uhd::stream_args_t &args_)
         config.dst_prefix        = E300_RADIO_DEST_PREFIX_RX;
         config.router_dst_there  = radio_index ? E300_XB_DST_R1 : E300_XB_DST_R0;
         config.router_dst_here   = E300_XB_DST_AXI;
-        boost::uint32_t data_sid = this->allocate_sid(config);
+        boost::uint32_t data_sid = this->_allocate_sid(config);
         this->_setup_dest_mapping(data_sid,
                                   radio_index ? E300_R1_RX_DATA_STREAM
                                               : E300_R0_RX_DATA_STREAM);
@@ -419,7 +419,7 @@ rx_streamer::sptr e300_impl::get_rx_stream(const uhd::stream_args_t &args_)
         perif.rx_streamer = my_streamer; //store weak pointer
 
         //sets all tick and samp rates on this streamer
-        this->update_tick_rate(this->get_tick_rate());
+        this->_update_tick_rate(this->_get_tick_rate());
         _tree->access<double>(str(boost::format("/mboards/0/rx_dsps/%u/rate/value") % 0)).update();
 
     }
@@ -462,7 +462,7 @@ tx_streamer::sptr e300_impl::get_tx_stream(const uhd::stream_args_t &args_)
         config.dst_prefix        = E300_RADIO_DEST_PREFIX_TX;
         config.router_dst_there  = radio_index ? E300_XB_DST_R1 : E300_XB_DST_R0;
         config.router_dst_here   = E300_XB_DST_AXI;
-        boost::uint32_t data_sid = this->allocate_sid(config);
+        boost::uint32_t data_sid = this->_allocate_sid(config);
         this->_setup_dest_mapping(data_sid,
                                   radio_index ? E300_R1_TX_DATA_STREAM
                                               : E300_R0_TX_DATA_STREAM);
@@ -508,7 +508,7 @@ tx_streamer::sptr e300_impl::get_tx_stream(const uhd::stream_args_t &args_)
         fc_cache->async_queue = async_md;
         fc_cache->old_async_queue = _async_md;
 
-        tick_rate_retriever_t get_tick_rate_fn = boost::bind(&e300_impl::get_tick_rate, this);
+        tick_rate_retriever_t get_tick_rate_fn = boost::bind(&e300_impl::_get_tick_rate, this);
 
         task::sptr task = task::make(boost::bind(&handle_tx_async_msgs,
                                                  fc_cache, perif.tx_flow_xport,
@@ -527,7 +527,7 @@ tx_streamer::sptr e300_impl::get_tx_stream(const uhd::stream_args_t &args_)
         perif.tx_streamer = my_streamer; //store weak pointer
 
         //sets all tick and samp rates on this streamer
-        this->update_tick_rate(this->get_tick_rate());
+        this->_update_tick_rate(this->_get_tick_rate());
         _tree->access<double>(str(boost::format("/mboards/0/tx_dsps/%u/rate/value") % 0)).update();
     }
 
