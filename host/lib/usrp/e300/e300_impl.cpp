@@ -655,8 +655,17 @@ void e300_impl::_setup_dest_mapping(const boost::uint32_t sid, const size_t whic
     _global_regs->poke32(DST_ADDR(sid & 0xff), which_stream);
 }
 
-void e300_impl::_update_time_source(const std::string &)
+void e300_impl::_update_time_source(const std::string &source)
 {
+    if (source == "none" or source == "internal") {
+        _global_regs->poke32(global_regs::SR_CORE_PPS_SEL, global_regs::PPS_INT);
+    } else if (source == "gpsdo") {
+        _global_regs->poke32(global_regs::SR_CORE_PPS_SEL, global_regs::PPS_GPS);
+    } else if (source == "external") {
+        _global_regs->poke32(global_regs::SR_CORE_PPS_SEL, global_regs::PPS_EXT);
+    } else {
+        throw uhd::key_error("update_time_source: unknown source: " + source);
+    }
 }
 
 void e300_impl::_update_clock_source(const std::string &)

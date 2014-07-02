@@ -56,6 +56,12 @@ public:
     static const size_t RB32_CORE_GITHASH = 3;
     static const size_t RB32_CORE_XBAR    = 4;
     static const size_t RB32_CORE_TEST    = 24;
+
+
+    // PPS selection
+    static const size_t PPS_GPS = 0;
+    static const size_t PPS_INT = 2;
+    static const size_t PPS_EXT = 3;
 };
 
 UHD_INLINE boost::uint32_t XB_ADDR(const boost::uint32_t addr)

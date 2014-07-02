@@ -176,7 +176,7 @@ private: // methods
     void _update_rx_samp_rate(const size_t, const double);
     void _update_tx_samp_rate(const size_t, const double);
 
-    void _update_time_source(const std::string &);
+    void _update_time_source(const std::string &source);
     void _update_clock_source(const std::string &);
 
     void _update_rx_subdev_spec(const uhd::usrp::subdev_spec_t &spec);
