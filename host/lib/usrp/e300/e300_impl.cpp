@@ -18,6 +18,7 @@
 #include "e300_impl.hpp"
 #include "e300_spi.hpp"
 #include "e300_regs.hpp"
+#include "e300_eeprom_manager.hpp"
 
 #include <uhd/utils/msg.hpp>
 #include <uhd/utils/log.hpp>
@@ -29,6 +30,7 @@
 #include <boost/filesystem.hpp>
 #include <boost/functional/hash.hpp>
 #include <boost/bind.hpp>
+#include <boost/make_shared.hpp>
 #include <boost/assign/list_of.hpp>
 #include <boost/thread/thread.hpp> //sleep
 #include <boost/asio.hpp>
@@ -201,6 +203,10 @@ e300_impl::e300_impl(const uhd::device_addr_t &device_addr) : _sid_framer(0)
         zero_copy_if::sptr gregs_xport;
         gregs_xport = udp_zero_copy::make(device_addr["addr"], E300_SERVER_GREGS_PORT, ctrl_xport_params, dummy_buff_params_out, device_addr);
         _global_regs = global_regs::make(gregs_xport);
+
+        zero_copy_if::sptr i2c_xport;
+        i2c_xport = udp_zero_copy::make(device_addr["addr"], E300_SERVER_I2C_PORT, ctrl_xport_params, dummy_buff_params_out, device_addr);
+        _i2c = i2c::make_zc(i2c_xport);
     }
     else
     {
@@ -232,6 +238,8 @@ e300_impl::e300_impl(const uhd::device_addr_t &device_addr) : _sid_framer(0)
         _codec_ctrl = ad9361_ctrl::make(_codec_xport);
         // This is horrible ... why do I have to sleep here?
         boost::this_thread::sleep(boost::posix_time::milliseconds(100));
+
+        _i2c = i2c::make_i2cdev("/dev/i2c-0");
     }
 
     // Verify we can talk to the e300 core control registers ...
@@ -266,6 +274,7 @@ e300_impl::e300_impl(const uhd::device_addr_t &device_addr) : _sid_framer(0)
 
         tg.create_thread(boost::bind(&e300_impl::_run_server, this, E300_SERVER_CODEC_PORT, "CODEC", 0 /*don't care */));
         tg.create_thread(boost::bind(&e300_impl::_run_server, this, E300_SERVER_GREGS_PORT, "GREGS", 0 /*don't care */));
+        tg.create_thread(boost::bind(&e300_impl::_run_server, this, E300_SERVER_I2C_PORT, "I2C", 0 /*don't care */));
         tg.join_all();
         goto e300_impl_begin;
     }
@@ -278,7 +287,7 @@ e300_impl::e300_impl(const uhd::device_addr_t &device_addr) : _sid_framer(0)
     _tree = property_tree::make();
     _tree->create<std::string>("/name").set("E-Series Device");
     const fs_path mb_path = "/mboards/0";
-    _tree->create<std::string>(mb_path / "name").set("E300");
+    _tree->create<std::string>(mb_path / "name").set("E3x0");
     _tree->create<std::string>(mb_path / "codename").set("Troll");
 
     ////////////////////////////////////////////////////////////////////
@@ -299,10 +308,9 @@ e300_impl::e300_impl(const uhd::device_addr_t &device_addr) : _sid_framer(0)
     ////////////////////////////////////////////////////////////////////
     // setup the mboard eeprom
     ////////////////////////////////////////////////////////////////////
-    // TODO
-    mboard_eeprom_t mb_eeprom;
-    mb_eeprom["name"] = "TODO"; //FIXME with real eeprom values
-    mb_eeprom["serial"] = "TODO"; //FIXME with real eeprom values
+    _eeprom_manager = boost::make_shared<e300_eeprom_manager>(_i2c);
+
+    mboard_eeprom_t mb_eeprom = _eeprom_manager->read_mb_eeprom();
     _tree->create<mboard_eeprom_t>(mb_path / "eeprom")
         .set(mb_eeprom);
 

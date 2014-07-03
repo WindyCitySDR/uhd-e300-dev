@@ -233,6 +233,53 @@ static void e300_global_regs_tunnel(
     *running = false;
 }
 
+static void e300_i2c_tunnel(
+    const std::string &name,
+    boost::shared_ptr<asio::ip::udp::socket> socket,
+    uhd::usrp::e300::i2c::sptr i2c,
+    asio::ip::udp::endpoint *endpoint,
+    bool *running
+)
+{
+    UHD_ASSERT_THROW(i2c);
+    asio::ip::udp::endpoint _endpoint;
+    try
+    {
+        while (*running)
+        {
+            uint8_t in_buff[4] = {};
+
+            const size_t num_bytes = socket->receive_from(asio::buffer(in_buff), *endpoint);
+
+            if (num_bytes < 4) {
+                std::cout << "Received short packet: " << num_bytes << std::endl;
+                continue;
+            }
+
+            uhd::usrp::e300::i2c_transaction_t *in =
+                reinterpret_cast<uhd::usrp::e300::i2c_transaction_t *>(in_buff);
+
+            if(in->is_write) {
+                i2c->set_i2c_reg(in->addr, in->reg, in->data);
+            } else {
+                in->data = i2c->get_i2c_reg(in->addr, in->reg);
+                socket->send_to(asio::buffer(in_buff, 16), *endpoint);
+            }
+        }
+    }
+    catch(const std::exception &ex)
+    {
+        UHD_MSG(error) << "e300_i2c_tunnel exit " << name << " " << ex.what() << std::endl;
+    }
+    catch(...)
+    {
+        UHD_MSG(error) << "e300_i2c_tunnel exit " << name << std::endl;
+    }
+    UHD_MSG(status) << "e300_i2c_tunnel exit " << name << std::endl;
+    *running = false;
+}
+
+
 
 /***********************************************************************
  * The TCP server itself
@@ -285,11 +332,14 @@ void e300_impl::_run_server(
             {
                 tg.create_thread(boost::bind(&e300_codec_ctrl_tunnel, "CODEC tunnel", socket, _codec_xport, &endpoint, &running));
             }
+            if (what == "I2C")
+            {
+                tg.create_thread(boost::bind(&e300_i2c_tunnel, "I2C tunnel", socket, _i2c, &endpoint, &running));
+            }
             if (what == "GREGS")
             {
                 tg.create_thread(boost::bind(&e300_global_regs_tunnel, "GREGS tunnel", socket, _global_regs, &endpoint, &running));
             }
-
 
             tg.join_all();
             socket->close();
