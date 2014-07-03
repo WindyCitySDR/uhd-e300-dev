@@ -334,7 +334,7 @@ void e300_impl::_run_server(
             }
             if (what == "I2C")
             {
-                tg.create_thread(boost::bind(&e300_i2c_tunnel, "I2C tunnel", socket, _i2c, &endpoint, &running));
+                tg.create_thread(boost::bind(&e300_i2c_tunnel, "I2C tunnel", socket, _eeprom_manager->get_i2c_sptr(), &endpoint, &running));
             }
             if (what == "GREGS")
             {

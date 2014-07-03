@@ -44,6 +44,8 @@ public:
         return _mb_eeprom;
     }
 
+    i2c::sptr get_i2c_sptr(void);
+
 private: // types
     const static size_t MB_SERIAL_LEN = 6;
     const static size_t MB_NAME_LEN   = 32;

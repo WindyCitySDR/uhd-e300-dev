@@ -222,7 +222,6 @@ private: // members
     ad9361_ctrl::sptr           _codec_ctrl;
     fe_control_settings_t       _fe_control_settings[2];
     global_regs::sptr           _global_regs;
-    i2c::sptr                   _i2c;
     e300_eeprom_manager::sptr   _eeprom_manager;
 };
 

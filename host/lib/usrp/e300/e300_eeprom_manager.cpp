@@ -131,5 +131,10 @@ void e300_eeprom_manager::write_mb_eeprom(const mboard_eeprom_t& eeprom)
 
 }
 
+i2c::sptr e300_eeprom_manager::get_i2c_sptr(void)
+{
+    return _i2c;
+}
+
 
 }}} // namespace

@@ -206,7 +206,7 @@ e300_impl::e300_impl(const uhd::device_addr_t &device_addr) : _sid_framer(0)
 
         zero_copy_if::sptr i2c_xport;
         i2c_xport = udp_zero_copy::make(device_addr["addr"], E300_SERVER_I2C_PORT, ctrl_xport_params, dummy_buff_params_out, device_addr);
-        _i2c = i2c::make_zc(i2c_xport);
+        _eeprom_manager = boost::make_shared<e300_eeprom_manager>(i2c::make_zc(i2c_xport));
     }
     else
     {
@@ -238,8 +238,7 @@ e300_impl::e300_impl(const uhd::device_addr_t &device_addr) : _sid_framer(0)
         _codec_ctrl = ad9361_ctrl::make(_codec_xport);
         // This is horrible ... why do I have to sleep here?
         boost::this_thread::sleep(boost::posix_time::milliseconds(100));
-
-        _i2c = i2c::make_i2cdev("/dev/i2c-0");
+        _eeprom_manager = boost::make_shared<e300_eeprom_manager>(i2c::make_i2cdev("/dev/i2c-0"));
     }
 
     // Verify we can talk to the e300 core control registers ...
@@ -308,7 +307,6 @@ e300_impl::e300_impl(const uhd::device_addr_t &device_addr) : _sid_framer(0)
     ////////////////////////////////////////////////////////////////////
     // setup the mboard eeprom
     ////////////////////////////////////////////////////////////////////
-    _eeprom_manager = boost::make_shared<e300_eeprom_manager>(_i2c);
 
     mboard_eeprom_t mb_eeprom = _eeprom_manager->read_mb_eeprom();
     _tree->create<mboard_eeprom_t>(mb_path / "eeprom")
