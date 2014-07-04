@@ -151,7 +151,7 @@ static device_addrs_t e300_find(const device_addr_t &multi_dev_hint)
     }
 
     std::vector<std::string> ip_addrs = discover_ip_addrs(
-        hint["addr"], "21761");
+        hint["addr"], E300_SERVER_I2C_PORT);
 
     BOOST_FOREACH(const std::string &ip_addr, ip_addrs)
     {
@@ -182,6 +182,7 @@ static device_addrs_t e300_find(const device_addr_t &multi_dev_hint)
             const mboard_eeprom_t eeprom = eeprom_manager.get_mb_eeprom();
             new_addr["name"] = eeprom["name"];
             new_addr["serial"] = eeprom["serial"];
+            new_addr["product"] = eeprom["product"];
         } catch (...) {
             // set these values as empty string, so the device may still be found
             // and the filters below can still operate on the discovered device
@@ -216,6 +217,7 @@ static device_addrs_t e300_find(const device_addr_t &multi_dev_hint)
             const mboard_eeprom_t eeprom = eeprom_manager.get_mb_eeprom();
             new_addr["name"] = eeprom["name"];
             new_addr["serial"] = eeprom["serial"];
+            new_addr["product"] = eeprom["product"];
         } catch (...) {
             // set these values as empty string, so the device may still be found
             // and the filters below can still operate on the discovered device
