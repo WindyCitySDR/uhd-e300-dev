@@ -20,6 +20,8 @@
 #include "ad9361_ctrl.hpp"
 #include "ad9361_driver/ad9361_transaction.h"
 
+#include "e300_sensor_manager.hpp"
+
 #include <uhd/utils/msg.hpp>
 #include <boost/asio.hpp>
 #include <boost/thread.hpp>
@@ -233,6 +235,55 @@ static void e300_global_regs_tunnel(
     *running = false;
 }
 
+static void e300_sensor_tunnel(
+    const std::string &name,
+    boost::shared_ptr<asio::ip::udp::socket> socket,
+    e300_sensor_manager::sptr sensor_manager,
+    asio::ip::udp::endpoint *endpoint,
+    bool *running
+)
+{
+    asio::ip::udp::endpoint _endpoint;
+    try
+    {
+        while (*running)
+        {
+            uint8_t in_buff[128] = {};
+
+            const size_t num_bytes = socket->receive_from(asio::buffer(in_buff), *endpoint);
+
+            if (num_bytes < sizeof(sensor_transaction_t)) {
+                std::cout << "Received short packet: " << num_bytes << std::endl;
+                continue;
+            }
+
+            uhd::usrp::e300::sensor_transaction_t *in =
+                reinterpret_cast<uhd::usrp::e300::sensor_transaction_t *>(in_buff);
+
+            if (uhd::ntohx(in->which) == ZYNQ_TEMP) {
+                sensor_value_t temp = sensor_manager->get_mb_temp();
+                // TODO: This is ugly ... use proper serialization
+                in->value = uhd::htonx<boost::uint32_t>(
+                    e300_sensor_manager::pack_float_in_uint32_t(temp.to_real()));
+            }
+
+
+            socket->send_to(asio::buffer(in_buff, sizeof(sensor_transaction_t)), *endpoint);
+        }
+    }
+    catch(const std::exception &ex)
+    {
+        UHD_MSG(error) << "e300_sensor_tunnel exit " << name << " " << ex.what() << std::endl;
+    }
+    catch(...)
+    {
+        UHD_MSG(error) << "e300_sensor_tunnel exit " << name << std::endl;
+    }
+    UHD_MSG(status) << "e300_sensor_tunnel exit " << name << std::endl;
+    *running = false;
+}
+
+
 
 /***********************************************************************
  * The TCP server itself
@@ -289,6 +340,11 @@ void e300_impl::_run_server(
             {
                 tg.create_thread(boost::bind(&e300_global_regs_tunnel, "GREGS tunnel", socket, _global_regs, &endpoint, &running));
             }
+            if (what == "SENSOR")
+            {
+                tg.create_thread(boost::bind(&e300_sensor_tunnel, "SENSOR tunnel", socket, _sensor_manager, &endpoint, &running));
+            }
+
 
 
             tg.join_all();

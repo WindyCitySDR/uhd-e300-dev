@@ -39,6 +39,7 @@
 #include "gpio_core_200.hpp"
 
 #include "e300_global_regs.hpp"
+#include "e300_sensor_manager.hpp"
 
 namespace uhd { namespace usrp { namespace e300 {
 
@@ -57,6 +58,7 @@ static std::string E300_SERVER_CTRL_PORT1 = "321858";
 
 static std::string E300_SERVER_CODEC_PORT = "321759";
 static std::string E300_SERVER_GREGS_PORT = "321760";
+static std::string E300_SERVER_SENSOR_PORT = "21762";
 
 static const double E300_DEFAULT_TICK_RATE = 32e6;
 
@@ -189,9 +191,6 @@ private: // methods
     void _update_fe_lo_freq(const std::string &fe, const double freq);
     void _update_active_frontends(void);
 
-    // sensors
-    uhd::sensor_value_t _get_mb_temp(void);
-
     // internal gpios
     boost::uint8_t _get_internal_gpio(
         gpio_core_200::sptr,
@@ -218,6 +217,7 @@ private: // members
     ad9361_ctrl::sptr           _codec_ctrl;
     fe_control_settings_t       _fe_control_settings[2];
     global_regs::sptr           _global_regs;
+    e300_sensor_manager::sptr   _sensor_manager;
 };
 
 }}} // namespace

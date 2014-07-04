@@ -18,6 +18,7 @@
 #include "e300_impl.hpp"
 #include "e300_spi.hpp"
 #include "e300_regs.hpp"
+#include "e300_sensor_manager.hpp"
 
 #include <uhd/utils/msg.hpp>
 #include <uhd/utils/log.hpp>
@@ -26,6 +27,7 @@
 #include <uhd/usrp/dboard_eeprom.hpp>
 #include <uhd/transport/udp_zero_copy.hpp>
 #include <uhd/types/sensors.hpp>
+#include <boost/make_shared.hpp>
 #include <boost/filesystem.hpp>
 #include <boost/functional/hash.hpp>
 #include <boost/bind.hpp>
@@ -201,6 +203,16 @@ e300_impl::e300_impl(const uhd::device_addr_t &device_addr) : _sid_framer(0)
         zero_copy_if::sptr gregs_xport;
         gregs_xport = udp_zero_copy::make(device_addr["addr"], E300_SERVER_GREGS_PORT, ctrl_xport_params, dummy_buff_params_out, device_addr);
         _global_regs = global_regs::make(gregs_xport);
+
+        uhd::transport::zero_copy_xport_params sensor_xport_params;
+        sensor_xport_params.recv_frame_size = 128;
+        sensor_xport_params.num_recv_frames = 10;
+        sensor_xport_params.send_frame_size = 128;
+        sensor_xport_params.num_send_frames = 10;
+
+        zero_copy_if::sptr sensors_xport;
+        sensors_xport = udp_zero_copy::make(device_addr["addr"], E300_SERVER_SENSOR_PORT, sensor_xport_params, dummy_buff_params_out, device_addr);
+        _sensor_manager = e300_sensor_manager::make_proxy(sensors_xport);
     }
     else
     {
@@ -232,6 +244,7 @@ e300_impl::e300_impl(const uhd::device_addr_t &device_addr) : _sid_framer(0)
         _codec_ctrl = ad9361_ctrl::make(_codec_xport);
         // This is horrible ... why do I have to sleep here?
         boost::this_thread::sleep(boost::posix_time::milliseconds(100));
+        _sensor_manager = e300_sensor_manager::make_local();
     }
 
     // Verify we can talk to the e300 core control registers ...
@@ -263,6 +276,7 @@ e300_impl::e300_impl(const uhd::device_addr_t &device_addr) : _sid_framer(0)
         tg.create_thread(boost::bind(&e300_impl::_run_server, this, E300_SERVER_TX_PORT1, "TX",1));
         tg.create_thread(boost::bind(&e300_impl::_run_server, this, E300_SERVER_CTRL_PORT1, "CTRL",1));
 
+        tg.create_thread(boost::bind(&e300_impl::_run_server, this, E300_SERVER_SENSOR_PORT, "SENSOR", 0 /*don't care */));
 
         tg.create_thread(boost::bind(&e300_impl::_run_server, this, E300_SERVER_CODEC_PORT, "CODEC", 0 /*don't care */));
         tg.create_thread(boost::bind(&e300_impl::_run_server, this, E300_SERVER_GREGS_PORT, "GREGS", 0 /*don't care */));
@@ -284,17 +298,9 @@ e300_impl::e300_impl(const uhd::device_addr_t &device_addr) : _sid_framer(0)
     ////////////////////////////////////////////////////////////////////
     // and do the misc mboard sensors
     ////////////////////////////////////////////////////////////////////
-    _tree->create<int>(mb_path / "sensors"); //empty TODO
-
-
-    if (!_network_mode) {
-        const std::vector<std::string> xadc_sensors = boost::assign::list_of("temp");
-        BOOST_FOREACH(const std::string &sensor, xadc_sensors)
-        {
-            _tree->create<sensor_value_t>(mb_path / "sensors" / sensor)
-                .publish(boost::bind(&e300_impl::_get_mb_temp, this));
-        }
-    }
+    _tree->create<int>(mb_path / "sensors");
+    _tree->create<sensor_value_t>(mb_path / "sensors" / "temp")
+        .publish(boost::bind(&e300_sensor_manager::get_mb_temp, _sensor_manager));
 
     ////////////////////////////////////////////////////////////////////
     // setup the mboard eeprom
@@ -785,14 +791,6 @@ void e300_impl::_setup_radio(const size_t dspno)
     time64_rb_bases.rb_now = RB64_TIME_NOW;
     time64_rb_bases.rb_pps = RB64_TIME_PPS;
     perif.time64 = time_core_3000::make(perif.ctrl, TOREG(SR_TIME), time64_rb_bases);
-}
-
-uhd::sensor_value_t e300_impl::_get_mb_temp(void)
-{
-    double scale = boost::lexical_cast<double>(e300_get_sysfs_attr(E300_TEMP_SYSFS, "in_temp0_scale"));
-    unsigned long raw = boost::lexical_cast<unsigned long>(e300_get_sysfs_attr(E300_TEMP_SYSFS, "in_temp0_raw"));
-    unsigned long offset = boost::lexical_cast<unsigned long>(e300_get_sysfs_attr(E300_TEMP_SYSFS, "in_temp0_offset"));
-    return sensor_value_t("temp", (raw + offset) * scale / 1e3, "C");
 }
 
 ////////////////////////////////////////////////////////////////////////

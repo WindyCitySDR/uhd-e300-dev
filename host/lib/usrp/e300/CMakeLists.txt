@@ -35,6 +35,7 @@ IF(ENABLE_E300)
         ${CMAKE_CURRENT_SOURCE_DIR}/e300_network.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/e300_global_regs.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/e300_spi.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/e300_sensor_manager.cpp
     )
     LIBUHD_APPEND_SOURCES(${E300_SOURCES})
     IF(UDEV_FOUND)
