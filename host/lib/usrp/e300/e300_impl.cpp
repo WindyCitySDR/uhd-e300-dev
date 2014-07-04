@@ -62,31 +62,76 @@ static device_addrs_t e300_find(const device_addr_t &hint_)
     //since a resource is intended for a different, non-USB, device.
     if (hint.has_key("resource")) return e300_addrs;
 
-    // need network discovery that takes addr
-    if (hint.has_key("addr")) try
-    {
-        UHD_LOG << "e300_find try network discovery..." << std::endl;
-        asio::io_service io_service;
-        asio::ip::udp::resolver resolver(io_service);
-        asio::ip::udp::resolver::query query(asio::ip::udp::v4(), hint["addr"], E300_SERVER_CODEC_PORT);
-        asio::ip::udp::endpoint endpoint = *resolver.resolve(query);
-        {
-            boost::shared_ptr<asio::ip::udp::socket> socket;
-            socket.reset(new asio::ip::udp::socket(io_service));
-            socket->connect(endpoint);
-            socket->close();
-        }
+    if (hint.has_key("addr")) {
         device_addr_t new_addr;
-        new_addr["type"] = "e300";
-        new_addr["addr"] = hint["addr"];
-        e300_addrs.push_back(new_addr);
-        UHD_LOG << "e300_find network discovery good " << new_addr.to_pp_string() << std::endl;
+        try {
+            UHD_LOG << "e300_find try network discovery..." << std::endl;
+
+            uhd::transport::zero_copy_xport_params xport_params;
+            uhd::transport::udp_zero_copy::buff_params dummy_buff_params_out;
+            xport_params.recv_frame_size = 64;
+            xport_params.num_recv_frames = 32;
+            xport_params.send_frame_size = 64;
+            xport_params.num_send_frames = 32;
+
+            zero_copy_if::sptr i2c_xport
+                = udp_zero_copy::make(
+                      hint["addr"],
+                      E300_SERVER_I2C_PORT,
+                      xport_params,
+                      dummy_buff_params_out,
+                      hint);
+
+            boost::shared_ptr<e300_eeprom_manager> eeprom_manager
+                = boost::make_shared<e300_eeprom_manager>(i2c::make_zc(i2c_xport));
+
+            const mboard_eeprom_t mboard_eeprom = eeprom_manager->read_mb_eeprom();
+
+
+            new_addr["name"] = mboard_eeprom["name"];
+            new_addr["serial"] = mboard_eeprom["serial"];
+            new_addr["product"] = mboard_eeprom["product"];
+
+            UHD_LOG << "e300_find network discovery good " << new_addr.to_pp_string() << std::endl;
+            if (
+                (not hint.has_key("name")   or hint["name"]   == new_addr["name"]) and
+                (not hint.has_key("serial") or hint["serial"] == new_addr["serial"]) and
+                (not hint.has_key("product") or hint["product"] == new_addr["product"])
+            ) {
+                e300_addrs.push_back(new_addr);
+            }
+        } catch (...) {
+           UHD_LOG << "e300_find network discovery threw" << std::endl;
+        }
+
         return e300_addrs;
     }
-    catch(...)
-    {
-        UHD_LOG << "e300_find network discovery threw" << std::endl;
-    }
+
+    // need network discovery that takes addr
+    //if (hint.has_key("addr")) try
+    //{
+        //UHD_LOG << "e300_find try network discovery..." << std::endl;
+        //asio::io_service io_service;
+        //asio::ip::udp::resolver resolver(io_service);
+        //asio::ip::udp::resolver::query query(asio::ip::udp::v4(), hint["addr"], E300_SERVER_CODEC_PORT);
+        //asio::ip::udp::endpoint endpoint = *resolver.resolve(query);
+        //{
+            //boost::shared_ptr<asio::ip::udp::socket> socket;
+            //socket.reset(new asio::ip::udp::socket(io_service));
+            //socket->connect(endpoint);
+            //socket->close();
+        //}
+        //device_addr_t new_addr;
+        //new_addr["type"] = "e300";
+        //new_addr["addr"] = hint["addr"];
+        //e300_addrs.push_back(new_addr);
+        //UHD_LOG << "e300_find network discovery good " << new_addr.to_pp_string() << std::endl;
+        //return e300_addrs;
+    //}
+    //catch(...)
+    //{
+        //UHD_LOG << "e300_find network discovery threw" << std::endl;
+    //}
 
     //device node not provided, assume its 0
     if (not hint.has_key("node"))
@@ -103,11 +148,17 @@ static device_addrs_t e300_find(const device_addr_t &hint_)
         new_addr["type"] = "e300";
         new_addr["node"] = fs::system_complete(fs::path(hint["node"])).string();
         //TODO read EEPROM!
-        new_addr["name"] = "";
-        new_addr["serial"] = "";
+        boost::shared_ptr<e300_eeprom_manager> eeprom_manager
+            = boost::make_shared<e300_eeprom_manager>(i2c::make_i2cdev("/dev/i2c-0"));
+        const mboard_eeprom_t mboard_eeprom = eeprom_manager->read_mb_eeprom();
+
+        new_addr["name"] = mboard_eeprom["name"];
+        new_addr["serial"] = mboard_eeprom["serial"];
+        new_addr["product"] = mboard_eeprom["product"];
         if (
             (not hint.has_key("name")   or hint["name"]   == new_addr["name"]) and
-            (not hint.has_key("serial") or hint["serial"] == new_addr["serial"])
+            (not hint.has_key("serial") or hint["serial"] == new_addr["serial"]) and
+            (not hint.has_key("product") or hint["product"] == new_addr["product"])
         ){
             e300_addrs.push_back(new_addr);
         }
