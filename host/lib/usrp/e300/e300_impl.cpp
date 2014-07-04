@@ -356,7 +356,7 @@ e300_impl::e300_impl(const uhd::device_addr_t &device_addr) : _sid_framer(0)
         _codec_ctrl = ad9361_ctrl::make(_codec_xport);
         // This is horrible ... why do I have to sleep here?
         boost::this_thread::sleep(boost::posix_time::milliseconds(100));
-        _eeprom_manager = boost::make_shared<e300_eeprom_manager>(i2c::make_i2cdev("/dev/i2c-0"));
+        _eeprom_manager = boost::make_shared<e300_eeprom_manager>(i2c::make_i2cdev(E300_I2CDEV_DEVICE));
     }
 
     // Verify we can talk to the e300 core control registers ...
