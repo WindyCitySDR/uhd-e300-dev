@@ -46,17 +46,19 @@ static const std::string E300_FPGA_FILE_NAME = "usrp_e300_fpga.bit";
 static const std::string E300_TEMP_SYSFS = "iio:device0";
 static const std::string E300_SPIDEV_DEVICE  = "/dev/spidev0.1";
 
-static std::string E300_SERVER_RX_PORT0 = "321756";
-static std::string E300_SERVER_TX_PORT0 = "321757";
-static std::string E300_SERVER_CTRL_PORT0 = "321758";
+static std::string E300_SERVER_RX_PORT0 = "21756";
+static std::string E300_SERVER_TX_PORT0 = "21757";
+static std::string E300_SERVER_CTRL_PORT0 = "21758";
 
-static std::string E300_SERVER_RX_PORT1 = "321856";
-static std::string E300_SERVER_TX_PORT1 = "321857";
-static std::string E300_SERVER_CTRL_PORT1 = "321858";
+static std::string E300_SERVER_RX_PORT1 = "21856";
+static std::string E300_SERVER_TX_PORT1 = "21857";
+static std::string E300_SERVER_CTRL_PORT1 = "21858";
 
 
-static std::string E300_SERVER_CODEC_PORT = "321759";
-static std::string E300_SERVER_GREGS_PORT = "321760";
+static std::string E300_SERVER_CODEC_PORT = "21759";
+static std::string E300_SERVER_GREGS_PORT = "21760";
+
+static std::string E300_SERVER_SENSOR_PORT = "21762";
 
 static const double E300_DEFAULT_TICK_RATE = 32e6;
 
