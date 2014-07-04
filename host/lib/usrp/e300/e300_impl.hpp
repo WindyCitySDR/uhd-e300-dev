@@ -62,7 +62,7 @@ static std::string E300_SERVER_SENSOR_PORT = "21762";
 
 static const double E300_DEFAULT_TICK_RATE = 32e6;
 
-static const double E300_RX_SW_BUFF_FULLNESS = 0.5;        //Buffer should be half full
+static const double E300_RX_SW_BUFF_FULLNESS = 0.9;        //Buffer should be half full
 
 // crossbar settings
 static const boost::uint8_t E300_RADIO_DEST_PREFIX_TX   = 0;
