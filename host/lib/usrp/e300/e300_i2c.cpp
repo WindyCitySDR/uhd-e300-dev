@@ -16,6 +16,7 @@
 //
 
 #include <uhd/exception.hpp>
+#include <uhd/transport/udp_simple.hpp>
 
 #include "e300_i2c.hpp"
 #include <cstring>
@@ -83,6 +84,69 @@ private:
 i2c::sptr i2c::make_zc(uhd::transport::zero_copy_if::sptr xport)
 {
     return sptr(new zc_impl(xport));
+}
+
+class simple_udp_impl : public i2c
+{
+public:
+    simple_udp_impl(const std::string &ip_addr, const std::string &port)
+    {
+        _xport = uhd::transport::udp_simple::make_connected(ip_addr, port);
+    }
+
+    virtual ~simple_udp_impl(void)
+    {
+    }
+
+    void set_i2c_reg(
+        const boost::uint8_t addr,
+        const boost::uint8_t reg,
+        const boost::uint8_t value)
+    {
+        i2c_transaction_t transaction;
+        transaction.is_write = 1;
+        transaction.addr = addr;
+        transaction.reg = reg;
+        transaction.data = value;
+
+        _xport->send(
+            boost::asio::buffer(
+                &transaction,
+                sizeof(transaction)));
+    }
+
+    boost::uint8_t get_i2c_reg(
+        const boost::uint8_t addr,
+        const boost::uint8_t reg)
+    {
+        i2c_transaction_t transaction;
+        transaction.is_write = 0;
+        transaction.addr = addr;
+        transaction.reg  = reg;
+        transaction.data = 0;
+
+        _xport->send(
+            boost::asio::buffer(
+                &transaction,
+                sizeof(transaction)));
+
+        boost::uint8_t buff[sizeof(i2c_transaction_t)] = {};
+        const size_t nbytes = _xport->recv(
+            boost::asio::buffer(buff), 0.100);
+        if (not (nbytes == sizeof(transaction)))
+            throw std::runtime_error("i2c_simple_udp_impl recv timeout");
+        i2c_transaction_t *reply = reinterpret_cast<i2c_transaction_t*>(buff);
+        return reply->data;
+    }
+private:
+    uhd::transport::udp_simple::sptr _xport;
+};
+
+i2c::sptr i2c::make_simple_udp(
+    const std::string &ip_addr,
+    const std::string &port)
+{
+    return sptr(new simple_udp_impl(ip_addr,port));
 }
 
 }}} // namespace

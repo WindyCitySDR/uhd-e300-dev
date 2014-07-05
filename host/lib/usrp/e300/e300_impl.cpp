@@ -160,25 +160,9 @@ static device_addrs_t e300_find(const device_addr_t &multi_dev_hint)
         new_addr["addr"] = ip_addr;
 
         // see if we can read the eeprom
-        // TODO: full blown zero_copy udp
-        //       is definitely overkill
         try {
-            uhd::transport::zero_copy_xport_params params;
-            udp_zero_copy::buff_params buff_params_out;
-            params.recv_frame_size = 64;
-            params.num_recv_frames = 5;
-            params.send_frame_size = 64;
-            params.num_send_frames = 5;
-
-            zero_copy_if::sptr i2c_xport
-                = udp_zero_copy::make(new_addr["addr"],
-                      E300_SERVER_I2C_PORT,
-                      params,
-                      buff_params_out,
-                      new_addr);
-
             e300_eeprom_manager eeprom_manager(
-                i2c::make_zc(i2c_xport));
+                i2c::make_simple_udp(new_addr["addr"], E300_SERVER_I2C_PORT));
             const mboard_eeprom_t eeprom = eeprom_manager.get_mb_eeprom();
             new_addr["name"] = eeprom["name"];
             new_addr["serial"] = eeprom["serial"];

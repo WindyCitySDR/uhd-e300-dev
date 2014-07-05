@@ -40,6 +40,9 @@ public:
 
     static sptr make_i2cdev(const std::string &device);
     static sptr make_zc(uhd::transport::zero_copy_if::sptr xport);
+    static sptr make_simple_udp(
+        const std::string &ip_addr,
+        const std::string &port);
 
     virtual boost::uint8_t get_i2c_reg(
         const boost::uint8_t addr,
