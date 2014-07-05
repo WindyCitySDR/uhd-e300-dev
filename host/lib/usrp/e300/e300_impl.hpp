@@ -45,6 +45,8 @@
 namespace uhd { namespace usrp { namespace e300 {
 
 static const std::string E300_FPGA_FILE_NAME = "usrp_e300_fpga.bit";
+static const std::string E310_FPGA_FILE_NAME = "usrp_e310_fpga.bit";
+
 static const std::string E300_TEMP_SYSFS = "iio:device0";
 static const std::string E300_SPIDEV_DEVICE  = "/dev/spidev0.1";
 static const std::string E300_I2CDEV_DEVICE  = "/dev/i2c-0";

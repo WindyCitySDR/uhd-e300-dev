@@ -260,8 +260,10 @@ e300_impl::e300_impl(const uhd::device_addr_t &device_addr) : _sid_framer(0)
     {
         //extract the FPGA path for the e300
         const std::string e300_fpga_image = find_image_path(
-            device_addr.get("fpga", E300_FPGA_FILE_NAME)
-        );
+            device_addr.get(
+                "fpga",
+                device_addr["product"] == "E300" ?
+                E300_FPGA_FILE_NAME : E310_FPGA_FILE_NAME));
 
         if (not device_addr.has_key("no_reload_fpga"))
             this->_load_fpga_image(e300_fpga_image);

@@ -69,10 +69,10 @@ const mboard_eeprom_t& e300_eeprom_manager::read_mb_eeprom(void)
     _mb_eeprom["product"] = str(
         boost::format("E%s")
         % (boost::lexical_cast<std::string>(
-            uhd::htonx<boost::uint16_t>(map.hw_product))));
+            uhd::ntohx<boost::uint16_t>(map.hw_product))));
 
     _mb_eeprom["revision"] = boost::lexical_cast<std::string>(
-        uhd::htonx<boost::uint16_t>(map.hw_revision));
+        uhd::ntohx<boost::uint16_t>(map.hw_revision));
     _mb_eeprom["serial"] = _bytes_to_string(
         map.serial, MB_SERIAL_LEN);
 
