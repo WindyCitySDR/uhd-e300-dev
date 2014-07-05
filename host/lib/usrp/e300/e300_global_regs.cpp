@@ -19,6 +19,7 @@
 
 #include <boost/cstdint.hpp>
 #include <uhd/exception.hpp>
+#include <uhd/utils/byteswap.hpp>
 #include <cstring>
 #include <iostream>
 
@@ -83,8 +84,9 @@ public:
     boost::uint32_t peek32(const uhd::wb_iface::wb_addr_type addr)
     {
         global_regs_transaction_t transaction;
-        transaction.is_poke = 0;
-        transaction.addr    = static_cast<boost::uint32_t>(addr);
+        transaction.is_poke = uhd::htonx<boost::uint32_t>(0);
+        transaction.addr    = uhd::htonx<boost::uint32_t>(
+            static_cast<boost::uint32_t>(addr));
         {
             uhd::transport::managed_send_buffer::sptr buff = _xport->get_send_buff(10.0);
             if (not buff or buff->size() < sizeof(transaction))
@@ -98,15 +100,16 @@ public:
                 throw std::runtime_error("global_regs_zc_impl recv timeout");
             std::memcpy(&transaction, buff->cast<const void *>(), sizeof(transaction));
         }
-        return transaction.data;
+        return uhd::ntohx<boost::uint32_t>(transaction.data);
     }
 
     void poke32(const uhd::wb_iface::wb_addr_type addr, const boost::uint32_t data)
     {
         global_regs_transaction_t transaction;
-        transaction.is_poke = 1;
-        transaction.addr    = static_cast<boost::uint32_t>(addr);
-        transaction.data    = data;
+        transaction.is_poke = uhd::htonx<boost::uint32_t>(1);
+        transaction.addr    = uhd::htonx<boost::uint32_t>(
+            static_cast<boost::uint32_t>(addr));
+        transaction.data    = uhd::htonx<boost::uint32_t>(data);
         {
             uhd::transport::managed_send_buffer::sptr buff = _xport->get_send_buff(10.0);
             if (not buff or buff->size() < sizeof(transaction))

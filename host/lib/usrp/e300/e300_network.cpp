@@ -21,6 +21,7 @@
 #include "ad9361_driver/ad9361_transaction.h"
 
 #include <uhd/utils/msg.hpp>
+#include <uhd/utils/byteswap.hpp>
 #include <boost/asio.hpp>
 #include <boost/thread.hpp>
 
@@ -212,11 +213,11 @@ static void e300_global_regs_tunnel(
             uhd::usrp::e300::global_regs_transaction_t *in =
                 reinterpret_cast<uhd::usrp::e300::global_regs_transaction_t *>(in_buff);
 
-            if(in->is_poke) {
-                regs->poke32(in->addr, in->data);
+            if(uhd::ntohx<boost::uint32_t>(in->is_poke)) {
+                regs->poke32(uhd::ntohx<boost::uint32_t>(in->addr), uhd::ntohx<boost::uint32_t>(in->data));
             }
             else {
-                in->data = regs->peek32(in->addr);
+                in->data = uhd::htonx<boost::uint32_t>(regs->peek32(in->addr));
                 socket->send_to(asio::buffer(in_buff, 16), *endpoint);
             }
         }
