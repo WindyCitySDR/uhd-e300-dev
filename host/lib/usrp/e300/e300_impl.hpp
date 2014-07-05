@@ -39,26 +39,31 @@
 #include "gpio_core_200.hpp"
 
 #include "e300_global_regs.hpp"
+#include "e300_i2c.hpp"
+#include "e300_eeprom_manager.hpp"
 #include "e300_sensor_manager.hpp"
 
 namespace uhd { namespace usrp { namespace e300 {
 
 static const std::string E300_FPGA_FILE_NAME = "usrp_e300_fpga.bit";
+static const std::string E310_FPGA_FILE_NAME = "usrp_e310_fpga.bit";
+
 static const std::string E300_TEMP_SYSFS = "iio:device0";
 static const std::string E300_SPIDEV_DEVICE  = "/dev/spidev0.1";
+static const std::string E300_I2CDEV_DEVICE  = "/dev/i2c-0";
 
-static std::string E300_SERVER_RX_PORT0 = "21756";
-static std::string E300_SERVER_TX_PORT0 = "21757";
-static std::string E300_SERVER_CTRL_PORT0 = "21758";
+static std::string E300_SERVER_RX_PORT0    = "21756";
+static std::string E300_SERVER_TX_PORT0    = "21757";
+static std::string E300_SERVER_CTRL_PORT0  = "21758";
 
-static std::string E300_SERVER_RX_PORT1 = "21856";
-static std::string E300_SERVER_TX_PORT1 = "21857";
-static std::string E300_SERVER_CTRL_PORT1 = "21858";
+static std::string E300_SERVER_RX_PORT1    = "21856";
+static std::string E300_SERVER_TX_PORT1    = "21857";
+static std::string E300_SERVER_CTRL_PORT1  = "21858";
 
 
-static std::string E300_SERVER_CODEC_PORT = "21759";
-static std::string E300_SERVER_GREGS_PORT = "21760";
-
+static std::string E300_SERVER_CODEC_PORT  = "21759";
+static std::string E300_SERVER_GREGS_PORT  = "21760";
+static std::string E300_SERVER_I2C_PORT    = "21761";
 static std::string E300_SERVER_SENSOR_PORT = "21762";
 
 static const double E300_DEFAULT_TICK_RATE = 32e6;
@@ -219,6 +224,7 @@ private: // members
     fe_control_settings_t       _fe_control_settings[2];
     global_regs::sptr           _global_regs;
     e300_sensor_manager::sptr   _sensor_manager;
+    e300_eeprom_manager::sptr   _eeprom_manager;
 };
 
 }}} // namespace

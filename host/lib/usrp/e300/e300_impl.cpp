@@ -18,6 +18,7 @@
 #include "e300_impl.hpp"
 #include "e300_spi.hpp"
 #include "e300_regs.hpp"
+#include "e300_eeprom_manager.hpp"
 #include "e300_sensor_manager.hpp"
 
 #include <uhd/utils/msg.hpp>
@@ -25,12 +26,15 @@
 #include <uhd/utils/static.hpp>
 #include <uhd/utils/images.hpp>
 #include <uhd/usrp/dboard_eeprom.hpp>
+#include <uhd/transport/if_addrs.hpp>
 #include <uhd/transport/udp_zero_copy.hpp>
+#include <uhd/transport/udp_simple.hpp>
 #include <uhd/types/sensors.hpp>
 #include <boost/make_shared.hpp>
 #include <boost/filesystem.hpp>
 #include <boost/functional/hash.hpp>
 #include <boost/bind.hpp>
+#include <boost/make_shared.hpp>
 #include <boost/assign/list_of.hpp>
 #include <boost/thread/thread.hpp> //sleep
 #include <boost/asio.hpp>
@@ -47,74 +51,176 @@ namespace uhd { namespace usrp { namespace e300 {
 /***********************************************************************
  * Discovery
  **********************************************************************/
-static device_addrs_t e300_find(const device_addr_t &hint_)
-{
-    //we only do single device discovery for now
-    const device_addr_t hint = separate_device_addr(hint_).at(0);
 
-    UHD_LOG << "e300_find with hint " << hint.to_pp_string() << std::endl;
+static std::vector<std::string> discover_ip_addrs(
+    const std::string& addr_hint, const std::string& port)
+{
+    std::vector<std::string> addrs;
+
+    // Create a UDP transport to communicate:
+    // Some devices will cause a throw when opened for a broadcast address.
+    // We print and recover so the caller can loop through all bcast addrs.
+    uhd::transport::udp_simple::sptr udp_bcast_xport;
+    try {
+        udp_bcast_xport = uhd::transport::udp_simple::make_broadcast(addr_hint, port);
+    } catch(const std::exception &e) {
+        UHD_MSG(error) << boost::format("Cannot open UDP transport on %s for discovery\n%s")
+        % addr_hint % e.what() << std::endl;
+        return addrs;
+    }
+
+    // TODO: Do not abuse the I2C transport here ...
+    // we send a read request to i2c address 0x51,
+    // to read register 0
+    i2c_transaction_t req;
+    req.is_write = 0;
+    req.addr = 0x51; // mboard's eeprom address, we don't really care
+    req.reg = 0;
+
+    // send dummy request
+    udp_bcast_xport->send(boost::asio::buffer(&req, sizeof(req)));
+
+    // loop for replies until timeout
+    while (true) {
+        boost::uint8_t buff[sizeof(i2c_transaction_t)] = {};
+        const size_t nbytes = udp_bcast_xport->recv(boost::asio::buffer(buff), 0.050);
+        if (nbytes == 0)
+            break; //No more responses
+
+        const i2c_transaction_t *reply = reinterpret_cast<const i2c_transaction_t*>(buff);
+        if (req.addr == reply->addr)
+           addrs.push_back(udp_bcast_xport->get_recv_addr());
+    }
+
+    return addrs;
+}
+
+static device_addrs_t e300_find(const device_addr_t &multi_dev_hint)
+{
+    // handle multi device discovery
+    device_addrs_t hints = separate_device_addr(multi_dev_hint);
+
+    if (hints.size() > 1) {
+        device_addrs_t found_devices;
+        std::string err_msg;
+        BOOST_FOREACH(const device_addr_t &hint_i, hints)
+        {
+            device_addrs_t found_devices_i = e300_find(hint_i);
+            if(found_devices_i.size() != 1)
+                err_msg += str(boost::format(
+                    "Could not resolve device hint \"%s\" to a single device.")
+                    % hint_i.to_string());
+            else
+                found_devices.push_back(found_devices_i[0]);
+            if (found_devices.empty())
+                return device_addrs_t();
+
+            if (not err_msg.empty())
+                throw uhd::value_error(err_msg);
+        }
+        return device_addrs_t(1, combine_device_addrs(found_devices));
+    }
+
+    // initialize the hint for a single device case
+    UHD_ASSERT_THROW(hints.size() <= 1);
+    hints.resize(1); // in case it was empty
+    device_addr_t hint = hints[0];
     device_addrs_t e300_addrs;
 
-    //return an empty list of addresses when type is set to non-e300
-    if (hint.has_key("type") and hint["type"] != "e300") return e300_addrs;
+    // return an empty list of addresses when type is set to non-e300
+    if (hint.has_key("type") and hint["type"] != "e3x0")
+        return e300_addrs;
 
-    //Return an empty list of addresses when a resource is specified,
-    //since a resource is intended for a different, non-USB, device.
-    if (hint.has_key("resource")) return e300_addrs;
-
-    // need network discovery that takes addr
-    if (hint.has_key("addr")) try
-    {
-        UHD_LOG << "e300_find try network discovery..." << std::endl;
-        asio::io_service io_service;
-        asio::ip::udp::resolver resolver(io_service);
-        asio::ip::udp::resolver::query query(asio::ip::udp::v4(), hint["addr"], E300_SERVER_CODEC_PORT);
-        asio::ip::udp::endpoint endpoint = *resolver.resolve(query);
+    // if no address or node has been specified, send a broadcast
+    if ((not hint.has_key("addr")) and (not hint.has_key("node"))) {
+        BOOST_FOREACH(const if_addrs_t &if_addrs, get_if_addrs())
         {
-            boost::shared_ptr<asio::ip::udp::socket> socket;
-            socket.reset(new asio::ip::udp::socket(io_service));
-            socket->connect(endpoint);
-            socket->close();
+            // avoid the loopback device
+            if (if_addrs.inet == asio::ip::address_v4::loopback().to_string())
+                continue;
+
+            // create a new hint with this broadcast address
+            device_addr_t new_hint = hint;
+            new_hint["addr"] = if_addrs.bcast;
+
+            // call discover with the new hint ad append results
+            device_addrs_t new_e300_addrs = e300_find(new_hint);
+            e300_addrs.insert(e300_addrs.begin(),
+                new_e300_addrs.begin(), new_e300_addrs.end());
+
         }
-        device_addr_t new_addr;
-        new_addr["type"] = "e300";
-        new_addr["addr"] = hint["addr"];
-        e300_addrs.push_back(new_addr);
-        UHD_LOG << "e300_find network discovery good " << new_addr.to_pp_string() << std::endl;
         return e300_addrs;
     }
-    catch(...)
+
+    std::vector<std::string> ip_addrs = discover_ip_addrs(
+        hint["addr"], E300_SERVER_I2C_PORT);
+
+    BOOST_FOREACH(const std::string &ip_addr, ip_addrs)
     {
-        UHD_LOG << "e300_find network discovery threw" << std::endl;
+        device_addr_t new_addr;
+        new_addr["type"] = "e3x0";
+        new_addr["addr"] = ip_addr;
+
+        // see if we can read the eeprom
+        try {
+            e300_eeprom_manager eeprom_manager(
+                i2c::make_simple_udp(new_addr["addr"], E300_SERVER_I2C_PORT));
+            const mboard_eeprom_t eeprom = eeprom_manager.get_mb_eeprom();
+            new_addr["name"] = eeprom["name"];
+            new_addr["serial"] = eeprom["serial"];
+            new_addr["product"] = eeprom["product"];
+        } catch (...) {
+            // set these values as empty string, so the device may still be found
+            // and the filters below can still operate on the discovered device
+            new_addr["name"] = "";
+            new_addr["serial"] = "";
+        }
+        // filter the discovered device below by matching optional keys
+        if ((not hint.has_key("name")   or hint["name"]   == new_addr["name"]) and
+            (not hint.has_key("serial") or hint["serial"] == new_addr["serial"]))
+        {
+            e300_addrs.push_back(new_addr);
+        }
     }
 
-    //device node not provided, assume its 0
-    if (not hint.has_key("node"))
-    {
+    // finally search locally
+    // if device node is not provided,
+    // use the default one
+    if (not hint.has_key("node")) {
         device_addr_t new_addr = hint;
         new_addr["node"] = "/dev/axi_fpga";
         return e300_find(new_addr);
     }
 
-    //use the given device node name
-    if (fs::exists(hint["node"]))
-    {
+    // use the given node
+    if (fs::exists(hint["node"])) {
         device_addr_t new_addr;
-        new_addr["type"] = "e300";
+        new_addr["type"] = "e3x0";
         new_addr["node"] = fs::system_complete(fs::path(hint["node"])).string();
-        //TODO read EEPROM!
-        new_addr["name"] = "";
-        new_addr["serial"] = "";
-        if (
-            (not hint.has_key("name")   or hint["name"]   == new_addr["name"]) and
-            (not hint.has_key("serial") or hint["serial"] == new_addr["serial"])
-        ){
+
+        try {
+            e300_eeprom_manager eeprom_manager(i2c::make_i2cdev(E300_I2CDEV_DEVICE));
+            const mboard_eeprom_t eeprom = eeprom_manager.get_mb_eeprom();
+            new_addr["name"] = eeprom["name"];
+            new_addr["serial"] = eeprom["serial"];
+            new_addr["product"] = eeprom["product"];
+        } catch (...) {
+            // set these values as empty string, so the device may still be found
+            // and the filters below can still operate on the discovered device
+            new_addr["name"] = "";
+            new_addr["serial"] = "";
+        }
+        // filter the discovered device below by matching optional keys
+        if ((not hint.has_key("name")   or hint["name"]   == new_addr["name"]) and
+            (not hint.has_key("serial") or hint["serial"] == new_addr["serial"]))
+        {
             e300_addrs.push_back(new_addr);
         }
     }
 
     return e300_addrs;
 }
+
 
 /***********************************************************************
  * Make
@@ -140,8 +246,10 @@ e300_impl::e300_impl(const uhd::device_addr_t &device_addr) : _sid_framer(0)
     {
         //extract the FPGA path for the e300
         const std::string e300_fpga_image = find_image_path(
-            device_addr.get("fpga", E300_FPGA_FILE_NAME)
-        );
+            device_addr.get(
+                "fpga",
+                device_addr["product"] == "E300" ?
+                E300_FPGA_FILE_NAME : E310_FPGA_FILE_NAME));
 
         if (not device_addr.has_key("no_reload_fpga"))
             this->_load_fpga_image(e300_fpga_image);
@@ -204,6 +312,10 @@ e300_impl::e300_impl(const uhd::device_addr_t &device_addr) : _sid_framer(0)
         gregs_xport = udp_zero_copy::make(device_addr["addr"], E300_SERVER_GREGS_PORT, ctrl_xport_params, dummy_buff_params_out, device_addr);
         _global_regs = global_regs::make(gregs_xport);
 
+        zero_copy_if::sptr i2c_xport;
+        i2c_xport = udp_zero_copy::make(device_addr["addr"], E300_SERVER_I2C_PORT, ctrl_xport_params, dummy_buff_params_out, device_addr);
+        _eeprom_manager = boost::make_shared<e300_eeprom_manager>(i2c::make_zc(i2c_xport));
+
         uhd::transport::zero_copy_xport_params sensor_xport_params;
         sensor_xport_params.recv_frame_size = 128;
         sensor_xport_params.num_recv_frames = 10;
@@ -213,6 +325,7 @@ e300_impl::e300_impl(const uhd::device_addr_t &device_addr) : _sid_framer(0)
         zero_copy_if::sptr sensors_xport;
         sensors_xport = udp_zero_copy::make(device_addr["addr"], E300_SERVER_SENSOR_PORT, sensor_xport_params, dummy_buff_params_out, device_addr);
         _sensor_manager = e300_sensor_manager::make_proxy(sensors_xport);
+
     }
     else
     {
@@ -244,6 +357,7 @@ e300_impl::e300_impl(const uhd::device_addr_t &device_addr) : _sid_framer(0)
         _codec_ctrl = ad9361_ctrl::make(_codec_xport);
         // This is horrible ... why do I have to sleep here?
         boost::this_thread::sleep(boost::posix_time::milliseconds(100));
+        _eeprom_manager = boost::make_shared<e300_eeprom_manager>(i2c::make_i2cdev(E300_I2CDEV_DEVICE));
         _sensor_manager = e300_sensor_manager::make_local();
     }
 
@@ -280,6 +394,7 @@ e300_impl::e300_impl(const uhd::device_addr_t &device_addr) : _sid_framer(0)
 
         tg.create_thread(boost::bind(&e300_impl::_run_server, this, E300_SERVER_CODEC_PORT, "CODEC", 0 /*don't care */));
         tg.create_thread(boost::bind(&e300_impl::_run_server, this, E300_SERVER_GREGS_PORT, "GREGS", 0 /*don't care */));
+        tg.create_thread(boost::bind(&e300_impl::_run_server, this, E300_SERVER_I2C_PORT, "I2C", 0 /*don't care */));
         tg.join_all();
         goto e300_impl_begin;
     }
@@ -292,7 +407,7 @@ e300_impl::e300_impl(const uhd::device_addr_t &device_addr) : _sid_framer(0)
     _tree = property_tree::make();
     _tree->create<std::string>("/name").set("E-Series Device");
     const fs_path mb_path = "/mboards/0";
-    _tree->create<std::string>(mb_path / "name").set("E300");
+    _tree->create<std::string>(mb_path / "name").set("E3x0");
     _tree->create<std::string>(mb_path / "codename").set("Troll");
 
     ////////////////////////////////////////////////////////////////////
@@ -305,10 +420,8 @@ e300_impl::e300_impl(const uhd::device_addr_t &device_addr) : _sid_framer(0)
     ////////////////////////////////////////////////////////////////////
     // setup the mboard eeprom
     ////////////////////////////////////////////////////////////////////
-    // TODO
-    mboard_eeprom_t mb_eeprom;
-    mb_eeprom["name"] = "TODO"; //FIXME with real eeprom values
-    mb_eeprom["serial"] = "TODO"; //FIXME with real eeprom values
+
+    mboard_eeprom_t mb_eeprom = _eeprom_manager->read_mb_eeprom();
     _tree->create<mboard_eeprom_t>(mb_path / "eeprom")
         .set(mb_eeprom);
 
