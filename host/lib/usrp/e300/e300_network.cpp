@@ -219,7 +219,7 @@ static void e300_global_regs_tunnel(
                 regs->poke32(uhd::ntohx<boost::uint32_t>(in->addr), uhd::ntohx<boost::uint32_t>(in->data));
             }
             else {
-                in->data = uhd::htonx<boost::uint32_t>(regs->peek32(in->addr));
+                in->data = uhd::htonx<boost::uint32_t>(regs->peek32(uhd::ntohx<boost::uint32_t>(in->addr)));
                 socket->send_to(asio::buffer(in_buff, 16), *endpoint);
             }
         }
