@@ -644,7 +644,7 @@ e300_impl::~e300_impl(void)
 
 double e300_impl::_set_tick_rate(const double rate)
 {
-    const size_t factor = 2; // TODO: This breaks the SISO case, and needs to be reworked
+    const size_t factor = 2; // set_clock_rate() sets 2x the input rate which this factor corrects
     UHD_MSG(status) << "Asking for clock rate " << rate/1e6 << " MHz\n";
     _tick_rate = _codec_ctrl->set_clock_rate(rate/factor)*factor;
     UHD_MSG(status) << "Actually got clock rate " << _tick_rate/1e6 << " MHz\n";
