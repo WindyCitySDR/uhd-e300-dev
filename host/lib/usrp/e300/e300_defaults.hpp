@@ -36,6 +36,16 @@ static const double DEFAULT_FE_BW           = 56e6;
 static const std::string DEFAULT_TIME_SRC   = "none";
 static const std::string DEFAULT_CLOCK_SRC  = "internal";
 
+static const size_t DEFAULT_RX_DATA_FRAME_SIZE = 2048;
+static const size_t DEFAULT_RX_DATA_NUM_FRAMES = 128;
+
+static const size_t DEFAULT_TX_DATA_FRAME_SIZE = 2048;
+static const size_t DEFAULT_TX_DATA_NUM_FRAMES = 128;
+
+static const size_t DEFAULT_CTRL_FRAME_SIZE    = 64;
+static const size_t DEFAULT_CTRL_NUM_FRAMES    = 32;
+
+
 }}} // namespace
 
 #endif // INCLUDED_E300_DEFAULTS_HPP

@@ -260,16 +260,16 @@ e300_impl::e300_impl(const uhd::device_addr_t &device_addr) : _sid_framer(0)
     // setup fifo xports
     ////////////////////////////////////////////////////////////////////
     uhd::transport::zero_copy_xport_params ctrl_xport_params;
-    ctrl_xport_params.recv_frame_size = 64;
-    ctrl_xport_params.num_recv_frames = 32;
-    ctrl_xport_params.send_frame_size = 64;
-    ctrl_xport_params.num_send_frames = 32;
+    ctrl_xport_params.recv_frame_size = e300::DEFAULT_CTRL_FRAME_SIZE;
+    ctrl_xport_params.num_recv_frames = e300::DEFAULT_CTRL_NUM_FRAMES;
+    ctrl_xport_params.send_frame_size = e300::DEFAULT_CTRL_FRAME_SIZE;
+    ctrl_xport_params.num_send_frames = e300::DEFAULT_CTRL_NUM_FRAMES;
 
     uhd::transport::zero_copy_xport_params data_xport_params;
-    data_xport_params.recv_frame_size = 2048;
-    data_xport_params.num_recv_frames = 128;
-    data_xport_params.send_frame_size = 2048;
-    data_xport_params.num_send_frames = 128;
+    data_xport_params.recv_frame_size = e300::DEFAULT_RX_DATA_FRAME_SIZE;
+    data_xport_params.num_recv_frames = e300::DEFAULT_RX_DATA_NUM_FRAMES;
+    data_xport_params.send_frame_size = e300::DEFAULT_TX_DATA_FRAME_SIZE;
+    data_xport_params.num_send_frames = e300::DEFAULT_TX_DATA_NUM_FRAMES;
 
     uhd::device_addr_t ctrl_xport_args;
     ctrl_xport_args["recv_frame_size"] = str(boost::format("%d") % ctrl_xport_params.recv_frame_size);
