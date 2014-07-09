@@ -350,8 +350,7 @@ rx_streamer::sptr e300_impl::get_rx_stream(const uhd::stream_args_t &args_)
     for (size_t stream_i = 0; stream_i < args.channels.size(); stream_i++)
     {
 
-        const size_t radio_index = _tree->access<std::vector<size_t> >("/mboards/0/rx_chan_dsp_mapping")
-                                            .get().at(args.channels[stream_i]);
+        const size_t radio_index = args.channels[stream_i];
 
         radio_perifs_t &perif = _radio_perifs[radio_index];
 
@@ -420,7 +419,7 @@ rx_streamer::sptr e300_impl::get_rx_stream(const uhd::stream_args_t &args_)
 
         //sets all tick and samp rates on this streamer
         this->_update_tick_rate(this->_get_tick_rate());
-        _tree->access<double>(str(boost::format("/mboards/0/rx_dsps/%u/rate/value") % 0)).update();
+        _tree->access<double>(str(boost::format("/mboards/0/rx_dsps/%u/rate/value") % radio_index)).update();
 
     }
     return my_streamer;
@@ -449,9 +448,7 @@ tx_streamer::sptr e300_impl::get_tx_stream(const uhd::stream_args_t &args_)
 
     for (size_t stream_i = 0; stream_i < args.channels.size(); stream_i++)
     {
-        const size_t chan = args.channels[stream_i];
-        const size_t radio_index = _tree->access<std::vector<size_t> >("/mboards/0/tx_chan_dsp_mapping")
-                                            .get().at(args.channels[stream_i]);
+        const size_t radio_index = args.channels[stream_i];
 
         radio_perifs_t &perif = _radio_perifs[radio_index];
 
@@ -504,7 +501,7 @@ tx_streamer::sptr e300_impl::get_tx_stream(const uhd::stream_args_t &args_)
         perif.deframer->configure_flow_control(0/*cycs off*/, fc_window/8/*pkts*/);
         boost::shared_ptr<e300_tx_fc_cache_t> fc_cache(new e300_tx_fc_cache_t());
         fc_cache->stream_channel = stream_i;
-        fc_cache->device_channel = chan;
+        fc_cache->device_channel = args.channels[stream_i];
         fc_cache->async_queue = async_md;
         fc_cache->old_async_queue = _async_md;
 
@@ -528,7 +525,7 @@ tx_streamer::sptr e300_impl::get_tx_stream(const uhd::stream_args_t &args_)
 
         //sets all tick and samp rates on this streamer
         this->_update_tick_rate(this->_get_tick_rate());
-        _tree->access<double>(str(boost::format("/mboards/0/tx_dsps/%u/rate/value") % 0)).update();
+        _tree->access<double>(str(boost::format("/mboards/0/tx_dsps/%u/rate/value") % radio_index)).update();
     }
 
     return my_streamer;
