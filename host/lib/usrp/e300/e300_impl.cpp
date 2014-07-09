@@ -16,6 +16,7 @@
 //
 
 #include "e300_impl.hpp"
+#include "e300_defaults.hpp"
 #include "e300_spi.hpp"
 #include "e300_regs.hpp"
 #include "e300_eeprom_manager.hpp"
@@ -539,18 +540,18 @@ e300_impl::e300_impl(const uhd::device_addr_t &device_addr) : _sid_framer(0)
 
             _tree->create<double>(rf_fe_path / "gains" / name / "value")
                 .coerce(boost::bind(&ad9361_ctrl::set_gain, _codec_ctrl, fe_name, _1))
-                .set(0.0);
+                .set(e300::DEFAULT_FE_GAIN);
         }
         _tree->create<std::string>(rf_fe_path / "connection").set("IQ");
         _tree->create<bool>(rf_fe_path / "enabled").set(true);
         _tree->create<bool>(rf_fe_path / "use_lo_offset").set(false);
         _tree->create<double>(rf_fe_path / "bandwidth" / "value")
             .coerce(boost::bind(&ad9361_ctrl::set_bw_filter, _codec_ctrl, fe_name, _1))
-            .set(40e6);
+            .set(e300::DEFAULT_FE_BW);
         _tree->create<meta_range_t>(rf_fe_path / "bandwidth" / "range")
             .publish(boost::bind(&ad9361_ctrl::get_bw_filter_range, fe_name));
         _tree->create<double>(rf_fe_path / "freq" / "value")
-            .set(0.0)
+            .set(e300::DEFAULT_FE_FREQ)
             .coerce(boost::bind(&ad9361_ctrl::tune, _codec_ctrl, fe_name, _1))
             .subscribe(boost::bind(&e300_impl::_update_fe_lo_freq, this, fe_name, _1));
         _tree->create<meta_range_t>(rf_fe_path / "freq" / "range")
@@ -599,14 +600,14 @@ e300_impl::e300_impl(const uhd::device_addr_t &device_addr) : _sid_framer(0)
     //init the clock rate to something, but only when we have active chains
     //init the clock rate to something reasonable
     _tree->access<double>(mb_path / "tick_rate").set(
-        device_addr.cast<double>("master_clock_rate", E300_DEFAULT_TICK_RATE));
+        device_addr.cast<double>("master_clock_rate", e300::DEFAULT_TICK_RATE));
     //_codec_ctrl->set_active_chains(false, false, false, false);
 
     _tree->access<subdev_spec_t>(mb_path / "rx_subdev_spec").set(subdev_spec_t("A:RX1 A:RX2"));
     _tree->access<subdev_spec_t>(mb_path / "tx_subdev_spec").set(subdev_spec_t("A:TX1 A:TX2"));
 
-    _tree->access<std::string>(mb_path / "clock_source" / "value").set("internal");
-    _tree->access<std::string>(mb_path / "time_source" / "value").set("none");
+    _tree->access<std::string>(mb_path / "clock_source" / "value").set(e300::DEFAULT_CLOCK_SRC);
+    _tree->access<std::string>(mb_path / "time_source" / "value").set(e300::DEFAULT_TIME_SRC);
 
 }
 
@@ -867,10 +868,10 @@ void e300_impl::_setup_radio(const size_t dspno)
     _tree->create<double>(rx_dsp_path / "rate" / "value")
         .coerce(boost::bind(&rx_dsp_core_3000::set_host_rate, perif.ddc, _1))
         .subscribe(boost::bind(&e300_impl::_update_rx_samp_rate, this, dspno, _1))
-        .set(1e6);
+        .set(e300::DEFAULT_RX_SAMP_RATE);
     _tree->create<double>(rx_dsp_path / "freq" / "value")
         .coerce(boost::bind(&rx_dsp_core_3000::set_freq, perif.ddc, _1))
-        .set(0.0);
+        .set(e300::DEFAULT_DDC_FREQ);
     _tree->create<meta_range_t>(rx_dsp_path / "freq" / "range")
         .publish(boost::bind(&rx_dsp_core_3000::get_freq_range, perif.ddc));
     _tree->create<stream_cmd_t>(rx_dsp_path / "stream_cmd")
@@ -891,10 +892,10 @@ void e300_impl::_setup_radio(const size_t dspno)
     _tree->create<double>(tx_dsp_path / "rate" / "value")
         .coerce(boost::bind(&tx_dsp_core_3000::set_host_rate, perif.duc, _1))
         .subscribe(boost::bind(&e300_impl::_update_tx_samp_rate, this, dspno, _1))
-        .set(1e6);
+        .set(e300::DEFAULT_TX_SAMP_RATE);
     _tree->create<double>(tx_dsp_path / "freq" / "value")
         .coerce(boost::bind(&tx_dsp_core_3000::set_freq, perif.duc, _1))
-        .set(0.0);
+        .set(e300::DEFAULT_DUC_FREQ);
     _tree->create<meta_range_t>(tx_dsp_path / "freq" / "range")
         .publish(boost::bind(&tx_dsp_core_3000::get_freq_range, perif.duc));
 

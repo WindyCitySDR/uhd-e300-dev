@@ -66,8 +66,6 @@ static std::string E300_SERVER_GREGS_PORT  = "21760";
 static std::string E300_SERVER_I2C_PORT    = "21761";
 static std::string E300_SERVER_SENSOR_PORT = "21762";
 
-static const double E300_DEFAULT_TICK_RATE = 32e6;
-
 static const double E300_RX_SW_BUFF_FULLNESS = 0.9;        //Buffer should be half full
 
 // crossbar settings
