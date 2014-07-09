@@ -420,10 +420,11 @@ e300_impl::e300_impl(const uhd::device_addr_t &device_addr) : _sid_framer(0)
     ////////////////////////////////////////////////////////////////////
     // setup the mboard eeprom
     ////////////////////////////////////////////////////////////////////
-
-    mboard_eeprom_t mb_eeprom = _eeprom_manager->read_mb_eeprom();
     _tree->create<mboard_eeprom_t>(mb_path / "eeprom")
-        .set(mb_eeprom);
+        .set(_eeprom_manager->get_mb_eeprom())  // set first...
+        .subscribe(boost::bind(
+            &e300_eeprom_manager::write_mb_eeprom,
+            _eeprom_manager, _1));
 
     ////////////////////////////////////////////////////////////////////
     // clocking
