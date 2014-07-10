@@ -195,6 +195,11 @@ private: // methods
     void _update_fe_lo_freq(const std::string &fe, const double freq);
     void _update_active_frontends(void);
 
+    // overflow handling is special for MIMO case
+    void _handle_overflow(
+        radio_perifs_t &perif,
+        boost::weak_ptr<uhd::rx_streamer> streamer);
+
     // internal gpios
     boost::uint8_t _get_internal_gpio(
         gpio_core_200::sptr,

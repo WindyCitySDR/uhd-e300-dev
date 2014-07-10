@@ -160,6 +160,38 @@ struct e300_rx_fc_cache_t
     size_t last_seq_in;
 };
 
+void e300_impl::_handle_overflow(
+    radio_perifs_t &perif,
+    boost::weak_ptr<uhd::rx_streamer> streamer)
+{
+    boost::shared_ptr<sph::recv_packet_streamer> my_streamer =
+            boost::dynamic_pointer_cast<sph::recv_packet_streamer>(streamer.lock());
+
+    //If the rx_streamer has expired then overflow handling makes no sense.
+    if (not my_streamer)
+        return;
+
+    if (my_streamer->get_num_channels() == 1) {
+        perif.framer->handle_overflow();
+        return;
+    }
+
+    // MIMO overflow recovery time
+    // find out if we were in continuous mode before stopping
+    const bool in_continuous_streaming_mode = perif.framer->in_continuous_streaming_mode();
+    // stop streaming
+    my_streamer->issue_stream_cmd(stream_cmd_t::STREAM_MODE_STOP_CONTINUOUS);
+    // flush transports
+    my_streamer->flush_all(0.001);
+    // restart streaming
+    if (in_continuous_streaming_mode) {
+        stream_cmd_t stream_cmd(stream_cmd_t::STREAM_MODE_START_CONTINUOUS);
+        stream_cmd.stream_now = false;
+        stream_cmd.time_spec = perif.time64->get_time_now() + time_spec_t(0.01);
+        my_streamer->issue_stream_cmd(stream_cmd);
+    }
+}
+
 
 static void handle_rx_flowctrl(
     const boost::uint32_t sid,
