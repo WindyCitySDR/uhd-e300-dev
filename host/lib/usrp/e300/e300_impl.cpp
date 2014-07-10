@@ -266,12 +266,21 @@ e300_impl::e300_impl(const uhd::device_addr_t &device_addr) : _sid_framer(0)
     ctrl_xport_params.num_send_frames = e300::DEFAULT_CTRL_NUM_FRAMES;
 
     uhd::transport::zero_copy_xport_params data_xport_params;
-    data_xport_params.recv_frame_size = e300::DEFAULT_RX_DATA_FRAME_SIZE;
-    data_xport_params.num_recv_frames = e300::DEFAULT_RX_DATA_NUM_FRAMES;
-    data_xport_params.send_frame_size = e300::DEFAULT_TX_DATA_FRAME_SIZE;
-    data_xport_params.num_send_frames = e300::DEFAULT_TX_DATA_NUM_FRAMES;
+    data_xport_params.recv_frame_size = device_addr.cast<size_t>("recv_frame_size", e300::DEFAULT_RX_DATA_FRAME_SIZE);
+    data_xport_params.num_recv_frames = device_addr.cast<size_t>("num_recv_frames", e300::DEFAULT_RX_DATA_NUM_FRAMES);
+    data_xport_params.send_frame_size = device_addr.cast<size_t>("send_frame_size", e300::DEFAULT_TX_DATA_FRAME_SIZE);
+    data_xport_params.num_send_frames = device_addr.cast<size_t>("num_send_frames", e300::DEFAULT_TX_DATA_NUM_FRAMES);
 
     _network_mode = device_addr.has_key("addr");
+
+    // until we figure out why this goes wrong we'll keep this hack around
+    if (device_addr.has_key("addr") or device_addr.has_key("server")) {
+        data_xport_params.recv_frame_size =
+            std::min(e300::MAX_NET_RX_DATA_FRAME_SIZE, data_xport_params.recv_frame_size);
+        data_xport_params.send_frame_size =
+            std::min(e300::MAX_NET_TX_DATA_FRAME_SIZE, data_xport_params.send_frame_size);
+    }
+
 
     udp_zero_copy::buff_params dummy_buff_params_out;
 

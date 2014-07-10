@@ -45,6 +45,9 @@ static const size_t DEFAULT_TX_DATA_NUM_FRAMES = 128;
 static const size_t DEFAULT_CTRL_FRAME_SIZE    = 64;
 static const size_t DEFAULT_CTRL_NUM_FRAMES    = 32;
 
+static const size_t MAX_NET_RX_DATA_FRAME_SIZE = 1200;
+static const size_t MAX_NET_TX_DATA_FRAME_SIZE = 1200;
+
 
 }}} // namespace
 
