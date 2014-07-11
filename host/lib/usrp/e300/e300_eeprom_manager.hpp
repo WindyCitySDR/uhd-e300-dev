@@ -47,6 +47,16 @@ public:
         return _mb_eeprom;
     }
 
+    // dboard
+    const dboard_eeprom_t& read_db_eeprom();
+    void write_db_eeprom(const dboard_eeprom_t& eeprom);
+
+    UHD_INLINE const dboard_eeprom_t& get_db_eeprom()
+    {
+        return _db_eeprom;
+    }
+
+
     i2c::sptr get_i2c_sptr(void);
 
     enum mboard_t {USRP_E300_MB, USRP_E310_MB, UNKNOWN};
@@ -60,6 +70,7 @@ private: // types
     const static size_t MB_NAME_LEN   = 32;
     const static size_t MB_ADDR       = 0x51;
 
+    const static size_t DB_SERIAL_LEN = 6;
     const static size_t DB_ADDR       = 0x50;
 
     struct mb_eeprom_map_t
@@ -81,6 +92,21 @@ private: // types
 
         //User specific
         boost::uint8_t user_name[MB_NAME_LEN];
+    };
+
+    struct db_eeprom_map_t
+    {
+        // Data format version
+        uint16_t data_version_major;
+        uint16_t data_version_minor;
+
+        // HW identification info
+        uint16_t hw_product;
+        uint16_t hw_revision;
+
+        // serial
+        uint8_t serial[MB_SERIAL_LEN];
+        uint8_t pad[20 - MB_SERIAL_LEN];
     };
 
 private: // members

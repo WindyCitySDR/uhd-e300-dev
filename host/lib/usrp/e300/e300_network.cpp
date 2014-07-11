@@ -364,11 +364,11 @@ static void e300_i2c_tunnel(
     {
         while (*running)
         {
-            uint8_t in_buff[4] = {};
+            uint8_t in_buff[sizeof(uhd::usrp::e300::i2c_transaction_t)];
 
             const size_t num_bytes = socket->receive_from(asio::buffer(in_buff), *endpoint);
 
-            if (num_bytes < 4) {
+            if (num_bytes < sizeof(uhd::usrp::e300::i2c_transaction_t)) {
                 std::cout << "Received short packet: " << num_bytes << std::endl;
                 continue;
             }
@@ -376,11 +376,30 @@ static void e300_i2c_tunnel(
             uhd::usrp::e300::i2c_transaction_t *in =
                 reinterpret_cast<uhd::usrp::e300::i2c_transaction_t *>(in_buff);
 
-            if(in->is_write) {
-                i2c->set_i2c_reg(in->addr, in->reg, in->data);
+            // byte addressed accesses go through here
+            if(in->type & i2c::ONEBYTE) {
+                if(in->type & i2c::WRITE) {
+                    i2c->set_i2c_reg8(
+                        in->addr,
+                        uhd::ntohx<boost::uint16_t>(in->reg), in->data);
+                } else {
+                    in->data = i2c->get_i2c_reg8(in->addr, uhd::ntohx<boost::uint16_t>(in->reg));
+                    socket->send_to(asio::buffer(in_buff, sizeof(in_buff)), *endpoint);
+                }
+
+            // 2 byte addressed accesses go through here
+            } else if (in->type & i2c::TWOBYTE) {
+                if(in->type & i2c::WRITE) {
+                    i2c->set_i2c_reg16(
+                        in->addr,
+                        uhd::ntohx<boost::uint16_t>(in->reg), in->data);
+                } else {
+                    in->data = i2c->get_i2c_reg16(in->addr, uhd::ntohx<boost::uint16_t>(in->reg));
+                    socket->send_to(asio::buffer(in_buff, sizeof(in_buff)), *endpoint);
+                }
+
             } else {
-                in->data = i2c->get_i2c_reg(in->addr, in->reg);
-                socket->send_to(asio::buffer(in_buff, 16), *endpoint);
+                UHD_MSG(error) << "e300_i2c_tunnel could not handle message." << std::endl;
             }
         }
     }

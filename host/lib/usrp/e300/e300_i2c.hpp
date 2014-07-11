@@ -27,10 +27,10 @@
 namespace uhd { namespace usrp { namespace e300 {
 
 struct i2c_transaction_t {
-    boost::uint8_t is_write;
-    boost::uint8_t addr;
-    boost::uint8_t reg;
-    boost::uint8_t data;
+    boost::uint16_t reg;
+    boost::uint8_t  addr;
+    boost::uint8_t  data;
+    boost::uint8_t  type;
 };
 
 class i2c : public boost::noncopyable
@@ -44,17 +44,32 @@ public:
         const std::string &ip_addr,
         const std::string &port);
 
-    virtual boost::uint8_t get_i2c_reg(
+    virtual boost::uint8_t get_i2c_reg8(
         const boost::uint8_t addr,
         const boost::uint8_t reg) = 0;
 
-    virtual void set_i2c_reg(
+    virtual boost::uint8_t get_i2c_reg16(
+        const boost::uint8_t addr,
+        const boost::uint16_t reg) = 0;
+
+    virtual void set_i2c_reg8(
         const boost::uint8_t addr,
         const boost::uint8_t reg,
         const boost::uint8_t value) = 0;
 
+    virtual void set_i2c_reg16(
+        const boost::uint8_t addr,
+        const boost::uint16_t reg,
+        const boost::uint8_t value) = 0;
+
+
     static const boost::uint8_t DB_EEPROM_ADDR = 0x50;
     static const boost::uint8_t MB_EEPROM_ADDR = 0x51;
+
+    static const boost::uint8_t WRITE          = 0x1;
+    static const boost::uint8_t READ           = 0x0;
+    static const boost::uint8_t TWOBYTE        = 0x4;
+    static const boost::uint8_t ONEBYTE        = 0x2;
 };
 
 }}};
