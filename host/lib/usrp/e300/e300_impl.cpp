@@ -500,9 +500,6 @@ e300_impl::e300_impl(const uhd::device_addr_t &device_addr) : _sid_framer(0)
     ////////////////////////////////////////////////////////////////////
     // create RF frontend interfacing
     ////////////////////////////////////////////////////////////////////
-    static const std::vector<std::string> frontends = boost::assign::list_of
-        ("TX1")("TX2")("RX1")("RX2");
-
     {
         const fs_path codec_path = mb_path / ("rx_codecs") / "A";
         _tree->create<std::string>(codec_path / "name").set("E300 RX dual ADC");
@@ -512,55 +509,6 @@ e300_impl::e300_impl(const uhd::device_addr_t &device_addr) : _sid_framer(0)
         const fs_path codec_path = mb_path / ("tx_codecs") / "A";
         _tree->create<std::string>(codec_path / "name").set("E300 TX dual DAC");
         _tree->create<int>(codec_path / "gains"); //empty cuz gains are in frontend
-    }
-
-    BOOST_FOREACH(const std::string &fe_name, frontends)
-    {
-        const std::string x = std::string(1, tolower(fe_name[0]));
-        const fs_path rf_fe_path = mb_path / "dboards" / "A" / (x+"x_frontends") / fe_name;
-
-        _tree->create<std::string>(rf_fe_path / "name").set(fe_name);
-        _tree->create<int>(rf_fe_path / "sensors"); //empty TODO
-        BOOST_FOREACH(const std::string &name, ad9361_ctrl::get_gain_names(fe_name))
-        {
-            _tree->create<meta_range_t>(rf_fe_path / "gains" / name / "range")
-                .set(ad9361_ctrl::get_gain_range(fe_name));
-
-            _tree->create<double>(rf_fe_path / "gains" / name / "value")
-                .coerce(boost::bind(&ad9361_ctrl::set_gain, _codec_ctrl, fe_name, _1))
-                .set(e300::DEFAULT_FE_GAIN);
-        }
-        _tree->create<std::string>(rf_fe_path / "connection").set("IQ");
-        _tree->create<bool>(rf_fe_path / "enabled").set(true);
-        _tree->create<bool>(rf_fe_path / "use_lo_offset").set(false);
-        _tree->create<double>(rf_fe_path / "bandwidth" / "value")
-            .coerce(boost::bind(&ad9361_ctrl::set_bw_filter, _codec_ctrl, fe_name, _1))
-            .set(e300::DEFAULT_FE_BW);
-        _tree->create<meta_range_t>(rf_fe_path / "bandwidth" / "range")
-            .publish(boost::bind(&ad9361_ctrl::get_bw_filter_range, fe_name));
-        _tree->create<double>(rf_fe_path / "freq" / "value")
-            .set(e300::DEFAULT_FE_FREQ)
-            .coerce(boost::bind(&ad9361_ctrl::tune, _codec_ctrl, fe_name, _1))
-            .subscribe(boost::bind(&e300_impl::_update_fe_lo_freq, this, fe_name, _1));
-        _tree->create<meta_range_t>(rf_fe_path / "freq" / "range")
-            .publish(boost::bind(&ad9361_ctrl::get_rf_freq_range));
-
-        //setup antenna stuff
-        if (fe_name[0] == 'R')
-        {
-            static const std::vector<std::string> ants = boost::assign::list_of("TX/RX")("RX2");
-            _tree->create<std::vector<std::string> >(rf_fe_path / "antenna" / "options").set(ants);
-            _tree->create<std::string>(rf_fe_path / "antenna" / "value")
-                .subscribe(boost::bind(&e300_impl::_update_antenna_sel, this, fe_name, _1))
-                .set("RX2");
-        }
-        if (fe_name[0] == 'T')
-        {
-            static const std::vector<std::string> ants(1, "TX/RX");
-            _tree->create<std::vector<std::string> >(rf_fe_path / "antenna" / "options").set(ants);
-            _tree->create<std::string>(rf_fe_path / "antenna" / "value").set("TX/RX");
-        }
-
     }
 
     ////////////////////////////////////////////////////////////////////
@@ -591,8 +539,8 @@ e300_impl::e300_impl(const uhd::device_addr_t &device_addr) : _sid_framer(0)
         device_addr.cast<double>("master_clock_rate", e300::DEFAULT_TICK_RATE));
     //_codec_ctrl->set_active_chains(false, false, false, false);
 
-    _tree->access<subdev_spec_t>(mb_path / "rx_subdev_spec").set(subdev_spec_t("A:RX1 A:RX2"));
-    _tree->access<subdev_spec_t>(mb_path / "tx_subdev_spec").set(subdev_spec_t("A:TX1 A:TX2"));
+    _tree->access<subdev_spec_t>(mb_path / "rx_subdev_spec").set(subdev_spec_t("A:A A:B"));
+    _tree->access<subdev_spec_t>(mb_path / "tx_subdev_spec").set(subdev_spec_t("A:A A:B"));
 
     _tree->access<std::string>(mb_path / "clock_source" / "value").set(e300::DEFAULT_CLOCK_SRC);
     _tree->access<std::string>(mb_path / "time_source" / "value").set(e300::DEFAULT_TIME_SRC);
@@ -781,11 +729,10 @@ void e300_impl::_update_clock_source(const std::string &)
 {
 }
 
-void e300_impl::_update_antenna_sel(const std::string &fe, const std::string &ant)
+void e300_impl::_update_antenna_sel(const size_t &fe, const std::string &ant)
 {
-    const size_t i = (fe == "RX1")? 0 : 1;
-    _fe_control_settings[i].rx_ant = ant;
-    this->_update_atrs(i);
+    _fe_control_settings[fe].rx_ant = ant;
+    this->_update_atrs(fe);
 }
 
 void e300_impl::_update_fe_lo_freq(const std::string &fe, const double freq)
@@ -894,6 +841,59 @@ void e300_impl::_setup_radio(const size_t dspno)
     time64_rb_bases.rb_now = RB64_TIME_NOW;
     time64_rb_bases.rb_pps = RB64_TIME_PPS;
     perif.time64 = time_core_3000::make(perif.ctrl, TOREG(SR_TIME), time64_rb_bases);
+
+    ////////////////////////////////////////////////////////////////////
+    // create RF frontend interfacing
+    ////////////////////////////////////////////////////////////////////
+    for(size_t direction = 0; direction < 2; direction++)
+    {
+        const std::string x = direction? "rx" : "tx";
+        const std::string key = std::string((direction? "RX" : "TX")) + std::string(((dspno == 0)? "1" : "2"));
+        const fs_path rf_fe_path = mb_path / "dboards" / "A" / (x+"_frontends") / (dspno? "B" : "A");
+
+        _tree->create<std::string>(rf_fe_path / "name").set("FE-"+key);
+        _tree->create<int>(rf_fe_path / "sensors"); //empty TODO
+        BOOST_FOREACH(const std::string &name, ad9361_ctrl::get_gain_names(key))
+        {
+            _tree->create<meta_range_t>(rf_fe_path / "gains" / name / "range")
+                .set(ad9361_ctrl::get_gain_range(key));
+
+            _tree->create<double>(rf_fe_path / "gains" / name / "value")
+                .coerce(boost::bind(&ad9361_ctrl::set_gain, _codec_ctrl, key, _1))
+                .set(e300::DEFAULT_FE_BW);
+        }
+        _tree->create<std::string>(rf_fe_path / "connection").set("IQ");
+        _tree->create<bool>(rf_fe_path / "enabled").set(true);
+        _tree->create<bool>(rf_fe_path / "use_lo_offset").set(false);
+        _tree->create<double>(rf_fe_path / "bandwidth" / "value")
+            .coerce(boost::bind(&ad9361_ctrl::set_bw_filter, _codec_ctrl, key, _1))
+            .set(e300::DEFAULT_FE_BW);
+        _tree->create<meta_range_t>(rf_fe_path / "bandwidth" / "range")
+            .publish(boost::bind(&ad9361_ctrl::get_bw_filter_range, key));
+        _tree->create<double>(rf_fe_path / "freq" / "value")
+            .set(e300::DEFAULT_FE_FREQ)
+            .coerce(boost::bind(&ad9361_ctrl::tune, _codec_ctrl, key, _1))
+            .subscribe(boost::bind(&e300_impl::_update_fe_lo_freq, this, key, _1));
+        _tree->create<meta_range_t>(rf_fe_path / "freq" / "range")
+            .publish(boost::bind(&ad9361_ctrl::get_rf_freq_range));
+
+        //setup antenna stuff
+        if (key[0] == 'R')
+        {
+            static const std::vector<std::string> ants = boost::assign::list_of("TX/RX")("RX2");
+            _tree->create<std::vector<std::string> >(rf_fe_path / "antenna" / "options").set(ants);
+            _tree->create<std::string>(rf_fe_path / "antenna" / "value")
+                .subscribe(boost::bind(&e300_impl::_update_antenna_sel, this, dspno, _1))
+                .set("RX2");
+
+        }
+        if (key[0] == 'T')
+        {
+            static const std::vector<std::string> ants(1, "TX/RX");
+            _tree->create<std::vector<std::string> >(rf_fe_path / "antenna" / "options").set(ants);
+            _tree->create<std::string>(rf_fe_path / "antenna" / "value").set("TX/RX");
+        }
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////

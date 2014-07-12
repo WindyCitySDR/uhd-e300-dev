@@ -76,25 +76,25 @@ void e300_impl::_update_tx_samp_rate(const size_t dspno, const double rate)
 void e300_impl::_update_rx_subdev_spec(const uhd::usrp::subdev_spec_t &spec)
 {
     //sanity checking
-    if (spec.size()) validate_subdev_spec(_tree, spec, "rx");
+    if (spec.size())
+        validate_subdev_spec(_tree, spec, "rx");
+
     UHD_ASSERT_THROW(spec.size() <= 2);
 
     _fe_control_settings[0].rx_enb = false;
     _fe_control_settings[1].rx_enb = false;
 
-    if (spec.size() == 1)
-    {
+    if (spec.size() == 1) {
         UHD_ASSERT_THROW(spec[0].db_name == "A");
-        _fe_control_settings[0].rx_enb = spec[0].sd_name == "RX1";
-        _fe_control_settings[1].rx_enb = spec[0].sd_name == "RX2";
+        _fe_control_settings[0].rx_enb = spec[0].sd_name == "A";
+        _fe_control_settings[1].rx_enb = spec[0].sd_name == "B";
     }
-    if (spec.size() == 2)
-    {
+    if (spec.size() == 2) {
         //TODO we can support swapping at a later date, only this combo is supported
         UHD_ASSERT_THROW(spec[0].db_name == "A");
-        UHD_ASSERT_THROW(spec[0].sd_name == "RX1");
+        UHD_ASSERT_THROW(spec[0].sd_name == "A");
         UHD_ASSERT_THROW(spec[1].db_name == "A");
-        UHD_ASSERT_THROW(spec[1].sd_name == "RX2");
+        UHD_ASSERT_THROW(spec[1].sd_name == "B");
         _fe_control_settings[0].rx_enb = true;
         _fe_control_settings[1].rx_enb = true;
     }
@@ -105,25 +105,25 @@ void e300_impl::_update_rx_subdev_spec(const uhd::usrp::subdev_spec_t &spec)
 void e300_impl::_update_tx_subdev_spec(const uhd::usrp::subdev_spec_t &spec)
 {
     //sanity checking
-    if (spec.size()) validate_subdev_spec(_tree, spec, "tx");
+    if (spec.size())
+        validate_subdev_spec(_tree, spec, "tx");
+
     UHD_ASSERT_THROW(spec.size() <= 2);
 
     _fe_control_settings[0].tx_enb = false;
     _fe_control_settings[1].tx_enb = false;
 
-    if (spec.size() == 1)
-    {
+    if (spec.size() == 1) {
         UHD_ASSERT_THROW(spec[0].db_name == "A");
-        _fe_control_settings[0].tx_enb = spec[0].sd_name == "TX1";
-        _fe_control_settings[1].tx_enb = spec[0].sd_name == "TX2";
+        _fe_control_settings[0].tx_enb = spec[0].sd_name == "A";
+        _fe_control_settings[1].tx_enb = spec[0].sd_name == "B";
     }
-    if (spec.size() == 2)
-    {
+    if (spec.size() == 2) {
         //TODO we can support swapping at a later date, only this combo is supported
         UHD_ASSERT_THROW(spec[0].db_name == "A");
-        UHD_ASSERT_THROW(spec[0].sd_name == "TX1");
+        UHD_ASSERT_THROW(spec[0].sd_name == "A");
         UHD_ASSERT_THROW(spec[1].db_name == "A");
-        UHD_ASSERT_THROW(spec[1].sd_name == "TX2");
+        UHD_ASSERT_THROW(spec[1].sd_name == "B");
         _fe_control_settings[0].tx_enb = true;
         _fe_control_settings[1].tx_enb = true;
     }
