@@ -502,12 +502,12 @@ e300_impl::e300_impl(const uhd::device_addr_t &device_addr) : _sid_framer(0)
     ////////////////////////////////////////////////////////////////////
     {
         const fs_path codec_path = mb_path / ("rx_codecs") / "A";
-        _tree->create<std::string>(codec_path / "name").set("E300 RX dual ADC");
+        _tree->create<std::string>(codec_path / "name").set("E3x0 RX dual ADC");
         _tree->create<int>(codec_path / "gains"); //empty cuz gains are in frontend
     }
     {
         const fs_path codec_path = mb_path / ("tx_codecs") / "A";
-        _tree->create<std::string>(codec_path / "name").set("E300 TX dual DAC");
+        _tree->create<std::string>(codec_path / "name").set("E3x0 TX dual DAC");
         _tree->create<int>(codec_path / "gains"); //empty cuz gains are in frontend
     }
 
