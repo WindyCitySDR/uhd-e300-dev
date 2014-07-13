@@ -162,10 +162,15 @@ private: // types
         double tx_freq;
     };
 
+    enum compat_t {FPGA_MAJOR, FPGA_MINOR};
+
 private: // methods
     void _load_fpga_image(const std::string &path);
 
     void _register_loopback_self_test(uhd::wb_iface::sptr iface);
+
+    boost::uint32_t _get_version(compat_t which);
+    std::string _get_version_hash(void);
 
     void _setup_radio(const size_t which_radio);
 

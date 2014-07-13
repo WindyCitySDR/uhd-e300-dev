@@ -357,15 +357,16 @@ e300_impl::e300_impl(const uhd::device_addr_t &device_addr) : _sid_framer(0)
     UHD_MSG(status) << "Initializing core control..." << std::endl;
     this->_register_loopback_self_test(_global_regs);
 
-    // TODO: Put this in the right place
-    const boost::uint32_t git_hash = _global_regs->peek32(global_regs::RB32_CORE_GITHASH);
-    const boost::uint32_t compat = _global_regs->peek32(global_regs::RB32_CORE_COMPAT);
-    UHD_MSG(status) << "Getting version information... " << std::flush;
-    UHD_MSG(status) << boost::format("%u.%02d (git %7x%s)")
-        % (compat & 0xff) % ((compat & 0xff00) >> 8)
-        % (git_hash & 0x0FFFFFFF)
-        % ((git_hash & 0xF000000) ? "-dirty" : "") << std::endl;
-
+    // Verify fpga compatibility version matches at least for the major
+    if (_get_version(FPGA_MAJOR) != fpga::COMPAT_MAJOR) {
+        throw uhd::runtime_error(str(boost::format(
+            "Expected FPGA compatibility number %lu.x, but got %lu.%lu:\n"
+            "The FPGA build is not compatible with the host code build.\n"
+            "%s"
+        ) % fpga::COMPAT_MAJOR
+          % _get_version(FPGA_MAJOR) % _get_version(FPGA_MINOR)
+          % print_images_error()));
+    }
 
 
     ////////////////////////////////////////////////////////////////////
@@ -401,6 +402,14 @@ e300_impl::e300_impl(const uhd::device_addr_t &device_addr) : _sid_framer(0)
     const fs_path mb_path = "/mboards/0";
     _tree->create<std::string>(mb_path / "name").set("E3x0");
     _tree->create<std::string>(mb_path / "codename").set("Troll");
+
+    _tree->create<std::string>(mb_path / "fpga_version").set(
+        str(boost::format("%u.%u")
+            % _get_version(FPGA_MAJOR)
+            % _get_version(FPGA_MINOR)));
+
+    _tree->create<std::string>(mb_path / "fpga_version_hash").set(
+        _get_version_hash());
 
     ////////////////////////////////////////////////////////////////////
     // and do the misc mboard sensors
@@ -650,6 +659,30 @@ void e300_impl::_register_loopback_self_test(wb_iface::sptr iface)
         if (test_fail) break; //exit loop on any failure
     }
     UHD_MSG(status) << ((test_fail)? " fail" : "pass") << std::endl;
+}
+
+boost::uint32_t e300_impl::_get_version(compat_t which)
+{
+    const boost::uint16_t compat_num
+        = _global_regs->peek32(global_regs::RB32_CORE_COMPAT);
+
+    switch(which) {
+    case FPGA_MAJOR:
+        return compat_num & 0xff;
+    case FPGA_MINOR:
+        return (compat_num & 0xff00) >> 8;
+    default:
+        throw uhd::value_error("Requested unknown version.");
+    };
+}
+
+std::string e300_impl::_get_version_hash(void)
+{
+    const boost::uint32_t git_hash
+        = _global_regs->peek32(global_regs::RB32_CORE_GITHASH);
+    return str(boost::format("%7s%s")
+        % (git_hash & 0x0FFFFFFF)
+        % ((git_hash & 0xF000000) ? "-dirty" : ""));
 }
 
 void e300_impl::_codec_loopback_self_test(wb_iface::sptr iface)

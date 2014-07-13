@@ -21,6 +21,9 @@ namespace uhd { namespace usrp { namespace e300 { namespace fpga {
 
 static const size_t NUM_RADIOS = 2;
 
+static const boost::uint32_t COMPAT_MAJOR = 1;
+static const boost::uint32_t COMPAT_MINOR = 0;
+
 }}}} // namespace
 
 #endif // INCLUDED_E300_FPGA_DEFS_HPP
