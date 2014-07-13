@@ -830,6 +830,27 @@ void e300_impl::_update_time_source(const std::string &source)
     _update_gpio_state();
 }
 
+e300_impl::both_xports_t e300_impl::_make_transport(
+    const boost::uint8_t &destination,
+    const boost::uint8_t &prefix,
+    const uhd::device_addr_t &args,
+    boost::uint32_t &sid)
+{
+    both_xports_t xports;
+
+    sid_config_t config;
+    config.router_addr_there    = E300_DEVICE_THERE;
+    config.dst_prefix           = prefix;
+    config.router_dst_there     = destination;
+    config.router_dst_here      = E300_XB_DST_AXI;
+    sid = this->_allocate_sid(config);
+
+    // in local mode
+    if (_xport_path == AXI) {
+    } else if (_xport_path == ETH) {
+    }
+}
+
 void e300_impl::_update_clock_source(const std::string &)
 {
 }

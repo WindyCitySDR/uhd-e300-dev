@@ -18,6 +18,7 @@
 
 UHD_INSTALL(FILES
     clock_config.hpp
+    cvita_sid.hpp
     device_addr.hpp
     dict.ipp
     dict.hpp

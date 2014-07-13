@@ -163,6 +163,17 @@ private: // types
         double tx_freq;
     };
 
+    // convenience struct
+    struct both_xports_t
+    {
+        uhd::transport::zero_copy_if::sptr recv;
+        uhd::transport::zero_copy_if::sptr send;
+        size_t recv_buff_size;
+        size_t send_buff_size;
+    };
+
+    enum xport_t {AXI, ETH};
+
     enum compat_t {FPGA_MAJOR, FPGA_MINOR};
 
     struct gpio_t
@@ -205,6 +216,12 @@ private: // methods
     void _setup_dest_mapping(
         const boost::uint32_t sid,
         const size_t which_stream);
+
+    both_xports_t _make_transport(
+        const boost::uint8_t &destination,
+        const boost::uint8_t &prefix,
+        const uhd::device_addr_t &args,
+        boost::uint32_t &sid);
 
     double _get_tick_rate(void){return _tick_rate;}
     double _set_tick_rate(const double rate);
@@ -257,6 +274,7 @@ private: // methods
 
 private: // members
     bool                        _network_mode;
+    xport_t                     _xport_path;
     e300_fifo_interface::sptr   _fifo_iface;
     size_t                      _sid_framer;
     radio_perifs_t              _radio_perifs[2];
