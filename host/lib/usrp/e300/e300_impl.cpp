@@ -17,6 +17,7 @@
 
 #include "e300_impl.hpp"
 #include "e300_defaults.hpp"
+#include "e300_fpga_defs.hpp"
 #include "e300_spi.hpp"
 #include "e300_regs.hpp"
 #include "e300_eeprom_manager.hpp"
@@ -32,6 +33,8 @@
 #include <uhd/transport/udp_simple.hpp>
 #include <uhd/types/sensors.hpp>
 #include <boost/make_shared.hpp>
+#include <boost/algorithm/string.hpp>
+#include <boost/format.hpp>
 #include <boost/filesystem.hpp>
 #include <boost/functional/hash.hpp>
 #include <boost/bind.hpp>
@@ -430,8 +433,8 @@ e300_impl::e300_impl(const uhd::device_addr_t &device_addr) : _sid_framer(0)
     ////////////////////////////////////////////////////////////////////
     // setup radios
     ////////////////////////////////////////////////////////////////////
-    this->_setup_radio(0);
-    this->_setup_radio(1);
+    for(size_t instance = 0; instance < fpga::NUM_RADIOS; instance++)
+        this->_setup_radio(instance);
 
     _codec_ctrl->data_port_loopback(true);
 
@@ -533,18 +536,28 @@ e300_impl::e300_impl(const uhd::device_addr_t &device_addr) : _sid_framer(0)
     // do some post-init tasks
     ////////////////////////////////////////////////////////////////////
 
-    //init the clock rate to something, but only when we have active chains
-    //init the clock rate to something reasonable
+    // init the clock rate to something reasonable
     _tree->access<double>(mb_path / "tick_rate").set(
         device_addr.cast<double>("master_clock_rate", e300::DEFAULT_TICK_RATE));
-    //_codec_ctrl->set_active_chains(false, false, false, false);
 
-    _tree->access<subdev_spec_t>(mb_path / "rx_subdev_spec").set(subdev_spec_t("A:A A:B"));
-    _tree->access<subdev_spec_t>(mb_path / "tx_subdev_spec").set(subdev_spec_t("A:A A:B"));
+    // subdev spec contains full width of selections
+    subdev_spec_t rx_spec, tx_spec;
+    BOOST_FOREACH(const std::string &fe, _tree->list(mb_path / "dboards" / "A" / "rx_frontends"))
+    {
+        rx_spec.push_back(subdev_spec_pair_t("A", fe));
+    }
+    BOOST_FOREACH(const std::string &fe, _tree->list(mb_path / "dboards" / "A" / "tx_frontends"))
+    {
+        tx_spec.push_back(subdev_spec_pair_t("A", fe));
+    }
+    _tree->access<subdev_spec_t>(mb_path / "rx_subdev_spec").set(rx_spec);
+    _tree->access<subdev_spec_t>(mb_path / "tx_subdev_spec").set(tx_spec);
 
-    _tree->access<std::string>(mb_path / "clock_source" / "value").set(e300::DEFAULT_CLOCK_SRC);
-    _tree->access<std::string>(mb_path / "time_source" / "value").set(e300::DEFAULT_TIME_SRC);
-
+    // init to default time and clock source
+    _tree->access<std::string>(mb_path / "clock_source" / "value").set(
+        e300::DEFAULT_CLOCK_SRC);
+    _tree->access<std::string>(mb_path / "time_source" / "value").set(
+        e300::DEFAULT_TIME_SRC);
 }
 
 boost::uint8_t e300_impl::_get_internal_gpio(
@@ -845,11 +858,12 @@ void e300_impl::_setup_radio(const size_t dspno)
     ////////////////////////////////////////////////////////////////////
     // create RF frontend interfacing
     ////////////////////////////////////////////////////////////////////
-    for(size_t direction = 0; direction < 2; direction++)
+    static const std::vector<std::string> data_directions = boost::assign::list_of("tx")("rx");
+    BOOST_FOREACH(const std::string& direction, data_directions)
     {
-        const std::string x = direction? "rx" : "tx";
-        const std::string key = std::string((direction? "RX" : "TX")) + std::string(((dspno == 0)? "1" : "2"));
-        const fs_path rf_fe_path = mb_path / "dboards" / "A" / (x+"_frontends") / (dspno? "B" : "A");
+        const std::string key = boost::to_upper_copy(direction) + str(boost::format("%u") % (dspno + 1));
+        const fs_path rf_fe_path
+            = mb_path / "dboards" / "A" / (direction + "_frontends") / ((dspno == 0) ? "A" : "B");
 
         _tree->create<std::string>(rf_fe_path / "name").set("FE-"+key);
         _tree->create<int>(rf_fe_path / "sensors"); //empty TODO

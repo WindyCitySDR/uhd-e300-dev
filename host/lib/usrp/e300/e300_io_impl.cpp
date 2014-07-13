@@ -17,6 +17,7 @@
 
 #include "e300_regs.hpp"
 #include "e300_impl.hpp"
+#include "e300_fpga_defs.hpp"
 #include "validate_subdev_spec.hpp"
 #include "../../transport/super_recv_packet_handler.hpp"
 #include "../../transport/super_send_packet_handler.hpp"
@@ -79,7 +80,7 @@ void e300_impl::_update_rx_subdev_spec(const uhd::usrp::subdev_spec_t &spec)
     if (spec.size())
         validate_subdev_spec(_tree, spec, "rx");
 
-    UHD_ASSERT_THROW(spec.size() <= 2);
+    UHD_ASSERT_THROW(spec.size() <= fpga::NUM_RADIOS);
 
     _fe_control_settings[0].rx_enb = false;
     _fe_control_settings[1].rx_enb = false;
@@ -108,7 +109,7 @@ void e300_impl::_update_tx_subdev_spec(const uhd::usrp::subdev_spec_t &spec)
     if (spec.size())
         validate_subdev_spec(_tree, spec, "tx");
 
-    UHD_ASSERT_THROW(spec.size() <= 2);
+    UHD_ASSERT_THROW(spec.size() <= fpga::NUM_RADIOS);
 
     _fe_control_settings[0].tx_enb = false;
     _fe_control_settings[1].tx_enb = false;
