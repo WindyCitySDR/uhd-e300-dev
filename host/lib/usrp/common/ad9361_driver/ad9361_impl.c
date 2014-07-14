@@ -87,14 +87,15 @@ void set_active_chains(uint64_t handle, int tx1, int tx2, int rx1, int rx2);
  * Placeholders, unused, or test functions
  **********************************************************************/
 static char *tmp_req_buffer;
-void post_err_msg( const char* error)
+void post_err_msg(const char* error)
 {
-    ad9361_transaction_t *request;
+    msg("[AD9361 error] %s", error);
     if (!tmp_req_buffer)
         return;
 
-    request = (ad9361_transaction_t *)tmp_req_buffer;
-    strncpy(request->error_msg, error, AD9361_TRANSACTION_MAX_ERROR_MSG);
+    ad9361_transaction_t *request = (ad9361_transaction_t *)tmp_req_buffer;
+    strncpy(request->error_msg, error, (AD9361_TRANSACTION_MAX_ERROR_MSG + 1)); // '+ 1' as length excludes terminating NUL
+    request->error_msg[AD9361_TRANSACTION_MAX_ERROR_MSG] = '\0';  // If string was too long, NUL will not be copied, so force one just in case
 }
 
 /* Make AD9361 output its test tone. */
@@ -272,7 +273,7 @@ void calibrate_synth_charge_pumps(ad9361_device_t* device)
     /* If this function ever gets called, and the ENSM isn't already in the
      * ALERT state, then something has gone horribly wrong. */
     if((read_ad9361_reg(device, 0x017) & 0x0F) != 5) {
-        post_err_msg("AD9361 not in ALERT during cal!");
+        post_err_msg("AD9361 not in ALERT during cal");
     }
 
     /* Calibrate the RX synthesizer charge pump. */
@@ -280,7 +281,7 @@ void calibrate_synth_charge_pumps(ad9361_device_t* device)
     write_ad9361_reg(device, 0x23d, 0x04);
     while(!(read_ad9361_reg(device, 0x244) & 0x80)) {
         if(count > 5) {
-            post_err_msg("RX charge pump cal failure!");
+            post_err_msg("RX charge pump cal failure");
             break;
         }
 
@@ -353,7 +354,7 @@ double calibrate_baseband_rx_analog_filter(ad9361_device_t* device) {
     write_ad9361_reg(device, 0x016, 0x80);
     while(read_ad9361_reg(device, 0x016) & 0x80) {
         if(count > 100) {
-            post_err_msg("RX baseband filter cal FAILURE!");
+            post_err_msg("RX baseband filter cal FAILURE");
             break;
         }
 
@@ -408,7 +409,7 @@ double calibrate_baseband_tx_analog_filter(ad9361_device_t* device)
     write_ad9361_reg(device, 0x016, 0x40);
     while(read_ad9361_reg(device, 0x016) & 0x40) {
         if(count > 100) {
-            post_err_msg("TX baseband filter cal FAILURE!");
+            post_err_msg("TX baseband filter cal FAILURE");
             break;
         }
 
@@ -472,7 +473,7 @@ void calibrate_secondary_tx_filter(ad9361_device_t* device)
     } else if((bbbw_mhz * 2) > 24) {
         reg0d0 = 0x57;
     } else {
-        post_err_msg("INVALID_CODE_PATH: bbbw_mhz wrong");
+        post_err_msg("Cal2ndTxFil: INVALID_CODE_PATH bad bbbw_mhz");
         reg0d0 = 0x00;
     }
 
@@ -540,7 +541,7 @@ void calibrate_rx_TIAs(ad9361_device_t* device)
     } else if(ceil_bbbw_mhz > 10) {
         reg1db = 0x20;
     } else {
-        post_err_msg("INVALID_CODE_PATH: bbbw_mhz wrong");
+        post_err_msg("CalRxTias: INVALID_CODE_PATH bad bbbw_mhz");
     }
 
     if(CTIA_fF > 2920) {
@@ -717,7 +718,7 @@ void calibrate_baseband_dc_offset(ad9361_device_t* device)
     write_ad9361_reg(device, 0x016, 0x01);
     while(read_ad9361_reg(device, 0x016) & 0x01) {
         if(count > 100) {
-            post_err_msg("Baseband DC Offset Calibration Failure!");
+            post_err_msg("Baseband DC Offset Calibration Failure");
             break;
         }
 
@@ -754,7 +755,7 @@ void calibrate_rf_dc_offset(ad9361_device_t* device)
     write_ad9361_reg(device, 0x016, 0x02);
     while(read_ad9361_reg(device, 0x016) & 0x02) {
         if(count > 100) {
-            post_err_msg("RF DC Offset Calibration Failure!");
+            post_err_msg("RF DC Offset Calibration Failure");
             break;
         }
 
@@ -843,7 +844,7 @@ void tx_quadrature_cal_routine(ad9361_device_t* device)
     write_ad9361_reg(device, 0x016, 0x10);
     while(read_ad9361_reg(device, 0x016) & 0x10) {
         if(count > 100) {
-            post_err_msg("TX Quadrature Calibration Failure!");
+            post_err_msg("TX Quadrature Calibration Failure");
             break;
         }
 
@@ -862,7 +863,7 @@ void calibrate_tx_quadrature(ad9361_device_t* device)
     /* Make sure we are, in fact, in the ALERT state. If not, something is
      * terribly wrong in the driver execution flow. */
     if((read_ad9361_reg(device, 0x017) & 0x0F) != 5) {
-        post_err_msg("TX Quad Cal started, but not in ALERT!");
+        post_err_msg("TX Quad Cal started, but not in ALERT");
     }
 
     /* Turn off free-running and continuous calibrations. Note that this
@@ -1090,7 +1091,7 @@ void setup_synth(ad9361_device_t* device, int which, double vcorate) {
         write_ad9361_reg(device, 0x27f, loop_filter_c3 | (loop_filter_r1 << 4));
         write_ad9361_reg(device, 0x280, loop_filter_r3);
     } else {
-        post_err_msg("INVALID_CODE_PATH");
+        post_err_msg("[setup_synth] INVALID_CODE_PATH");
     }
 }
 
@@ -1127,7 +1128,7 @@ double tune_bbvco(ad9361_device_t* device, const double rate) {
         if(vcorate >= vcomin && vcorate <= vcomax) break;
     }
     if(i == 7)
-        post_err_msg("tune_bbvco: wrong vcorate");
+        post_err_msg("[tune_bbvco] wrong vcorate");
 
     msg("[tune_bbvco] vcodiv=%d vcorate=%.10f", vcodiv, vcorate);
 
@@ -1226,7 +1227,7 @@ double tune_helper(ad9361_device_t* device, int which, const double value) {
                   (value <= 6e9)) {
             device->regs.inputsel = (device->regs.inputsel & 0xC0) | 0x03;
         } else {
-            post_err_msg("INVALID_CODE_PATH");
+            post_err_msg("[tune_helper] INVALID_CODE_PATH");
         }
 
         write_ad9361_reg(device, 0x004, device->regs.inputsel);
@@ -1266,7 +1267,7 @@ double tune_helper(ad9361_device_t* device, int which, const double value) {
                   (value <= 6e9)) {
             device->regs.inputsel = device->regs.inputsel & 0xBF;
         } else {
-            post_err_msg("INVALID_CODE_PATH");
+            post_err_msg("[tune_helper] INVALID_CODE_PATH");
         }
 
         write_ad9361_reg(device, 0x004, device->regs.inputsel);
@@ -1384,7 +1385,7 @@ double setup_rates(ad9361_device_t* device, const double rate)
         device->tfir_factor = 1;
     } else {
         // should never get in here
-        post_err_msg("INVALID_CODE_PATH");
+        post_err_msg("[setup_rates] INVALID_CODE_PATH");
     }
 
     msg("[setup_rates] divfactor=%d", divfactor);
@@ -1665,7 +1666,7 @@ double set_clock_rate(uint64_t handle, const double req_rate) {
     ad9361_device_t* device = get_ad9361_device(handle);
 
     if(req_rate > 61.44e6) {
-        post_err_msg("Requested master clock rate outside range!");
+        post_err_msg("Requested master clock rate outside range");
     }
 
     msg("[set_clock_rate] req_rate=%.10f", req_rate);
@@ -1694,7 +1695,7 @@ double set_clock_rate(uint64_t handle, const double req_rate) {
             break;
 
         default:
-            post_err_msg("AD9361 is in unknown state!");
+            post_err_msg("[set_clock_rate:1] AD9361 in unknown state");
             break;
     };
 
@@ -1770,7 +1771,7 @@ double set_clock_rate(uint64_t handle, const double req_rate) {
             break;
 
         default:
-            post_err_msg("AD9361 is in unknown state!");
+            post_err_msg("[set_clock_rate:2] AD9361 in unknown state");
             break;
     };
 
@@ -1838,7 +1839,7 @@ double tune(uint64_t handle, int which, const double value) {
         }
 
     } else {
-        post_err_msg("INVALID_CODE_PATH");
+        post_err_msg("[tune] INVALID_CODE_PATH");
     }
 
     /* If we aren't already in the ALERT state, we will need to return to
@@ -1944,15 +1945,16 @@ double set_gain(uint64_t handle, int which, int n, const double value)
 /* This function is responsible to dispatch the vendor request call
  * to the proper handler
  */
+
 //void dispatch_vrq(const char *vrb, char* vrb_out) {
-void ad9361_dispatch(/*const char request[64]*/const char* vrb, /*char response[64]*/char* vrb_out)
+void ad9361_dispatch(const char* vrb, char* vrb_out)
 {
     double ret_val;
     int mask;
     ad9361_transaction_t *request, *response;
 
-    memcpy(vrb_out, vrb, AD9361_DISPATCH_PACKET_SIZE); //copy request to response memory
-    tmp_req_buffer = vrb_out;
+    memcpy(vrb_out, vrb, AD9361_DISPATCH_PACKET_SIZE);  // Copy request to response memory
+    tmp_req_buffer = vrb_out;                           // Set this to enable 'post_err_msg'
 
     //////////////////////////////////////////////
 
@@ -1961,9 +1963,7 @@ void ad9361_dispatch(/*const char request[64]*/const char* vrb, /*char response[
 
     request = (ad9361_transaction_t *)vrb;
     response = (ad9361_transaction_t *)vrb_out;
-
-    //msg("[dispatch_vrq] action=%d", request->action);
-    //msg("[dispatch_vrq] action=%f", (double)request->action);
+    response->error_msg[0] = '\0';  // Ensure error is cleared
 
     switch (request->action) {
         case AD9361_ACTION_ECHO:
@@ -2007,17 +2007,7 @@ void ad9361_dispatch(/*const char request[64]*/const char* vrb, /*char response[
             set_active_chains(request->handle,mask & 1, mask & 2, mask & 4, mask & 8);
             break;
         default:
-            post_err_msg("NOT IMPLEMENTED");
+            post_err_msg("[ad9361_dispatch] NOT IMPLEMENTED");
             break;
     }
-}
-
-void _ad9361_dispatch(/*const char request[64]*/const char* request, /*char response[64]*/char* response)
-{
-    //msg("[set_clock_rate] %f", 123456789.0);
-    memcpy(response, request, AD9361_DISPATCH_PACKET_SIZE); //copy request to response memory
-    //tmp_req_buffer = (char *)request; //makes post error message work
-    tmp_req_buffer = response;
-
-    /*dispatch_vrq*/ad9361_dispatch(/*response*/request, response); //uses rw memory as request and response
 }
