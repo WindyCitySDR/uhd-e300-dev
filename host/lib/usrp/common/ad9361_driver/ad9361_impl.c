@@ -1808,9 +1808,27 @@ void set_active_chains(uint64_t handle, int tx1, int tx2, int rx1, int rx2) {
     if(rx1) { device->regs.rxfilt = device->regs.rxfilt | 0x40; }
     if(rx2) { device->regs.rxfilt = device->regs.rxfilt | 0x80; }
 
+    /* Check for FDD state */
+    uint8_t set_back_to_fdd = 0;
+    uint8_t ensm_state = read_ad9361_reg(device, 0x017) & 0x0F;
+    if (ensm_state == 0xA)   // FDD
+    {
+        /* Put into ALERT state (via the FDD flush state). */
+        write_ad9361_reg(device, 0x014, 0x01);
+        set_back_to_fdd = 1;
+    }
+
+    /* Wait for FDD flush state to complete (if necessary) */
+    while (ensm_state == 0xA || ensm_state == 0xB)
+        ensm_state = read_ad9361_reg(device, 0x017) & 0x0F;
+
     /* Turn on / off the chains. */
     write_ad9361_reg(device, 0x002, device->regs.txfilt);
     write_ad9361_reg(device, 0x003, device->regs.rxfilt);
+
+    /* Put back into FDD state if necessary */
+    if (set_back_to_fdd)
+        write_ad9361_reg(device, 0x014, 0x21);
 }
 
 /* Tune the RX or TX frequency.
