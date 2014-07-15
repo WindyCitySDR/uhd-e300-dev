@@ -419,6 +419,13 @@ rx_streamer::sptr e300_impl::get_rx_stream(const uhd::stream_args_t &args_)
     args.otw_format = "sc16";
     args.channels = args.channels.empty()? std::vector<size_t>(1, 0) : args.channels;
 
+    uhd::transport::zero_copy_xport_params data_xport_params;
+    data_xport_params.recv_frame_size = 2048;
+    data_xport_params.num_recv_frames = 128;
+    data_xport_params.send_frame_size = 2048;
+    data_xport_params.num_send_frames = 128;
+
+
     boost::shared_ptr<sph::recv_packet_streamer> my_streamer;
     for (size_t stream_i = 0; stream_i < args.channels.size(); stream_i++)
     {
@@ -427,12 +434,19 @@ rx_streamer::sptr e300_impl::get_rx_stream(const uhd::stream_args_t &args_)
 
         radio_perifs_t &perif = _radio_perifs[radio_index];
 
-        sid_config_t config;
-        config.router_addr_there = E300_DEVICE_THERE;
-        config.dst_prefix        = E300_RADIO_DEST_PREFIX_RX;
-        config.router_dst_there  = radio_index ? E300_XB_DST_R1 : E300_XB_DST_R0;
-        config.router_dst_here   = E300_XB_DST_AXI;
-        boost::uint32_t data_sid = this->_allocate_sid(config);
+        boost::uint32_t data_sid;
+
+        ////////////////////////////////////////////////////////////////////
+        // crossbar config for ctrl xports
+        ////////////////////////////////////////////////////////////////////
+        both_xports_t data_xports = _make_transport(
+           radio_index ? E300_XB_DST_R1 : E300_XB_DST_R0,
+           E300_RADIO_DEST_PREFIX_RX,
+           data_xport_params,
+           data_sid);
+        perif.rx_data_xport = data_xports.recv;
+        perif.rx_flow_xport = data_xports.send;
+
         this->_setup_dest_mapping(data_sid,
                                   radio_index ? E300_R1_RX_DATA_STREAM
                                               : E300_R0_RX_DATA_STREAM);
@@ -445,7 +459,7 @@ rx_streamer::sptr e300_impl::get_rx_stream(const uhd::stream_args_t &args_)
             - sizeof(vrt::if_packet_info_t().cid) //no class id ever used
             - sizeof(vrt::if_packet_info_t().tsi) //no int time ever used
         ;
-        const size_t bpp = perif.rx_data_xport->get_recv_frame_size() - hdr_size;
+        const size_t bpp = perif.tx_data_xport->get_recv_frame_size() - hdr_size;
         const size_t bpi = convert::get_bytes_per_item(args.otw_format);
         const size_t spp = unsigned(args.args.cast<double>("spp", bpp/bpi));
 
@@ -515,6 +529,13 @@ tx_streamer::sptr e300_impl::get_tx_stream(const uhd::stream_args_t &args_)
     args.otw_format = "sc16";
     args.channels = args.channels.empty()? std::vector<size_t>(1, 0) : args.channels;
 
+    uhd::transport::zero_copy_xport_params data_xport_params;
+    data_xport_params.recv_frame_size = 2048;
+    data_xport_params.num_recv_frames = 128;
+    data_xport_params.send_frame_size = 2048;
+    data_xport_params.num_send_frames = 128;
+
+
     //shared async queue for all channels in streamer
     boost::shared_ptr<async_md_type> async_md(new async_md_type(1000/*messages deep*/));
 
@@ -526,18 +547,18 @@ tx_streamer::sptr e300_impl::get_tx_stream(const uhd::stream_args_t &args_)
 
         radio_perifs_t &perif = _radio_perifs[radio_index];
 
+        boost::uint32_t data_sid;
+        both_xports_t data_xports = _make_transport(
+           radio_index ? E300_XB_DST_R1 : E300_XB_DST_R0,
+           E300_RADIO_DEST_PREFIX_TX,
+           data_xport_params,
+           data_sid);
+        perif.tx_data_xport = data_xports.send;
+        perif.tx_flow_xport = data_xports.recv;
 
-        //allocate sid
-        sid_config_t config;
-        config.router_addr_there = E300_DEVICE_THERE;
-        config.dst_prefix        = E300_RADIO_DEST_PREFIX_TX;
-        config.router_dst_there  = radio_index ? E300_XB_DST_R1 : E300_XB_DST_R0;
-        config.router_dst_here   = E300_XB_DST_AXI;
-        boost::uint32_t data_sid = this->_allocate_sid(config);
         this->_setup_dest_mapping(data_sid,
                                   radio_index ? E300_R1_TX_DATA_STREAM
                                               : E300_R0_TX_DATA_STREAM);
-
         //calculate packet size
         static const size_t hdr_size = 0
             + vrt::num_vrl_words32*sizeof(boost::uint32_t)

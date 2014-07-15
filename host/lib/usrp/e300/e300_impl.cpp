@@ -386,20 +386,7 @@ e300_impl::e300_impl(const uhd::device_addr_t &device_addr) : _sid_framer(0)
         _fifo_iface = e300_fifo_interface::make(fifo_cfg);
         _global_regs = global_regs::make(_fifo_iface->get_global_regs_base());
 
-        // static mapping, boooohhhhhh
-        _radio_perifs[0].send_ctrl_xport = _fifo_iface->make_send_xport(E300_R0_CTRL_STREAM, ctrl_xport_params);
-        _radio_perifs[0].recv_ctrl_xport = _fifo_iface->make_recv_xport(E300_R0_CTRL_STREAM, ctrl_xport_params);
-        _radio_perifs[0].tx_data_xport   = _fifo_iface->make_send_xport(E300_R0_TX_DATA_STREAM, data_xport_params);
-        _radio_perifs[0].tx_flow_xport   = _fifo_iface->make_recv_xport(E300_R0_TX_DATA_STREAM, ctrl_xport_params);
-        _radio_perifs[0].rx_data_xport   = _fifo_iface->make_recv_xport(E300_R0_RX_DATA_STREAM, data_xport_params);
-        _radio_perifs[0].rx_flow_xport   = _fifo_iface->make_send_xport(E300_R0_RX_DATA_STREAM, ctrl_xport_params);
-
-        _radio_perifs[1].send_ctrl_xport = _fifo_iface->make_send_xport(E300_R1_CTRL_STREAM, ctrl_xport_params);
-        _radio_perifs[1].recv_ctrl_xport = _fifo_iface->make_recv_xport(E300_R1_CTRL_STREAM, ctrl_xport_params);
-        _radio_perifs[1].tx_data_xport   = _fifo_iface->make_send_xport(E300_R1_TX_DATA_STREAM, data_xport_params);
-        _radio_perifs[1].tx_flow_xport   = _fifo_iface->make_recv_xport(E300_R1_TX_DATA_STREAM, ctrl_xport_params);
-        _radio_perifs[1].rx_data_xport   = _fifo_iface->make_recv_xport(E300_R1_RX_DATA_STREAM, data_xport_params);
-        _radio_perifs[1].rx_flow_xport   = _fifo_iface->make_send_xport(E300_R1_RX_DATA_STREAM, ctrl_xport_params);
+        _xport_path = AXI;
 
         _codec_xport = ad9361_ctrl_transport::make_software_spi(AD9361_E300, spi::make(E300_SPIDEV_DEVICE), 1);
         _codec_ctrl = ad9361_ctrl::make(_codec_xport);
@@ -830,10 +817,22 @@ void e300_impl::_update_time_source(const std::string &source)
     _update_gpio_state();
 }
 
+size_t e300_impl::_get_axi_dma_channel(
+    boost::uint8_t destination,
+    boost::uint8_t prefix)
+{
+    static const boost::uint32_t RADIO_GRP_SIZE = 4;
+    static const boost::uint32_t RADIO0_GRP     = 0;
+    static const boost::uint32_t RADIO1_GRP     = 1;
+
+    boost::uint32_t radio_grp = (destination == E300_XB_DST_R0) ? RADIO0_GRP : RADIO1_GRP;
+    return ((radio_grp * RADIO_GRP_SIZE) + prefix);
+}
+
 e300_impl::both_xports_t e300_impl::_make_transport(
     const boost::uint8_t &destination,
     const boost::uint8_t &prefix,
-    const uhd::device_addr_t &args,
+    const uhd::transport::zero_copy_xport_params &params,
     boost::uint32_t &sid)
 {
     both_xports_t xports;
@@ -847,8 +846,17 @@ e300_impl::both_xports_t e300_impl::_make_transport(
 
     // in local mode
     if (_xport_path == AXI) {
+        const size_t stream = _get_axi_dma_channel(
+            destination,
+            prefix);
+        xports.send =
+            _fifo_iface->make_send_xport(stream, params);
+        xports.recv =
+            _fifo_iface->make_recv_xport(stream, params);
     } else if (_xport_path == ETH) {
     }
+
+    return xports;
 }
 
 void e300_impl::_update_clock_source(const std::string &)
@@ -878,19 +886,29 @@ void e300_impl::_setup_radio(const size_t dspno)
     radio_perifs_t &perif = _radio_perifs[dspno];
     const fs_path mb_path = "/mboards/0";
 
+    boost::uint32_t ctrl_sid;
+
+    uhd::transport::zero_copy_xport_params data_xport_params;
+    data_xport_params.recv_frame_size = e300::DEFAULT_RX_DATA_FRAME_SIZE;
+    data_xport_params.num_recv_frames = e300::DEFAULT_RX_DATA_NUM_FRAMES;
+    data_xport_params.send_frame_size = e300::DEFAULT_TX_DATA_FRAME_SIZE;
+    data_xport_params.num_send_frames = e300::DEFAULT_TX_DATA_NUM_FRAMES;
+
     ////////////////////////////////////////////////////////////////////
     // crossbar config for ctrl xports
     ////////////////////////////////////////////////////////////////////
-    sid_config_t config;
-    config.router_addr_there = E300_DEVICE_THERE;
-    config.dst_prefix        = E300_RADIO_DEST_PREFIX_CTRL;
-    config.router_dst_there  = dspno ? E300_XB_DST_R1 : E300_XB_DST_R0;
-    config.router_dst_here   = E300_XB_DST_AXI;
-    boost::uint32_t ctrl_sid = this->_allocate_sid(config);
+
+    both_xports_t ctrl_xports = _make_transport(
+       dspno ? E300_XB_DST_R1 : E300_XB_DST_R0,
+       E300_RADIO_DEST_PREFIX_CTRL,
+       data_xport_params,
+       ctrl_sid);
+    perif.send_ctrl_xport = ctrl_xports.send;
+    perif.recv_ctrl_xport = ctrl_xports.recv;
+
     this->_setup_dest_mapping(ctrl_sid,
                               dspno ? E300_R1_CTRL_STREAM
                                     : E300_R0_CTRL_STREAM);
-
 
     ////////////////////////////////////////////////////////////////////
     // radio control

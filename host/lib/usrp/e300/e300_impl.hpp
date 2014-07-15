@@ -217,10 +217,14 @@ private: // methods
         const boost::uint32_t sid,
         const size_t which_stream);
 
+    size_t _get_axi_dma_channel(
+        boost::uint8_t destination,
+        boost::uint8_t prefix);
+
     both_xports_t _make_transport(
         const boost::uint8_t &destination,
         const boost::uint8_t &prefix,
-        const uhd::device_addr_t &args,
+        const uhd::transport::zero_copy_xport_params &params,
         boost::uint32_t &sid);
 
     double _get_tick_rate(void){return _tick_rate;}
