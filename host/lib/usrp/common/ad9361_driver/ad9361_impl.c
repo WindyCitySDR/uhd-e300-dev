@@ -1533,6 +1533,7 @@ void init_ad9361(uint64_t handle) {
     write_ad9361_reg(device, 0x019, 0x00); // AuxDAC2 Word[9:2]
     write_ad9361_reg(device, 0x01A, 0x00); // AuxDAC1 Config and Word[1:0]
     write_ad9361_reg(device, 0x01B, 0x00); // AuxDAC2 Config and Word[1:0]
+    write_ad9361_reg(device, 0x022, 0x4A); // Invert Bypassed LNA
     write_ad9361_reg(device, 0x023, 0xFF); // AuxDAC Manaul/Auto Control
     write_ad9361_reg(device, 0x026, 0x00); // AuxDAC Manual Select Bit/GPO Manual Select
     write_ad9361_reg(device, 0x030, 0x00); // AuxDAC1 Rx Delay
