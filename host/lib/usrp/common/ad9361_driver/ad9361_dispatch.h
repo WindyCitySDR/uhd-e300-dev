@@ -1,5 +1,5 @@
 //
-// Copyright 2013 Ettus Research LLC
+// Copyright 2014 Ettus Research LLC
 //
 
 #ifndef INCLUDED_AD9361_DISPATCH_H

@@ -1,3 +1,7 @@
+//
+// Copyright 2014 Ettus Research LLC
+//
+
 #ifndef INCLUDED_AD9361_FILTER_TAPS_HPP
 #define INCLUDED_AD9361_FILTER_TAPS_HPP
 

@@ -1,9 +1,6 @@
 //
-// Copyright 2012 Ettus Research LLC
-
-/* This file implements b200 vendor requests handler
- * It handles ad9361 setup and configuration
- */
+// Copyright 2014 Ettus Research LLC
+//
 
 #include <stdarg.h>
 #include <stdlib.h>
