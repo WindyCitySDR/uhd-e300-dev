@@ -7,12 +7,12 @@
 #ifdef __cplusplus
 #include <string.h>
 static int lround(double dbl) { return static_cast<int>(dbl+0.5); }
+using namespace std;
 #else
 #include <stdbool.h>
 #include <math.h>
 #endif
 #include <iostream>
-using namespace std;
 #include <ad9361_transaction.h>
 #include "ad9361_filter_taps.h"
 #include "ad9361_gain_tables.h"
