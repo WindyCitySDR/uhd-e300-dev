@@ -3,11 +3,16 @@
 //
 
 #include <stdarg.h>
-#include <stdlib.h>
 #include <stdio.h>
-#include <math.h>
+#ifdef __cplusplus
 #include <string.h>
-
+static int lround(double dbl) { return static_cast<int>(dbl+0.5); }
+#else
+#include <stdbool.h>
+#include <math.h>
+#endif
+#include <iostream>
+using namespace std;
 #include <ad9361_transaction.h>
 #include "ad9361_filter_taps.h"
 #include "ad9361_gain_tables.h"
@@ -19,13 +24,6 @@
 
 #define AD9361_MIN(a, b) (((a) < (b)) ? (a) : (b))
 #define AD9361_MAX(a, b) (((a) > (b)) ? (a) : (b))
-
-#ifdef _MSC_VER
-long lround(double num)
-{
-    return (long)(num > 0 ? num + 0.5 : ceil(num - 0.5));
-}
-#endif
 
 ////////////////////////////////////////////////////////////
 
@@ -79,12 +77,12 @@ void ad9361_set_msgfn(msgfn pfn)
 #define B8(d) ((unsigned char)B8__(HEX__(d)))
 
 double set_gain(uint64_t handle, int which, int n, const double value);
-void set_active_chains(uint64_t handle, int tx1, int tx2, int rx1, int rx2);
+void set_active_chains(uint64_t handle, bool tx1, bool tx2, bool rx1, bool rx2);
 /***********************************************************************
  * Placeholders, unused, or test functions
  **********************************************************************/
 static char *tmp_req_buffer;
-void post_err_msg(const char* error)
+void post_err_msg( const char* error)
 {
     msg("[AD9361 error] %s", error);
     if (!tmp_req_buffer)
@@ -125,13 +123,11 @@ int freq_is_nearly_equal(double a, double b) {
 
 /* This function takes in the calculated maximum number of FIR taps, and
  * returns a number of taps that makes AD9361 happy. */
-int get_num_taps(int max_num_taps)
-{
-    int num_taps, i;
+int get_num_taps(int max_num_taps) {
 
+    int num_taps = 0;
     int num_taps_list[] = {16, 32, 48, 64, 80, 96, 112, 128};
-    num_taps = 0;
-
+    int i;
     for(i = 1; i < 8; i++) {
         if(max_num_taps >= num_taps_list[i]) {
             continue;
@@ -148,83 +144,112 @@ int get_num_taps(int max_num_taps)
  *
  * The process is the same for both filters, but the function must be told
  * how many taps are in the filter, and given a vector of the taps
- * themselves. Note that the filters are symmetric, so value of 'num_taps'
- * should actually be twice the length of the tap vector. */
-void program_fir_filter(ad9361_device_t* device, int which, int num_taps, uint16_t *coeffs)
-{
-    int num_unique_coeffs, addr;
-    uint16_t base;
-    uint8_t reg_numtaps;
+ * themselves.  */
 
+void program_fir_filter(ad9361_device_t* device, int which, int num_taps, uint16_t *coeffs) {
+  uint16_t base;
+
+  /* RX and TX filters use largely identical sets of programming registers.
+     Select the appropriate bank of registers here. */
+  if(which == RX_TYPE) {
+    base = 0x0f0;
+  } else {
+    base = 0x060;
+  }
+
+  /* Encode number of filter taps for programming register */
+  uint8_t reg_numtaps = (((num_taps / 16) - 1) & 0x07) << 5;
+  
+  /* Turn on the filter clock. */
+  write_ad9361_reg(device, base+5, reg_numtaps | 0x1a);
+  ad9361_msleep(1);
+  
+  /* Zero the unused taps just in case they have stale data */  
+  int addr;
+  for(addr=num_taps; addr < 128; addr++) {
+    write_ad9361_reg(device, base+0, addr);
+    write_ad9361_reg(device, base+1, 0x0);
+    write_ad9361_reg(device, base+2, 0x0);
+    write_ad9361_reg(device, base+5, reg_numtaps |  0x1e);
+    write_ad9361_reg(device, base+4, 0x00);
+    write_ad9361_reg(device, base+4, 0x00);
+    }
+
+ /* Iterate through indirect programming of filter coeffs using ADI recomended procedure */
+  for(addr=0; addr < num_taps; addr++) {
+    write_ad9361_reg(device, base+0, addr);
+    write_ad9361_reg(device, base+1, (coeffs[addr]) & 0xff);
+    write_ad9361_reg(device, base+2, (coeffs[addr] >> 8) & 0xff);
+    write_ad9361_reg(device, base+5, reg_numtaps |  0x1e);
+    write_ad9361_reg(device, base+4, 0x00);
+    write_ad9361_reg(device, base+4, 0x00);
+    }
+
+    /* UG-671 states (page 25) (paraphrased and clarified):
+       " After the table has been programmed, write to register BASE+5 with the write bit D2 cleared and D1 high.
+       Then, write to register BASE+5 again with D1 clear, thus ensuring that the write bit resets internally 
+       before the clock stops. Wait 4 sample clock periods after setting D2 high while that data writes into the table"
+    */
+
+    write_ad9361_reg(device, base+5, reg_numtaps | 0x1A);
     if(which == RX_TYPE) {
-        base = 0x0f0;
-        write_ad9361_reg(device, base+6, 0x02); //filter gain
-    } else {
-        base = 0x060;
-    }
-
-    /* Write the filter configuration. */
-    reg_numtaps = (((num_taps / 16) - 1) & 0x07) << 5;
-
-    /* Turn on the filter clock. */
-    write_ad9361_reg(device, base+5, reg_numtaps | 0x1a);
-    ad9361_msleep(1);
-
-    num_unique_coeffs = (num_taps / 2);
-
-    /* The filters are symmetric, so iterate over the tap vector,
-     * programming each index, and then iterate backwards, repeating the
-     * process. */
-    for(addr=0; addr < num_unique_coeffs; addr++) {
-        write_ad9361_reg(device, base+0, addr);
-        write_ad9361_reg(device, base+1, (coeffs[addr]) & 0xff);
-        write_ad9361_reg(device, base+2, (coeffs[addr] >> 8) & 0xff);
-        write_ad9361_reg(device, base+5, 0xfe);
-        write_ad9361_reg(device, base+4, 0x00);
-        write_ad9361_reg(device, base+4, 0x00);
-    }
-
-    for(addr=0; addr < num_unique_coeffs; addr++) {
-        write_ad9361_reg(device, base+0, addr+num_unique_coeffs);
-        write_ad9361_reg(device, base+1, (coeffs[num_unique_coeffs-1-addr]) & 0xff);
-        write_ad9361_reg(device, base+2, (coeffs[num_unique_coeffs-1-addr] >> 8) & 0xff);
-        write_ad9361_reg(device, base+5, 0xfe);
-        write_ad9361_reg(device, base+4, 0x00);
-        write_ad9361_reg(device, base+4, 0x00);
-    }
-
-    /* Disable the filter clock. */
-    write_ad9361_reg(device, base+5, 0xf8);
+      write_ad9361_reg(device, base+5, reg_numtaps | 0x18); 
+      write_ad9361_reg(device, base+6, 0x02); /* Also turn on -6dB Rx gain here, to stop filter overfow.*/
+  } else {
+      write_ad9361_reg(device, base+5, reg_numtaps | 0x19); /* Also turn on -6dB Tx gain here, to stop filter overfow.*/
+  }
 }
+
+
 
 /* Program the RX FIR Filter. */
 void setup_rx_fir(ad9361_device_t* device, int total_num_taps) {
-    uint16_t *coeffs;
+    int num_taps = total_num_taps;
+#ifdef __cplusplus
+    uint16_t* coeffs = new uint16_t[num_taps];
+#else
+    uint16_t coeffs[num_taps];
+#endif
     int i;
-    int num_taps = total_num_taps / 2;
-    coeffs = malloc(num_taps*sizeof(uint16_t));
     for(i = 0; i < num_taps; i++) {
-        coeffs[num_taps - 1 - i] = default_128tap_coeffs[63 - i];
+      switch(num_taps) {
+      case 128: coeffs[i] = (uint16_t)hb127_coeffs[i]; break;
+      case 96:  coeffs[i] = (uint16_t)hb95_coeffs[i]; break;
+      case 64:  coeffs[i] = (uint16_t)hb63_coeffs[i]; break;
+      case 48:  coeffs[i] = (uint16_t)hb47_coeffs[i]; break;
+      default:  post_err_msg("Unsupported number of Rx FIR taps.");
+      }
     }
 
     program_fir_filter(device, RX_TYPE, total_num_taps, coeffs);
-    free(coeffs);
+#ifdef __cplusplus
+    delete[] coeffs;
+#endif
 }
 
 /* Program the TX FIR Filter. */
-void setup_tx_fir(ad9361_device_t* device, int total_num_taps)
-{
+void setup_tx_fir(ad9361_device_t* device, int total_num_taps) {
+    int num_taps = total_num_taps;
+#ifdef __cplusplus
+    uint16_t* coeffs = new uint16_t[num_taps];
+#else
+    uint16_t coeffs[num_taps];
+#endif
     int i;
-    uint16_t *coeffs;
-    int num_taps = total_num_taps / 2;
-
-    coeffs = malloc(num_taps*sizeof(uint16_t));
     for(i = 0; i < num_taps; i++) {
-        coeffs[num_taps - 1 - i] = default_128tap_coeffs[63 - i];
+      switch(num_taps) {
+      case 128: coeffs[i] = (uint16_t)hb127_coeffs[i]; break;
+      case 96:  coeffs[i] = (uint16_t)hb95_coeffs[i]; break;
+      case 64:  coeffs[i] = (uint16_t)hb63_coeffs[i]; break;
+      case 48:  coeffs[i] = (uint16_t)hb47_coeffs[i]; break;
+      default:  post_err_msg("Unsupported number of Tx FIR taps.");
+      }
     }
 
     program_fir_filter(device, TX_TYPE, total_num_taps, coeffs);
-    free(coeffs);
+#ifdef __cplusplus
+    delete[] coeffs;
+#endif
 }
 
 /***********************************************************************
@@ -234,10 +259,7 @@ void setup_tx_fir(ad9361_device_t* device, int total_num_taps)
 /* Calibrate and lock the BBPLL.
  *
  * This function should be called anytime the BBPLL is tuned. */
-void calibrate_lock_bbpll(ad9361_device_t* device)
-{
-    int count;
-
+void calibrate_lock_bbpll(ad9361_device_t* device) {
     write_ad9361_reg(device, 0x03F, 0x05); // Start the BBPLL calibration
     write_ad9361_reg(device, 0x03F, 0x01); // Clear the 'start' bit
 
@@ -247,7 +269,7 @@ void calibrate_lock_bbpll(ad9361_device_t* device)
     write_ad9361_reg(device, 0x04d, 0x05);
 
     /* Wait for BBPLL lock. */
-    count = 0;
+    int count = 0;
     while(!(read_ad9361_reg(device, 0x05e) & 0x80)) {
         if(count > 1000) {
             post_err_msg("BBPLL not locked");
@@ -263,10 +285,7 @@ void calibrate_lock_bbpll(ad9361_device_t* device)
  *
  * Technically, this calibration only needs to be done once, at device
  * initialization. */
-void calibrate_synth_charge_pumps(ad9361_device_t* device)
-{
-    int count;
-
+void calibrate_synth_charge_pumps(ad9361_device_t* device) {
     /* If this function ever gets called, and the ENSM isn't already in the
      * ALERT state, then something has gone horribly wrong. */
     if((read_ad9361_reg(device, 0x017) & 0x0F) != 5) {
@@ -274,7 +293,7 @@ void calibrate_synth_charge_pumps(ad9361_device_t* device)
     }
 
     /* Calibrate the RX synthesizer charge pump. */
-    count = 0;
+    int count = 0;
     write_ad9361_reg(device, 0x23d, 0x04);
     while(!(read_ad9361_reg(device, 0x244) & 0x80)) {
         if(count > 5) {
@@ -308,8 +327,6 @@ void calibrate_synth_charge_pumps(ad9361_device_t* device)
  * bandwidth, so this must be re-done after any change to the RX sample
  * rate. */
 double calibrate_baseband_rx_analog_filter(ad9361_device_t* device) {
-    int count;
-    double rxtune_clk, bbbw_mhz, temp, bbbw_khz;
     /* For filter tuning, baseband BW is half the complex BW, and must be
      * between 28e6 and 0.2e6. */
     double bbbw = device->baseband_bw / 2.0;
@@ -319,7 +336,7 @@ double calibrate_baseband_rx_analog_filter(ad9361_device_t* device) {
         bbbw = 0.20e6;
     }
 
-    rxtune_clk = ((1.4 * bbbw * 2 *
+    double rxtune_clk = ((1.4 * bbbw * 2 *
             DOUBLE_PI) / DOUBLE_LN_2);
 
     device->rx_bbf_tunediv = AD9361_MIN(511, ad9361_ceil_to_int(device->bbpll_freq / rxtune_clk));
@@ -327,10 +344,10 @@ double calibrate_baseband_rx_analog_filter(ad9361_device_t* device) {
     device->regs.bbftune_config = (device->regs.bbftune_config & 0xFE) \
                          | ((device->rx_bbf_tunediv >> 8) & 0x0001);
 
-    bbbw_mhz = bbbw / 1e6;
+    double bbbw_mhz = bbbw / 1e6;
 
-    temp = ((bbbw_mhz - ad9361_floor_to_int(bbbw_mhz)) * 1000) / 7.8125;
-    bbbw_khz = (uint8_t) AD9361_MIN(127, (ad9361_floor_to_int(temp + 0.5)));
+    double temp = ((bbbw_mhz - ad9361_floor_to_int(bbbw_mhz)) * 1000) / 7.8125;
+    uint8_t bbbw_khz = (uint8_t) AD9361_MIN(127, (ad9361_floor_to_int(temp + 0.5)));
 
     /* Set corner frequencies and dividers. */
     write_ad9361_reg(device, 0x1fb, (uint8_t)(bbbw_mhz));
@@ -347,7 +364,7 @@ double calibrate_baseband_rx_analog_filter(ad9361_device_t* device) {
     write_ad9361_reg(device, 0x1e3, 0x02);
 
     /* Run the calibration! */
-    count = 0;
+    int count = 0;
     write_ad9361_reg(device, 0x016, 0x80);
     while(read_ad9361_reg(device, 0x016) & 0x80) {
         if(count > 100) {
@@ -371,12 +388,7 @@ double calibrate_baseband_rx_analog_filter(ad9361_device_t* device) {
  * Note that the filter calibration depends heavily on the baseband
  * bandwidth, so this must be re-done after any change to the TX sample
  * rate. */
-double calibrate_baseband_tx_analog_filter(ad9361_device_t* device)
-{
-    int count;
-    double txtune_clk;
-    uint16_t txbbfdiv;
-
+double calibrate_baseband_tx_analog_filter(ad9361_device_t* device) {
     /* For filter tuning, baseband BW is half the complex BW, and must be
      * between 28e6 and 0.2e6. */
     double bbbw = device->baseband_bw / 2.0;
@@ -386,10 +398,10 @@ double calibrate_baseband_tx_analog_filter(ad9361_device_t* device)
         bbbw = 0.625e6;
     }
 
-    txtune_clk = ((1.6 * bbbw * 2 *
+    double txtune_clk = ((1.6 * bbbw * 2 *
             DOUBLE_PI) / DOUBLE_LN_2);
 
-    txbbfdiv = AD9361_MIN(511, (ad9361_ceil_to_int(device->bbpll_freq / txtune_clk)));
+    uint16_t txbbfdiv = AD9361_MIN(511, (ad9361_ceil_to_int(device->bbpll_freq / txtune_clk)));
 
     device->regs.bbftune_mode = (device->regs.bbftune_mode & 0xFE) \
                          | ((txbbfdiv >> 8) & 0x0001);
@@ -402,7 +414,7 @@ double calibrate_baseband_tx_analog_filter(ad9361_device_t* device)
     write_ad9361_reg(device, 0x0ca, 0x22);
 
     /* Calibrate! */
-    count = 0;
+    int count = 0;
     write_ad9361_reg(device, 0x016, 0x40);
     while(read_ad9361_reg(device, 0x016) & 0x40) {
         if(count > 100) {
@@ -424,31 +436,27 @@ double calibrate_baseband_tx_analog_filter(ad9361_device_t* device)
  *
  * This filter also depends on the TX sample rate, so if a rate change is
  * made, the previous calibration will no longer be valid. */
-void calibrate_secondary_tx_filter(ad9361_device_t* device)
-{
-    int i, cap, res;
-    double bbbw, bbbw_mhz, corner_freq;
-    uint8_t reg0d0, reg0d1, reg0d2;
-
+void calibrate_secondary_tx_filter(ad9361_device_t* device) {
     /* For filter tuning, baseband BW is half the complex BW, and must be
      * between 20e6 and 0.53e6. */
-    bbbw = device->baseband_bw / 2.0;
+    double bbbw = device->baseband_bw / 2.0;
     if(bbbw > 20e6) {
         bbbw = 20e6;
     } else if (bbbw < 0.53e6) {
         bbbw = 0.53e6;
     }
 
-    bbbw_mhz = bbbw / 1e6;
+    double bbbw_mhz = bbbw / 1e6;
 
     /* Start with a resistor value of 100 Ohms. */
-    res = 100;
+    int res = 100;
 
     /* Calculate target corner frequency. */
-    corner_freq = 5 * bbbw_mhz * 2 * DOUBLE_PI;
+    double corner_freq = 5 * bbbw_mhz * 2 * DOUBLE_PI;
 
     /* Iterate through RC values to determine correct combination. */
-    cap = 0;
+    int cap = 0;
+    int i;
     for(i = 0; i <= 3; i++) {
         cap = (ad9361_floor_to_int(0.5 + (( 1 / ((corner_freq * res) * 1e6)) * 1e12))) - 12;
 
@@ -461,6 +469,8 @@ void calibrate_secondary_tx_filter(ad9361_device_t* device)
     if(cap > 63) {
         cap = 63;
     }
+
+    uint8_t reg0d0, reg0d1, reg0d2;
 
     /* Translate baseband bandwidths to register settings. */
     if((bbbw_mhz * 2) <= 9) {
@@ -499,36 +509,31 @@ void calibrate_secondary_tx_filter(ad9361_device_t* device)
  *
  * Note that the values in the TIA register, after calibration, vary with
  * the RX gain settings. */
-void calibrate_rx_TIAs(ad9361_device_t* device)
-{
-    double bbbw, ceil_bbbw_mhz, CTIA_fF;
-    int Cbbf, R2346;
-    uint8_t reg1eb, reg1ec, reg1e6, reg1db, reg1dc, reg1dd;
-    uint8_t reg1de, reg1df, temp;
+void calibrate_rx_TIAs(ad9361_device_t* device) {
 
-    reg1eb = read_ad9361_reg(device, 0x1eb) & 0x3F;
-    reg1ec = read_ad9361_reg(device, 0x1ec) & 0x7F;
-    reg1e6 = read_ad9361_reg(device, 0x1e6) & 0x07;
-    reg1db = 0x00;
-    reg1dc = 0x00;
-    reg1dd = 0x00;
-    reg1de = 0x00;
-    reg1df = 0x00;
+    uint8_t reg1eb = read_ad9361_reg(device, 0x1eb) & 0x3F;
+    uint8_t reg1ec = read_ad9361_reg(device, 0x1ec) & 0x7F;
+    uint8_t reg1e6 = read_ad9361_reg(device, 0x1e6) & 0x07;
+    uint8_t reg1db = 0x00;
+    uint8_t reg1dc = 0x00;
+    uint8_t reg1dd = 0x00;
+    uint8_t reg1de = 0x00;
+    uint8_t reg1df = 0x00;
 
     /* For calibration, baseband BW is half the complex BW, and must be
      * between 28e6 and 0.2e6. */
-    bbbw = device->baseband_bw / 2.0;
+    double bbbw = device->baseband_bw / 2.0;
     if(bbbw > 20e6) {
         bbbw = 20e6;
     } else if (bbbw < 0.20e6) {
         bbbw = 0.20e6;
     }
-    ceil_bbbw_mhz = ad9361_ceil_to_int(bbbw / 1e6);
+    double ceil_bbbw_mhz = ad9361_ceil_to_int(bbbw / 1e6);
 
     /* Do some crazy resistor and capacitor math. */
-    Cbbf = (reg1eb * 160) + (reg1ec * 10) + 140;
-    R2346 = 18300 * (reg1e6 & 0x07);
-    CTIA_fF = (Cbbf * R2346 * 0.56) / 3500;
+    int Cbbf = (reg1eb * 160) + (reg1ec * 10) + 140;
+    int R2346 = 18300 * (reg1e6 & 0x07);
+    double CTIA_fF = (Cbbf * R2346 * 0.56) / 3500;
 
     /* Translate baseband BW to register settings. */
     if(ceil_bbbw_mhz <= 3) {
@@ -545,11 +550,11 @@ void calibrate_rx_TIAs(ad9361_device_t* device)
         reg1dc = 0x40;
         reg1de = 0x40;
 
-        temp = (uint8_t) AD9361_MIN(127, (ad9361_floor_to_int(0.5 + ((CTIA_fF - 400.0) / 320.0))));
+        uint8_t temp = (uint8_t) AD9361_MIN(127, (ad9361_floor_to_int(0.5 + ((CTIA_fF - 400.0) / 320.0))));
         reg1dd = temp;
         reg1df = temp;
     } else {
-        temp = (uint8_t) ad9361_floor_to_int(0.5 + ((CTIA_fF - 400.0) / 40.0)) + 0x40;
+        uint8_t temp = (uint8_t) ad9361_floor_to_int(0.5 + ((CTIA_fF - 400.0) / 40.0)) + 0x40;
         reg1dc = temp;
         reg1de = temp;
         reg1dd = 0;
@@ -570,15 +575,8 @@ void calibrate_rx_TIAs(ad9361_device_t* device)
  * values of which must be derived mathematically, dependent on the current
  * setting of the BBPLL. Note that the order of calculation is critical, as
  * some of the 40 registers depend on the values in others. */
-void setup_adc(ad9361_device_t* device)
-{
-    uint8_t rxbbf_c3_msb, rxbbf_c3_lsb, rxbbf_r2346, data[40];
-    double bbbw_mhz, fsadc, rc_timeconst, scale_res, scale_cap;
-    double scale_snr, maxsnr;
-    double data007, data010, data012, data015, data018, data021;
-    int i;
-
-    bbbw_mhz = (((device->bbpll_freq / 1e6) / device->rx_bbf_tunediv) * DOUBLE_LN_2) \
+void setup_adc(ad9361_device_t* device) {
+    double bbbw_mhz = (((device->bbpll_freq / 1e6) / device->rx_bbf_tunediv) * DOUBLE_LN_2) \
                   / (1.4 * 2 * DOUBLE_PI);
 
     /* For calibration, baseband BW is half the complex BW, and must be
@@ -589,14 +587,14 @@ void setup_adc(ad9361_device_t* device)
         bbbw_mhz = 0.20;
     }
 
-    rxbbf_c3_msb = read_ad9361_reg(device, 0x1eb) & 0x3F;
-    rxbbf_c3_lsb = read_ad9361_reg(device, 0x1ec) & 0x7F;
-    rxbbf_r2346 = read_ad9361_reg(device, 0x1e6) & 0x07;
+    uint8_t rxbbf_c3_msb = read_ad9361_reg(device, 0x1eb) & 0x3F;
+    uint8_t rxbbf_c3_lsb = read_ad9361_reg(device, 0x1ec) & 0x7F;
+    uint8_t rxbbf_r2346 = read_ad9361_reg(device, 0x1e6) & 0x07;
 
-    fsadc = device->adcclock_freq / 1e6;
+    double fsadc = device->adcclock_freq / 1e6;
 
     /* Sort out the RC time constant for our baseband bandwidth... */
-    rc_timeconst = 0.0;
+    double rc_timeconst = 0.0;
     if(bbbw_mhz < 18) {
         rc_timeconst = (1 / ((1.4 * 2 * DOUBLE_PI) \
                             * (18300 * rxbbf_r2346)
@@ -611,27 +609,28 @@ void setup_adc(ad9361_device_t* device)
                             * (bbbw_mhz * 1e6) * (1 + (0.01 * (bbbw_mhz - 18)))));
     }
 
-    scale_res = ad9361_sqrt(1 / rc_timeconst);
-    scale_cap = ad9361_sqrt(1 / rc_timeconst);
+    double scale_res = ad9361_sqrt(1 / rc_timeconst);
+    double scale_cap = ad9361_sqrt(1 / rc_timeconst);
 
-    scale_snr = (device->adcclock_freq < 80e6) ? 1.0 : 1.584893192;
-    maxsnr = 640 / 160;
+    double scale_snr = (device->adcclock_freq < 80e6) ? 1.0 : 1.584893192;
+    double maxsnr = 640 / 160;
 
     /* Calculate the values for all 40 settings registers.
      *
      * DO NOT TOUCH THIS UNLESS YOU KNOW EXACTLY WHAT YOU ARE DOING. kthx.*/
+    uint8_t data[40];
     data[0] = 0;    data[1] = 0; data[2] = 0; data[3] = 0x24;
     data[4] = 0x24; data[5] = 0; data[6] = 0;
     data[7] = (uint8_t) AD9361_MIN(124, (ad9361_floor_to_int(-0.5
                     + (80.0 * scale_snr * scale_res
                     * AD9361_MIN(1.0, ad9361_sqrt(maxsnr * fsadc / 640.0))))));
-    data007 = data[7];
+    double data007 = data[7];
     data[8] = (uint8_t) AD9361_MIN(255, (ad9361_floor_to_int(0.5
                     + ((20.0 * (640.0 / fsadc) * ((data007 / 80.0))
                     / (scale_res * scale_cap))))));
     data[10] = (uint8_t) AD9361_MIN(127, (ad9361_floor_to_int(-0.5 + (77.0 * scale_res
                     * AD9361_MIN(1.0, ad9361_sqrt(maxsnr * fsadc / 640.0))))));
-    data010 = data[10];
+    double data010 = data[10];
     data[9] = (uint8_t) AD9361_MIN(127, (ad9361_floor_to_int(0.8 * data010)));
     data[11] = (uint8_t) AD9361_MIN(255, (ad9361_floor_to_int(0.5
                     + (20.0 * (640.0 / fsadc) * ((data010 / 77.0)
@@ -639,25 +638,25 @@ void setup_adc(ad9361_device_t* device)
     data[12] = (uint8_t) AD9361_MIN(127, (ad9361_floor_to_int(-0.5
                     + (80.0 * scale_res * AD9361_MIN(1.0,
                     ad9361_sqrt(maxsnr * fsadc / 640.0))))));
-    data012 = data[12];
+    double data012 = data[12];
     data[13] = (uint8_t) AD9361_MIN(255, (ad9361_floor_to_int(-1.5
                     + (20.0 * (640.0 / fsadc) * ((data012 / 80.0)
                     / (scale_res * scale_cap))))));
     data[14] = 21 * (uint8_t)(ad9361_floor_to_int(0.1 * 640.0 / fsadc));
     data[15] = (uint8_t) AD9361_MIN(127, (1.025 * data007));
-    data015 = data[15];
+    double data015 = data[15];
     data[16] = (uint8_t) AD9361_MIN(127, (ad9361_floor_to_int((data015
                     * (0.98 + (0.02 * AD9361_MAX(1.0,
                     (640.0 / fsadc) / maxsnr)))))));
     data[17] = data[15];
     data[18] = (uint8_t) AD9361_MIN(127, (0.975 * (data010)));
-    data018 = data[18];
+    double data018 = data[18];
     data[19] = (uint8_t) AD9361_MIN(127, (ad9361_floor_to_int((data018
                     * (0.98 + (0.02 * AD9361_MAX(1.0,
                     (640.0 / fsadc) / maxsnr)))))));
     data[20] = data[18];
     data[21] = (uint8_t) AD9361_MIN(127, (0.975 * data012));
-    data021 = data[21];
+    double data021 = data[21];
     data[22] = (uint8_t) AD9361_MIN(127, (ad9361_floor_to_int((data021
                     * (0.98 + (0.02 * AD9361_MAX(1.0,
                     (640.0 / fsadc) / maxsnr)))))));
@@ -692,6 +691,7 @@ void setup_adc(ad9361_device_t* device)
     data[39] = 0x00;
 
     /* Program the registers! */
+    int i;
     for(i=0; i<40; i++) {
         write_ad9361_reg(device, 0x200+i, data[i]);
     }
@@ -702,16 +702,14 @@ void setup_adc(ad9361_device_t* device)
  *
  * Note that this function is called from within the TX quadrature
  * calibration function! */
-void calibrate_baseband_dc_offset(ad9361_device_t* device)
-{
-    int count;
+void calibrate_baseband_dc_offset(ad9361_device_t* device) {
     write_ad9361_reg(device, 0x193, 0x3f); // Calibration settings
     write_ad9361_reg(device, 0x190, 0x0f); // Set tracking coefficient
     //write_ad9361_reg(device, 0x190, /*0x0f*//*0xDF*/0x80*1 | 0x40*1 | (16+8/*+4*/)); // Set tracking coefficient: don't *4 counter, do decim /4, increased gain shift
     write_ad9361_reg(device, 0x194, 0x01); // More calibration settings
 
     /* Start that calibration, baby. */
-    count = 0;
+    int count = 0;
     write_ad9361_reg(device, 0x016, 0x01);
     while(read_ad9361_reg(device, 0x016) & 0x01) {
         if(count > 100) {
@@ -728,10 +726,7 @@ void calibrate_baseband_dc_offset(ad9361_device_t* device)
  *
  * Note that this function is called from within the TX quadrature
  * calibration function. */
-void calibrate_rf_dc_offset(ad9361_device_t* device)
-{
-    int count;
-
+void calibrate_rf_dc_offset(ad9361_device_t* device) {
     /* Some settings are frequency-dependent. */
     if(device->rx_freq < 4e9) {
         write_ad9361_reg(device, 0x186, 0x32); // RF DC Offset count
@@ -748,7 +743,7 @@ void calibrate_rf_dc_offset(ad9361_device_t* device)
     write_ad9361_reg(device, 0x189, 0x30);
 
     /* Run the calibration! */
-    count = 0;
+    int count = 0;
     write_ad9361_reg(device, 0x016, 0x02);
     while(read_ad9361_reg(device, 0x016) & 0x02) {
         if(count > 100) {
@@ -781,11 +776,7 @@ void calibrate_rx_quadrature(ad9361_device_t* device) {
  * The TX quadrature needs to be done twice, once for each TX chain, with
  * only one register change in between. Thus, this function enacts the
  * calibrations, and it is called from calibrate_tx_quadrature. */
-void tx_quadrature_cal_routine(ad9361_device_t* device)
-{
-    int count;
-    uint8_t reg0a3, nco_freq;
-    double max_cal_freq, bbbw;
+void tx_quadrature_cal_routine(ad9361_device_t* device) {
 
     /* This is a weird process, but here is how it works:
      * 1) Read the calibrated NCO frequency bits out of 0A3.
@@ -793,8 +784,8 @@ void tx_quadrature_cal_routine(ad9361_device_t* device)
      * 3) Re-read 0A3 to get bits [5:0] because maybe they changed?
      * 4) Update only the TX NCO freq bits in 0A3.
      * 5) Profit (I hope). */
-    reg0a3 = read_ad9361_reg(device, 0x0a3);
-    nco_freq = (reg0a3 & 0xC0);
+    uint8_t reg0a3 = read_ad9361_reg(device, 0x0a3);
+    uint8_t nco_freq = (reg0a3 & 0xC0);
     write_ad9361_reg(device, 0x0a0, 0x15 | (nco_freq >> 1));
     reg0a3 = read_ad9361_reg(device, 0x0a3);
     write_ad9361_reg(device, 0x0a3, (reg0a3 & 0x3F) | nco_freq);
@@ -803,8 +794,8 @@ void tx_quadrature_cal_routine(ad9361_device_t* device)
      * where the two test tones used for quadrature calibration are outside
      * of the RX BBF, and therefore don't make it to the ADC. We will check
      * for that scenario here. */
-    max_cal_freq = (((device->baseband_bw * device->tfir_factor) * ((nco_freq >> 6) + 1)) / 32) * 2;
-    bbbw = device->baseband_bw / 2.0; // bbbw represents the one-sided BW
+    double max_cal_freq = (((device->baseband_bw * device->tfir_factor) * ((nco_freq >> 6) + 1)) / 32) * 2;
+    double bbbw = device->baseband_bw / 2.0; // bbbw represents the one-sided BW
     if(bbbw > 28e6) {
         bbbw = 28e6;
     } else if (bbbw < 0.20e6) {
@@ -837,7 +828,7 @@ void tx_quadrature_cal_routine(ad9361_device_t* device)
     calibrate_rf_dc_offset(device);
 
     /* Now, calibrate the TX quadrature! */
-    count = 0;
+    int count = 0;
     write_ad9361_reg(device, 0x016, 0x10);
     while(read_ad9361_reg(device, 0x016) & 0x10) {
         if(count > 100) {
@@ -854,9 +845,7 @@ void tx_quadrature_cal_routine(ad9361_device_t* device)
  *
  * Note that from within this function we are also triggering the baseband
  * and RF DC calibrations. */
-void calibrate_tx_quadrature(ad9361_device_t* device)
-{
-    uint8_t orig_reg_inputsel;
+void calibrate_tx_quadrature(ad9361_device_t* device) {
     /* Make sure we are, in fact, in the ALERT state. If not, something is
      * terribly wrong in the driver execution flow. */
     if((read_ad9361_reg(device, 0x017) & 0x0F) != 5) {
@@ -870,7 +859,7 @@ void calibrate_tx_quadrature(ad9361_device_t* device)
     /* This calibration must be done in a certain order, and for both TX_A
      * and TX_B, separately. Store the original setting so that we can
      * restore it later. */
-    orig_reg_inputsel = device->regs.inputsel;
+    uint8_t orig_reg_inputsel = device->regs.inputsel;
 
     /***********************************************************************
      * TX1/2-A Calibration
@@ -904,7 +893,6 @@ void calibrate_tx_quadrature(ad9361_device_t* device)
  *
  * Note that this table is fixed for all frequency settings. */
 void program_mixer_gm_subtable(ad9361_device_t* device) {
-    int i;
     uint8_t gain[] = {0x78, 0x74, 0x70, 0x6C, 0x68, 0x64, 0x60, 0x5C, 0x58,
                       0x54, 0x50, 0x4C, 0x48, 0x30, 0x18, 0x00};
     uint8_t gm[] = {0x00, 0x0D, 0x15, 0x1B, 0x21, 0x25, 0x29, 0x2C, 0x2F,
@@ -914,6 +902,7 @@ void program_mixer_gm_subtable(ad9361_device_t* device) {
     write_ad9361_reg(device, 0x13f, 0x02);
 
     /* Program the GM Sub-table. */
+    int i;
     for(i = 15; i >= 0; i--) {
         write_ad9361_reg(device, 0x138, i);
         write_ad9361_reg(device, 0x139, gain[(15 - i)]);
@@ -938,9 +927,8 @@ void program_gain_table(ad9361_device_t* device) {
 
     /* Figure out which gain table we should be using for our current
      * frequency band. */
-    uint8_t new_gain_table, index;
     uint8_t (*gain_table)[5] = NULL;
-
+    uint8_t new_gain_table;
     if(device->rx_freq  < 1300e6) {
         gain_table = gain_table_sub_1300mhz;
         new_gain_table = 1;
@@ -967,7 +955,7 @@ void program_gain_table(ad9361_device_t* device) {
     write_ad9361_reg(device, 0x137, 0x1A);
 
     /* IT'S PROGRAMMING TIME. */
-    index = 0;
+    uint8_t index = 0;
     for(; index < 77; index++) {
         write_ad9361_reg(device, 0x130, index);
         write_ad9361_reg(device, 0x131, gain_table[index][1]);
@@ -1028,16 +1016,11 @@ void setup_gain_control(ad9361_device_t* device)
  * included header file. The table is indexed based on the passed VCO rate.
  */
 void setup_synth(ad9361_device_t* device, int which, double vcorate) {
-    int vcoindex, i;
-    uint8_t vco_output_level, vco_varactor, vco_bias_ref, vco_bias_tcf;
-    uint8_t vco_cal_offset, vco_varactor_ref, charge_pump_curr;
-    uint8_t loop_filter_c2, loop_filter_c1, loop_filter_r1, loop_filter_c3;
-    uint8_t loop_filter_r3;
-
     /* The vcorates in the vco_index array represent lower boundaries for
      * rates. Once we find a match, we use that index to look-up the rest of
      * the register values in the LUT. */
-    vcoindex = 0;
+    int vcoindex = 0;
+    int i;
     for(i = 0; i < 53; i++) {
         vcoindex = i;
         if(vcorate > vco_index[i]) {
@@ -1049,18 +1032,18 @@ void setup_synth(ad9361_device_t* device, int which, double vcorate) {
         post_err_msg("vcoindex > 53");
 
     /* Parse the values out of the LUT based on our calculated index... */
-    vco_output_level = synth_cal_lut[vcoindex][0];
-    vco_varactor = synth_cal_lut[vcoindex][1];
-    vco_bias_ref = synth_cal_lut[vcoindex][2];
-    vco_bias_tcf = synth_cal_lut[vcoindex][3];
-    vco_cal_offset = synth_cal_lut[vcoindex][4];
-    vco_varactor_ref = synth_cal_lut[vcoindex][5];
-    charge_pump_curr = synth_cal_lut[vcoindex][6];
-    loop_filter_c2 = synth_cal_lut[vcoindex][7];
-    loop_filter_c1 = synth_cal_lut[vcoindex][8];
-    loop_filter_r1 = synth_cal_lut[vcoindex][9];
-    loop_filter_c3 = synth_cal_lut[vcoindex][10];
-    loop_filter_r3 = synth_cal_lut[vcoindex][11];
+    uint8_t vco_output_level = synth_cal_lut[vcoindex][0];
+    uint8_t vco_varactor = synth_cal_lut[vcoindex][1];
+    uint8_t vco_bias_ref = synth_cal_lut[vcoindex][2];
+    uint8_t vco_bias_tcf = synth_cal_lut[vcoindex][3];
+    uint8_t vco_cal_offset = synth_cal_lut[vcoindex][4];
+    uint8_t vco_varactor_ref = synth_cal_lut[vcoindex][5];
+    uint8_t charge_pump_curr = synth_cal_lut[vcoindex][6];
+    uint8_t loop_filter_c2 = synth_cal_lut[vcoindex][7];
+    uint8_t loop_filter_c1 = synth_cal_lut[vcoindex][8];
+    uint8_t loop_filter_r1 = synth_cal_lut[vcoindex][9];
+    uint8_t loop_filter_c3 = synth_cal_lut[vcoindex][10];
+    uint8_t loop_filter_r3 = synth_cal_lut[vcoindex][11];
 
     /* ... annnd program! */
     if(which == RX_TYPE) {
@@ -1099,12 +1082,8 @@ void setup_synth(ad9361_device_t* device, int which, double vcorate) {
  * not exported outside of this file, and is invoked based on the rate
  * fed to the public set_clock_rate function. */
 double tune_bbvco(ad9361_device_t* device, const double rate) {
-    double fref, vcomax, vcomin, vcorate, actual_vcorate;
-    double icp_baseline, freq_baseline, icp;
-    int modulus, vcodiv, i, nint, nfrac, icp_reg;
-
     msg("[tune_bbvco] rate=%.10f", rate);
-
+    
     /* Let's not re-tune to the same frequency over and over... */
     if(freq_is_nearly_equal(rate, device->req_coreclk)) {
         return device->adcclock_freq;
@@ -1112,36 +1091,39 @@ double tune_bbvco(ad9361_device_t* device, const double rate) {
 
     device->req_coreclk = rate;
 
-    fref = 40e6;
-    modulus = 2088960;
-    vcomax = 1430e6;
-    vcomin = 672e6;
-
+    const double fref = 40e6;
+    const int modulus = 2088960;
+    const double vcomax = 1430e6;
+    const double vcomin = 672e6;
+    double vcorate;
+    int vcodiv;
+    
     /* Iterate over VCO dividers until appropriate divider is found. */
-    for(i = 1; i <= 6; i++) {
+    int i = 1;
+    for(; i <= 6; i++) {
         vcodiv = 1 << i;
         vcorate = rate * vcodiv;
-
+        
         if(vcorate >= vcomin && vcorate <= vcomax) break;
     }
-    if(i == 7)
-        post_err_msg("[tune_bbvco] wrong vcorate");
-
+    if(i == 7) 
+        post_err_msg("tune_bbvco: wrong vcorate");
+    
     msg("[tune_bbvco] vcodiv=%d vcorate=%.10f", vcodiv, vcorate);
-
+    
     /* Fo = Fref * (Nint + Nfrac / mod) */
-    nint = vcorate / fref;
+    int nint = vcorate / fref;
     msg("[tune_bbvco] (nint)=%.10f", (vcorate / fref));
-    nfrac = lround(((vcorate / fref) - (double)nint) * (double)modulus);
+    int nfrac = lround(((vcorate / fref) - (double)nint) * (double)modulus);
     msg("[tune_bbvco] (nfrac)=%.10f", (((vcorate / fref) - (double)nint) * (double)modulus));
     msg("[tune_bbvco] nint=%d nfrac=%d", nint, nfrac);
-    actual_vcorate = fref * ((double)nint + ((double)nfrac / (double)modulus));
-
+    double actual_vcorate = fref * ((double)nint + ((double)nfrac / (double)modulus));
+    
     /* Scale CP current according to VCO rate */
-    icp_baseline = 150e-6;
-    freq_baseline = 1280e6;
-    icp = icp_baseline * (actual_vcorate / freq_baseline);
-    icp_reg = (icp / 25e-6) - 1;
+    const double icp_baseline = 150e-6;
+    const double freq_baseline = 1280e6;
+    double icp = icp_baseline * (actual_vcorate / freq_baseline);
+    int icp_reg = (icp / 25e-6) - 1;
 
     write_ad9361_reg(device, 0x045, 0x00);            // REFCLK / 1 to BBPLL
     write_ad9361_reg(device, 0x046, icp_reg & 0x3F);  // CP current
@@ -1187,28 +1169,28 @@ void program_gains(uint64_t handle) {
 double tune_helper(ad9361_device_t* device, int which, const double value) {
 
     /* The RFPLL runs from 6 GHz - 12 GHz */
-    double fref, vcomax, vcomin, vcorate, actual_vcorate, actual_lo;
-    int modulus, vcodiv, i, nint, nfrac;
-
-    fref = 80e6;
-    modulus = 8388593;
-    vcomax = 12e9;
-    vcomin = 6e9;
+    const double fref = 80e6;
+    const int modulus = 8388593;
+    const double vcomax = 12e9;
+    const double vcomin = 6e9;
+    double vcorate;
+    int vcodiv;
 
     /* Iterate over VCO dividers until appropriate divider is found. */
+    int i;
     for(i = 0; i <= 6; i++) {
         vcodiv = 2 << i;
         vcorate = value * vcodiv;
         if(vcorate >= vcomin && vcorate <= vcomax) break;
     }
-    if(i == 7)
+    if(i == 7) 
         post_err_msg("RFVCO can't find valid VCO rate!");
 
-    nint = vcorate / fref;
-    nfrac = ((vcorate / fref) - nint) * modulus;
+    int nint = vcorate / fref;
+    int nfrac = ((vcorate / fref) - nint) * modulus;
 
-    actual_vcorate = fref * (nint + (double)(nfrac)/modulus);
-    actual_lo = actual_vcorate / vcodiv;
+    double actual_vcorate = fref * (nint + (double)(nfrac)/modulus);
+    double actual_lo = actual_vcorate / vcodiv;
 
     if(which == RX_TYPE) {
 
@@ -1301,10 +1283,7 @@ double tune_helper(ad9361_device_t* device, int which, const double value) {
  * a requested TX & RX rate, it sets the interpolation & decimation filters,
  * and tunes the VCO that feeds the ADCs and DACs.
  */
-double setup_rates(ad9361_device_t* device, const double rate)
-{
-    double adcclk, dacclk;
-    int max_tx_taps, max_rx_taps, num_tx_taps, num_rx_taps, divfactor;
+double setup_rates(ad9361_device_t* device, const double rate) {
 
     /* If we make it into this function, then we are tuning to a new rate.
      * Store the new rate. */
@@ -1315,7 +1294,7 @@ double setup_rates(ad9361_device_t* device, const double rate)
      * receivers have to be turned on for the calibration portion of
      * bring-up, and then they will be switched out to reflect the actual
      * user-requested antenna selections. */
-    divfactor = 0;
+    int divfactor = 0;
     device->tfir_factor = 0;
     if(rate < 0.33e6) {
         // RX1 + RX2 enabled, 3, 2, 2, 4
@@ -1388,8 +1367,8 @@ double setup_rates(ad9361_device_t* device, const double rate)
     msg("[setup_rates] divfactor=%d", divfactor);
 
     /* Tune the BBPLL to get the ADC and DAC clocks. */
-    adcclk = tune_bbvco(device, rate * divfactor);
-    dacclk = adcclk;
+    const double adcclk = tune_bbvco(device, rate * divfactor);
+    double dacclk = adcclk;
 
     /* The DAC clock must be <= 336e6, and is either the ADC clock or 1/2 the
      * ADC clock.*/
@@ -1409,15 +1388,21 @@ double setup_rates(ad9361_device_t* device, const double rate)
 
     msg("[setup_rates] adcclk=%f", adcclk);
     device->baseband_bw = (adcclk / divfactor);
+    
+     /*
+      The Tx & Rx FIR calculate 16 taps per clock cycle. This limits the number of available taps to the ratio of DAC_CLK/ADC_CLK 
+      to the input data rate multiplied by 16. For example, if the input data rate is 25 MHz and DAC_CLK is 100 MHz, 
+      then the ratio of DAC_CLK to the input data rate is 100/25 or 4. In this scenario, the total number of taps available is 64.
 
-    /* Setup the RX and TX FIR filters. Scale the number of taps based on
-     * the clock speed. */
-    max_tx_taps = 16 * AD9361_MIN((int)((dacclk / rate) + 0.5), \
-            AD9361_MIN(4 * (1 << device->tfir_factor), 8));
-    max_rx_taps = AD9361_MIN((16 * (int)(adcclk / rate)), 128);
+      Also, whilst the Rx FIR filter always has memory available for 128 taps, the Tx FIR Filter can only support a maximum length of 64 taps
+      in 1x interpolation mode, and 128 taps in 2x & 4x modes.
+    */
+    const int max_tx_taps = AD9361_MIN(AD9361_MIN((16 * (int)((dacclk / rate) + 0.5)), 128), 
+				       (device->tfir_factor==1) ? 64 : 128);
+    const int max_rx_taps = AD9361_MIN((16 * (int)((adcclk / rate) + 0.5)), 128);
 
-    num_tx_taps = get_num_taps(max_tx_taps);
-    num_rx_taps = get_num_taps(max_rx_taps);
+    const int num_tx_taps = get_num_taps(max_tx_taps);
+    const int num_rx_taps = get_num_taps(max_rx_taps);
 
     setup_tx_fir(device, num_tx_taps);
     setup_rx_fir(device, num_rx_taps);
@@ -1429,9 +1414,6 @@ double setup_rates(ad9361_device_t* device, const double rate)
  * Publicly exported functions to host calls
  **********************************************************************/
 void init_ad9361(uint64_t handle) {
-    digital_interface_delays_t timing;
-    uint8_t rx_delays, tx_delays;
-
     ad9361_device_t* device = get_ad9361_device(handle);
     /* Initialize shadow registers. */
     device->regs.vcodivs = 0x00;
@@ -1522,9 +1504,9 @@ void init_ad9361(uint64_t handle) {
     }
 
     /* Data delay for TX and RX data clocks */
-    timing = ad9361_client_get_digital_interface_timing(device->product);
-    rx_delays = ((timing.rx_clk_delay & 0xF) << 4) | (timing.rx_data_delay & 0xF);
-    tx_delays = ((timing.tx_clk_delay & 0xF) << 4) | (timing.tx_data_delay & 0xF);
+    digital_interface_delays_t timing = ad9361_client_get_digital_interface_timing(device->product);
+    uint8_t rx_delays = ((timing.rx_clk_delay & 0xF) << 4) | (timing.rx_data_delay & 0xF);
+    uint8_t tx_delays = ((timing.tx_clk_delay & 0xF) << 4) | (timing.tx_data_delay & 0xF);
     write_ad9361_reg(device, 0x006, rx_delays);
     write_ad9361_reg(device, 0x007, tx_delays);
 
@@ -1646,7 +1628,7 @@ void init_ad9361(uint64_t handle) {
     write_ad9361_reg(device, 0x15C, 0x67); // Power Measurement Duration
 
     /* Turn on the default RX & TX chains. */
-    set_active_chains(handle, 1, 0, 0, 0);
+    set_active_chains(handle, true, false, false, false);
 
     /* Set TXers & RXers on (only works in FDD mode) */
     write_ad9361_reg(device, 0x014, 0x21);
@@ -1659,8 +1641,6 @@ void init_ad9361(uint64_t handle) {
  *
  * This is the only clock setting function that is exposed to the outside. */
 double set_clock_rate(uint64_t handle, const double req_rate) {
-    uint8_t current_state, orig_tx_chains, orig_rx_chains;
-    double rate;
     ad9361_device_t* device = get_ad9361_device(handle);
 
     if(req_rate > 61.44e6) {
@@ -1678,7 +1658,7 @@ double set_clock_rate(uint64_t handle, const double req_rate) {
 
     /* We must be in the SLEEP / WAIT state to do this. If we aren't already
      * there, transition the ENSM to State 0. */
-    current_state = read_ad9361_reg(device, 0x017) & 0x0F;
+    uint8_t current_state = read_ad9361_reg(device, 0x017) & 0x0F;
     switch(current_state) {
         case 0x05:
             /* We are in the ALERT state. */
@@ -1700,13 +1680,13 @@ double set_clock_rate(uint64_t handle, const double req_rate) {
     /* Store the current chain / antenna selections so that we can restore
      * them at the end of this routine; all chains will be enabled from
      * within setup_rates for calibration purposes. */
-    orig_tx_chains = device->regs.txfilt & 0xC0;
-    orig_rx_chains = device->regs.rxfilt & 0xC0;
+    uint8_t orig_tx_chains = device->regs.txfilt & 0xC0;
+    uint8_t orig_rx_chains = device->regs.rxfilt & 0xC0;
 
     /* Call into the clock configuration / settings function. This is where
      * all the hard work gets done. */
-    rate = setup_rates(device, req_rate);
-
+    double rate = setup_rates(device, req_rate);
+    
     msg("[set_clock_rate] rate=%.10f", rate);
 
     /* Transition to the ALERT state and calibrate everything. */
@@ -1795,7 +1775,7 @@ double set_clock_rate(uint64_t handle, const double req_rate) {
  *  TX / RX2        Side B              RX2 (when switched to RX)
  *  RX2             Side B              RX2
  */
-void set_active_chains(uint64_t handle, int tx1, int tx2, int rx1, int rx2) {
+void set_active_chains(uint64_t handle, bool tx1, bool tx2, bool rx1, bool rx2) {
     ad9361_device_t* device = get_ad9361_device(handle);
 
     /* Clear out the current active chain settings. */
@@ -1839,9 +1819,6 @@ void set_active_chains(uint64_t handle, int tx1, int tx2, int rx1, int rx2) {
  *
  * After tuning, it runs any appropriate calibrations. */
 double tune(uint64_t handle, int which, const double value) {
-    int not_in_alert;
-    double tune_freq;
-
     ad9361_device_t* device = get_ad9361_device(handle);
 
     if(which == RX_TYPE) {
@@ -1860,7 +1837,7 @@ double tune(uint64_t handle, int which, const double value) {
 
     /* If we aren't already in the ALERT state, we will need to return to
      * the FDD state after tuning. */
-    not_in_alert = 0;
+    int not_in_alert = 0;
     if((read_ad9361_reg(device, 0x017) & 0x0F) != 5) {
         /* Force the device into the ALERT state. */
         not_in_alert = 1;
@@ -1868,7 +1845,7 @@ double tune(uint64_t handle, int which, const double value) {
     }
 
     /* Tune the RF VCO! */
-    tune_freq = tune_helper(device, which, value);
+    double tune_freq = tune_helper(device, which, value);
 
     /* Run any necessary calibrations / setups */
     if(which == RX_TYPE) {
@@ -1896,11 +1873,7 @@ double tune(uint64_t handle, int which, const double value) {
  * _not_ the gain index. This is the opposite of the eval software's GUI!
  * Also note that the RX chains are done in terms of gain, and the TX chains
  * are done in terms of attenuation. */
-double set_gain(uint64_t handle, int which, int n, const double value)
-{
-    int gain_offset, gain_index, attenreg;
-    double atten;
-
+double set_gain(uint64_t handle, int which, int n, const double value) {
     ad9361_device_t* device = get_ad9361_device(handle);
 
     if(which == RX_TYPE) {
@@ -1910,7 +1883,7 @@ double set_gain(uint64_t handle, int which, int n, const double value)
          *      >= 1300MHz and < 4000MHz: dB + 3
          *      >= 4000MHz and <= 6000MHz: dB + 14
          */
-        gain_offset = 0;
+        int gain_offset = 0;
         if(device->rx_freq < 1300e6) {
             gain_offset = 5;
         } else if(device->rx_freq < 4000e6) {
@@ -1919,7 +1892,7 @@ double set_gain(uint64_t handle, int which, int n, const double value)
             gain_offset = 14;
         }
 
-        gain_index = value + gain_offset;
+        int gain_index = value + gain_offset;
 
         /* Clip the gain values to the proper min/max gain values. */
         if(gain_index > 76) gain_index = 76;
@@ -1943,8 +1916,8 @@ double set_gain(uint64_t handle, int which, int n, const double value)
         /* Each gain step is -0.25dB. Calculate the attenuation necessary
          * for the requested gain, convert it into gain steps, then write
          * the attenuation word. Max gain (so zero attenuation) is 89.75. */
-        atten = AD9361_MAX_GAIN - value;
-        attenreg = atten * 4;
+        double atten = AD9361_MAX_GAIN - value;
+        int attenreg = atten * 4;
         if(n == 1) {
             device->tx1_gain = value;
             write_ad9361_reg(device, 0x073, attenreg & 0xFF);
@@ -1962,25 +1935,22 @@ double set_gain(uint64_t handle, int which, int n, const double value)
  * to the proper handler
  */
 
-//void dispatch_vrq(const char *vrb, char* vrb_out) {
 void ad9361_dispatch(const char* vrb, char* vrb_out)
 {
-    double ret_val;
-    int mask;
-    ad9361_transaction_t *request, *response;
-
-    memcpy(vrb_out, vrb, AD9361_DISPATCH_PACKET_SIZE);  // Copy request to response memory
-    tmp_req_buffer = vrb_out;                           // Set this to enable 'post_err_msg'
-
+    memcpy(vrb_out, vrb, AD9361_DISPATCH_PACKET_SIZE); //copy request to response memory
+    tmp_req_buffer = vrb_out;
+    
     //////////////////////////////////////////////
-
-    ret_val = 0.0;
-    mask = 0;
-
-    request = (ad9361_transaction_t *)vrb;
-    response = (ad9361_transaction_t *)vrb_out;
-    response->error_msg[0] = '\0';  // Ensure error is cleared
-
+    
+    double ret_val = 0.0;
+    int mask = 0;
+    
+    const ad9361_transaction_t *request = (const ad9361_transaction_t *)vrb;
+    ad9361_transaction_t *response = (ad9361_transaction_t *)vrb_out;
+    
+    //msg("[dispatch_vrq] action=%d", request->action);
+    //msg("[dispatch_vrq] action=%f", (double)request->action);
+    
     switch (request->action) {
         case AD9361_ACTION_ECHO:
             break; // nothing to do

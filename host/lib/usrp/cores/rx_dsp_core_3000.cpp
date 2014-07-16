@@ -134,8 +134,7 @@ public:
         }
 
         if (_is_b200) {
-            _iface->poke32(REG_DSP_RX_DECIM, (hb1 << 9) | (hb0 << 8) | (decim & 0xff));
-
+            _iface->poke32(REG_DSP_RX_DECIM, (hb0 << 9) /* samll HB */  | (hb1 << 8) /* large HB */ | (decim & 0xff));
             if (decim > 1 and hb0 == 0 and hb1 == 0) {
                 UHD_MSG(warning) << boost::format(
                     "The requested decimation is odd; the user should expect CIC rolloff.\n"
