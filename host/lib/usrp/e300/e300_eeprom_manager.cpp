@@ -66,11 +66,8 @@ const mboard_eeprom_t& e300_eeprom_manager::read_mb_eeprom(void)
 
     mb_eeprom_map_t &map = *map_ptr;
 
-    _mb_eeprom["product"] = str(
-        boost::format("E%s")
-        % (boost::lexical_cast<std::string>(
-            uhd::ntohx<boost::uint16_t>(map.hw_product))));
-
+    _mb_eeprom["product"] = boost::lexical_cast<std::string>(
+        uhd::ntohx<boost::uint16_t>(map.hw_product));
     _mb_eeprom["revision"] = boost::lexical_cast<std::string>(
         uhd::ntohx<boost::uint16_t>(map.hw_revision));
     _mb_eeprom["serial"] = _bytes_to_string(
@@ -103,11 +100,8 @@ void e300_eeprom_manager::write_mb_eeprom(const mboard_eeprom_t& eeprom)
     mb_eeprom_map_t &map = *map_ptr;
 
     if (_mb_eeprom.has_key("product")) {
-        // TODO: This is a hack, do this nice
-        if (_mb_eeprom["product"] == "E300")
-            map.hw_product = uhd::htonx<boost::uint16_t>(300);
-        else
-            map.hw_product = uhd::htonx<boost::uint16_t>(310);
+        map.hw_product = uhd::htonx<boost::uint16_t>(
+            boost::lexical_cast<boost::uint16_t>(_mb_eeprom["product"]));
     }
     if (_mb_eeprom.has_key("revision")) {
         map.hw_revision = uhd::htonx<boost::uint16_t>(
@@ -129,6 +123,47 @@ void e300_eeprom_manager::write_mb_eeprom(const mboard_eeprom_t& eeprom)
     for(size_t i = 0; i < sizeof(mb_eeprom_map_t); i++)
         _i2c->set_i2c_reg(MB_ADDR, i, bytes[i]);
 
+}
+
+e300_eeprom_manager::mboard_t e300_eeprom_manager::get_mb_type(void) const
+{
+    boost::mutex::scoped_lock(_mutex);
+    boost::uint16_t pid = boost::lexical_cast<boost::uint16_t>(
+        _mb_eeprom["product"]);
+    return get_mb_type(pid);
+}
+
+e300_eeprom_manager::mboard_t e300_eeprom_manager::get_mb_type(
+    boost::uint16_t pid)
+{
+    switch (pid) {
+    case E300_MB_PID:
+        return USRP_E300_MB;
+
+    case E310_MB_PID:
+        return USRP_E310_MB;
+
+    default:
+        return UNKNOWN;
+    };
+}
+
+
+std::string e300_eeprom_manager::get_mb_type_string(void) const
+{
+    boost::mutex::scoped_lock(_mutex);
+    boost::uint16_t product = boost::lexical_cast<boost::uint16_t>(
+        _mb_eeprom["product"]);
+    switch (product) {
+    case E300_MB_PID:
+        return "E300";
+
+    case E310_MB_PID:
+        return "E310";
+
+    default:
+        return "UNKNOWN";
+    };
 }
 
 i2c::sptr e300_eeprom_manager::get_i2c_sptr(void)

@@ -249,14 +249,25 @@ e300_impl::e300_impl(const uhd::device_addr_t &device_addr) : _sid_framer(0)
     if (not device_addr.has_key("addr"))
     {
         //extract the FPGA path for the e300
-        const std::string e300_fpga_image = find_image_path(
-            device_addr.get(
-                "fpga",
-                device_addr["product"] == "E300" ?
-                E300_FPGA_FILE_NAME : E310_FPGA_FILE_NAME));
-
+        const boost::uint16_t pid = boost::lexical_cast<boost::uint16_t>(
+            device_addr["product"]);
+        std::string fpga_image;
+        switch(e300_eeprom_manager::get_mb_type(pid)) {
+        case e300_eeprom_manager::USRP_E310_MB:
+            fpga_image = find_image_path(E310_FPGA_FILE_NAME);
+            break;
+        case e300_eeprom_manager::USRP_E300_MB:
+            fpga_image = find_image_path(E300_FPGA_FILE_NAME);
+            break;
+        case e300_eeprom_manager::UNKNOWN:
+        default:
+            UHD_MSG(warning) << "Unknown motherboard type, loading e300 image."
+                             << std::endl;
+            fpga_image = find_image_path(E300_FPGA_FILE_NAME);
+            break;
+        }
         if (not device_addr.has_key("no_reload_fpga"))
-            this->_load_fpga_image(e300_fpga_image);
+            this->_load_fpga_image(fpga_image);
     }
 
     ////////////////////////////////////////////////////////////////////
@@ -400,7 +411,9 @@ e300_impl::e300_impl(const uhd::device_addr_t &device_addr) : _sid_framer(0)
     _tree = property_tree::make();
     _tree->create<std::string>("/name").set("E-Series Device");
     const fs_path mb_path = "/mboards/0";
-    _tree->create<std::string>(mb_path / "name").set("E3x0");
+    _tree->create<std::string>(mb_path / "name")
+        .set(_eeprom_manager->get_mb_type_string());
+
     _tree->create<std::string>(mb_path / "codename").set("Troll");
 
     _tree->create<std::string>(mb_path / "fpga_version").set(

@@ -28,6 +28,9 @@
 
 namespace uhd { namespace usrp { namespace e300 {
 
+static const boost::uint16_t E300_MB_PID = 0x77d1;
+static const boost::uint16_t E310_MB_PID = 0x77d2;
+
 class e300_eeprom_manager : boost::noncopyable
 {
 public:
@@ -45,6 +48,12 @@ public:
     }
 
     i2c::sptr get_i2c_sptr(void);
+
+    enum mboard_t {USRP_E300_MB, USRP_E310_MB, UNKNOWN};
+
+    mboard_t get_mb_type(void) const;
+    static mboard_t get_mb_type(boost::uint16_t pid);
+    std::string get_mb_type_string(void) const;
 
 private: // types
     const static size_t MB_SERIAL_LEN = 6;
@@ -78,7 +87,6 @@ private: // members
     mboard_eeprom_t                         _mb_eeprom;
     dboard_eeprom_t                         _db_eeprom;
     i2c::sptr                               _i2c;
-    uhd::dict<boost::uint16_t, std::string> _products;
 
     boost::mutex    _mutex;
 };
