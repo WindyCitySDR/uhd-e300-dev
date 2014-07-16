@@ -266,8 +266,12 @@ e300_impl::e300_impl(const uhd::device_addr_t &device_addr) : _sid_framer(0)
             fpga_image = find_image_path(E300_FPGA_FILE_NAME);
             break;
         }
-        if (not device_addr.has_key("no_reload_fpga"))
-            this->_load_fpga_image(fpga_image);
+        if (not device_addr.has_key("no_reload_fpga")) {
+            if (device_addr.has_key("fpga"))
+                this->_load_fpga_image(device_addr["fpga"]);
+            else
+                this->_load_fpga_image(fpga_image);
+        }
     }
 
     ////////////////////////////////////////////////////////////////////
