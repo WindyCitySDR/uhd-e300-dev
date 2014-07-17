@@ -2,6 +2,7 @@
 #include <boost/foreach.hpp>
 #include <boost/bind.hpp>
 #include <boost/make_shared.hpp>
+#include <boost/lexical_cast.hpp>
 #include <iostream>
 
 #include "e300_ublox_control.hpp"
@@ -20,37 +21,36 @@ control::control(const std::string &node, const size_t baud_rate)
     _serial = boost::make_shared<async_serial>(node, baud_rate);
     _serial->set_read_callback(boost::bind(&control::_rx_callback, this, _1, _2));
 
-
-
     //_send_message(MSG_MON_HW, NULL, 0);
-    //_send_message(MSG_MON_VER, NULL, 0);
+    _send_message(MSG_MON_VER, NULL, 0);
+    //
+    //_send_message(MSG_CFG_PRT, NULL, 0);
+    //_send_message(MSG_CFG_RATE, NULL, 0);
+    //configure_rates(1000,1,0);
+    //_send_message(MSG_CFG_RATE, NULL, 0);
 
-    //_send_message(MSG_CFG_ANT, NULL, 0);
-    //_wait_for_ack(MSG_CFG_ANT, 1.0);
-
+    UHD_MSG(status) << "Turning off NMEA ... " << std::endl;
     configure_message_rate(MSG_GLL, 0);
     configure_message_rate(MSG_GSV, 0);
     configure_message_rate(MSG_GGA, 0);
     configure_message_rate(MSG_GSA, 0);
     configure_message_rate(MSG_RMC, 0);
     configure_message_rate(MSG_VTG, 0);
-    configure_message_rate(MSG_NAV_TIMEUTC, 2);
-    configure_message_rate(MSG_NAV_SOL, 2);
+    configure_message_rate(MSG_NAV_TIMEUTC, 1);
+    configure_message_rate(MSG_NAV_SOL, 1);
 
-    //configure_antenna(0x001b, 0x8251);
+    configure_antenna(0x001b, 0x8251);
 
-    //boost::this_thread::sleep(boost::posix_time::seconds(1));
 
-//    configure_antenna(0x001a, 0x8251);
-
-    UHD_MSG(status) << "Turning on PPS ... " << std::endl;
+    UHD_MSG(status) << "Turning on PPS output ... " << std::endl;
     configure_pps(0xf4240, 0x3d090, 1, 1, 1, 0, 0, 0);
+}
 
-    //boost::this_thread::sleep(boost::posix_time::seconds(5));
-
-    //configure_pps(0xf4240, 0x3d090, 1, 1, 0, 0, 0, 0);
-
-//    configure_message_rate(MSG_NAV_TIMEUTC, 0);
+control::~control(void)
+{
+    // turn it all off again
+    configure_antenna(0x001a, 0x8251);
+    configure_pps(0xf4240, 0x3d090, 1, 1, 0, 0, 0, 0);
 }
 
 void control::_decode_init(void)
@@ -80,13 +80,36 @@ void control::_calc_checksum(
     }
 }
 
+void control::configure_rates(
+    boost::uint16_t meas_rate,
+    boost::uint16_t nav_rate,
+    boost::uint16_t time_ref)
+{
+    payload_tx_cfg_rate_t cfg_rate;
+    cfg_rate.meas_rate = uhd::htowx<boost::uint16_t>(meas_rate);
+    cfg_rate.nav_rate = uhd::htowx<boost::uint16_t>(nav_rate);
+    cfg_rate.time_ref = uhd::htowx<boost::uint16_t>(time_ref);
+
+    _send_message(
+        MSG_CFG_RATE,
+        reinterpret_cast<const uint8_t*>(&cfg_rate),
+        sizeof(cfg_rate));
+
+    _wait_for_ack(MSG_CFG_RATE, 1.0);
+}
+
 void control::configure_message_rate(
     const boost::uint16_t msg,
     const uint8_t rate)
 {
     payload_tx_cfg_msg_t cfg_msg;
     cfg_msg.msg  = uhd::htowx<boost::uint16_t>(msg);
-    cfg_msg.rate = rate;
+    cfg_msg.rate[0] = 0;//rate;
+    cfg_msg.rate[1] = rate;
+    cfg_msg.rate[2] = 0;//rate;
+    cfg_msg.rate[3] = 0;//rate;
+    cfg_msg.rate[4] = 0;//rate;
+    cfg_msg.rate[5] = 0;//rate;
     _send_message(
         MSG_CFG_MSG,
         reinterpret_cast<const uint8_t*>(&cfg_msg),
@@ -142,6 +165,11 @@ void control::_rx_callback(const char *data, unsigned int len)
     std::vector<char> v(data, data+len);
     BOOST_FOREACH(const char &c, v)
     {
+        //if (std::isprint(c)) {
+            //std::cout << c;
+        //}
+        //if (c == '\n')
+            //std::cout << std::endl;
         _parse_char(c);
     }
 }
@@ -275,12 +303,12 @@ int control::_payload_rx_init(void)
     switch(_rx_msg) {
 
     case MSG_NAV_SOL:
-        if (not _rx_payload_length == sizeof(payload_rx_nav_sol_t))
+        if (not (_rx_payload_length == sizeof(payload_rx_nav_sol_t)))
             _rx_state = RXMSG_ERROR_LENGTH;
         break;
 
     case MSG_NAV_TIMEUTC:
-        if (not _rx_payload_length == sizeof(payload_rx_nav_timeutc_t))
+        if (not (_rx_payload_length == sizeof(payload_rx_nav_timeutc_t)))
             _rx_state = RXMSG_ERROR_LENGTH;
         break;
 
@@ -288,12 +316,12 @@ int control::_payload_rx_init(void)
         break; // always take this one
 
     case MSG_ACK_ACK:
-        if (not _rx_payload_length == sizeof(payload_rx_ack_ack_t))
+        if (not (_rx_payload_length == sizeof(payload_rx_ack_ack_t)))
             _rx_state = RXMSG_ERROR_LENGTH;
         break;
 
     case MSG_ACK_NAK:
-        if (not _rx_payload_length == sizeof(payload_rx_ack_nak_t))
+        if (not (_rx_payload_length == sizeof(payload_rx_ack_nak_t)))
             _rx_state = RXMSG_ERROR_LENGTH;
         break;
 
@@ -306,6 +334,13 @@ int control::_payload_rx_init(void)
     case RXMSG_HANDLE: // handle message
     case RXMSG_IGNORE: // ignore message but don't report error
         ret = 0;
+        break;
+    case RXMSG_DISABLE: // ignore message but don't report error
+    case RXMSG_ERROR_LENGTH: // the length doesn't match
+        ret = -1;
+        break;
+    default: // invalid, error
+        ret = -1;
         break;
     };
 
@@ -340,7 +375,7 @@ int control::_payload_rx_done(void)
 
     switch (_rx_msg) {
     case MSG_MON_VER:
-        std::cout << "MON-VER" << std::endl;
+        std::cout << boost::format("MON-VER: FW-Version %s") % (_buf.payload_rx_mon_ver_part1.sw_version) << std::endl;
         break;
 
     case MSG_MON_HW:
@@ -387,7 +422,7 @@ int control::_payload_rx_done(void)
         break;
 
     default:
-        std::cout << "Got unknown message, with good checksum [";
+        std::cout << boost::format("Got unknown message %lx , with good checksum [") % int(_rx_msg);
         for(size_t i = 0; i < _rx_payload_length; i++)
             std::cout << boost::format("%lx, ") % int(_buf.raw[i]);
         std::cout << "]"<< std::endl;

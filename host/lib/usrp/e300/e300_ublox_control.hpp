@@ -4,6 +4,7 @@
 #include <boost/cstdint.hpp>
 #include <boost/noncopyable.hpp>
 #include <boost/asio.hpp>
+#include <uhd/config.hpp>
 
 #include "e300_async_serial.hpp"
 
@@ -135,8 +136,8 @@ struct payload_rx_mon_hw_t
 // rx mon-ver
 struct payload_rx_mon_ver_part1_t
 {
-    boost::uint8_t sw_version[30];
-    boost::uint8_t hw_version[10];
+    char sw_version[30];
+    char hw_version[10];
 };
 
 struct payload_rx_mon_ver_part2_t
@@ -185,17 +186,25 @@ struct payload_tx_cfg_rate_t
 };
 
 // tx cfg-msg
+//struct payload_tx_cfg_msg_t
+//{
+    //union {
+        //boost::uint16_t msg;
+        //struct {
+            //boost::uint8_t msg_cls;
+            //boost::uint8_t msg_id;
+        //};
+    //};
+    //boost::uint8_t rate;
+//};
+
+// tx cfg-msg
 struct payload_tx_cfg_msg_t
 {
-    union {
-        boost::uint16_t msg;
-        struct {
-            boost::uint8_t msg_cls;
-            boost::uint8_t msg_id;
-        };
-    };
-    boost::uint8_t rate;
+    boost::uint16_t msg;
+    boost::uint8_t rate[6];
 };
+
 
 // tx cfg-ant
 struct payload_tx_cfg_ant_t
@@ -274,10 +283,12 @@ typedef union {
 } buf_t;
 
 
-class control : boost::noncopyable
+class UHD_API control : boost::noncopyable
 {
 public:
     control(const std::string &node, const size_t baud_rate);
+
+    ~control(void);
 
     void configure_message_rate(
         const boost::uint16_t msg,
@@ -297,6 +308,10 @@ public:
         const boost::int16_t rf_group_delay,
         const boost::int32_t user_delay);
 
+    void configure_rates(
+        boost::uint16_t meas_rate,
+        boost::uint16_t nav_rate,
+        boost::uint16_t time_ref);
 
 private: // types
     enum decoder_state_t {

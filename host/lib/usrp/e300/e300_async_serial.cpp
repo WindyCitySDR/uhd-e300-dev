@@ -172,8 +172,7 @@ void async_serial::_read_end(
 void async_serial::_do_write()
 {
     // if a write operation is already in progress, do nothing
-    if(_write_buffer == 0)
-    {
+    if(_write_buffer == 0) {
         boost::lock_guard<boost::mutex> l(_write_queue_mutex);
         _write_buffer_size=_write_queue.size();
         _write_buffer.reset(new char[_write_queue.size()]);
