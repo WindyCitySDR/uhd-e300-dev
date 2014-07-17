@@ -97,16 +97,16 @@ private: // types
     struct db_eeprom_map_t
     {
         // Data format version
-        uint16_t data_version_major;
-        uint16_t data_version_minor;
+        boost::uint16_t data_version_major;
+        boost::uint16_t data_version_minor;
 
         // HW identification info
-        uint16_t hw_product;
-        uint16_t hw_revision;
+        boost::uint16_t hw_product;
+        boost::uint16_t hw_revision;
 
         // serial
-        uint8_t serial[MB_SERIAL_LEN];
-        uint8_t pad[20 - MB_SERIAL_LEN];
+        boost::uint8_t serial[MB_SERIAL_LEN];
+        boost::uint8_t pad[20 - MB_SERIAL_LEN];
     };
 
 private: // members
