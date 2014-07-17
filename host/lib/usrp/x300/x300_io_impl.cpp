@@ -672,9 +672,10 @@ rx_streamer::sptr x300_impl::get_rx_stream_ce(const uhd::stream_args_t &args_, b
     );
     //Give the streamer a functor issue stream cmd
     //bind requires a rx_vita_core_3000::sptr to add a streamer->framer lifetime dependency
-    my_streamer->set_issue_stream_cmd(
-        0, boost::bind(&x300_impl::dummy_issue_stream_command, this, _1)
-    );
+    // TODO connect stream command
+    //my_streamer->set_issue_stream_cmd(
+        //0, boost::bind(&x300_impl::dummy_issue_stream_command, this, _1)
+    //);
     my_streamer->set_xport_chan_sid(stream_i, true, data_sid);
 
     //Store a weak pointer to prevent a streamer->x300_impl->streamer circular dependency
@@ -688,30 +689,6 @@ rx_streamer::sptr x300_impl::get_rx_stream_ce(const uhd::stream_args_t &args_, b
     return my_streamer;
 }
 
-
-//////////////// RFNOC ////////////////////////////////
-void x300_impl::dummy_issue_stream_command(const uhd::stream_cmd_t &stream_cmd)
-{
-    UHD_MSG(status) << "entering dummy_issue_stream_command " << std::endl;
-    if (_ce_index != 1 and _ce_index != 0) {
-        return;
-    }
-    if (stream_cmd.stream_mode == stream_cmd_t::STREAM_MODE_START_CONTINUOUS) {
-        UHD_MSG(status) << "sending start command on CE " << 1 << std::endl;
-        // This will start stream ZOMFG
-        _mb[0].nocshell_ctrls[1]->poke32(
-            SR_ADDR(0x0000, 9),
-            50
-        );
-    }
-    else if (stream_cmd.stream_mode == stream_cmd_t::STREAM_MODE_STOP_CONTINUOUS) {
-        UHD_MSG(status) << "sending stop command on CE " << 1 << std::endl;
-        _mb[0].nocshell_ctrls[1]->poke32(
-            SR_ADDR(0x0000, 9),
-            0
-        );
-    }
-}
 
 //  This probably wants a ref to the nocshell controller at some point
 void x300_impl::handle_overflow_ce(boost::weak_ptr<uhd::rx_streamer> streamer)
@@ -729,7 +706,7 @@ boost::uint32_t x300_impl::rfnoc_cmd(
         size_t ce_index = boost::lexical_cast<size_t>(dst[2]);
         if (type == "poke") {
             UHD_MSG(status) << "Setting register " << std::dec << arg1 << " on CE " << ce_index << " to " << str(boost::format("0x%08x") % arg2) << std::endl;
-            mb.nocshell_ctrls[ce_index]->poke32(SR_ADDR(0x0000, arg1), arg2);
+            mb.nocshell_ctrls[ce_index]->sr_write(arg1, arg2);
             return 0;
         }
         else if (type == "set_fc") {
@@ -737,24 +714,20 @@ boost::uint32_t x300_impl::rfnoc_cmd(
                 UHD_MSG(status) << "Activating downstream flow control for CE " << ce_index << ". Downstream block buffer size: " << arg1 << " packets." << std::endl;
                 //mb.nocshell_ctrls[ce_index]->poke32(SR_ADDR(0x0000, 1), 0);
                 //boost::this_thread::sleep(boost::posix_time::milliseconds(1000));
-                mb.nocshell_ctrls[ce_index]->poke32(SR_ADDR(0x0000, 0), arg1);
-                mb.nocshell_ctrls[ce_index]->poke32(SR_ADDR(0x0000, 1), 1);
+                mb.nocshell_ctrls[ce_index]->configure_flow_control_out(arg1);
             } else {
                 UHD_MSG(status) << "Disabling downstream flow control for CE " << ce_index << "." << std::endl;
-                mb.nocshell_ctrls[ce_index]->poke32(SR_ADDR(0x0000, 0), 0);
-                mb.nocshell_ctrls[ce_index]->poke32(SR_ADDR(0x0000, 1), 0);
+                mb.nocshell_ctrls[ce_index]->configure_flow_control_out(0, false);
             }
             if (arg2) {
                 UHD_MSG(status) << "Activating upstream flow control for CE " << ce_index << ". Send ACKs every " << arg2 << " packets." << std::endl;
-                mb.nocshell_ctrls[ce_index]->poke32(SR_ADDR(0x0000, 2), 0); // cycs off
-                mb.nocshell_ctrls[ce_index]->poke32(SR_ADDR(0x0000, 3), (1 << 31) | ((arg2) & 0xffff));
+                mb.nocshell_ctrls[ce_index]->configure_flow_control_in(0 /* cycs off */, arg2);
             } else {
                 UHD_MSG(status) << "Disabling upstream flow control for CE " << ce_index << "." << std::endl;
-                mb.nocshell_ctrls[ce_index]->poke32(SR_ADDR(0x0000, 2), 0);
-                mb.nocshell_ctrls[ce_index]->poke32(SR_ADDR(0x0000, 3), 0);
+                mb.nocshell_ctrls[ce_index]->configure_flow_control_in(0 , 0);
             }
             UHD_MSG(status) << "Resetting fc counters." << std::endl;
-            mb.nocshell_ctrls[ce_index]->poke32(SR_ADDR(0x0000, 4), 0);
+            mb.nocshell_ctrls[ce_index]->reset_flow_control();
             return 0;
         }
         throw uhd::value_error("x300_impl::rfnoc_cmd only supports poke and setup_fc on CEs");

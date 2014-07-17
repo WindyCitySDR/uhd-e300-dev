@@ -15,35 +15,32 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 //
 
-#ifndef INCLUDED_LIBUHD_BLOCK_CTRL_HPP
-#define INCLUDED_LIBUHD_BLOCK_CTRL_HPP
+#ifndef INCLUDED_LIBUHD_RFNOC_BLOCK_CTRL_HPP
+#define INCLUDED_LIBUHD_RFNOC_BLOCK_CTRL_HPP
 
-#include <string>
-#include <boost/shared_ptr.hpp>
-#include <boost/utility.hpp>
-#include <uhd/transport/zero_copy.hpp>
-#include <uhd/types/wb_iface.hpp>
+#include <uhd/usrp/rfnoc/block_ctrl_base.hpp>
 
-/*!
- * Provide access to peek, poke for noc shell ctrl modules
+namespace uhd {
+    namespace rfnoc {
+
+/*! \brief Provide access basic to functionality of an RFNoC block.
  */
-class block_ctrl
+class UHD_API block_ctrl : virtual public block_ctrl_base
 {
 public:
     typedef boost::shared_ptr<block_ctrl> sptr;
 
-    //! Make a new control object
     static sptr make(
-        const bool big_endian,
-        uhd::transport::zero_copy_if::sptr ctrl_xport,
-        uhd::transport::zero_copy_if::sptr resp_xport,
-        const boost::uint32_t sid,
-        const std::string &name = "block"
+            uhd::wb_iface::sptr ctrl_iface,
+            uhd::sid_t ctrl_sid,
+            uhd::property_tree::sptr tree
     );
 
-    virtual void poke32(const uhd::wb_iface::wb_addr_type addr, const boost::uint32_t data) = 0;
-    virtual boost::uint32_t peek32(const uhd::wb_iface::wb_addr_type addr) = 0;
+    // Nothing else here -- all function definitions are in block_ctrl_base
 
-};
+}; /* class block_ctrl*/
 
-#endif /* INCLUDED_LIBUHD_BLOCK_CTRL_HPP */
+}} /* namespace uhd::rfnoc */
+
+#endif /* INCLUDED_LIBUHD_RFNOC_BLOCK_CTRL_HPP */
+// vim: sw=4 et:

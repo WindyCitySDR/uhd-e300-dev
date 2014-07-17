@@ -15,8 +15,8 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 //
 
-#ifndef INCLUDED_UHD_TYPES_SERIAL_HPP
-#define INCLUDED_UHD_TYPES_SERIAL_HPP
+#ifndef INCLUDED_UHD_TYPES_SID_HPP
+#define INCLUDED_UHD_TYPES_SID_HPP
 
 #include <uhd/config.hpp>
 #include <boost/cstdint.hpp>
@@ -151,5 +151,5 @@ namespace uhd{
 
 } //namespace uhd
 
-#endif /* INCLUDED_UHD_TYPES_SERIAL_HPP */
+#endif /* INCLUDED_UHD_TYPES_SID_HPP */
 // vim: sw=4 et:

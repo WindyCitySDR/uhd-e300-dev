@@ -17,7 +17,6 @@
 
 #include "loopback_test.hpp"
 #include <iostream>
-#include "block_ctrl.hpp"
 
 namespace uhd { namespace transport {
 

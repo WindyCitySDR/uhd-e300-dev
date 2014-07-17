@@ -45,6 +45,7 @@
 
 using namespace uhd;
 using namespace uhd::usrp;
+using namespace uhd::rfnoc;
 using namespace uhd::transport;
 using namespace uhd::niusrprio;
 namespace asio = boost::asio;
@@ -854,23 +855,47 @@ void x300_impl::setup_mb(const size_t mb_i, const uhd::device_addr_t &dev_addr)
     }
 
     //////////////// RFNOC /////////////////
+    // Here's the plan:
+    // - We cycle through all ports on this mb's xbar
+    //     - For now: Just check ports 5, 6, 7 and add radios manually
+    // - Calculate destination address and create a transport
+    // - Create a block_ctrl and connect it
+    // - Poll readback register 1
+    // - Figure out if there's a better derivative of block_ctrl_base than the standard
+    // - If yes, add that sptr to the list of block controls
+    // - Else, just add the original block_ctrl sptr
+    //
     const boost::uint8_t ce_map[] = {X300_XB_DST_CE0, X300_XB_DST_CE1, X300_XB_DST_CE2};
     for (size_t i = 0; i < 3; i++) {
-        boost::uint32_t ctrl_sid;
-        UHD_MSG(status) << str(boost::format("Setting up NoC-Shell Control #%d (SID: 0x%08x)") % i % ctrl_sid) << std::endl;
+        boost::uint32_t ctrl_sid_;
         both_xports_t xport = this->make_transport(
             mb_i, // mb index
             ce_map[i], // destination (top 6 bits of local part of sid)
             0x00, // "prefix" (lower 2 bits of sid, not relevant unless radio)
             dev_addr,
-            ctrl_sid // sid (output)
+            ctrl_sid_ // sid (output)
         );
-        UHD_LOG << "NoC-Shell " << i << boost::format("ctrl_sid = 0x%08x\n") % ctrl_sid << std::endl;
-        mb.nocshell_ctrls[i] = block_ctrl::make(
-            mb.if_pkt_is_big_endian,
-            xport.send, xport.recv,
-            ctrl_sid,
-            str(boost::format("nocshell_ctrl_%d") % i)
+        uhd::sid_t ctrl_sid(ctrl_sid_);
+        UHD_MSG(status) << str(boost::format("Setting up NoC-Shell Control #%d (SID: %s)") % i % ctrl_sid.to_pp_string()) << std::endl;
+        radio_ctrl_core_3000::sptr ctrl = radio_ctrl_core_3000::make(
+                mb.if_pkt_is_big_endian,
+                xport.recv,
+                xport.send,
+                ctrl_sid,
+                str(boost::format("CE_%02d_Port_%02d") % i % ce_map[i])
+        );
+        boost::uint64_t noc_id = ctrl->peek64(0);
+        // TODO: Implement a clever check to see if this port is connected.
+        //  Could just be as simple as waiting for a timeout in the previous peek.
+        UHD_MSG(status) << str(boost::format("Port %d: Found NoC-Block with ID %016x.") % ce_map[i] % noc_id) << std::endl;
+        // TODO: Implement cunning method to figure out the right block_ctrl_base
+        // derivative using the noc-id
+
+        // For now, it's just block_ctrl
+        mb.nocshell_ctrls[i] = uhd::rfnoc::block_ctrl::make(
+                ctrl,
+                ctrl_sid,
+                _tree->subtree(mb_path)
         );
     }
     //////////////// RFNOC /////////////////
@@ -1764,10 +1789,7 @@ void x300_impl::test_rfnoc_loopback(size_t mb_index, int ce_index=0)
 
     if (ce_index == 0) {
         boost::uint32_t data = ((data_sid >> 16) & 0xFFFF) | (1 << 16);
-        _mb[mb_index].nocshell_ctrls[ce_index]->poke32(
-            SR_ADDR(0x0000, 8),
-            data
-        );
+        _mb[mb_index].nocshell_ctrls[ce_index]->sr_write(SR_NEXT_DST, data);
     }
 
     loopback_test tester;

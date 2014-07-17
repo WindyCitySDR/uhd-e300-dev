@@ -20,6 +20,9 @@
 
 #include <uhd/property_tree.hpp>
 #include <uhd/device3.hpp>
+///////////// RFNOC /////////////////////
+#include <uhd/usrp/rfnoc/block_ctrl.hpp>
+///////////// RFNOC /////////////////////
 #include <uhd/usrp/mboard_eeprom.hpp>
 #include <uhd/usrp/dboard_manager.hpp>
 #include <uhd/usrp/dboard_eeprom.hpp>
@@ -50,9 +53,6 @@
 #include <uhd/transport/vrt_if_packet.hpp>
 #include "recv_packet_demuxer_3000.hpp"
 
-///////////// RFNOC /////////////////////
-#include "block_ctrl.hpp"
-///////////// RFNOC /////////////////////
 
 static const std::string X300_FW_FILE_NAME  = "usrp_x300_fw.bin";
 
@@ -156,7 +156,6 @@ public:
     uhd::rx_streamer::sptr get_rx_stream(const uhd::stream_args_t &);
     uhd::tx_streamer::sptr get_tx_stream(const uhd::stream_args_t &);
     ///////////// RFNOC ////////////////////////
-    void dummy_issue_stream_command(const uhd::stream_cmd_t &stream_cmd);
     void handle_overflow_ce(boost::weak_ptr<uhd::rx_streamer> streamer);
     int _ce_index;
     boost::uint32_t rfnoc_cmd(
@@ -244,7 +243,7 @@ private:
         gpio_core_200::sptr fp_gpio;
 
 	///////////// RFNOC /////////////////////
-	block_ctrl::sptr nocshell_ctrls[3];
+        uhd::rfnoc::block_ctrl_base::sptr nocshell_ctrls[3];
 	///////////// RFNOC /////////////////////
 
         //clock control register bits

@@ -15,13 +15,11 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
 
-########################################################################
-# This file included, use CMake directory variables
-########################################################################
-
-INCLUDE_DIRECTORIES(${CMAKE_CURRENT_SOURCE_DIR})
-
-LIBUHD_APPEND_SOURCES(
-    ${CMAKE_CURRENT_SOURCE_DIR}/block_ctrl_base.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/block_ctrl_impl.cpp
+UHD_INSTALL(FILES
+    block_ctrl_base.hpp
+    block_ctrl.hpp
+    constants.hpp
+    null_block_ctrl.hpp
+    DESTINATION ${INCLUDE_DIR}/uhd/usrp/rfnoc
+    COMPONENT headers
 )
