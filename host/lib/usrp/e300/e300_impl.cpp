@@ -370,6 +370,8 @@ e300_impl::e300_impl(const uhd::device_addr_t &device_addr)
         _sensor_manager = e300_sensor_manager::make_local();
     }
 
+    _ubx_control = boost::make_shared<uhd::usrp::gps::ublox::ubx::control>("/dev/ttyPS1", 9600);
+
     // Verify we can talk to the e300 core control registers ...
     UHD_MSG(status) << "Initializing core control..." << std::endl;
     this->_register_loopback_self_test(_global_regs);
