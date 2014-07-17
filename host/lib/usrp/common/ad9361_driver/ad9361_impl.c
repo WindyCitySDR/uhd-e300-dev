@@ -159,12 +159,12 @@ void program_fir_filter(ad9361_device_t* device, int which, int num_taps, uint16
 
   /* Encode number of filter taps for programming register */
   uint8_t reg_numtaps = (((num_taps / 16) - 1) & 0x07) << 5;
-  
+
   /* Turn on the filter clock. */
   write_ad9361_reg(device, base+5, reg_numtaps | 0x1a);
   ad9361_msleep(1);
-  
-  /* Zero the unused taps just in case they have stale data */  
+
+  /* Zero the unused taps just in case they have stale data */
   int addr;
   for(addr=num_taps; addr < 128; addr++) {
     write_ad9361_reg(device, base+0, addr);
@@ -187,13 +187,13 @@ void program_fir_filter(ad9361_device_t* device, int which, int num_taps, uint16
 
     /* UG-671 states (page 25) (paraphrased and clarified):
        " After the table has been programmed, write to register BASE+5 with the write bit D2 cleared and D1 high.
-       Then, write to register BASE+5 again with D1 clear, thus ensuring that the write bit resets internally 
+       Then, write to register BASE+5 again with D1 clear, thus ensuring that the write bit resets internally
        before the clock stops. Wait 4 sample clock periods after setting D2 high while that data writes into the table"
     */
 
     write_ad9361_reg(device, base+5, reg_numtaps | 0x1A);
     if(which == RX_TYPE) {
-      write_ad9361_reg(device, base+5, reg_numtaps | 0x18); 
+      write_ad9361_reg(device, base+5, reg_numtaps | 0x18);
       write_ad9361_reg(device, base+6, 0x02); /* Also turn on -6dB Rx gain here, to stop filter overfow.*/
   } else {
       write_ad9361_reg(device, base+5, reg_numtaps | 0x19); /* Also turn on -6dB Tx gain here, to stop filter overfow.*/
@@ -1083,7 +1083,7 @@ void setup_synth(ad9361_device_t* device, int which, double vcorate) {
  * fed to the public set_clock_rate function. */
 double tune_bbvco(ad9361_device_t* device, const double rate) {
     msg("[tune_bbvco] rate=%.10f", rate);
-    
+
     /* Let's not re-tune to the same frequency over and over... */
     if(freq_is_nearly_equal(rate, device->req_coreclk)) {
         return device->adcclock_freq;
@@ -1097,20 +1097,20 @@ double tune_bbvco(ad9361_device_t* device, const double rate) {
     const double vcomin = 672e6;
     double vcorate;
     int vcodiv;
-    
+
     /* Iterate over VCO dividers until appropriate divider is found. */
     int i = 1;
     for(; i <= 6; i++) {
         vcodiv = 1 << i;
         vcorate = rate * vcodiv;
-        
+
         if(vcorate >= vcomin && vcorate <= vcomax) break;
     }
-    if(i == 7) 
+    if(i == 7)
         post_err_msg("tune_bbvco: wrong vcorate");
-    
+
     msg("[tune_bbvco] vcodiv=%d vcorate=%.10f", vcodiv, vcorate);
-    
+
     /* Fo = Fref * (Nint + Nfrac / mod) */
     int nint = vcorate / fref;
     msg("[tune_bbvco] (nint)=%.10f", (vcorate / fref));
@@ -1118,7 +1118,7 @@ double tune_bbvco(ad9361_device_t* device, const double rate) {
     msg("[tune_bbvco] (nfrac)=%.10f", (((vcorate / fref) - (double)nint) * (double)modulus));
     msg("[tune_bbvco] nint=%d nfrac=%d", nint, nfrac);
     double actual_vcorate = fref * ((double)nint + ((double)nfrac / (double)modulus));
-    
+
     /* Scale CP current according to VCO rate */
     const double icp_baseline = 150e-6;
     const double freq_baseline = 1280e6;
@@ -1183,7 +1183,7 @@ double tune_helper(ad9361_device_t* device, int which, const double value) {
         vcorate = value * vcodiv;
         if(vcorate >= vcomin && vcorate <= vcomax) break;
     }
-    if(i == 7) 
+    if(i == 7)
         post_err_msg("RFVCO can't find valid VCO rate!");
 
     int nint = vcorate / fref;
@@ -1388,16 +1388,16 @@ double setup_rates(ad9361_device_t* device, const double rate) {
 
     msg("[setup_rates] adcclk=%f", adcclk);
     device->baseband_bw = (adcclk / divfactor);
-    
+
      /*
-      The Tx & Rx FIR calculate 16 taps per clock cycle. This limits the number of available taps to the ratio of DAC_CLK/ADC_CLK 
-      to the input data rate multiplied by 16. For example, if the input data rate is 25 MHz and DAC_CLK is 100 MHz, 
+      The Tx & Rx FIR calculate 16 taps per clock cycle. This limits the number of available taps to the ratio of DAC_CLK/ADC_CLK
+      to the input data rate multiplied by 16. For example, if the input data rate is 25 MHz and DAC_CLK is 100 MHz,
       then the ratio of DAC_CLK to the input data rate is 100/25 or 4. In this scenario, the total number of taps available is 64.
 
       Also, whilst the Rx FIR filter always has memory available for 128 taps, the Tx FIR Filter can only support a maximum length of 64 taps
       in 1x interpolation mode, and 128 taps in 2x & 4x modes.
     */
-    const int max_tx_taps = AD9361_MIN(AD9361_MIN((16 * (int)((dacclk / rate) + 0.5)), 128), 
+    const int max_tx_taps = AD9361_MIN(AD9361_MIN((16 * (int)((dacclk / rate) + 0.5)), 128),
 				       (device->tfir_factor==1) ? 64 : 128);
     const int max_rx_taps = AD9361_MIN((16 * (int)((adcclk / rate) + 0.5)), 128);
 
@@ -1686,7 +1686,7 @@ double set_clock_rate(uint64_t handle, const double req_rate) {
     /* Call into the clock configuration / settings function. This is where
      * all the hard work gets done. */
     double rate = setup_rates(device, req_rate);
-    
+
     msg("[set_clock_rate] rate=%.10f", rate);
 
     /* Transition to the ALERT state and calibrate everything. */
@@ -1939,18 +1939,18 @@ void ad9361_dispatch(const char* vrb, char* vrb_out)
 {
     memcpy(vrb_out, vrb, AD9361_DISPATCH_PACKET_SIZE); //copy request to response memory
     tmp_req_buffer = vrb_out;
-    
+
     //////////////////////////////////////////////
-    
+
     double ret_val = 0.0;
     int mask = 0;
-    
+
     const ad9361_transaction_t *request = (const ad9361_transaction_t *)vrb;
     ad9361_transaction_t *response = (ad9361_transaction_t *)vrb_out;
-    
+
     //msg("[dispatch_vrq] action=%d", request->action);
     //msg("[dispatch_vrq] action=%f", (double)request->action);
-    
+
     switch (request->action) {
         case AD9361_ACTION_ECHO:
             break; // nothing to do
