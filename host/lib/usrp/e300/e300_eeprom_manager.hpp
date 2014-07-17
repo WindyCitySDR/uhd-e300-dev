@@ -31,6 +31,9 @@ namespace uhd { namespace usrp { namespace e300 {
 static const boost::uint16_t E300_MB_PID = 0x77d1;
 static const boost::uint16_t E310_MB_PID = 0x77d2;
 
+static const boost::uint16_t E300_DB_PID = 0x0100;
+static const boost::uint16_t E310_DB_PID = 0x0110;
+
 class e300_eeprom_manager : boost::noncopyable
 {
 public:
