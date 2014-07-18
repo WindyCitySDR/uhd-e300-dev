@@ -698,9 +698,9 @@ void x300_impl::handle_overflow_ce(boost::weak_ptr<uhd::rx_streamer> streamer)
 
 
 boost::uint32_t x300_impl::rfnoc_cmd(
-		    const std::string &dst, const std::string &type,
-		    boost::uint32_t arg1, boost::uint32_t arg2)
-{
+                const std::string &dst, const std::string &type,
+                boost::uint32_t arg1, boost::uint32_t arg2
+) {
     mboard_members_t &mb = _mb[0];
     if (dst == "ce0" or dst == "ce1" or dst == "ce2") {
         size_t ce_index = boost::lexical_cast<size_t>(dst[2]);

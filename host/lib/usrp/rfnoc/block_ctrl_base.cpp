@@ -15,11 +15,15 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 //
 
+#include <uhd/utils/msg.hpp>
+#include <boost/format.hpp>
+
 #include <uhd/usrp/rfnoc/block_ctrl_base.hpp>
 #include "radio_ctrl_core_3000.hpp"
 
 //! Convert register to a peek/poke compatible address
 inline boost::uint32_t _sr_to_addr(boost::uint32_t reg) { return reg * 4; };
+inline boost::uint32_t _sr_to_addr64(boost::uint32_t reg) { return reg * 8; }; // for peek64
 
 using namespace uhd;
 using namespace uhd::rfnoc;
@@ -44,24 +48,28 @@ block_ctrl_base::block_ctrl_base(
     _tree(tree),
     _buf_sizes(16, 0),
     _noc_id(0),
-    _block_id("99/NOBLOCK") // Some random value
+    _block_id()
 {
+    UHD_MSG(status) << "block_ctrl_base()" << std::endl;
     // Read NoC-ID
     _noc_id = sr_read64(SR_READBACK_REG_ID);
+    UHD_MSG(status) << "NOC ID: " << str(boost::format("0x%016x") % _noc_id) << std::endl;
 
     // Read buffer sizes (also, identifies which ports may receive connections)
     for (size_t port_offset = 0; port_offset < 16; port_offset += 8) {
         settingsbus_reg_t reg =
             (port_offset == 0) ? SR_READBACK_REG_BUFFALLOC0 : SR_READBACK_REG_BUFFALLOC1;
         boost::uint64_t value = sr_read64(reg);
+        UHD_MSG(status) << "On port offset " << port_offset << ", read from reg " << reg << ", got size value " << value << std::endl;
         for (size_t i = 0; i < 8; i++) {
             size_t buf_size_log2 = (value >> (i * 8)) & 0xFF; // Buffer size in x = log2(lines)
             _buf_sizes[i + port_offset] = BYTES_PER_LINE * (1 << buf_size_log2); // Bytes == 8 * 2^x
         }
     }
 
-    // Figure out block ID
+    UHD_MSG(status) << "Buffer size 0: " << _buf_sizes[0] << std::endl;
 
+    // Figure out block ID
 
     // Populate property tree
 }
@@ -70,12 +78,15 @@ block_ctrl_base::~block_ctrl_base() {
 }
 
 void block_ctrl_base::sr_write(const boost::uint32_t reg, const boost::uint32_t data) {
+    UHD_MSG(status) << str(boost::format("sr_write(%d, %08x)") % reg % data) << std::endl;
+    UHD_MSG(status) << str(boost::format("_sr_to_addr() == %d") % _sr_to_addr(reg)) << std::endl;
     _ctrl_iface->poke32(_sr_to_addr(reg), data);
 }
 
 boost::uint64_t block_ctrl_base::sr_read64(const settingsbus_reg_t reg)
 {
-    return _ctrl_iface->peek64(_sr_to_addr(reg));
+    UHD_MSG(status) << str(boost::format("sr_read64(%d)") % reg) << std::endl;
+    return _ctrl_iface->peek64(_sr_to_addr64(reg));
 }
 
 boost::uint32_t block_ctrl_base::sr_read32(const settingsbus_reg_t reg) {
