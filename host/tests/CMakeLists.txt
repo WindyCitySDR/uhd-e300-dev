@@ -25,6 +25,7 @@ include(UHDUnitTest)
 ########################################################################
 SET(test_sources
     addr_test.cpp
+    block_id_test.cpp
     buffer_test.cpp
     byteswap_test.cpp
     convert_test.cpp

@@ -18,6 +18,7 @@
 UHD_INSTALL(FILES
     block_ctrl_base.hpp
     block_ctrl.hpp
+    block_id.hpp
     constants.hpp
     null_block_ctrl.hpp
     DESTINATION ${INCLUDE_DIR}/uhd/usrp/rfnoc

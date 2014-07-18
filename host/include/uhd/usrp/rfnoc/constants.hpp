@@ -38,6 +38,10 @@ enum settingsbus_reg_t {
     SR_READBACK_REG_USER       = 3,
 };
 
+// Regular expressions
+static const std::string VALID_BLOCKNAME_REGEX = "[A-Za-z][A-Za-z0-9]*";
+static const std::string VALID_BLOCKID_REGEX = "(?:(\\d+)(?:/))?([A-Za-z][A-Za-z0-9]*)(?:(?:_)(\\d\\d?))?";
+
 }} /* namespace uhd::rfnoc */
 
 #endif /* INCLUDED_LIBUHD_RFNOC_CONSTANTS_HPP */
