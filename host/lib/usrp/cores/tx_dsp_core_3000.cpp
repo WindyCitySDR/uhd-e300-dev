@@ -92,7 +92,7 @@ public:
             interp /= 2;
         }
 
-        _iface->poke32(REG_DSP_TX_INTERP, (hb1 << 9) | (hb0 << 8) | (interp & 0xff));
+        _iface->poke32(REG_DSP_TX_INTERP, (hb1 << 9) /* was large HB */ | (hb0 << 8) /* was small HB */ | (interp & 0xff));
 
         if (interp > 1 and hb0 == 0 and hb1 == 0)
         {
