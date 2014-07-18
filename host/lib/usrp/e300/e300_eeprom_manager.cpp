@@ -98,7 +98,8 @@ const dboard_eeprom_t& e300_eeprom_manager::read_db_eeprom(void)
 
     db_eeprom_map_t &map = *map_ptr;
 
-    // TODO: Worry about ids and other fields
+    _db_eeprom.id = uhd::usrp::dboard_id_t::from_uint16(
+        uhd::ntohx<boost::uint16_t>(map.hw_product));
 
     _db_eeprom.revision = boost::lexical_cast<std::string>(
         uhd::ntohx<boost::uint16_t>(map.hw_revision));
@@ -125,7 +126,10 @@ void e300_eeprom_manager::write_db_eeprom(const dboard_eeprom_t& eeprom)
 
     db_eeprom_map_t &map = *map_ptr;
 
-    // TODO: Worry about ids and other fields
+    if (_db_eeprom.id != dboard_id_t::none()) {
+        map.hw_product = uhd::htonx<boost::uint16_t>(
+            _db_eeprom.id.to_uint16());
+    }
 
     if (not _db_eeprom.revision.empty()) {
         map.hw_revision = uhd::htonx<boost::uint16_t>(
