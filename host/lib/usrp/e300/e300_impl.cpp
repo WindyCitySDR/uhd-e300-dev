@@ -272,6 +272,8 @@ e300_impl::e300_impl(const uhd::device_addr_t &device_addr)
     , _sid_framer(0)
 {
     _type = uhd::device::USRP;
+    _device_addr = device_addr;
+    _xport_path = device_addr.has_key("addr") ? ETH : AXI;
 
     _async_md.reset(new async_md_type(1000/*messages deep*/));
 
