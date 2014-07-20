@@ -168,8 +168,6 @@ private: // types
     {
         uhd::transport::zero_copy_if::sptr recv;
         uhd::transport::zero_copy_if::sptr send;
-        size_t recv_buff_size;
-        size_t send_buff_size;
     };
 
     enum xport_t {AXI, ETH};
@@ -218,6 +216,10 @@ private: // methods
         const size_t which_stream);
 
     size_t _get_axi_dma_channel(
+        boost::uint8_t destination,
+        boost::uint8_t prefix);
+
+    boost::uint16_t _get_udp_port(
         boost::uint8_t destination,
         boost::uint8_t prefix);
 
@@ -277,19 +279,21 @@ private: // methods
         const boost::uint32_t value);
 
 private: // members
-    bool                        _network_mode;
-    xport_t                     _xport_path;
-    e300_fifo_interface::sptr   _fifo_iface;
-    size_t                      _sid_framer;
-    radio_perifs_t              _radio_perifs[2];
-    double                      _tick_rate;
-    ad9361_ctrl_transport::sptr _codec_xport;
-    ad9361_ctrl::sptr           _codec_ctrl;
-    fe_control_settings_t       _settings;
-    global_regs::sptr           _global_regs;
-    e300_sensor_manager::sptr   _sensor_manager;
-    e300_eeprom_manager::sptr   _eeprom_manager;
-    gpio_t                      _misc;
+    uhd::device_addr_t                     _device_addr;
+    xport_t                                _xport_path;
+    e300_fifo_interface::sptr              _fifo_iface;
+    size_t                                 _sid_framer;
+    radio_perifs_t                         _radio_perifs[2];
+    double                                 _tick_rate;
+    ad9361_ctrl_transport::sptr            _codec_xport;
+    ad9361_ctrl::sptr                      _codec_ctrl;
+    fe_control_settings_t                  _settings;
+    global_regs::sptr                      _global_regs;
+    e300_sensor_manager::sptr              _sensor_manager;
+    e300_eeprom_manager::sptr              _eeprom_manager;
+    uhd::transport::zero_copy_xport_params _data_xport_params;
+    uhd::transport::zero_copy_xport_params _ctrl_xport_params;
+    gpio_t                                 _misc;
 };
 
 }}} // namespace

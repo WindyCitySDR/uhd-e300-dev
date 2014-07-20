@@ -35,9 +35,9 @@ SET(x3xx_burner_sources
     cdecode.c
 )
 
-IF(ENABLE_E300 AND LIBUDEV_FOUND)
-    LIST(APPEND util_sources usrp_e3x0_network_mode.cpp)
-ENDIF(ENABLE_E300 AND LIBUDEV_FOUND)
+IF(ENABLE_E300 AND UDEV_FOUND)
+    LIST(APPEND util_runtime_sources usrp_e3x0_network_mode.cpp)
+ENDIF(ENABLE_E300 AND UDEV_FOUND)
 
 #for each source: build an executable and install
 FOREACH(util_source ${util_runtime_sources})

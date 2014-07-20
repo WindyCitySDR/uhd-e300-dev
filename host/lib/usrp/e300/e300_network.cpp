@@ -372,7 +372,7 @@ private:
 
 private:
     boost::shared_ptr<e300_fifo_interface>   _fifo_iface;
-    xports_t                    _xports[2];
+    xports_t                                 _xports[2];
     boost::shared_ptr<ad9361_ctrl_transport> _codec_xport;
     boost::shared_ptr<ad9361_ctrl>           _codec_ctrl;
     boost::shared_ptr<global_regs>           _global_regs;
@@ -385,7 +385,7 @@ network_server_impl::~network_server_impl(void)
 }
 
 /***********************************************************************
- * The TCP server itself
+ * The UDP server itself
  **********************************************************************/
 void network_server_impl::_run_server(
     const std::string &port,
@@ -416,35 +416,28 @@ void network_server_impl::_run_server(
             boost::thread_group tg;
             bool running = true;
             xports_t &perif = _xports[fe];
-            if (what == "RX")
-            {
+            if (what == "RX") {
                 tg.create_thread(boost::bind(&e300_recv_tunnel, "RX data tunnel", perif.rx_data_xport, socket, &endpoint, &running));
                 tg.create_thread(boost::bind(&e300_send_tunnel, "RX flow tunnel", socket, perif.rx_flow_xport, &endpoint, &running));
             }
-            if (what == "TX")
-            {
+            if (what == "TX") {
                 tg.create_thread(boost::bind(&e300_recv_tunnel, "TX flow tunnel", perif.tx_flow_xport, socket, &endpoint, &running));
                 tg.create_thread(boost::bind(&e300_send_tunnel, "TX data tunnel", socket, perif.tx_data_xport, &endpoint, &running));
             }
-            if (what == "CTRL")
-            {
+            if (what == "CTRL") {
                 tg.create_thread(boost::bind(&e300_recv_tunnel, "response tunnel", perif.recv_ctrl_xport, socket, &endpoint, &running));
                 tg.create_thread(boost::bind(&e300_send_tunnel, "control tunnel", socket, perif.send_ctrl_xport, &endpoint, &running));
             }
-            if (what == "CODEC")
-            {
+            if (what == "CODEC") {
                 tg.create_thread(boost::bind(&e300_codec_ctrl_tunnel, "CODEC tunnel", socket, _codec_xport, &endpoint, &running));
             }
-            if (what == "I2C")
-            {
+            if (what == "I2C") {
                 tg.create_thread(boost::bind(&e300_i2c_tunnel, "I2C tunnel", socket, _eeprom_manager->get_i2c_sptr(), &endpoint, &running));
             }
-            if (what == "GREGS")
-            {
+            if (what == "GREGS") {
                 tg.create_thread(boost::bind(&e300_global_regs_tunnel, "GREGS tunnel", socket, _global_regs, &endpoint, &running));
             }
-            if (what == "SENSOR")
-            {
+            if (what == "SENSOR") {
                 tg.create_thread(boost::bind(&e300_sensor_tunnel, "SENSOR tunnel", socket, _sensor_manager, &endpoint, &running));
             }
 
@@ -519,6 +512,12 @@ network_server_impl::network_server_impl(const uhd::device_addr_t &device_addr)
     data_xport_params.num_recv_frames = device_addr.cast<size_t>("num_recv_frames", e300::DEFAULT_RX_DATA_NUM_FRAMES);
     data_xport_params.send_frame_size = device_addr.cast<size_t>("send_frame_size", e300::DEFAULT_TX_DATA_FRAME_SIZE);
     data_xport_params.num_send_frames = device_addr.cast<size_t>("num_send_frames", e300::DEFAULT_TX_DATA_NUM_FRAMES);
+    // until we figure out why this goes wrong we'll keep this hack around
+    data_xport_params.recv_frame_size =
+        std::min(e300::MAX_NET_RX_DATA_FRAME_SIZE, data_xport_params.recv_frame_size);
+    data_xport_params.send_frame_size =
+        std::min(e300::MAX_NET_TX_DATA_FRAME_SIZE, data_xport_params.send_frame_size);
+
 
     e300_fifo_config_t fifo_cfg;
     try {
@@ -554,6 +553,7 @@ network_server_impl::network_server_impl(const uhd::device_addr_t &device_addr)
 }}} // namespace
 
 using namespace uhd::usrp::e300;
+
 network_server::sptr network_server::make(const uhd::device_addr_t &device_addr)
 {
     return sptr(new network_server_impl(device_addr));

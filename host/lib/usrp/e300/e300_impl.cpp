@@ -255,12 +255,7 @@ static device_addrs_t e300_find(const device_addr_t &multi_dev_hint)
 static device::sptr e300_make(const device_addr_t &device_addr)
 {
     UHD_LOG << "e300_make with args " << device_addr.to_pp_string() << std::endl;
-    if(device_addr.has_key("server"))
-        throw uhd::runtime_error(
-            str(boost::format("Please run the server executable \"%s\"")
-                % "usrp_e3x0_network_mode"));
-    else
-        return device::sptr(new e300_impl(device_addr));
+    return device::sptr(new e300_impl(device_addr));
 }
 
 /***********************************************************************
@@ -269,6 +264,8 @@ static device::sptr e300_make(const device_addr_t &device_addr)
 e300_impl::e300_impl(const uhd::device_addr_t &device_addr) : _sid_framer(0)
 {
     _type = uhd::device::USRP;
+    _device_addr = device_addr;
+    _xport_path = device_addr.has_key("addr") ? ETH : AXI;
 
     _async_md.reset(new async_md_type(1000/*messages deep*/));
 
@@ -277,6 +274,24 @@ e300_impl::e300_impl(const uhd::device_addr_t &device_addr) : _sid_framer(0)
     ////////////////////////////////////////////////////////////////////
     if (not device_addr.has_key("addr"))
     {
+        //extract the FPGA path for the e300
+        const boost::uint16_t pid = boost::lexical_cast<boost::uint16_t>(
+            device_addr["product"]);
+        std::string fpga_image;
+        switch(e300_eeprom_manager::get_mb_type(pid)) {
+        case e300_eeprom_manager::USRP_E310_MB:
+            fpga_image = find_image_path(E310_FPGA_FILE_NAME);
+            break;
+        case e300_eeprom_manager::USRP_E300_MB:
+            fpga_image = find_image_path(E300_FPGA_FILE_NAME);
+            break;
+        case e300_eeprom_manager::UNKNOWN:
+        default:
+            UHD_MSG(warning) << "Unknown motherboard type, loading e300 image."
+                             << std::endl;
+            fpga_image = find_image_path(E300_FPGA_FILE_NAME);
+            break;
+        }
         if (not device_addr.has_key("no_reload_fpga")) {
             // Load FPGA image if provided via args
             if (device_addr.has_key("fpga")) {
@@ -309,59 +324,35 @@ e300_impl::e300_impl(const uhd::device_addr_t &device_addr) : _sid_framer(0)
     ////////////////////////////////////////////////////////////////////
     // setup fifo xports
     ////////////////////////////////////////////////////////////////////
-    uhd::transport::zero_copy_xport_params ctrl_xport_params;
-    ctrl_xport_params.recv_frame_size = e300::DEFAULT_CTRL_FRAME_SIZE;
-    ctrl_xport_params.num_recv_frames = e300::DEFAULT_CTRL_NUM_FRAMES;
-    ctrl_xport_params.send_frame_size = e300::DEFAULT_CTRL_FRAME_SIZE;
-    ctrl_xport_params.num_send_frames = e300::DEFAULT_CTRL_NUM_FRAMES;
+    _ctrl_xport_params.recv_frame_size = e300::DEFAULT_CTRL_FRAME_SIZE;
+    _ctrl_xport_params.num_recv_frames = e300::DEFAULT_CTRL_NUM_FRAMES;
+    _ctrl_xport_params.send_frame_size = e300::DEFAULT_CTRL_FRAME_SIZE;
+    _ctrl_xport_params.num_send_frames = e300::DEFAULT_CTRL_NUM_FRAMES;
 
-    uhd::transport::zero_copy_xport_params data_xport_params;
-    data_xport_params.recv_frame_size = device_addr.cast<size_t>("recv_frame_size", e300::DEFAULT_RX_DATA_FRAME_SIZE);
-    data_xport_params.num_recv_frames = device_addr.cast<size_t>("num_recv_frames", e300::DEFAULT_RX_DATA_NUM_FRAMES);
-    data_xport_params.send_frame_size = device_addr.cast<size_t>("send_frame_size", e300::DEFAULT_TX_DATA_FRAME_SIZE);
-    data_xport_params.num_send_frames = device_addr.cast<size_t>("num_send_frames", e300::DEFAULT_TX_DATA_NUM_FRAMES);
-
-    _network_mode = device_addr.has_key("addr");
+    _data_xport_params.recv_frame_size = e300::DEFAULT_RX_DATA_FRAME_SIZE;
+    _data_xport_params.num_recv_frames = e300::DEFAULT_RX_DATA_NUM_FRAMES;
+    _data_xport_params.send_frame_size = e300::DEFAULT_TX_DATA_FRAME_SIZE;
+    _data_xport_params.num_send_frames = e300::DEFAULT_TX_DATA_NUM_FRAMES;
 
     // until we figure out why this goes wrong we'll keep this hack around
     if (device_addr.has_key("addr")) {
-        data_xport_params.recv_frame_size =
-            std::min(e300::MAX_NET_RX_DATA_FRAME_SIZE, data_xport_params.recv_frame_size);
-        data_xport_params.send_frame_size =
-            std::min(e300::MAX_NET_TX_DATA_FRAME_SIZE, data_xport_params.send_frame_size);
+        _data_xport_params.recv_frame_size =
+            std::min(e300::MAX_NET_RX_DATA_FRAME_SIZE, _data_xport_params.recv_frame_size);
+        _data_xport_params.send_frame_size =
+            std::min(e300::MAX_NET_TX_DATA_FRAME_SIZE, _data_xport_params.send_frame_size);
     }
-
-
     udp_zero_copy::buff_params dummy_buff_params_out;
 
-    if (_network_mode)
-    {
-        radio_perifs_t &perif = _radio_perifs[0];
-        perif.send_ctrl_xport = udp_zero_copy::make(device_addr["addr"], E300_SERVER_CTRL_PORT0, ctrl_xport_params, dummy_buff_params_out, device_addr);
-        perif.recv_ctrl_xport = perif.send_ctrl_xport;
-        perif.tx_data_xport = udp_zero_copy::make(device_addr["addr"], E300_SERVER_TX_PORT0, data_xport_params, dummy_buff_params_out, device_addr);
-        perif.tx_flow_xport = perif.tx_data_xport;
-        perif.rx_data_xport = udp_zero_copy::make(device_addr["addr"], E300_SERVER_RX_PORT0, data_xport_params, dummy_buff_params_out, device_addr);
-        perif.rx_flow_xport = perif.rx_data_xport;
-
-
-        radio_perifs_t &perif1 = _radio_perifs[1];
-        perif1.send_ctrl_xport = udp_zero_copy::make(device_addr["addr"], E300_SERVER_CTRL_PORT1, ctrl_xport_params, dummy_buff_params_out, device_addr);
-        perif1.recv_ctrl_xport = perif1.send_ctrl_xport;
-        perif1.tx_data_xport = udp_zero_copy::make(device_addr["addr"], E300_SERVER_TX_PORT1, data_xport_params, dummy_buff_params_out, device_addr);
-        perif1.tx_flow_xport = perif1.tx_data_xport;
-        perif1.rx_data_xport = udp_zero_copy::make(device_addr["addr"], E300_SERVER_RX_PORT1, data_xport_params, dummy_buff_params_out, device_addr);
-        perif1.rx_flow_xport = perif1.rx_data_xport;
-
-        zero_copy_if::sptr codec_xport;
-        codec_xport = udp_zero_copy::make(device_addr["addr"], E300_SERVER_CODEC_PORT, ctrl_xport_params, dummy_buff_params_out, device_addr);
+    if (_xport_path == ETH) {
+        zero_copy_if::sptr codec_xport =
+            udp_zero_copy::make(device_addr["addr"], E300_SERVER_CODEC_PORT, _ctrl_xport_params, dummy_buff_params_out, device_addr);
         _codec_ctrl = ad9361_ctrl::make(ad9361_ctrl_transport::make_zero_copy(codec_xport));
-        zero_copy_if::sptr gregs_xport;
-        gregs_xport = udp_zero_copy::make(device_addr["addr"], E300_SERVER_GREGS_PORT, ctrl_xport_params, dummy_buff_params_out, device_addr);
+        zero_copy_if::sptr gregs_xport =
+            udp_zero_copy::make(device_addr["addr"], E300_SERVER_GREGS_PORT, _ctrl_xport_params, dummy_buff_params_out, device_addr);
         _global_regs = global_regs::make(gregs_xport);
 
         zero_copy_if::sptr i2c_xport;
-        i2c_xport = udp_zero_copy::make(device_addr["addr"], E300_SERVER_I2C_PORT, ctrl_xport_params, dummy_buff_params_out, device_addr);
+        i2c_xport = udp_zero_copy::make(device_addr["addr"], E300_SERVER_I2C_PORT, _ctrl_xport_params, dummy_buff_params_out, device_addr);
         _eeprom_manager = boost::make_shared<e300_eeprom_manager>(i2c::make_zc(i2c_xport));
 
         uhd::transport::zero_copy_xport_params sensor_xport_params;
@@ -649,9 +640,8 @@ void e300_impl::_enforce_tick_rate_limits(
 
 double e300_impl::_set_tick_rate(const double rate)
 {
-    const size_t factor = 1;
     UHD_MSG(status) << "Asking for clock rate " << rate/1e6 << " MHz\n";
-    _tick_rate = _codec_ctrl->set_clock_rate(rate/factor)*factor;
+    _tick_rate = _codec_ctrl->set_clock_rate(rate);
     UHD_MSG(status) << "Actually got clock rate " << _tick_rate/1e6 << " MHz\n";
 
     BOOST_FOREACH(radio_perifs_t &perif, _radio_perifs)
@@ -829,6 +819,28 @@ size_t e300_impl::_get_axi_dma_channel(
     return ((radio_grp * RADIO_GRP_SIZE) + prefix);
 }
 
+boost::uint16_t e300_impl::_get_udp_port(
+        boost::uint8_t destination,
+        boost::uint8_t prefix)
+{
+    if (destination == E300_XB_DST_R0) {
+        if (prefix == E300_RADIO_DEST_PREFIX_CTRL)
+            return boost::lexical_cast<boost::uint16_t>(E300_SERVER_CTRL_PORT0);
+        else if (prefix == E300_RADIO_DEST_PREFIX_TX)
+            return boost::lexical_cast<boost::uint16_t>(E300_SERVER_TX_PORT0);
+        else if (prefix == E300_RADIO_DEST_PREFIX_RX)
+            return boost::lexical_cast<boost::uint16_t>(E300_SERVER_RX_PORT0);
+    } else if (destination == E300_XB_DST_R1) {
+        if (prefix == E300_RADIO_DEST_PREFIX_CTRL)
+            return boost::lexical_cast<boost::uint16_t>(E300_SERVER_CTRL_PORT1);
+        else if (prefix == E300_RADIO_DEST_PREFIX_TX)
+            return boost::lexical_cast<boost::uint16_t>(E300_SERVER_TX_PORT1);
+        else if (prefix == E300_RADIO_DEST_PREFIX_RX)
+            return boost::lexical_cast<boost::uint16_t>(E300_SERVER_RX_PORT1);
+    }
+    throw uhd::value_error(str(boost::format("No UDP port defined for combination: %u %u") % destination % prefix));
+}
+
 e300_impl::both_xports_t e300_impl::_make_transport(
     const boost::uint8_t &destination,
     const boost::uint8_t &prefix,
@@ -846,15 +858,38 @@ e300_impl::both_xports_t e300_impl::_make_transport(
 
     // in local mode
     if (_xport_path == AXI) {
+        // lookup which dma channel we need
+        // to use to create our transport
         const size_t stream = _get_axi_dma_channel(
             destination,
             prefix);
+
         xports.send =
             _fifo_iface->make_send_xport(stream, params);
         xports.recv =
             _fifo_iface->make_recv_xport(stream, params);
+
+    // in network mode
     } else if (_xport_path == ETH) {
+        // lookup which udp port we need
+        // to use to create our transport
+        const boost::uint16_t port = _get_udp_port(
+            destination,
+            prefix);
+
+        udp_zero_copy::buff_params dummy_buff_params_out;
+        xports.send = udp_zero_copy::make(
+            _device_addr["addr"],
+            str(boost::format("%u") % port), params,
+            dummy_buff_params_out,
+            _device_addr);
+
+        // use the same xport in both directions
+        xports.recv = xports.send;
     }
+
+    // configure the return path
+    _setup_dest_mapping(sid, _get_axi_dma_channel(destination, prefix));
 
     return xports;
 }
@@ -886,22 +921,16 @@ void e300_impl::_setup_radio(const size_t dspno)
     radio_perifs_t &perif = _radio_perifs[dspno];
     const fs_path mb_path = "/mboards/0";
 
-    boost::uint32_t ctrl_sid;
-
-    uhd::transport::zero_copy_xport_params data_xport_params;
-    data_xport_params.recv_frame_size = e300::DEFAULT_RX_DATA_FRAME_SIZE;
-    data_xport_params.num_recv_frames = e300::DEFAULT_RX_DATA_NUM_FRAMES;
-    data_xport_params.send_frame_size = e300::DEFAULT_TX_DATA_FRAME_SIZE;
-    data_xport_params.num_send_frames = e300::DEFAULT_TX_DATA_NUM_FRAMES;
-
     ////////////////////////////////////////////////////////////////////
     // crossbar config for ctrl xports
     ////////////////////////////////////////////////////////////////////
 
+    // make a transport, grab a sid
+    boost::uint32_t ctrl_sid;
     both_xports_t ctrl_xports = _make_transport(
        dspno ? E300_XB_DST_R1 : E300_XB_DST_R0,
        E300_RADIO_DEST_PREFIX_CTRL,
-       data_xport_params,
+       _ctrl_xport_params,
        ctrl_sid);
     perif.send_ctrl_xport = ctrl_xports.send;
     perif.recv_ctrl_xport = ctrl_xports.recv;
