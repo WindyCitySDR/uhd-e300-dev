@@ -16,6 +16,7 @@
 //
 
 #include <uhd/utils/msg.hpp>
+#include <uhd/utils/log.hpp>
 #include <boost/format.hpp>
 
 #include <uhd/usrp/rfnoc/block_ctrl_base.hpp>
@@ -31,15 +32,6 @@ using namespace uhd::rfnoc;
 // One line in FPGA is 64 Bits
 static const size_t BYTES_PER_LINE = 8;
 
-    struct block_connection_t {
-        //! True for big endian transport
-        const bool big_endian;
-        //! Transport to send commands
-        uhd::transport::zero_copy_if::sptr ctrl_xport;
-        //! Transport for command responses (may be the same as ctrl_xport)
-        uhd::transport::zero_copy_if::sptr resp_xport;
-    };
-
 block_ctrl_base::block_ctrl_base(
         wb_iface::sptr ctrl_iface,
         sid_t ctrl_sid,
@@ -47,8 +39,7 @@ block_ctrl_base::block_ctrl_base(
         property_tree::sptr tree
 ) : _ctrl_iface(ctrl_iface),
     _ctrl_sid(ctrl_sid),
-    _tree(tree),
-    _block_id()
+    _tree(tree)
 {
     UHD_MSG(status) << "block_ctrl_base()" << std::endl;
     // Read NoC-ID
@@ -71,8 +62,12 @@ block_ctrl_base::block_ctrl_base(
 
     // Figure out block ID
     std::string blockname = "CE"; // Until we can read the actual block names
+    std::vector<std::string> l = _tree->list("/");
+    BOOST_FOREACH(const std::string &str, l) {
+        std::cout << "Already in tree: " << str << std::endl;
+    }
     _block_id.set(device_index, blockname, 0);
-    while (_tree->exists(_block_id.get_local())) {
+    while (_tree->exists("xbar/" + _block_id.get_local())) {
         _block_id++;
     }
     UHD_MSG(status) << "Using block ID: " << _block_id << std::endl;
@@ -81,7 +76,7 @@ block_ctrl_base::block_ctrl_base(
     _root_path = "xbar/" + _block_id.get_local();
     _tree->create<boost::uint64_t>(_root_path / "noc_id").set(noc_id);
     _tree->create<std::vector<size_t> >(_root_path / "input_buffer_size").set(buf_sizes);
-    _tree->create<size-t>(_root_path / "bytes_per_packet").set(noc_id);
+    _tree->create<size_t>(_root_path / "bytes_per_packet").set(1456);
 
     // TODO: Add IO signature
 }
@@ -119,12 +114,15 @@ void block_ctrl_base::issue_stream_cmd(
         return;
     }
 
-    BOOST_FOREACH(const boost::weak_ptr<block_ctrl_base> &upstream_block_ctrl, _upstream_blocks) {
-        upstream_block_ctrl->issue_stream_cmd(stream_cmd);
+    BOOST_FOREACH(const boost::weak_ptr<block_ctrl_base> upstream_block_ctrl, _upstream_blocks) {
+        sptr(upstream_block_ctrl)->issue_stream_cmd(stream_cmd);
     }
 }
 
 void block_ctrl_base::configure_flow_control_in(boost::uint32_t cycles, boost::uint32_t packets, size_t block_port) {
+    UHD_LOG
+        << "Setting upstream flow control on " << _block_id << " (Block Port: " << block_port
+        << ") to: cycles==" << cycles << ", packets==" << packets << std::endl;
     boost::uint32_t cycles_word = 0;
     if (cycles) {
         cycles_word = (1<<31) | cycles;
@@ -139,6 +137,10 @@ void block_ctrl_base::configure_flow_control_in(boost::uint32_t cycles, boost::u
 }
 
 void block_ctrl_base::configure_flow_control_out(boost::uint32_t buf_size_pkts, const uhd::sid_t &sid) {
+    UHD_LOG
+        << "Setting downstream flow control on " << _block_id
+        << "(SID == " << sid << ")"
+        << " to: buf_size_pkts==" << buf_size_pkts << std::endl;
     // This actually takes counts between acks. So if the buffer size is 1 packet, we set
     // set this to zero.
     sr_write(SR_FLOW_CTRL_BUF_SIZE, (buf_size_pkts == 0) ? 0 : buf_size_pkts-1);
@@ -147,10 +149,12 @@ void block_ctrl_base::configure_flow_control_out(boost::uint32_t buf_size_pkts, 
 
 void block_ctrl_base::reset_flow_control() {
     sr_write(SR_FLOW_CTRL_CLR_SEQ, 0x00C1EA12); // 'CLEAR', but we can write anything, really
+    return;
 }
 
 void block_ctrl_base::set_bytes_per_packet(size_t bpp) {
-    // TODO tbw
+    _tree->access<size_t>(_root_path / "bytes_per_packet").set(bpp);
+    return;
 }
 
 void block_ctrl_base::register_upstream_block(block_ctrl_base::sptr upstream_block) {

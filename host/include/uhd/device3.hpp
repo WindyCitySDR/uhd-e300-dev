@@ -25,19 +25,20 @@ namespace uhd {
 
 /*!
  * \brief Extends uhd::device for third-generation USRP devices.
+ *
+ * One outstanding feature of these devices is that they support
+ * RFNoC (RF Network-on-Chip).
  */
 class UHD_API device3 : public uhd::device {
 
   public:
     typedef boost::shared_ptr<device3> sptr;
 
-    /* TODO Add ! when this is func is uncommented
-     *
-     * \brief Returns a block controller class for an RFNoC block.
+    /*! \brief Returns a block controller class for an RFNoC block.
      *
      * \param unique_block_name Canonical block name (e.g. "0/FFT_1").
      */
-    //virtual rfnoc::block_ctrl_base::sptr get_block_ctrl(const std::string &unique_block_name) = 0;
+    //virtual rfnoc::block_ctrl_base::sptr get_block_ctrl(const rfnoc::block_id_t &block_id) = 0;
 
     /*!
      * \param dst Who gets this command (radio0, ce1, ...)
@@ -51,6 +52,10 @@ class UHD_API device3 : public uhd::device {
             boost::uint32_t arg1=0,
             boost::uint32_t arg2=0
     ) = 0;
+
+  //private:
+    //std::vector<
+    //rfnoc::block_ctrl_base::sptr
 
 };
 

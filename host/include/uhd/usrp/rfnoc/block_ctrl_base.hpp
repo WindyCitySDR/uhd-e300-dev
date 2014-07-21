@@ -87,11 +87,11 @@ public:
 
     /*! Returns the unique block ID for this block (e.g. "0/FFT_1").
      */
-    virtual block_id_t get_block_id() const { return _block_id; };
+    block_id_t get_block_id() const { return _block_id; };
 
     /*! Returns the SID for the control transport.
      */
-    virtual uhd::sid_t get_ctrl_sid() const { return _ctrl_sid; };
+    uhd::sid_t get_ctrl_sid() const { return _ctrl_sid; };
 
     /*! Issue a stream command for this block.
      *
@@ -157,9 +157,8 @@ public:
      * this block about upstream blocks.
      *
      * \param upstream_block A pointer to the block instantiation
-     * \param handles_stream_cmds Whether or not \p upstream_block can receive stream commands from this block.
      */
-    void register_upstream_block(sptr upstream_block, bool handles_stream_cmds=true);
+    void register_upstream_block(sptr upstream_block);
 
     /*! Clears the list of upstream blocks.
      *
@@ -188,13 +187,6 @@ protected:
             uhd::property_tree::sptr tree
     );
 
-protected:
-    //! Property sub-tree
-    uhd::property_tree::sptr _tree;
-
-    //! Root node of this block's properties
-    uhd::fs_path _root_path;
-
 private:
     //! An object to actually send and receive the commands
     wb_iface::sptr _ctrl_iface;
@@ -208,6 +200,13 @@ private:
 
     //! List of upstream blocks
     std::vector< boost::weak_ptr<block_ctrl_base> > _upstream_blocks;
+
+protected:
+    //! Property sub-tree
+    uhd::property_tree::sptr _tree;
+
+    //! Root node of this block's properties
+    uhd::fs_path _root_path;
 
 }; /* class block_ctrl_base */
 

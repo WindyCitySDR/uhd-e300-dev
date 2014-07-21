@@ -706,28 +706,28 @@ boost::uint32_t x300_impl::rfnoc_cmd(
         size_t ce_index = boost::lexical_cast<size_t>(dst[2]);
         if (type == "poke") {
             UHD_MSG(status) << "Setting register " << std::dec << arg1 << " on CE " << ce_index << " to " << str(boost::format("0x%08x") % arg2) << std::endl;
-            mb.nocshell_ctrls[ce_index]->sr_write(arg1, arg2);
+            mb._rfnoc_block_ctrl[ce_index]->sr_write(arg1, arg2);
             return 0;
         }
         else if (type == "set_fc") {
             if (arg1) {
                 UHD_MSG(status) << "Activating downstream flow control for CE " << ce_index << ". Downstream block buffer size: " << arg1 << " packets." << std::endl;
-                //mb.nocshell_ctrls[ce_index]->poke32(SR_ADDR(0x0000, 1), 0);
+                //mb._rfnoc_block_ctrl[ce_index]->poke32(SR_ADDR(0x0000, 1), 0);
                 //boost::this_thread::sleep(boost::posix_time::milliseconds(1000));
-                mb.nocshell_ctrls[ce_index]->configure_flow_control_out(arg1);
+                mb._rfnoc_block_ctrl[ce_index]->configure_flow_control_out(arg1);
             } else {
                 UHD_MSG(status) << "Disabling downstream flow control for CE " << ce_index << "." << std::endl;
-                mb.nocshell_ctrls[ce_index]->configure_flow_control_out(0, false);
+                mb._rfnoc_block_ctrl[ce_index]->configure_flow_control_out(0, false);
             }
             if (arg2) {
                 UHD_MSG(status) << "Activating upstream flow control for CE " << ce_index << ". Send ACKs every " << arg2 << " packets." << std::endl;
-                mb.nocshell_ctrls[ce_index]->configure_flow_control_in(0 /* cycs off */, arg2);
+                mb._rfnoc_block_ctrl[ce_index]->configure_flow_control_in(0 /* cycs off */, arg2);
             } else {
                 UHD_MSG(status) << "Disabling upstream flow control for CE " << ce_index << "." << std::endl;
-                mb.nocshell_ctrls[ce_index]->configure_flow_control_in(0 , 0);
+                mb._rfnoc_block_ctrl[ce_index]->configure_flow_control_in(0 , 0);
             }
             UHD_MSG(status) << "Resetting fc counters." << std::endl;
-            mb.nocshell_ctrls[ce_index]->reset_flow_control();
+            mb._rfnoc_block_ctrl[ce_index]->reset_flow_control();
             return 0;
         }
         throw uhd::value_error("x300_impl::rfnoc_cmd only supports poke and setup_fc on CEs");
