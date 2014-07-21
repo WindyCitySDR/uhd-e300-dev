@@ -106,20 +106,32 @@ void block_ctrl_base::issue_stream_command(
 ) {
     // TODO: Avoid infinite loops by remembering who issued this stream cmd
     // TODO: Pass this command to all upstream blocks
+    // If nothing is connected, throw an error
 }
 
 void block_ctrl_base::configure_flow_control_in(boost::uint32_t cycles, boost::uint32_t packets, size_t block_port) {
-    sr_write(SR_FLOW_CTRL_CYCS_PER_ACK, cycles);
-    sr_write(SR_FLOW_CTRL_PKTS_PER_ACK, packets);
+    boost::uint32_t cycles_word = 0;
+    if (cycles) {
+        cycles_word = (1<<31) | cycles;
+    }
+    sr_write(SR_FLOW_CTRL_CYCS_PER_ACK, cycles_word);
+
+    boost::uint32_t packets_word = 0;
+    if (packets) {
+        packets_word = (1<<31) | packets;
+    }
+    sr_write(SR_FLOW_CTRL_PKTS_PER_ACK, packets_word);
 }
 
 void block_ctrl_base::configure_flow_control_out(boost::uint32_t buf_size_pkts, const uhd::sid_t &sid) {
-    sr_write(SR_FLOW_CTRL_BUF_SIZE, buf_size_pkts); // FIXME +1, -1?
+    // This actually takes counts between acks. So if the buffer size is 1 packet, we set
+    // set this to zero.
+    sr_write(SR_FLOW_CTRL_BUF_SIZE, (buf_size_pkts == 0) ? 0 : buf_size_pkts-1);
     sr_write(SR_FLOW_CTRL_ENABLE, (buf_size_pkts != 0));
 }
 
 void block_ctrl_base::reset_flow_control() {
-    sr_write(SR_FLOW_CTRL_CLR_SEQ, 0xD00D); // We can write anything, really
+    sr_write(SR_FLOW_CTRL_CLR_SEQ, 0x00C1EA12); // 'CLEAR', but we can write anything, really
 }
 
 void block_ctrl_base::set_bytes_per_packet(size_t bpp) {
