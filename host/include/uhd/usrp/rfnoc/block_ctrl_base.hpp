@@ -96,13 +96,25 @@ public:
     /*! Issue a stream command for this block.
      *
      * There is no guaranteed action for this command. The default implementation
-     * is to send this command to the next upstream block.
+     * is to send this command to the next upstream block, or issue a warning if
+     * there is no upstream block registered.
+     *
      * However, implementations of block_ctrl_base might choose to do whatever seems
-     * approprate, including throwing exceptions. This may also be true for some
+     * appropriate, including throwing exceptions. This may also be true for some
      * stream commands and not for others (i.e. STREAM_MODE_START_CONTINUOUS may be
      * implemented, and STREAM_MODE_NUM_SAMPS_AND_DONE may be not).
+     *
+     * This function does not check for infinite loops. Example: Say you have two blocks,
+     * which are both registered as upstream from one another. If they both use
+     * block_ctrl_base::issue_stream_cmd(), then the stream command will be passed from
+     * one block to another indefinitely. This will not happen if one the block's
+     * controller classes overrides this function and actually handles it.
+     *
+     * See also register_upstream_block().
+     *
+     * \param stream_cmd The stream command.
      */
-    virtual void issue_stream_command(const uhd::stream_cmd_t &stream_cmd);
+    virtual void issue_stream_cmd(const uhd::stream_cmd_t &stream_cmd);
 
     /*! Configure flow control for incoming streams.
      *
@@ -135,9 +147,26 @@ public:
      *
      * Note: block_ctrl_base only stores this value internally, but does not
      * set any registers. It is recommended to overload this function
-     * to actually change the blocks.
+     * to actually change settings.
      */
     virtual void set_bytes_per_packet(size_t bpp);
+
+    /*! Register a block upstream of this one (i.e., a block that can send data to this block).
+     *
+     * Note: This does *not* affect any settings (flow control etc.). This literally only tells
+     * this block about upstream blocks.
+     *
+     * \param upstream_block A pointer to the block instantiation
+     * \param handles_stream_cmds Whether or not \p upstream_block can receive stream commands from this block.
+     */
+    void register_upstream_block(sptr upstream_block, bool handles_stream_cmds=true);
+
+    /*! Clears the list of upstream blocks.
+     *
+     * After calling this, and before calling register_upstream_block() again,
+     * block_ctrl_base::issue_stream_cmd() will not do anything but issue a warning.
+     */
+    void clear_upstream_blocks() { _upstream_blocks.clear(); };
 
     virtual ~block_ctrl_base();
 
@@ -145,9 +174,9 @@ protected:
     block_ctrl_base(void) {}; // To allow pure virtual (interface) sub-classes
 
     /*!
-     *
      * \param ctrl_iface A valid interface that allows us to do peeks and pokes
      * \param ctrl_sid The SID corresponding to ctrl_iface
+     * \param device_index The device index (or motherboard index).
      * \param tree A property tree for this motherboard. Example: If the root a device's
      *             property tree is /mboards/0, pass a subtree starting at /mboards/0
      *             to the constructor.
@@ -155,6 +184,7 @@ protected:
     block_ctrl_base(
             uhd::wb_iface::sptr ctrl_iface,
             uhd::sid_t ctrl_sid,
+            size_t device_index,
             uhd::property_tree::sptr tree
     );
 
@@ -162,25 +192,21 @@ private:
     //! An object to actually send and receive the commands
     wb_iface::sptr _ctrl_iface;
 
-    //! The SID of the control transport
+    //! The SID of the control transport.
+    //_ctrl_sid.get_dst_address() must yield this block's address.
     uhd::sid_t _ctrl_sid;
 
     //! Property sub-tree
     uhd::property_tree::sptr _tree;
 
-    //! A vector of length 16 storing the buffer sizes.
-    std::vector<size_t> _buf_sizes;
-
-    //! The 64-Bit NoC-ID. This is *not* necessarily unique to this block, as there
-    //  might be multiple blocks with the same FPGA code.
-    boost::uint64_t _noc_id;
+    //! Root node of this block's properties
+    uhd::fs_path _root_path;
 
     //! The (unique) block ID.
     block_id_t _block_id;
 
-    // TODO:
-    // * Store connections (upstream blocks, downstream blocks)
-    //
+    //! List of upstream blocks
+    std::vector< boost::weak_ptr<block_ctrl_base> > _upstream_blocks;
 
 }; /* class block_ctrl_base */
 

@@ -25,8 +25,9 @@ public:
     block_ctrl_impl(
             uhd::wb_iface::sptr ctrl_iface,
             uhd::sid_t ctrl_sid,
+            size_t device_index,
             uhd::property_tree::sptr tree
-    ) : block_ctrl_base(ctrl_iface, ctrl_sid, tree)
+    ) : block_ctrl_base(ctrl_iface, ctrl_sid, device_index, tree)
     {
         // nop
     }
@@ -37,11 +38,12 @@ public:
 block_ctrl::sptr block_ctrl::make(
     uhd::wb_iface::sptr ctrl_iface,
     uhd::sid_t ctrl_sid,
+    size_t device_index,
     uhd::property_tree::sptr tree
 ) {
     return sptr(
         new block_ctrl_impl(
-            ctrl_iface, ctrl_sid, tree
+            ctrl_iface, ctrl_sid, device_index, tree
         )
     );
 }

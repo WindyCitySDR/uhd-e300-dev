@@ -895,6 +895,7 @@ void x300_impl::setup_mb(const size_t mb_i, const uhd::device_addr_t &dev_addr)
         mb.nocshell_ctrls[i] = uhd::rfnoc::block_ctrl::make(
                 ctrl,
                 ctrl_sid,
+                mb_i,
                 _tree->subtree(mb_path)
         );
     }

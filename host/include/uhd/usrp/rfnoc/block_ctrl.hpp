@@ -33,6 +33,7 @@ public:
     static sptr make(
             uhd::wb_iface::sptr ctrl_iface,
             uhd::sid_t ctrl_sid,
+            size_t device_index,
             uhd::property_tree::sptr tree
     );
 

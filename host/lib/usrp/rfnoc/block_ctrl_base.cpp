@@ -28,6 +28,7 @@ inline boost::uint32_t _sr_to_addr64(boost::uint32_t reg) { return reg * 8; }; /
 using namespace uhd;
 using namespace uhd::rfnoc;
 
+// One line in FPGA is 64 Bits
 static const size_t BYTES_PER_LINE = 8;
 
     struct block_connection_t {
@@ -42,20 +43,20 @@ static const size_t BYTES_PER_LINE = 8;
 block_ctrl_base::block_ctrl_base(
         wb_iface::sptr ctrl_iface,
         sid_t ctrl_sid,
+        size_t device_index,
         property_tree::sptr tree
 ) : _ctrl_iface(ctrl_iface),
     _ctrl_sid(ctrl_sid),
     _tree(tree),
-    _buf_sizes(16, 0),
-    _noc_id(0),
     _block_id()
 {
     UHD_MSG(status) << "block_ctrl_base()" << std::endl;
     // Read NoC-ID
-    _noc_id = sr_read64(SR_READBACK_REG_ID);
-    UHD_MSG(status) << "NOC ID: " << str(boost::format("0x%016x") % _noc_id) << std::endl;
+    boost::uint64_t noc_id = sr_read64(SR_READBACK_REG_ID);
+    UHD_MSG(status) << "NOC ID: " << str(boost::format("0x%016x") % noc_id) << std::endl;
 
     // Read buffer sizes (also, identifies which ports may receive connections)
+    std::vector<size_t> buf_sizes(16, 0);
     for (size_t port_offset = 0; port_offset < 16; port_offset += 8) {
         settingsbus_reg_t reg =
             (port_offset == 0) ? SR_READBACK_REG_BUFFALLOC0 : SR_READBACK_REG_BUFFALLOC1;
@@ -63,15 +64,24 @@ block_ctrl_base::block_ctrl_base(
         UHD_MSG(status) << "On port offset " << port_offset << ", read from reg " << reg << ", got size value " << value << std::endl;
         for (size_t i = 0; i < 8; i++) {
             size_t buf_size_log2 = (value >> (i * 8)) & 0xFF; // Buffer size in x = log2(lines)
-            _buf_sizes[i + port_offset] = BYTES_PER_LINE * (1 << buf_size_log2); // Bytes == 8 * 2^x
+            buf_sizes[i + port_offset] = BYTES_PER_LINE * (1 << buf_size_log2); // Bytes == 8 * 2^x
         }
     }
-
-    UHD_MSG(status) << "Buffer size 0: " << _buf_sizes[0] << std::endl;
+    UHD_MSG(status) << "Buffer size 0: " << buf_sizes[0] << std::endl;
 
     // Figure out block ID
+    std::string blockname = "CE"; // Until we can read the actual block names
+    _block_id.set(device_index, blockname, 0);
+    while (_tree->exists(_block_id.get_local())) {
+        _block_id++;
+    }
+    UHD_MSG(status) << "Using block ID: " << _block_id << std::endl;
 
     // Populate property tree
+    _root_path = "xbar/" + _block_id.get_local();
+    _tree->create<boost::uint64_t>(_root_path / "noc_id").set(noc_id);
+    _tree->create<std::vector<size_t> >(_root_path / "input_buffer_size").set(buf_sizes);
+    // TODO: Add IO signature
 }
 
 block_ctrl_base::~block_ctrl_base() {
@@ -79,13 +89,11 @@ block_ctrl_base::~block_ctrl_base() {
 
 void block_ctrl_base::sr_write(const boost::uint32_t reg, const boost::uint32_t data) {
     UHD_MSG(status) << str(boost::format("sr_write(%d, %08x)") % reg % data) << std::endl;
-    UHD_MSG(status) << str(boost::format("_sr_to_addr() == %d") % _sr_to_addr(reg)) << std::endl;
     _ctrl_iface->poke32(_sr_to_addr(reg), data);
 }
 
 boost::uint64_t block_ctrl_base::sr_read64(const settingsbus_reg_t reg)
 {
-    UHD_MSG(status) << str(boost::format("sr_read64(%d)") % reg) << std::endl;
     return _ctrl_iface->peek64(_sr_to_addr64(reg));
 }
 
@@ -94,19 +102,24 @@ boost::uint32_t block_ctrl_base::sr_read32(const settingsbus_reg_t reg) {
 }
 
 size_t block_ctrl_base::get_fifo_size(size_t block_port) const {
-    return _buf_sizes.at(block_port);
+    return _tree->access<std::vector<size_t> >(_root_path / "input_buffer_size").get().at(block_port);
 }
 
 boost::uint32_t block_ctrl_base::get_address() {
     return _ctrl_sid.get_dst_address();
 }
 
-void block_ctrl_base::issue_stream_command(
+void block_ctrl_base::issue_stream_cmd(
         const uhd::stream_cmd_t &stream_cmd
 ) {
-    // TODO: Avoid infinite loops by remembering who issued this stream cmd
-    // TODO: Pass this command to all upstream blocks
-    // If nothing is connected, throw an error
+    if (_upstream_blocks.empty()) {
+        UHD_MSG(warning) << "issue_stream_cmd() not implemented for " << _block_id << std::endl;
+        return;
+    }
+
+    BOOST_FOREACH(const boost::weak_ptr<block_ctrl_base> &upstream_block_ctrl, _upstream_blocks) {
+        upstream_block_ctrl->issue_stream_cmd(stream_cmd);
+    }
 }
 
 void block_ctrl_base::configure_flow_control_in(boost::uint32_t cycles, boost::uint32_t packets, size_t block_port) {
@@ -136,6 +149,10 @@ void block_ctrl_base::reset_flow_control() {
 
 void block_ctrl_base::set_bytes_per_packet(size_t bpp) {
     // TODO tbw
+}
+
+void block_ctrl_base::register_upstream_block(block_ctrl_base::sptr upstream_block) {
+    _upstream_blocks.push_back(boost::weak_ptr<block_ctrl_base>(upstream_block));
 }
 
 // vim: sw=4 et:
