@@ -51,7 +51,7 @@ public:
      * \param reg The settings register to write to.
      * \param data New value of this register.
      */
-    virtual void sr_write(const boost::uint32_t reg, const boost::uint32_t data);
+    void sr_write(const boost::uint32_t reg, const boost::uint32_t data);
 
     /*! Allows reading one register on the settings bus (64-Bit version).
      *
@@ -59,7 +59,7 @@ public:
      *
      * Returns the readback value.
      */
-    virtual boost::uint64_t sr_read64(const settingsbus_reg_t reg);
+    boost::uint64_t sr_read64(const settingsbus_reg_t reg);
 
     /*! Allows reading one register on the settings bus (32-Bit version).
      *
@@ -67,7 +67,7 @@ public:
      *
      * Returns the readback value.
      */
-    virtual boost::uint32_t sr_read32(const settingsbus_reg_t reg);
+    boost::uint32_t sr_read32(const settingsbus_reg_t reg);
 
     /*! Return the size of input buffer on a given block port.
      *
@@ -188,6 +188,13 @@ protected:
             uhd::property_tree::sptr tree
     );
 
+protected:
+    //! Property sub-tree
+    uhd::property_tree::sptr _tree;
+
+    //! Root node of this block's properties
+    uhd::fs_path _root_path;
+
 private:
     //! An object to actually send and receive the commands
     wb_iface::sptr _ctrl_iface;
@@ -195,12 +202,6 @@ private:
     //! The SID of the control transport.
     //_ctrl_sid.get_dst_address() must yield this block's address.
     uhd::sid_t _ctrl_sid;
-
-    //! Property sub-tree
-    uhd::property_tree::sptr _tree;
-
-    //! Root node of this block's properties
-    uhd::fs_path _root_path;
 
     //! The (unique) block ID.
     block_id_t _block_id;

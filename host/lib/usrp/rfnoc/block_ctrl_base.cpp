@@ -81,6 +81,8 @@ block_ctrl_base::block_ctrl_base(
     _root_path = "xbar/" + _block_id.get_local();
     _tree->create<boost::uint64_t>(_root_path / "noc_id").set(noc_id);
     _tree->create<std::vector<size_t> >(_root_path / "input_buffer_size").set(buf_sizes);
+    _tree->create<size-t>(_root_path / "bytes_per_packet").set(noc_id);
+
     // TODO: Add IO signature
 }
 
