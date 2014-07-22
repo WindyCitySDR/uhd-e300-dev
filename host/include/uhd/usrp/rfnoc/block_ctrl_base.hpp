@@ -41,6 +41,44 @@ namespace uhd {
 class UHD_API block_ctrl_base;
 class block_ctrl_base : boost::noncopyable, public boost::enable_shared_from_this<block_ctrl_base>
 {
+private:
+    //! An object to actually send and receive the commands
+    wb_iface::sptr _ctrl_iface;
+
+    //! The SID of the control transport.
+    //_ctrl_sid.get_dst_address() must yield this block's address.
+    uhd::sid_t _ctrl_sid;
+
+    //! The (unique) block ID.
+    block_id_t _block_id;
+
+    //! List of upstream blocks
+    std::vector< boost::weak_ptr<block_ctrl_base> > _upstream_blocks;
+
+protected:
+    block_ctrl_base(void) {}; // To allow pure virtual (interface) sub-classes
+
+    /*!
+     * \param ctrl_iface A valid interface that allows us to do peeks and pokes
+     * \param ctrl_sid The SID corresponding to ctrl_iface
+     * \param device_index The device index (or motherboard index).
+     * \param tree A property tree for this motherboard. Example: If the root a device's
+     *             property tree is /mboards/0, pass a subtree starting at /mboards/0
+     *             to the constructor.
+     */
+    block_ctrl_base(
+            uhd::wb_iface::sptr ctrl_iface,
+            uhd::sid_t ctrl_sid,
+            size_t device_index,
+            uhd::property_tree::sptr tree
+    );
+
+    //! Property sub-tree
+    uhd::property_tree::sptr _tree;
+
+    //! Root node of this block's properties
+    uhd::fs_path _root_path;
+
 public:
     typedef boost::shared_ptr<block_ctrl_base> sptr;
 
@@ -151,6 +189,16 @@ public:
      */
     virtual void set_bytes_per_packet(size_t bpp);
 
+    virtual size_t get_bytes_per_packet(size_t in_block_port=0, size_t out_block_port=0);
+
+    /*! Configures data flowing from port \p output_block_port to go to \p next_address
+     *
+     * In the default implementation, this will write the value in \p next_address
+     * to register SR_NEXT_DST of this blocks settings bus. The value will also
+     * have bit 16 set to 1, since some blocks require this to respect this value.
+     */
+    virtual void set_destination(boost::uint32_t next_address, size_t output_block_port = 0);
+
     /*! Register a block upstream of this one (i.e., a block that can send data to this block).
      *
      * Note: This does *not* affect any settings (flow control etc.). This literally only tells
@@ -168,45 +216,6 @@ public:
     void clear_upstream_blocks() { _upstream_blocks.clear(); };
 
     virtual ~block_ctrl_base();
-
-protected:
-    block_ctrl_base(void) {}; // To allow pure virtual (interface) sub-classes
-
-    /*!
-     * \param ctrl_iface A valid interface that allows us to do peeks and pokes
-     * \param ctrl_sid The SID corresponding to ctrl_iface
-     * \param device_index The device index (or motherboard index).
-     * \param tree A property tree for this motherboard. Example: If the root a device's
-     *             property tree is /mboards/0, pass a subtree starting at /mboards/0
-     *             to the constructor.
-     */
-    block_ctrl_base(
-            uhd::wb_iface::sptr ctrl_iface,
-            uhd::sid_t ctrl_sid,
-            size_t device_index,
-            uhd::property_tree::sptr tree
-    );
-
-private:
-    //! An object to actually send and receive the commands
-    wb_iface::sptr _ctrl_iface;
-
-    //! The SID of the control transport.
-    //_ctrl_sid.get_dst_address() must yield this block's address.
-    uhd::sid_t _ctrl_sid;
-
-    //! The (unique) block ID.
-    block_id_t _block_id;
-
-    //! List of upstream blocks
-    std::vector< boost::weak_ptr<block_ctrl_base> > _upstream_blocks;
-
-protected:
-    //! Property sub-tree
-    uhd::property_tree::sptr _tree;
-
-    //! Root node of this block's properties
-    uhd::fs_path _root_path;
 
 }; /* class block_ctrl_base */
 

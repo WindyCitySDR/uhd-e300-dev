@@ -62,10 +62,6 @@ block_ctrl_base::block_ctrl_base(
 
     // Figure out block ID
     std::string blockname = "CE"; // Until we can read the actual block names
-    std::vector<std::string> l = _tree->list("/");
-    BOOST_FOREACH(const std::string &str, l) {
-        std::cout << "Already in tree: " << str << std::endl;
-    }
     _block_id.set(device_index, blockname, 0);
     while (_tree->exists("xbar/" + _block_id.get_local())) {
         _block_id++;
@@ -138,9 +134,9 @@ void block_ctrl_base::configure_flow_control_in(boost::uint32_t cycles, boost::u
 
 void block_ctrl_base::configure_flow_control_out(boost::uint32_t buf_size_pkts, const uhd::sid_t &sid) {
     UHD_LOG
-        << "Setting downstream flow control on " << _block_id
-        << "(SID == " << sid << ")"
-        << " to: buf_size_pkts==" << buf_size_pkts << std::endl;
+        << "In block: " << _block_id
+        << " (SID == " << sid << ") "
+        << "Setting downstream flow control to: buf_size_pkts == " << buf_size_pkts << std::endl;
     // This actually takes counts between acks. So if the buffer size is 1 packet, we set
     // set this to zero.
     sr_write(SR_FLOW_CTRL_BUF_SIZE, (buf_size_pkts == 0) ? 0 : buf_size_pkts-1);
@@ -155,6 +151,27 @@ void block_ctrl_base::reset_flow_control() {
 void block_ctrl_base::set_bytes_per_packet(size_t bpp) {
     _tree->access<size_t>(_root_path / "bytes_per_packet").set(bpp);
     return;
+}
+
+size_t block_ctrl_base::get_bytes_per_packet(size_t in_block_port, size_t out_block_port)
+{
+    UHD_LOG
+        << "In block: " << _block_id
+        << "Querying bytes per packet for in_port: " << in_block_port
+        << " out_port: " << out_block_port
+        << std::endl;
+    return _tree->access<size_t>(_root_path / "bytes_per_packet").get();
+}
+
+void block_ctrl_base::set_destination(
+        boost::uint32_t next_address,
+        size_t output_block_port
+) {
+    sid_t new_sid(next_address);
+    new_sid.set_remote_src_address(_ctrl_sid.get_remote_src_address());
+    new_sid.set_local_src_address(_ctrl_sid.get_local_src_address() + output_block_port);
+    UHD_LOG << "In block: " << _block_id << "Setting SID: " << new_sid << std::endl;
+    sr_write(SR_NEXT_DST, (1<<16) | next_address);
 }
 
 void block_ctrl_base::register_upstream_block(block_ctrl_base::sptr upstream_block) {
