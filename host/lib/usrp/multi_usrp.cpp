@@ -1044,6 +1044,39 @@ public:
         return 0;
     }
 
+    void connect(
+            const uhd::rfnoc::block_id_t &src_block,
+            size_t src_block_port,
+            const uhd::rfnoc::block_id_t &dst_block,
+            size_t dst_block_port
+    ) {
+        rfnoc::block_ctrl_base::sptr src = get_device3()->get_block_ctrl(src_block);
+        rfnoc::block_ctrl_base::sptr dst = get_device3()->get_block_ctrl(dst_block);
+
+        // Check IO signatures match
+        // TODO
+
+        // Calculate SID
+        sid_t sid = dst->get_ctrl_sid();
+        sid.set_src_address((src->get_ctrl_sid().get_dst_address() & 0xFFF0) | src_block_port);
+        sid.set_local_dst_address((sid.get_local_dst_address() & 0xF0) | dst_block_port);
+
+        // Set next destination
+        src->set_destination(sid.get_dst_address(), src_block_port);
+
+        // Set flow control
+        src->configure_flow_control_out(dst->get_fifo_size(dst_block_port));
+        size_t buf_size_pkts = dst->get_fifo_size(dst_block_port) / dst->get_bytes_per_packet();
+        dst->configure_flow_control_in(0, buf_size_pkts, dst_block_port);
+
+        // Register blocks
+        dst->register_upstream_block(src);
+    }
+
+    void connect(const uhd::rfnoc::block_id_t &src_block, const uhd::rfnoc::block_id_t &dst_block) {
+        connect(src_block, 0, dst_block, 0);
+    }
+
 private:
     device::sptr _dev;
     property_tree::sptr _tree;

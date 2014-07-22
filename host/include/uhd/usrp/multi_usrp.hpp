@@ -928,6 +928,20 @@ public:
      */
     virtual boost::uint32_t get_gpio_attr(const std::string &bank, const std::string &attr, const size_t mboard = 0) = 0;
 
+
+    virtual void connect(
+                const uhd::rfnoc::block_id_t &src_block,
+                size_t src_block_port,
+                const uhd::rfnoc::block_id_t &dst_block,
+                size_t dst_block_port
+    ) = 0;
+
+    virtual void connect(
+            const uhd::rfnoc::block_id_t &src_block,
+            const uhd::rfnoc::block_id_t &dst_block
+    ) = 0;
+
+
 };
 
 }}
