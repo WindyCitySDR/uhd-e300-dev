@@ -26,7 +26,7 @@ namespace uhd {
 /*!
  * \brief Extends uhd::device for third-generation USRP devices.
  *
- * One outstanding feature of these devices is that they support
+ * One major feature of these devices is that they support
  * RFNoC (RF Network-on-Chip).
  */
 class UHD_API device3 : public uhd::device {
@@ -36,9 +36,23 @@ class UHD_API device3 : public uhd::device {
 
     /*! \brief Returns a block controller class for an RFNoC block.
      *
-     * \param unique_block_name Canonical block name (e.g. "0/FFT_1").
+     * If the given block ID is not valid (i.e. such a block does not exist
+     * on this device), it will throw a uhd::lookup_error.
+     *
+     * \param block_id Canonical block name (e.g. "0/FFT_1").
      */
-    //virtual rfnoc::block_ctrl_base::sptr get_block_ctrl(const rfnoc::block_id_t &block_id) = 0;
+    virtual rfnoc::block_ctrl_base::sptr get_block_ctrl(const rfnoc::block_id_t &block_id) const;
+
+    /*! Like get_block_ctrl(), but uses a less strict method for finding blocks.
+     *
+     * Uses block_ctrl_base::match() internally. The first block that matches
+     * the given string will be returned.
+     * As with get_block_ctrl(), this will throw a uhd::lookup_error if no block
+     * is found.
+     *
+     * \param block_id Block name (e.g. "FFT").
+     */
+    virtual rfnoc::block_ctrl_base::sptr find_block_ctrl(const std::string &block_id) const;
 
     /*!
      * \param dst Who gets this command (radio0, ce1, ...)
@@ -51,12 +65,15 @@ class UHD_API device3 : public uhd::device {
             const std::string &type,
             boost::uint32_t arg1=0,
             boost::uint32_t arg2=0
-    ) = 0;
+    ) {
+        throw uhd::not_implemented_error(str(boost::format("%s %s %d %d") % dst % type % arg1 % arg2));
+    }
 
-  //private:
-    //std::vector<
-    //rfnoc::block_ctrl_base::sptr
-
+  protected:
+    //! List of *all* RFNoC blocks available on this device.
+    //  It is the responsibility of the deriving class to make
+    //  sure this gets correctly populated.
+    std::vector< rfnoc::block_ctrl_base::sptr > _rfnoc_block_ctrl;
 };
 
 } //namespace uhd

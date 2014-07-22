@@ -30,6 +30,7 @@ SET(test_sources
     byteswap_test.cpp
     convert_test.cpp
     cast_test.cpp
+    device3_test.cpp
     dict_test.cpp
     error_test.cpp
     gain_group_test.cpp
