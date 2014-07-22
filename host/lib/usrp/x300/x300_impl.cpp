@@ -892,11 +892,13 @@ void x300_impl::setup_mb(const size_t mb_i, const uhd::device_addr_t &dev_addr)
         // derivative using the noc-id
 
         // For now, it's just block_ctrl
-        mb._rfnoc_block_ctrl[i] = uhd::rfnoc::block_ctrl::make(
+        mb._rfnoc_block_ctrl.push_back(
+            uhd::rfnoc::block_ctrl::make(
                 ctrl,
                 ctrl_sid,
                 mb_i,
                 _tree->subtree(mb_path)
+            )
         );
     }
     //////////////// RFNOC /////////////////
