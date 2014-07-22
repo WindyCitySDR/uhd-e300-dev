@@ -370,7 +370,25 @@ e300_impl::e300_impl(const uhd::device_addr_t &device_addr)
         _sensor_manager = e300_sensor_manager::make_local();
     }
 
-    _ubx_control = boost::make_shared<uhd::usrp::gps::ublox::ubx::control>("/dev/ttyPS1", 9600);
+    if (_xport_path == AXI) {
+        UHD_MSG(status) << "Detecting internal GPSDO.... " << std::flush;
+        try {
+            _gps = boost::make_shared<gps::ublox::ubx::control>("/dev/ttyPS1", 9600);
+        } catch (std::exception &e) {
+            UHD_MSG(error) << "An error occured making GPSDO control: " << e.what() << std::endl;
+        }
+        if (_gps and _gps->gps_detected()) {
+            UHD_MSG(status) << "found" << std::endl;
+            //const std::string mb_path = "mboards/0";
+            //BOOST_FOREACH(const std::string &name, _gps->get_sensors())
+            //{
+                //_tree->create<sensor_value_t>(mb_path / "sensors" / name)
+                    //.publish(boost::bind(&uhd::gps_ctrl::get_sensor, _gps, name));
+            //}
+        } else {
+            UHD_MSG(status) << "not found" << std::endl;
+        }
+    }
 
     // Verify we can talk to the e300 core control registers ...
     UHD_MSG(status) << "Initializing core control..." << std::endl;
@@ -412,6 +430,15 @@ e300_impl::e300_impl(const uhd::device_addr_t &device_addr)
     _tree->create<int>(mb_path / "sensors");
     _tree->create<sensor_value_t>(mb_path / "sensors" / "temp")
         .publish(boost::bind(&e300_sensor_manager::get_mb_temp, _sensor_manager));
+
+    if (_gps and _gps->gps_detected()) {
+        BOOST_FOREACH(const std::string &name, _gps->get_sensors())
+        {
+            _tree->create<sensor_value_t>(mb_path / "sensors" / name)
+                .publish(boost::bind(&uhd::gps_ctrl::get_sensor, _gps, name));
+        }
+    }
+
 
     ////////////////////////////////////////////////////////////////////
     // setup the mboard eeprom
@@ -483,7 +510,8 @@ e300_impl::e300_impl(const uhd::device_addr_t &device_addr)
     //setup reference source props
     _tree->create<std::string>(mb_path / "clock_source" / "value")
         .subscribe(boost::bind(&e300_impl::_update_clock_source, this, _1));
-    static const std::vector<std::string> clock_sources = boost::assign::list_of("internal")("external")("gpsdo");
+    static const std::vector<std::string> clock_sources = boost::assign::list_of("internal");
+    // not implemented ("external")("gpsdo");
     _tree->create<std::vector<std::string> >(mb_path / "clock_source" / "options").set(clock_sources);
 
     ////////////////////////////////////////////////////////////////////
@@ -547,11 +575,35 @@ e300_impl::e300_impl(const uhd::device_addr_t &device_addr)
     _tree->access<subdev_spec_t>(mb_path / "rx_subdev_spec").set(rx_spec);
     _tree->access<subdev_spec_t>(mb_path / "tx_subdev_spec").set(tx_spec);
 
+    if (_gps and _gps->gps_detected()) {
+            _tree->access<std::string>(mb_path / "clock_source" / "value").set("gpsdo");
+            _tree->access<std::string>(mb_path / "time_source" / "value").set("gpsdo");
+            UHD_MSG(status) << "References initialized to GPSDO sources" << std::endl;
+            UHD_MSG(status) << "Initializing time to the GPSDO time...";
+            const time_t tp = time_t(_gps->get_sensor("gps_time").to_int());
+            _tree->access<time_spec_t>(mb_path / "time" / "pps").set(time_spec_t(tp));
+            //wait for time to be set (timeout after 1 second)
+            for (int i = 0; i < 10; i++)
+            {
+                boost::this_thread::sleep(boost::posix_time::milliseconds(100));
+                if(tp == (_tree->access<time_spec_t>(mb_path / "time" / "pps").get()).get_full_secs()) {
+                    std::cout << "done" << std::endl;
+                    break;
+                }
+            }
+    } else {
+            _tree->access<std::string>(mb_path / "clock_source" / "value").set("internal");
+            _tree->access<std::string>(mb_path / "time_source" / "value").set("internal");
+            UHD_MSG(status) << "References initialized to internal sources" << std::endl;
+    }
+
     // init to default time and clock source
-    _tree->access<std::string>(mb_path / "clock_source" / "value").set(
-        e300::DEFAULT_CLOCK_SRC);
-    _tree->access<std::string>(mb_path / "time_source" / "value").set(
-        e300::DEFAULT_TIME_SRC);
+    //_tree->access<std::string>(mb_path / "clock_source" / "value").set(
+        //e300::DEFAULT_CLOCK_SRC);
+    //_tree->access<std::string>(mb_path / "time_source" / "value").set(
+        ////e300::DEFAULT_TIME_SRC);
+        //"gpsdo");
+    //UHD_MSG(status) << "INIT DONE" << std::endl;
 }
 
 boost::uint8_t e300_impl::_get_internal_gpio(
@@ -780,6 +832,7 @@ void e300_impl::_setup_dest_mapping(const boost::uint32_t sid, const size_t whic
 
 void e300_impl::_update_time_source(const std::string &source)
 {
+    UHD_MSG(status) << boost::format("Setting time source to %s") % source << std::endl;
     if (source == "none" or source == "internal") {
         _misc.pps_sel = global_regs::PPS_INT;
     } else if (source == "gpsdo") {

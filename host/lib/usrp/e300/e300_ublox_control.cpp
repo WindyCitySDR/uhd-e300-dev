@@ -3,12 +3,16 @@
 #include <boost/bind.hpp>
 #include <boost/make_shared.hpp>
 #include <boost/lexical_cast.hpp>
+#include <boost/assign/list_of.hpp>
+#include "boost/date_time/posix_time/posix_time.hpp"
+
 #include <iostream>
 
 #include "e300_ublox_control.hpp"
 
 #include <uhd/utils/byteswap.hpp>
 #include <uhd/utils/msg.hpp>
+#include <uhd/exception.hpp>
 
 
 namespace uhd { namespace usrp { namespace gps {
@@ -20,16 +24,15 @@ control::control(const std::string &node, const size_t baud_rate)
     _decode_init();
     _serial = boost::make_shared<async_serial>(node, baud_rate);
     _serial->set_read_callback(boost::bind(&control::_rx_callback, this, _1, _2));
+    //_set_locked(false);
 
-    //_send_message(MSG_MON_HW, NULL, 0);
-    _send_message(MSG_MON_VER, NULL, 0);
-    //
     //_send_message(MSG_CFG_PRT, NULL, 0);
     //_send_message(MSG_CFG_RATE, NULL, 0);
     //configure_rates(1000,1,0);
     //_send_message(MSG_CFG_RATE, NULL, 0);
+    //
+    _detect();
 
-    UHD_MSG(status) << "Turning off NMEA ... " << std::endl;
     configure_message_rate(MSG_GLL, 0);
     configure_message_rate(MSG_GSV, 0);
     configure_message_rate(MSG_GGA, 0);
@@ -42,14 +45,58 @@ control::control(const std::string &node, const size_t baud_rate)
     configure_antenna(0x001b, 0x8251);
 
 
-    UHD_MSG(status) << "Turning on PPS output ... " << std::endl;
-    configure_pps(0xf4240, 0x3d090, 1, 1, 1, 0, 0, 0);
+    //UHD_MSG(status) << "Turning on PPS output ... " << std::endl;
+    configure_pps(0xf4240, 0x3d090, 1, 0 /* utc */, 1, 0, 0, 0);
+
+    _sensors = boost::assign::list_of("gps_locked")("gps_time");
+}
+
+bool control::gps_detected(void)
+{
+    return _detected;
+}
+
+void control::_detect(void)
+{
+    _send_message(MSG_MON_VER, NULL, 0);
+    try{
+        _wait_for_ack(MSG_MON_VER, 0.5);
+    } catch (uhd::runtime_error &e) {
+        _detected = false;
+        return;
+    }
+    _detected = true;
+}
+
+std::vector<std::string> control::get_sensors(void)
+{
+    return _sensors;
+}
+
+uhd::sensor_value_t control::get_sensor(std::string key)
+{
+    if (key == "gps_time") {
+        return sensor_value_t("GPS epoch time", int(_get_epoch_time()), "seconds");
+    } else if (key == "gps_locked") {
+        bool lock;
+        _locked.wait_and_see(lock);
+        return sensor_value_t("GPS lock status", lock, "locked", "unlocked");
+    } else
+        throw uhd::key_error(str(boost::format("sensor %s unknown.") % key));
+}
+
+std::time_t control::_get_epoch_time(void)
+{
+    //std::cout << "EPOCH=" << (_get_time() - boost::posix_time::from_time_t(0)).total_seconds() << std::endl;
+    boost::posix_time::ptime ptime;
+    _ptime.wait_and_see(ptime);
+    return (ptime - boost::posix_time::from_time_t(0)).total_seconds();
 }
 
 control::~control(void)
 {
     // turn it all off again
-    configure_antenna(0x001a, 0x8251);
+    //configure_antenna(0x001a, 0x8251);
     configure_pps(0xf4240, 0x3d090, 1, 1, 0, 0, 0, 0);
 }
 
@@ -129,7 +176,10 @@ void control::configure_antenna(
         MSG_CFG_ANT,
         reinterpret_cast<const uint8_t*>(&cfg_ant),
         sizeof(cfg_ant));
-    _wait_for_ack(MSG_CFG_ANT, 1.0);
+    if (_wait_for_ack(MSG_CFG_ANT, 1.0) < 0) {
+        throw uhd::runtime_error("Didn't get an ACK for antenna configuration.");
+    }
+
 }
 
 void control::configure_pps(
@@ -155,7 +205,9 @@ void control::configure_pps(
         MSG_CFG_TP,
         reinterpret_cast<const uint8_t*>(&cfg_tp),
         sizeof(cfg_tp));
-    _wait_for_ack(MSG_CFG_TP, 1.0);
+    if (_wait_for_ack(MSG_CFG_TP, 1.0) < 0) {
+        throw uhd::runtime_error("Didn't get an ACK for PPS configuration.");
+    }
 }
 
 
@@ -174,7 +226,7 @@ void control::_rx_callback(const char *data, unsigned int len)
     }
 }
 
-int control::_parse_char(const boost::uint8_t b)
+void control::_parse_char(const boost::uint8_t b)
 {
     int ret = 0;
     //std::cout << boost::format("in state %ld got: 0x%lx") % _decode_state % int(b) << std::endl;
@@ -234,12 +286,12 @@ int control::_parse_char(const boost::uint8_t b)
 
         _add_byte_to_checksum(b);
         _rx_payload_length |= (b << 8);
-        if (_rx_payload_length > sizeof(_buf)) {
-            std::cout << "payload length b0rked, resetting ...." << std::endl;
-            _decode_init();
-            break;
+        if(_payload_rx_init()) {
+            _decode_init(); // we failed, give up for this one
+        } else {
+            _decode_state = _rx_payload_length ?
+                DECODE_PAYLOAD : DECODE_CHKSUM1;
         }
-        _decode_state = DECODE_PAYLOAD;
         break;
 
     // we're expecting payload
@@ -369,13 +421,14 @@ int control::_payload_rx_add_mon_ver(const boost::uint8_t b)
 
 int control::_payload_rx_done(void)
 {
+    int ret = 0;
     //if (_rxmsg_state != RXMSG_HANDLE) {
         //return 0;
     //}
 
     switch (_rx_msg) {
     case MSG_MON_VER:
-        std::cout << boost::format("MON-VER: FW-Version %s") % (_buf.payload_rx_mon_ver_part1.sw_version) << std::endl;
+        //std::cout << boost::format("MON-VER: FW-Version %s") % (_buf.payload_rx_mon_ver_part1.sw_version) << std::endl;
         break;
 
     case MSG_MON_HW:
@@ -383,43 +436,54 @@ int control::_payload_rx_done(void)
         break;
 
     case MSG_ACK_ACK:
-        std::cout << boost::format("ACK-ACK for 0x%lx 0x%lx")
-            % int(_buf.payload_rx_ack_ack.cls_id) % int(_buf.payload_rx_ack_ack.msg_id) << std::endl;
+        //std::cout << boost::format("ACK-ACK for 0x%lx 0x%lx")
+            //% int(_buf.payload_rx_ack_ack.cls_id) % int(_buf.payload_rx_ack_ack.msg_id) << std::endl;
         if ((_ack_state == ACK_WAITING) and (_buf.payload_rx_ack_ack.msg == _ack_waiting_msg))
             _ack_state = ACK_GOT_ACK;
         break;
 
     case MSG_ACK_NAK:
-        std::cout << boost::format("ACK-NAK for 0x%lx 0x%lx")
-            % int(_buf.payload_rx_ack_ack.cls_id) % int(_buf.payload_rx_ack_ack.msg_id) << std::endl;
+        //std::cout << boost::format("ACK-NAK for 0x%lx 0x%lx")
+            //% int(_buf.payload_rx_ack_ack.cls_id) % int(_buf.payload_rx_ack_ack.msg_id) << std::endl;
         if ((_ack_state == ACK_WAITING) and (_buf.payload_rx_ack_nak.msg == _ack_waiting_msg))
             _ack_state = ACK_GOT_NAK;
 
         break;
 
     case MSG_CFG_ANT:
-        std::cout << boost::format("CFG-ANT for 0x%lx 0x%lx")
-            % uhd::wtohx<boost::uint16_t>(_buf.payload_tx_cfg_ant.flags)
-            % uhd::wtohx<boost::uint16_t>(_buf.payload_tx_cfg_ant.pins) << std::endl;
+        //std::cout << boost::format("CFG-ANT for 0x%lx 0x%lx")
+            //% uhd::wtohx<boost::uint16_t>(_buf.payload_tx_cfg_ant.flags)
+            //% uhd::wtohx<boost::uint16_t>(_buf.payload_tx_cfg_ant.pins) << std::endl;
         break;
 
     case MSG_NAV_TIMEUTC:
-        std::cout << boost::format("NAV-TIMEUTC %u/%u/%u %02u:%02u:%02u - valid? 0x%lx")
-            % boost::uint16_t(_buf.payload_rx_nav_timeutc.day)
-            % boost::uint16_t(_buf.payload_rx_nav_timeutc.month)
-            % uhd::wtohx<boost::uint16_t>(_buf.payload_rx_nav_timeutc.year)
-            % boost::int16_t(_buf.payload_rx_nav_timeutc.hour)
-            % boost::int16_t(_buf.payload_rx_nav_timeutc.min)
-            % boost::int16_t(_buf.payload_rx_nav_timeutc.sec)
-            % boost::int16_t(_buf.payload_rx_nav_timeutc.valid)
-            << std::endl;
+        _ptime.update(boost::posix_time::ptime(
+            boost::gregorian::date(
+                boost::gregorian::greg_year(uhd::wtohx<boost::uint16_t>(
+                    _buf.payload_rx_nav_timeutc.year)),
+                boost::gregorian::greg_month(_buf.payload_rx_nav_timeutc.month),
+                boost::gregorian::greg_day(_buf.payload_rx_nav_timeutc.day)),
+            (boost::posix_time::hours(_buf.payload_rx_nav_timeutc.hour)
+            + boost::posix_time::minutes(_buf.payload_rx_nav_timeutc.min)
+            + boost::posix_time::seconds(_buf.payload_rx_nav_timeutc.sec))));
+	//std::cout << boost::format("NAV-TIMEUTC %u/%u/%u %02u:%02u:%02u - valid? 0x%lx")
+	    //% boost::uint16_t(_buf.payload_rx_nav_timeutc.day)
+	    //% boost::uint16_t(_buf.payload_rx_nav_timeutc.month)
+	    //% uhd::wtohx<boost::uint16_t>(_buf.payload_rx_nav_timeutc.year)
+	    //% boost::int16_t(_buf.payload_rx_nav_timeutc.hour)
+	    //% boost::int16_t(_buf.payload_rx_nav_timeutc.min)
+	    //% boost::int16_t(_buf.payload_rx_nav_timeutc.sec)
+	    //% boost::int16_t(_buf.payload_rx_nav_timeutc.valid)
+	    //<< std::endl;
         break;
 
     case MSG_NAV_SOL:
-        std::cout << boost::format("NAV-SOL - valid? 0x%lx")
-            % boost::int16_t(_buf.payload_rx_nav_sol.gps_fix)
-            << std::endl;
+        //_set_locked(_buf.payload_rx_nav_sol.gps_fix > 0);
+        _locked.update(_buf.payload_rx_nav_sol.gps_fix > 0);
         break;
+        //std::cout << boost::format("NAV-SOL - valid? 0x%lx")
+            //% boost::int16_t(_buf.payload_rx_nav_sol.gps_fix)
+            //<< std::endl;
 
     default:
         std::cout << boost::format("Got unknown message %lx , with good checksum [") % int(_rx_msg);
@@ -428,6 +492,7 @@ int control::_payload_rx_done(void)
         std::cout << "]"<< std::endl;
         break;
     };
+    return ret;
 }
 
 void control::_send_message(
@@ -474,13 +539,13 @@ int control::_wait_for_ack(
     do {
         if(_ack_state == ACK_GOT_ACK)
             return 0;
-        else if (_ack_state == ACK_GOT_NAK)
-            if (_ack_state == ACK_GOT_NAK) {
+        else if (_ack_state == ACK_GOT_NAK) {
             return -1;
         }
         boost::this_thread::sleep(boost::posix_time::milliseconds(20));
     } while (boost::get_system_time() < timeout_time);
 
+    // we get here ... it's a timeout
     _ack_state = ACK_IDLE;
     return ret;
 }

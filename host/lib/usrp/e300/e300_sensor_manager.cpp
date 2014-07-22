@@ -70,6 +70,41 @@ public:
                 uhd::ntohx(transaction.value)),
             "C");
     }
+
+    uhd::sensor_value_t get_gps_lock(void)
+    {
+        boost::mutex::scoped_lock(_mutex);
+        sensor_transaction_t transaction;
+        transaction.which = uhd::htonx<boost::uint32_t>(GPS_LOCK);
+        {
+            uhd::transport::managed_send_buffer::sptr buff
+                = _xport->get_send_buff(1.0);
+            if (not buff or buff->size() < sizeof(transaction)) {
+                throw uhd::runtime_error("sensor proxy send timeout");
+            }
+            std::memcpy(
+                buff->cast<void *>(),
+                &transaction,
+                sizeof(transaction));
+            buff->commit(sizeof(transaction));
+        }
+        {
+            uhd::transport::managed_recv_buffer::sptr buff
+                = _xport->get_recv_buff(1.0);
+
+            if (not buff or buff->size() < sizeof(transaction))
+                throw uhd::runtime_error("sensor proxy recv timeout");
+
+            std::memcpy(
+                &transaction,
+                buff->cast<const void *>(),
+                sizeof(transaction));
+        }
+        UHD_ASSERT_THROW(uhd::ntohx<boost::uint32_t>(transaction.which) == GPS_LOCK);
+        // TODO: Use proper serialization here ...
+        return sensor_value_t("GPS lock status", static_cast<bool>(uhd::ntohx(transaction.value)), "locked", "unlocked");
+    }
+
 private:
     uhd::transport::zero_copy_if::sptr _xport;
     boost::mutex                       _mutex;
@@ -105,6 +140,17 @@ public:
             e300_get_sysfs_attr(E300_TEMP_SYSFS, "in_temp0_offset"));
         return sensor_value_t("temp", (raw + offset) * scale / 1000, "C");
     }
+
+    uhd::sensor_value_t get_gps_lock(void)
+    {
+        return sensor_value_t("GPS lock status", false, "locked", "unlocked");
+    }
+
+    uhd::sensor_value_t get_gps_time(void)
+    {
+        return sensor_value_t("GPS epoch time", int(0), "seconds");
+    }
+
 
 };
 }}}

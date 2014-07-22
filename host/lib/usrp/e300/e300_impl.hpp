@@ -288,7 +288,7 @@ private: // members
     uhd::transport::zero_copy_xport_params _data_xport_params;
     uhd::transport::zero_copy_xport_params _ctrl_xport_params;
     gpio_t                                 _misc;
-    boost::shared_ptr<uhd::usrp::gps::ublox::ubx::control> _ubx_control;
+    boost::shared_ptr<gps::ublox::ubx::control> _gps;
 };
 
 }}} // namespace

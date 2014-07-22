@@ -31,21 +31,22 @@ struct sensor_transaction_t {
     boost::uint32_t which;
     union {
         boost::uint32_t value;
-        char nmea[83];
-        bool lock;
+        boost::uint32_t value64;
     };
 };
 
 
 
-enum temp_sensor {ZYNQ_TEMP=0, GPRMC=1,
-                  GPGGA=2, NMEA=3, GPS_LOCK=4};
+enum sensor {ZYNQ_TEMP=0, GPS_TIME=1,
+             GPS_LOCK=2};
 
 class e300_sensor_manager : boost::noncopyable
 {
 public:
     typedef boost::shared_ptr<e300_sensor_manager> sptr;
     virtual uhd::sensor_value_t get_mb_temp(void) = 0;
+    virtual uhd::sensor_value_t get_gps_lock(void) = 0;
+    //virtual uhd::sensor_value_t get_gps_time(void) = 0;
 
     static sptr make_proxy(uhd::transport::zero_copy_if::sptr xport);
     static sptr make_local(void);

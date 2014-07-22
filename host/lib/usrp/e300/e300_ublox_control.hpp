@@ -5,6 +5,8 @@
 #include <boost/noncopyable.hpp>
 #include <boost/asio.hpp>
 #include <uhd/config.hpp>
+#include <uhd/usrp/gps_ctrl.hpp>
+#include <uhd/types/sensors.hpp>
 
 #include "e300_async_serial.hpp"
 
@@ -186,19 +188,6 @@ struct payload_tx_cfg_rate_t
 };
 
 // tx cfg-msg
-//struct payload_tx_cfg_msg_t
-//{
-    //union {
-        //boost::uint16_t msg;
-        //struct {
-            //boost::uint8_t msg_cls;
-            //boost::uint8_t msg_id;
-        //};
-    //};
-    //boost::uint8_t rate;
-//};
-
-// tx cfg-msg
 struct payload_tx_cfg_msg_t
 {
     boost::uint16_t msg;
@@ -283,12 +272,65 @@ typedef union {
 } buf_t;
 
 
-class UHD_API control : boost::noncopyable
+template <typename T>
+class sensor_entry
+{
+public:
+    sensor_entry() : _seen(false)
+    {
+    }
+
+    void update(const T &val)
+    {
+        boost::mutex::scoped_lock l(_mutex);
+        _value = val;
+        _seen = false;
+        l.unlock();
+        _cond.notify_one();
+    }
+
+    bool seen() const
+    {
+        boost::mutex::scoped_lock l(_mutex);
+        return _seen;
+    }
+
+    bool try_and_see(T &val)
+    {
+        boost::mutex::scoped_lock l(_mutex);
+        if (_seen)
+            return false;
+
+        val = _value;
+        _seen = true;
+        return true;
+    }
+
+    void wait_and_see(T &val)
+    {
+        boost::mutex::scoped_lock l(_mutex);
+        while(_seen)
+        {
+            _cond.wait(l);
+	    std::cout << "Already seen ... " << std::endl;
+        }
+        val = _value;
+        _seen = true;
+    }
+
+private: // members
+    T                         _value;
+    boost::mutex              _mutex;
+    boost::condition_variable _cond;
+    bool                _seen;
+};
+
+class control : public virtual uhd::gps_ctrl
 {
 public:
     control(const std::string &node, const size_t baud_rate);
 
-    ~control(void);
+    virtual ~control(void);
 
     void configure_message_rate(
         const boost::uint16_t msg,
@@ -312,6 +354,11 @@ public:
         boost::uint16_t meas_rate,
         boost::uint16_t nav_rate,
         boost::uint16_t time_ref);
+
+    // gps_ctrl interface
+    bool gps_detected(void);
+    std::vector<std::string> get_sensors(void);
+    uhd::sensor_value_t get_sensor(std::string key);
 
 private: // types
     enum decoder_state_t {
@@ -339,10 +386,15 @@ private: // types
         ACK_GOT_ACK,
         ACK_GOT_NAK
     };
+
 private: // methods
+    std::time_t _get_epoch_time(void);
+
     void _decode_init(void);
 
     void _add_byte_to_checksum(const boost::uint8_t b);
+
+    void _detect(void);
 
     void _send_message(
         const boost::uint16_t msg,
@@ -360,7 +412,7 @@ private: // methods
 
     void _rx_callback(const char *data, unsigned len);
 
-    int _parse_char(const boost::uint8_t b);
+    void _parse_char(const boost::uint8_t b);
 
     int _payload_rx_init(void);
 
@@ -371,26 +423,34 @@ private: // methods
     int _payload_rx_done(void);
 
 private: // members
-    decoder_state_t          _decode_state;
-    rxmsg_state_t            _rxmsg_state;
+    // gps_ctrl stuff
+    bool                                   _detected;
+    std::vector<std::string>               _sensors;
 
-    ack_state_t              _ack_state;
-    boost::uint16_t          _ack_waiting_msg;
+    sensor_entry<bool>                     _locked;
+    sensor_entry<boost::posix_time::ptime> _ptime;
 
-    boost::uint8_t           _rx_ck_a;
-    boost::uint8_t           _rx_ck_b;
+    // decoder state
+    decoder_state_t                        _decode_state;
+    rxmsg_state_t                          _rxmsg_state;
 
-    boost::uint16_t          _rx_payload_length;
-    size_t                   _rx_payload_index;
-    boost::uint16_t          _rx_msg;
+    ack_state_t                            _ack_state;
+    boost::uint16_t                        _ack_waiting_msg;
 
-    rxmsg_state_t            _rx_state;
+    boost::uint8_t                         _rx_ck_a;
+    boost::uint8_t                         _rx_ck_b;
 
-    boost::shared_ptr<async_serial> _serial;
+    boost::uint16_t                        _rx_payload_length;
+    size_t                                 _rx_payload_index;
+    boost::uint16_t                        _rx_msg;
+
+    rxmsg_state_t                          _rx_state;
+
+    boost::shared_ptr<async_serial>        _serial;
 
     // this has to be at the end of the
     // class to be valid C++
-    buf_t                    _buf;
+    buf_t                                  _buf;
 };
 
 }} // namespace ublox::ubx
