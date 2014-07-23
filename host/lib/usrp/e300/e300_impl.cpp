@@ -240,6 +240,8 @@ static device::sptr e300_make(const device_addr_t &device_addr)
  **********************************************************************/
 e300_impl::e300_impl(const uhd::device_addr_t &device_addr) : _sid_framer(0)
 {
+    _type = uhd::device::USRP;
+
     _async_md.reset(new async_md_type(1000/*messages deep*/));
 
     e300_impl_begin:
@@ -1160,5 +1162,5 @@ void e300_impl::_update_atrs(const size_t &fe)
 
 UHD_STATIC_BLOCK(register_e300_device)
 {
-    device::register_device(&uhd::usrp::e300::e300_find, &uhd::usrp::e300::e300_make);
+    device::register_device(&uhd::usrp::e300::e300_find, &uhd::usrp::e300::e300_make, uhd::device::USRP);
 }
