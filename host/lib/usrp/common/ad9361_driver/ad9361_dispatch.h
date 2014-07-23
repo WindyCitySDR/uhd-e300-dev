@@ -1,5 +1,5 @@
 //
-// Copyright 2013 Ettus Research LLC
+// Copyright 2014 Ettus Research LLC
 //
 
 #ifndef INCLUDED_AD9361_DISPATCH_H
@@ -11,7 +11,7 @@ extern "C" {
 
 #include <ad9361_transaction.h>
 
-extern void ad9361_dispatch(/*const char request[64]*/const char* request, /*char response[64]*/char* response);
+extern void ad9361_dispatch(const char* request, char* response);
 
 typedef void (*msgfn)(const char*, ...);
 

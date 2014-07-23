@@ -347,23 +347,35 @@ public:
         ::close(_fd);
     }
 
-    uhd::transport::zero_copy_if::sptr make_recv_xport(const size_t which_stream, const uhd::device_addr_t &args)
+    uhd::transport::zero_copy_if::sptr make_recv_xport(
+        const size_t which_stream,
+        const uhd::transport::zero_copy_xport_params &params)
     {
-        return this->_make_xport(which_stream, args, true);
+        return this->_make_xport(which_stream, params, true);
     }
 
-    uhd::transport::zero_copy_if::sptr make_send_xport(const size_t which_stream, const uhd::device_addr_t &args)
+    uhd::transport::zero_copy_if::sptr make_send_xport(
+        const size_t which_stream,
+        const uhd::transport::zero_copy_xport_params &params)
     {
-        return this->_make_xport(which_stream, args, false);
+        return this->_make_xport(which_stream, params, false);
+    }
+
+    size_t get_global_regs_base() const
+    {
+        return REG_BASE(_ctrl_space);
     }
 
 private:
-    uhd::transport::zero_copy_if::sptr _make_xport(const size_t which_stream, const uhd::device_addr_t &args, const bool is_recv)
+    uhd::transport::zero_copy_if::sptr _make_xport(
+        const size_t which_stream,
+        const uhd::transport::zero_copy_xport_params &params,
+        const bool is_recv)
     {
         boost::mutex::scoped_lock lock(_setup_mutex);
 
-        const size_t frame_size(size_t(args.cast<double>((is_recv)? "recv_frame_size" : "send_frame_size", DEFAULT_FRAME_SIZE)));
-        const size_t num_frames(size_t(args.cast<double>((is_recv)? "num_recv_frames" : "num_send_frames", DEFAULT_NUM_FRAMES)));
+        const size_t frame_size = is_recv ? params.recv_frame_size : params.send_frame_size;
+        const size_t num_frames = is_recv ? params.num_recv_frames : params.num_send_frames;
         size_t &entries_in_use = (is_recv)? _recv_entries_in_use : _send_entries_in_use;
 
         __mem_addrz_t addrs;
@@ -383,19 +395,8 @@ private:
         UHD_ASSERT_THROW(_send_entries_in_use <= H2S_NUM_CMDS);
         UHD_ASSERT_THROW(_bytes_in_use <= _config.buff_length);
 
-        //program the dest table based on the stream
-        //TODO make this part of SID allocation
-        if (is_recv)
-        {
-            zf_poke32(DST_BASE(_ctrl_space) + which_stream*4, which_stream);
-        }
 
         return xport;
-    }
-
-    size_t get_global_regs_base() const
-    {
-        return REG_BASE(_ctrl_space);
     }
 
     e300_fifo_config_t _config;
@@ -422,7 +423,7 @@ e300_fifo_interface::sptr e300_fifo_interface::make(const e300_fifo_config_t &co
 
 e300_fifo_interface::sptr e300_fifo_interface::make(const e300_fifo_config_t &)
 {
-    throw uhd::runtime_error("e300_fifo_interface::make() !E300_NATIVE");
+    throw uhd::assertion_error("e300_fifo_interface::make() !E300_NATIVE");
 }
 
 #endif //E300_NATIVE

@@ -1,18 +1,17 @@
 //
-// Copyright 2013 Ettus Research LLC
+// Copyright 2014 Ettus Research LLC
 //
 
 #include <uhd/utils/msg.hpp>
 #include <cmath>
 #include <cstdlib>
-#include <cstdio>
 #include <cstring>
-
+#include <stdint.h>
 #include <ad9361_platform.h>
 #include "ad9361_ctrl.hpp"
-
-#include <boost/cstdint.hpp>
-#include <boost/thread.hpp>
+#include <stdio.h>
+#include <boost/date_time/posix_time/posix_time.hpp>
+#include <boost/thread/thread.hpp>
 
 //If the platform for the AD9361 driver is UHD (host) then the handle is simply
 //a pointer to a device class instance

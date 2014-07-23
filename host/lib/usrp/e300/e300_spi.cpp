@@ -16,11 +16,10 @@
 //
 
 #include <uhd/config.hpp>
-#include "e300_impl.hpp"
+#include <uhd/exception.hpp>
 #include "e300_spi.hpp"
 
 #ifdef E300_NATIVE
-#include <uhd/exception.hpp>
 #include <boost/thread.hpp>
 #include <boost/format.hpp>
 
@@ -122,7 +121,7 @@ namespace uhd { namespace usrp { namespace e300 {
 
 spi::sptr spi::make(const std::string &)
 {
-    throw uhd::runtime_error("spi::make() !E300_NATIVE");
+    throw uhd::assertion_error("spi::make() !E300_NATIVE");
 }
 }}};
 #endif //E300_NATIVE

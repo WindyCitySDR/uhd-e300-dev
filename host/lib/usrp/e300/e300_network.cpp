@@ -20,13 +20,18 @@
 #include "ad9361_ctrl.hpp"
 #include "ad9361_driver/ad9361_transaction.h"
 
+#include "e300_sensor_manager.hpp"
+
 #include <uhd/utils/msg.hpp>
+#include <uhd/utils/byteswap.hpp>
 #include <boost/asio.hpp>
 #include <boost/thread.hpp>
 
 using namespace uhd;
 using namespace uhd::transport;
 namespace asio = boost::asio;
+
+namespace uhd { namespace usrp { namespace e300 {
 
 static const size_t E300_NETWORK_DEBUG = false;
 
@@ -187,7 +192,7 @@ static void e300_codec_ctrl_tunnel(
 static void e300_global_regs_tunnel(
     const std::string &name,
     boost::shared_ptr<asio::ip::udp::socket> socket,
-    uhd::usrp::e300::global_regs::sptr regs,
+    global_regs::sptr regs,
     asio::ip::udp::endpoint *endpoint,
     bool *running
 )
@@ -207,14 +212,14 @@ static void e300_global_regs_tunnel(
                 continue;
             }
 
-            uhd::usrp::e300::global_regs_transaction_t *in =
-                reinterpret_cast<uhd::usrp::e300::global_regs_transaction_t *>(in_buff);
+            global_regs_transaction_t *in =
+                reinterpret_cast<global_regs_transaction_t *>(in_buff);
 
-            if(in->is_poke) {
-                regs->poke32(in->addr, in->data);
+            if(uhd::ntohx<boost::uint32_t>(in->is_poke)) {
+                regs->poke32(uhd::ntohx<boost::uint32_t>(in->addr), uhd::ntohx<boost::uint32_t>(in->data));
             }
             else {
-                in->data = regs->peek32(in->addr);
+                in->data = uhd::htonx<boost::uint32_t>(regs->peek32(uhd::ntohx<boost::uint32_t>(in->addr)));
                 socket->send_to(asio::buffer(in_buff, 16), *endpoint);
             }
         }
@@ -231,11 +236,108 @@ static void e300_global_regs_tunnel(
     *running = false;
 }
 
+static void e300_sensor_tunnel(
+    const std::string &name,
+    boost::shared_ptr<asio::ip::udp::socket> socket,
+    e300_sensor_manager::sptr sensor_manager,
+    asio::ip::udp::endpoint *endpoint,
+    bool *running
+)
+{
+    asio::ip::udp::endpoint _endpoint;
+    try
+    {
+        while (*running)
+        {
+            uint8_t in_buff[128] = {};
+
+            const size_t num_bytes = socket->receive_from(asio::buffer(in_buff), *endpoint);
+
+            if (num_bytes < sizeof(sensor_transaction_t)) {
+                std::cout << "Received short packet: " << num_bytes << std::endl;
+                continue;
+            }
+
+            uhd::usrp::e300::sensor_transaction_t *in =
+                reinterpret_cast<uhd::usrp::e300::sensor_transaction_t *>(in_buff);
+
+            if (uhd::ntohx(in->which) == ZYNQ_TEMP) {
+                sensor_value_t temp = sensor_manager->get_mb_temp();
+                // TODO: This is ugly ... use proper serialization
+                in->value = uhd::htonx<boost::uint32_t>(
+                    e300_sensor_manager::pack_float_in_uint32_t(temp.to_real()));
+            }
+
+
+            socket->send_to(asio::buffer(in_buff, sizeof(sensor_transaction_t)), *endpoint);
+        }
+    }
+    catch(const std::exception &ex)
+    {
+        UHD_MSG(error) << "e300_sensor_tunnel exit " << name << " " << ex.what() << std::endl;
+    }
+    catch(...)
+    {
+        UHD_MSG(error) << "e300_sensor_tunnel exit " << name << std::endl;
+    }
+    UHD_MSG(status) << "e300_sensor_tunnel exit " << name << std::endl;
+    *running = false;
+}
+
+static void e300_i2c_tunnel(
+    const std::string &name,
+    boost::shared_ptr<asio::ip::udp::socket> socket,
+    uhd::usrp::e300::i2c::sptr i2c,
+    asio::ip::udp::endpoint *endpoint,
+    bool *running
+)
+{
+    UHD_ASSERT_THROW(i2c);
+    asio::ip::udp::endpoint _endpoint;
+    try
+    {
+        while (*running)
+        {
+            uint8_t in_buff[4] = {};
+
+            const size_t num_bytes = socket->receive_from(asio::buffer(in_buff), *endpoint);
+
+            if (num_bytes < 4) {
+                std::cout << "Received short packet: " << num_bytes << std::endl;
+                continue;
+            }
+
+            uhd::usrp::e300::i2c_transaction_t *in =
+                reinterpret_cast<uhd::usrp::e300::i2c_transaction_t *>(in_buff);
+
+            if(in->is_write) {
+                i2c->set_i2c_reg(in->addr, in->reg, in->data);
+            } else {
+                in->data = i2c->get_i2c_reg(in->addr, in->reg);
+                socket->send_to(asio::buffer(in_buff, 16), *endpoint);
+            }
+        }
+    }
+    catch(const std::exception &ex)
+    {
+        UHD_MSG(error) << "e300_i2c_tunnel exit " << name << " " << ex.what() << std::endl;
+    }
+    catch(...)
+    {
+        UHD_MSG(error) << "e300_i2c_tunnel exit " << name << std::endl;
+    }
+    UHD_MSG(status) << "e300_i2c_tunnel exit " << name << std::endl;
+    *running = false;
+}
+
 
 /***********************************************************************
  * The TCP server itself
  **********************************************************************/
-void e300_impl::run_server(const std::string &port, const std::string &what)
+void e300_impl::_run_server(
+    const std::string &port,
+    const std::string &what,
+    const size_t fe)
 {
     asio::io_service io_service;
     asio::ip::udp::resolver resolver(io_service);
@@ -260,7 +362,7 @@ void e300_impl::run_server(const std::string &port, const std::string &what)
             //socket->set_option(option);
             boost::thread_group tg;
             bool running = true;
-            radio_perifs_t &perif = _radio_perifs[0];
+            radio_perifs_t &perif = _radio_perifs[fe];
             if (what == "RX")
             {
                 tg.create_thread(boost::bind(&e300_recv_tunnel, "RX data tunnel", perif.rx_data_xport, socket, &endpoint, &running));
@@ -280,10 +382,19 @@ void e300_impl::run_server(const std::string &port, const std::string &what)
             {
                 tg.create_thread(boost::bind(&e300_codec_ctrl_tunnel, "CODEC tunnel", socket, _codec_xport, &endpoint, &running));
             }
+            if (what == "I2C")
+            {
+                tg.create_thread(boost::bind(&e300_i2c_tunnel, "I2C tunnel", socket, _eeprom_manager->get_i2c_sptr(), &endpoint, &running));
+            }
             if (what == "GREGS")
             {
                 tg.create_thread(boost::bind(&e300_global_regs_tunnel, "GREGS tunnel", socket, _global_regs, &endpoint, &running));
             }
+            if (what == "SENSOR")
+            {
+                tg.create_thread(boost::bind(&e300_sensor_tunnel, "SENSOR tunnel", socket, _sensor_manager, &endpoint, &running));
+            }
+
 
 
             tg.join_all();
@@ -293,3 +404,4 @@ void e300_impl::run_server(const std::string &port, const std::string &what)
         catch(...){}
     }
 }
+}}} // namespace

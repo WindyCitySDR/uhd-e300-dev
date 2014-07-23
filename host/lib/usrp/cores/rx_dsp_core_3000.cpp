@@ -37,6 +37,8 @@
 
 #define FLAG_DSP_RX_MUX_SWAP_IQ   (1 << 0)
 #define FLAG_DSP_RX_MUX_REAL_MODE (1 << 1)
+#define FLAG_DSP_RX_MUX_INVERT_Q  (1 << 2)
+#define FLAG_DSP_RX_MUX_INVERT_I  (1 << 3)
 
 template <class T> T ceil_log2(T num){
     return std::ceil(std::log(num)/std::log(T(2)));
@@ -70,14 +72,17 @@ public:
         )
     }
 
-    void set_mux(const std::string &mode, const bool fe_swapped){
+    void set_mux(const std::string &mode, const bool fe_swapped, const bool invert_i, const bool invert_q){
         static const uhd::dict<std::string, boost::uint32_t> mode_to_mux = boost::assign::map_list_of
             ("IQ", 0)
             ("QI", FLAG_DSP_RX_MUX_SWAP_IQ)
             ("I", FLAG_DSP_RX_MUX_REAL_MODE)
             ("Q", FLAG_DSP_RX_MUX_SWAP_IQ | FLAG_DSP_RX_MUX_REAL_MODE)
         ;
-        _iface->poke32(REG_DSP_RX_MUX, mode_to_mux[mode] ^ (fe_swapped? FLAG_DSP_RX_MUX_SWAP_IQ : 0));
+        _iface->poke32(REG_DSP_RX_MUX, mode_to_mux[mode]
+            | (fe_swapped ? FLAG_DSP_RX_MUX_SWAP_IQ : 0)
+            | (invert_i ? FLAG_DSP_RX_MUX_INVERT_I : 0)
+            | (invert_q ? FLAG_DSP_RX_MUX_INVERT_Q : 0));
     }
 
     void set_tick_rate(const double rate){
@@ -129,8 +134,7 @@ public:
         }
 
         if (_is_b200) {
-            _iface->poke32(REG_DSP_RX_DECIM, (hb1 << 9) | (hb0 << 8) | (decim & 0xff));
-
+            _iface->poke32(REG_DSP_RX_DECIM, (hb0 << 9) /* samll HB */  | (hb1 << 8) /* large HB */ | (decim & 0xff));
             if (decim > 1 and hb0 == 0 and hb1 == 0) {
                 UHD_MSG(warning) << boost::format(
                     "The requested decimation is odd; the user should expect CIC rolloff.\n"

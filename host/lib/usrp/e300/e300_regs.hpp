@@ -24,27 +24,30 @@
 
 #define localparam static const int
 
-localparam SR_TEST      = 7;
-localparam SR_SPI       = 8;
-localparam SR_GPIO      = 16;
-localparam SR_MISC_OUTS = 24;
-localparam SR_READBACK  = 32;
-localparam SR_TX_CTRL   = 64;
-localparam SR_RX_CTRL   = 96;
+localparam SR_TEST       = 7;
+localparam SR_SPI        = 8;
+localparam SR_GPIO       = 16;
+localparam SR_MISC_OUTS  = 24;
+localparam SR_READBACK   = 32;
+localparam SR_TX_CTRL    = 64;
+localparam SR_RX_CTRL    = 96;
 localparam SR_CODEC_IDLE = 100;
-localparam SR_GPIO2      = 116;
-localparam SR_TIME      = 128;
-localparam SR_RX_DSP    = 144;
-localparam SR_TX_DSP    = 184;
-localparam SR_LEDS      = 196;
-localparam SR_FP_GPIO   = 200;
+localparam SR_TIME       = 128;
+localparam SR_RX_DSP     = 144;
+localparam SR_TX_DSP     = 184;
+localparam SR_LEDS       = 196;
+localparam SR_FP_GPIO    = 200;
 
-localparam RB32_TEST            = 0;
 localparam RB32_SPI             = 4;
 localparam RB64_TIME_NOW        = 8;
 localparam RB64_TIME_PPS        = 16;
-localparam RB64_CODEC_READBACK  = 24;
+localparam RB32_TEST            = 24;
 localparam RB32_FP_GPIO         = 32;
+localparam RB64_CODEC_READBACK  = 40;
+localparam RB32_RADIO_NUM       = 48;
+
+localparam ST_RX_ENABLE = 20;
+localparam ST_TX_ENABLE = 19;
 
 localparam LED_TXRX_TX = 18;
 localparam LED_TXRX_RX = 17;

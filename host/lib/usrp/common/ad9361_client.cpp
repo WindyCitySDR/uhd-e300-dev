@@ -1,5 +1,5 @@
 //
-// Copyright 2013-2014 Ettus Research LLC
+// Copyright 2014 Ettus Research LLC
 //
 
 #include <ad9361_client.h>
