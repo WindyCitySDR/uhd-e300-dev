@@ -210,8 +210,8 @@ UHD_INSTALL(FILES
 # Images download directory for utils/uhd_images_downloader.py
 ########################################################################
 
-SET(UHD_IMAGES_MD5SUM "fb5b36972c453e5b7954879873bbcf74")
-SET(UHD_IMAGES_DOWNLOAD_SRC "http://files.ettus.com/binaries/maint_images/archive/uhd-images_003.007.001-20-g468e7f35.zip")
+SET(UHD_IMAGES_MD5SUM "51b836149c731f6cced1704b60a92d0e")
+SET(UHD_IMAGES_DOWNLOAD_SRC "http://files.ettus.com/binaries/master_images/archive/uhd-images_003.007.002-121-ga6e18604.zip")
 
 ########################################################################
 # Register top level components
@@ -226,15 +226,15 @@ LIBUHD_REGISTER_COMPONENT("Tests" ENABLE_TESTS ON "ENABLE_LIBUHD" OFF)
 ########################################################################
 ADD_SUBDIRECTORY(docs)
 
+IF(ENABLE_LIBUHD)
+    ADD_SUBDIRECTORY(lib)
+ENDIF(ENABLE_LIBUHD)
+
 ADD_SUBDIRECTORY(include)
 
 IF(ENABLE_EXAMPLES)
     ADD_SUBDIRECTORY(examples)
 ENDIF(ENABLE_EXAMPLES)
-
-IF(ENABLE_LIBUHD)
-    ADD_SUBDIRECTORY(lib)
-ENDIF(ENABLE_LIBUHD)
 
 IF(ENABLE_TESTS)
     ADD_SUBDIRECTORY(tests)
