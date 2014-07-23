@@ -697,9 +697,9 @@ boost::uint32_t e300_impl::_get_version(compat_t which)
         = _global_regs->peek32(global_regs::RB32_CORE_COMPAT);
 
     switch(which) {
-    case FPGA_MAJOR:
-        return compat_num & 0xff;
     case FPGA_MINOR:
+        return compat_num & 0xff;
+    case FPGA_MAJOR:
         return (compat_num & 0xff00) >> 8;
     default:
         throw uhd::value_error("Requested unknown version.");
