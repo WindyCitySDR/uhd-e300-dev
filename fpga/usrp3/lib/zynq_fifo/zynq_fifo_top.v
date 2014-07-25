@@ -104,6 +104,16 @@ module zynq_fifo_top
 
     output event_irq,
 
+    //------------------------------------------------------------------
+    // Settings bus interface that will got to e300 core
+    //------------------------------------------------------------------
+    output [31:0] core_set_data,
+    output [31:0] core_set_addr,
+    output        core_set_stb,
+
+    input [31:0]  core_rb_data,
+    output        core_rb_stb,
+
     output [31:0] debug
 );
 
@@ -124,12 +134,20 @@ module zynq_fifo_top
     wire [1:0] set_page = set_addr[PAGE_WIDTH+1:PAGE_WIDTH];
     wire [1:0] rb_page = rb_addr[PAGE_WIDTH+1:PAGE_WIDTH];
 
-    //each arbiter gets 1 page
-    assign set_stb_s2h = set_stb && (set_page == 2'h0);
-    assign set_stb_h2s = set_stb && (set_page == 2'h1);
+    // each arbiter gets 1 page, e300_core the next
+    assign set_stb_s2h  = set_stb && (set_page == 2'h0);
+    assign set_stb_h2s  = set_stb && (set_page == 2'h1);
+    assign core_set_stb = set_stb && (set_page == 2'h2);
+
     assign rb_stb_s2h = rb_stb && (rb_page == 2'h0);
     assign rb_stb_h2s = rb_stb && (rb_page == 2'h1);
-    assign rb_data = (rb_page == 2'h0)? rb_data_s2h : rb_data_h2s;
+    assign rb_data = (rb_page == 2'h0)? rb_data_s2h :
+                     (rb_page == 2'h1)? rb_data_h2s :
+                     (rb_page == 2'h2)? core_rb_data:
+                     32'hdeadbeef;
+
+    assign core_set_addr = set_addr[7:0];
+    assign core_set_data = set_data;
 
     //------------------------------------------------------------------
     // configuration slaves
@@ -182,7 +200,7 @@ module zynq_fifo_top
     cvita_dest_lookup #(.DEST_WIDTH(S2H_STREAMS_WIDTH)) s2h_dest_gen
     (
         .clk(clk), .rst(rst),
-        .set_stb(set_stb && (set_page == 2'h2)), .set_addr(set_addr[9:2]), .set_data(set_data),
+        .set_stb(set_stb && (set_page == 2'h3)), .set_addr(set_addr[9:2]), .set_data(set_data),
         .i_tdata(s2h_tdata), .i_tlast(s2h_tlast), .i_tvalid(s2h_tvalid), .i_tready(s2h_tready),
         .o_tdata(s2h_tdata_i0), .o_tlast(s2h_tlast_i0), .o_tvalid(s2h_tvalid_i0), .o_tready(s2h_tready_i0),
         .o_tdest(which_stream_s2h)
