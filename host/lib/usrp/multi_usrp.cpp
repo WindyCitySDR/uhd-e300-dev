@@ -255,7 +255,14 @@ public:
         return _dev;
     }
 
-    device3::sptr get_device3(void){
+    bool is_device3(void) {
+        return boost::dynamic_pointer_cast<uhd::device3>(_dev) != NULL;
+    }
+
+    device3::sptr get_device3(void) {
+        if (not is_device3()) {
+            throw uhd::type_error("Cannot call get_device3() on a non-generation 3 device.");
+        }
         return boost::dynamic_pointer_cast<uhd::device3>(_dev);
     }
 
