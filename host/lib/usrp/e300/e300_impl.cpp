@@ -373,7 +373,7 @@ e300_impl::e300_impl(const uhd::device_addr_t &device_addr)
     if (_xport_path == AXI) {
         UHD_MSG(status) << "Detecting internal GPSDO.... " << std::flush;
         try {
-            _gps = boost::make_shared<gps::ublox::ubx::control>("/dev/ttyPS1", 9600);
+            _gps =gps::ublox::ubx::control::make("/dev/ttyPS1", 9600);
         } catch (std::exception &e) {
             UHD_MSG(error) << "An error occured making GPSDO control: " << e.what() << std::endl;
         }

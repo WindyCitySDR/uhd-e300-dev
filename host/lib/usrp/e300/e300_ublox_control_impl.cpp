@@ -8,22 +8,26 @@
 
 #include <iostream>
 
-#include "e300_ublox_control.hpp"
 
 #include <uhd/utils/byteswap.hpp>
 #include <uhd/utils/msg.hpp>
 #include <uhd/exception.hpp>
+
+#include "e300_ublox_control.hpp"
+
+#ifdef E300_NATIVE
+#include "e300_ublox_control_impl.hpp"
 
 
 namespace uhd { namespace usrp { namespace gps {
 
 namespace ublox { namespace ubx {
 
-control::control(const std::string &node, const size_t baud_rate)
+control_impl::control_impl(const std::string &node, const size_t baud_rate)
 {
     _decode_init();
     _serial = boost::make_shared<async_serial>(node, baud_rate);
-    _serial->set_read_callback(boost::bind(&control::_rx_callback, this, _1, _2));
+    _serial->set_read_callback(boost::bind(&control_impl::_rx_callback, this, _1, _2));
 
     _detect();
 
@@ -45,26 +49,22 @@ control::control(const std::string &node, const size_t baud_rate)
     _sensors = boost::assign::list_of("gps_locked")("gps_time");
 }
 
-bool control::gps_detected(void)
+bool control_impl::gps_detected(void)
 {
     return _detected;
 }
 
-void control::_detect(void)
+void control_impl::_detect(void)
 {
     _send_message(MSG_MON_VER, NULL, 0);
-    if (_wait_for_ack(MSG_MON_VER, 0.5) < 0)
-        _detected = false;
-    else
-        _detected = true;
 }
 
-std::vector<std::string> control::get_sensors(void)
+std::vector<std::string> control_impl::get_sensors(void)
 {
     return _sensors;
 }
 
-uhd::sensor_value_t control::get_sensor(std::string key)
+uhd::sensor_value_t control_impl::get_sensor(std::string key)
 {
     if (key == "gps_time") {
         return sensor_value_t("GPS epoch time", int(_get_epoch_time()), "seconds");
@@ -76,7 +76,7 @@ uhd::sensor_value_t control::get_sensor(std::string key)
         throw uhd::key_error(str(boost::format("sensor %s unknown.") % key));
 }
 
-std::time_t control::_get_epoch_time(void)
+std::time_t control_impl::_get_epoch_time(void)
 {
     //std::cout << "EPOCH=" << (_get_time() - boost::posix_time::from_time_t(0)).total_seconds() << std::endl;
     boost::posix_time::ptime ptime;
@@ -84,14 +84,14 @@ std::time_t control::_get_epoch_time(void)
     return (ptime - boost::posix_time::from_time_t(0)).total_seconds();
 }
 
-control::~control(void)
+control_impl::~control_impl(void)
 {
     // turn it all off again
     configure_antenna(0x001a, 0x8251);
     configure_pps(0xf4240, 0x3d090, 1, 1, 0, 0, 0, 0);
 }
 
-void control::_decode_init(void)
+void control_impl::_decode_init(void)
 {
     _decode_state = DECODE_SYNC1;
     _rx_ck_a = 0;
@@ -100,13 +100,13 @@ void control::_decode_init(void)
     _rx_payload_index  = 0;
 }
 
-void control::_add_byte_to_checksum(const boost::uint8_t b)
+void control_impl::_add_byte_to_checksum(const boost::uint8_t b)
 {
     _rx_ck_a = _rx_ck_a + b;
     _rx_ck_b = _rx_ck_b + _rx_ck_a;
 }
 
-void control::_calc_checksum(
+void control_impl::_calc_checksum(
     const boost::uint8_t *buffer,
     const boost::uint16_t length,
     checksum_t &checksum)
@@ -118,7 +118,7 @@ void control::_calc_checksum(
     }
 }
 
-void control::configure_rates(
+void control_impl::configure_rates(
     boost::uint16_t meas_rate,
     boost::uint16_t nav_rate,
     boost::uint16_t time_ref)
@@ -136,7 +136,7 @@ void control::configure_rates(
     _wait_for_ack(MSG_CFG_RATE, 1.0);
 }
 
-void control::configure_message_rate(
+void control_impl::configure_message_rate(
     const boost::uint16_t msg,
     const uint8_t rate)
 {
@@ -156,7 +156,7 @@ void control::configure_message_rate(
     _wait_for_ack(MSG_CFG_MSG, 1.0);
 }
 
-void control::configure_antenna(
+void control_impl::configure_antenna(
     const boost::uint16_t flags,
     const boost::uint16_t pins)
 {
@@ -173,7 +173,7 @@ void control::configure_antenna(
 
 }
 
-void control::configure_pps(
+void control_impl::configure_pps(
     const boost::uint32_t interval,
     const boost::uint32_t length,
     const boost::int8_t status,
@@ -202,7 +202,7 @@ void control::configure_pps(
 }
 
 
-void control::_rx_callback(const char *data, unsigned int len)
+void control_impl::_rx_callback(const char *data, unsigned int len)
 {
     //std::cout << "IN RX CALLBACK" << std::flush << std::endl;
     std::vector<char> v(data, data+len);
@@ -217,7 +217,7 @@ void control::_rx_callback(const char *data, unsigned int len)
     }
 }
 
-void control::_parse_char(const boost::uint8_t b)
+void control_impl::_parse_char(const boost::uint8_t b)
 {
     int ret = 0;
     //std::cout << boost::format("in state %ld got: 0x%lx") % _decode_state % int(b) << std::endl;
@@ -291,9 +291,6 @@ void control::_parse_char(const boost::uint8_t b)
             //% _rx_msg % _rx_payload_length % int(_rx_ck_a) % int(_rx_ck_b) << std::endl;
         _add_byte_to_checksum(b);
         switch(_rx_msg) {
-        case MSG_MON_VER:
-            ret = _payload_rx_add_mon_ver(b);
-            break;
         default:
             ret = _payload_rx_add(b);
             break;
@@ -338,7 +335,7 @@ void control::_parse_char(const boost::uint8_t b)
     };
 }
 
-int control::_payload_rx_init(void)
+int control_impl::_payload_rx_init(void)
 {
     int ret = 0;
 
@@ -390,7 +387,7 @@ int control::_payload_rx_init(void)
     return ret;
 }
 
-int control::_payload_rx_add(const boost::uint8_t b)
+int control_impl::_payload_rx_add(const boost::uint8_t b)
 {
     int ret = 0;
     //std::cout << boost::format("_payload_rx_add 0x%lx index=%ld length=%ld") % int(b)
@@ -401,25 +398,17 @@ int control::_payload_rx_add(const boost::uint8_t b)
     return ret;
 }
 
-int control::_payload_rx_add_mon_ver(const boost::uint8_t b)
+int control_impl::_payload_rx_done(void)
 {
     int ret = 0;
-    _buf.raw[_rx_payload_index] = b;
-    if (++_rx_payload_index >= _rx_payload_length)
-        ret = 1;
-    return ret;
-}
-
-int control::_payload_rx_done(void)
-{
-    int ret = 0;
-    //if (_rxmsg_state != RXMSG_HANDLE) {
-        //return 0;
-    //}
+    if (_rx_state != RXMSG_HANDLE) {
+        return 0;
+    }
 
     switch (_rx_msg) {
     case MSG_MON_VER:
         //std::cout << boost::format("MON-VER: FW-Version %s") % (_buf.payload_rx_mon_ver_part1.sw_version) << std::endl;
+        _detected = true;
         break;
 
     case MSG_MON_HW:
@@ -485,7 +474,7 @@ int control::_payload_rx_done(void)
     return ret;
 }
 
-void control::_send_message(
+void control_impl::_send_message(
     const boost::uint16_t msg,
     const boost::uint8_t *payload,
     const boost::uint16_t len)
@@ -513,7 +502,7 @@ void control::_send_message(
         sizeof(checksum));
 }
 
-int control::_wait_for_ack(
+int control_impl::_wait_for_ack(
     const boost::uint16_t msg,
     const double timeout)
 {
@@ -543,3 +532,18 @@ int control::_wait_for_ack(
 
 }} // namespace ublox::ubx
 }}} // namespace
+
+using namespace uhd::usrp::gps::ublox::ubx;
+
+control::sptr control::make(const std::string &node, const size_t baud_rate)
+{
+    return control::sptr(new control_impl(node, baud_rate));
+}
+#else
+using namespace uhd::usrp::gps::ublox::ubx;
+
+control::sptr control::make(const std::string &node, const size_t baud_rate)
+{
+    throw uhd::assertion_error("control::sptr::make: !E300_NATIVE");
+}
+#endif // E300_NATIVE
