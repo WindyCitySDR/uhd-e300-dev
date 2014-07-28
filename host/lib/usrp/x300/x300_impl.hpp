@@ -243,7 +243,7 @@ private:
         gpio_core_200::sptr fp_gpio;
 
 	///////////// RFNOC /////////////////////
-        std::vector< uhd::rfnoc::block_ctrl_base::sptr > _rfnoc_block_ctrl;
+        //std::vector< uhd::rfnoc::block_ctrl_base::sptr > _rfnoc_block_ctrl;
 	///////////// RFNOC /////////////////////
 
         //clock control register bits

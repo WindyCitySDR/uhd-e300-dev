@@ -892,7 +892,7 @@ void x300_impl::setup_mb(const size_t mb_i, const uhd::device_addr_t &dev_addr)
         // derivative using the noc-id
 
         // For now, it's just block_ctrl
-        mb._rfnoc_block_ctrl.push_back(
+        _rfnoc_block_ctrl.push_back(
             uhd::rfnoc::block_ctrl::make(
                 ctrl,
                 ctrl_sid,
@@ -1792,7 +1792,7 @@ void x300_impl::test_rfnoc_loopback(size_t mb_index, int ce_index=0)
 
     if (ce_index == 0) {
         boost::uint32_t data = ((data_sid >> 16) & 0xFFFF) | (1 << 16);
-        _mb[mb_index]._rfnoc_block_ctrl[ce_index]->sr_write(SR_NEXT_DST, data);
+        _rfnoc_block_ctrl[ce_index]->sr_write(SR_NEXT_DST, data);
     }
 
     loopback_test tester;
