@@ -24,13 +24,7 @@ control::control(const std::string &node, const size_t baud_rate)
     _decode_init();
     _serial = boost::make_shared<async_serial>(node, baud_rate);
     _serial->set_read_callback(boost::bind(&control::_rx_callback, this, _1, _2));
-    //_set_locked(false);
 
-    //_send_message(MSG_CFG_PRT, NULL, 0);
-    //_send_message(MSG_CFG_RATE, NULL, 0);
-    //configure_rates(1000,1,0);
-    //_send_message(MSG_CFG_RATE, NULL, 0);
-    //
     _detect();
 
     configure_message_rate(MSG_GLL, 0);
@@ -59,13 +53,10 @@ bool control::gps_detected(void)
 void control::_detect(void)
 {
     _send_message(MSG_MON_VER, NULL, 0);
-    try{
-        _wait_for_ack(MSG_MON_VER, 0.5);
-    } catch (uhd::runtime_error &e) {
+    if (_wait_for_ack(MSG_MON_VER, 0.5) < 0)
         _detected = false;
-        return;
-    }
-    _detected = true;
+    else
+        _detected = true;
 }
 
 std::vector<std::string> control::get_sensors(void)
@@ -96,7 +87,7 @@ std::time_t control::_get_epoch_time(void)
 control::~control(void)
 {
     // turn it all off again
-    //configure_antenna(0x001a, 0x8251);
+    configure_antenna(0x001a, 0x8251);
     configure_pps(0xf4240, 0x3d090, 1, 1, 0, 0, 0, 0);
 }
 
@@ -466,19 +457,18 @@ int control::_payload_rx_done(void)
             (boost::posix_time::hours(_buf.payload_rx_nav_timeutc.hour)
             + boost::posix_time::minutes(_buf.payload_rx_nav_timeutc.min)
             + boost::posix_time::seconds(_buf.payload_rx_nav_timeutc.sec))));
-	//std::cout << boost::format("NAV-TIMEUTC %u/%u/%u %02u:%02u:%02u - valid? 0x%lx")
-	    //% boost::uint16_t(_buf.payload_rx_nav_timeutc.day)
-	    //% boost::uint16_t(_buf.payload_rx_nav_timeutc.month)
-	    //% uhd::wtohx<boost::uint16_t>(_buf.payload_rx_nav_timeutc.year)
-	    //% boost::int16_t(_buf.payload_rx_nav_timeutc.hour)
-	    //% boost::int16_t(_buf.payload_rx_nav_timeutc.min)
-	    //% boost::int16_t(_buf.payload_rx_nav_timeutc.sec)
-	    //% boost::int16_t(_buf.payload_rx_nav_timeutc.valid)
-	    //<< std::endl;
+        //std::cout << boost::format("NAV-TIMEUTC %u/%u/%u %02u:%02u:%02u - valid? 0x%lx")
+            //% boost::uint16_t(_buf.payload_rx_nav_timeutc.day)
+            //% boost::uint16_t(_buf.payload_rx_nav_timeutc.month)
+            //% uhd::wtohx<boost::uint16_t>(_buf.payload_rx_nav_timeutc.year)
+            //% boost::int16_t(_buf.payload_rx_nav_timeutc.hour)
+            //% boost::int16_t(_buf.payload_rx_nav_timeutc.min)
+            //% boost::int16_t(_buf.payload_rx_nav_timeutc.sec)
+            //% boost::int16_t(_buf.payload_rx_nav_timeutc.valid)
+            //<< std::endl;
         break;
 
     case MSG_NAV_SOL:
-        //_set_locked(_buf.payload_rx_nav_sol.gps_fix > 0);
         _locked.update(_buf.payload_rx_nav_sol.gps_fix > 0);
         break;
         //std::cout << boost::format("NAV-SOL - valid? 0x%lx")

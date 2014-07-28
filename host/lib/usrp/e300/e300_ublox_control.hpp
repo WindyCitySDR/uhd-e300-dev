@@ -312,7 +312,7 @@ public:
         while(_seen)
         {
             _cond.wait(l);
-	    std::cout << "Already seen ... " << std::endl;
+            //std::cout << "Already seen ... " << std::endl;
         }
         val = _value;
         _seen = true;
