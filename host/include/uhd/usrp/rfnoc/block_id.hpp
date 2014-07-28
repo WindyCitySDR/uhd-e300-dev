@@ -53,8 +53,28 @@ namespace uhd {
         //! Return a string like this: "0/FFT_1" (includes all components, if set)
         std::string to_string() const;
 
+        //! Check if a given string is valid as a block name.
+        //
+        // Note: This only applies to the block *name*, not the entire block ID.
+        // Examples:
+        // * is_valid_blockname("FFT") will return true.
+        // * is_valid_blockname("FIR_Filter") will return false, because an underscore
+        //   is not allowed in a block name.
+        //
+        // Internally, this matches the string with uhd::rfnoc::VALID_BLOCKNAME_REGEX.
         static bool is_valid_blockname(const std::string &block_name);
 
+        //! Check if a given string is valid as a block ID.
+        //
+        // Note: This does necessary require a complete complete ID. If this returns
+        // true, then it is a valid input for block_id_t::match().
+        //
+        // Examples:
+        // * is_valid_block_id("FFT") will return true.
+        // * is_valid_block_id("0/Filter_1") will return true.
+        // * is_valid_block_id("0/Filter_Foo") will return false.
+        //
+        // Internally, this matches the string with uhd::rfnoc::VALID_BLOCKID_REGEX.
         static bool is_valid_block_id(const std::string &block_id);
 
         //! Check if block_str matches this block.

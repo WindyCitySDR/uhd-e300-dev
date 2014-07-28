@@ -115,15 +115,22 @@ public:
     /*!
      * Get the underlying device object.
      * This is needed to get access to the streaming API and properties.
-     * \return the device object within this single usrp
+     * \return the device object within this USRP
      */
     virtual device::sptr get_device(void) = 0;
+
+    /*! Returns true if this is a generation-3 device.
+     */
+    virtual bool is_device3(void) = 0;
 
     /*!
      * Get the underlying device3 object. Only works for generation-3 (or later) devices.
      *
+     * If this device is not actually a generation-3 device, it will throw
+     * a uhd::type_error.
+     *
      * This is needed to get access to the streaming API and properties.
-     * \return The device3 object for this USRP.
+     * \return The uhd::device3 object for this USRP.
      */
     virtual device3::sptr get_device3(void) = 0;
 

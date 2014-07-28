@@ -23,7 +23,11 @@
 namespace uhd {
     namespace rfnoc {
 
-/*! \brief Provide access basic to functionality of an RFNoC block.
+/*! \brief This is the default implementation of a block_ctrl_base.
+ *
+ * For most blocks, this will be a sufficient implementation. All registers
+ * can be set by sr_write(). The default behaviour of functions is documented
+ * in uhd::rfnoc::block_ctrl_base.
  */
 class UHD_API block_ctrl : virtual public block_ctrl_base
 {
