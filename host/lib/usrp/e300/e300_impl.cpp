@@ -865,6 +865,31 @@ void e300_impl::_setup_radio(const size_t dspno)
     perif.atr = gpio_core_200_32wo::make(perif.ctrl, TOREG(SR_GPIO));
 
     ////////////////////////////////////////////////////////////////////
+    // front end corrections
+    ////////////////////////////////////////////////////////////////////
+    std::string slot_name = (dspno == 0) ? "A" : "B";
+    perif.rx_fe = rx_frontend_core_200::make(perif.ctrl, TOREG(SR_RX_FRONT));
+    const fs_path rx_fe_path = mb_path / "rx_frontends" / slot_name;
+    _tree->create<std::complex<double> >(rx_fe_path / "dc_offset" / "value")
+        .coerce(boost::bind(&rx_frontend_core_200::set_dc_offset, perif.rx_fe, _1))
+        .set(std::complex<double>(0.0, 0.0));
+    _tree->create<bool>(rx_fe_path / "dc_offset" / "enable")
+        .subscribe(boost::bind(&rx_frontend_core_200::set_dc_offset_auto, perif.rx_fe, _1))
+        .set(true);
+    _tree->create<std::complex<double> >(rx_fe_path / "iq_balance" / "value")
+        .subscribe(boost::bind(&rx_frontend_core_200::set_iq_balance, perif.rx_fe, _1))
+        .set(std::complex<double>(0.0, 0.0));
+
+    perif.tx_fe = tx_frontend_core_200::make(perif.ctrl, TOREG(SR_TX_FRONT));
+    const fs_path tx_fe_path = mb_path / "tx_frontends" / slot_name;
+    _tree->create<std::complex<double> >(tx_fe_path / "dc_offset" / "value")
+        .coerce(boost::bind(&tx_frontend_core_200::set_dc_offset, perif.tx_fe, _1))
+        .set(std::complex<double>(0.0, 0.0));
+    _tree->create<std::complex<double> >(tx_fe_path / "iq_balance" / "value")
+        .subscribe(boost::bind(&tx_frontend_core_200::set_iq_balance, perif.tx_fe, _1))
+        .set(std::complex<double>(0.0, 0.0));
+
+    ////////////////////////////////////////////////////////////////////
     // create rx dsp control objects
     ////////////////////////////////////////////////////////////////////
     perif.framer = rx_vita_core_3000::make(perif.ctrl, TOREG(SR_RX_CTRL));
