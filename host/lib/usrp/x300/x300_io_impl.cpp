@@ -583,8 +583,8 @@ rx_streamer::sptr x300_impl::get_rx_stream_ce(const uhd::stream_args_t &args_, b
     // Setup
     mboard_members_t &mb = _mb[mb_index];
     size_t stream_i = 0;
-
-    //radio_perifs_t &perif = mb.radio_perifs[radio_index];
+    uhd::rfnoc::block_ctrl_base::sptr ce_ctrl = _rfnoc_block_ctrl[_ce_index];
+    UHD_MSG(status) << "rx streamer goes to block: " << ce_ctrl->get_block_id() << std::endl;
 
     //setup the dsp transport hints (default to a large recv buff)
     device_addr_t device_addr = mb.recv_args;
@@ -610,6 +610,7 @@ rx_streamer::sptr x300_impl::get_rx_stream_ce(const uhd::stream_args_t &args_, b
     both_xports_t xport = this->make_transport(mb_index, sid_lower, 0x00, device_addr, data_sid);
     UHD_LOG << boost::format("data_sid = 0x%08x, actual recv_buff_size = %d\n") % data_sid % xport.recv_buff_size << std::endl;
     UHD_MSG(status) << str(boost::format("rx data_sid = 0x%08x") % data_sid) << std::endl;
+    ce_ctrl->set_destination((data_sid >> 16) & 0xFFFF);
 
     // To calculate the max number of samples per packet, we assume the maximum header length
     // to avoid fragmentation should the entire header be used.
@@ -644,6 +645,7 @@ rx_streamer::sptr x300_impl::get_rx_stream_ce(const uhd::stream_args_t &args_, b
     const size_t fc_window = get_rx_flow_control_window(xport.recv->get_recv_frame_size(), xport.recv_buff_size, device_addr);
     //const size_t fc_handle_window = std::max<size_t>(1, fc_window / X300_RX_FC_REQUEST_FREQ);
     const size_t fc_handle_window = unsigned(args.args.cast<double>("fc_pkts_per_ack", std::max<size_t>(1, fc_window / X300_RX_FC_REQUEST_FREQ)));
+    ce_ctrl->configure_flow_control_out(fc_window);
 
     //UHD_LOG << "RX Flow Control Window = " << fc_window << ", RX Flow Control Handler Window = " << fc_handle_window << std::endl;
     UHD_MSG(status) << "RX Flow Control Window = " << fc_window << ", RX Flow Control Handler Window = " << fc_handle_window << std::endl;
@@ -1018,6 +1020,7 @@ tx_streamer::sptr x300_impl::get_tx_stream_ce(const uhd::stream_args_t &args_, b
 
     // Setup
     mboard_members_t &mb = _mb[mb_index];
+    uhd::rfnoc::block_ctrl_base::sptr ce_ctrl = _rfnoc_block_ctrl[_ce_index];
 
     //setup the dsp transport hints (TODO)
     device_addr_t device_addr = mb.send_args;
@@ -1066,6 +1069,7 @@ tx_streamer::sptr x300_impl::get_tx_stream_ce(const uhd::stream_args_t &args_, b
     size_t fc_window = 8000 / (bpp+8);
     //const size_t fc_handle_window = std::max<size_t>(1, fc_window/X300_TX_FC_RESPONSE_FREQ);
     const size_t fc_handle_window = 2;
+    ce_ctrl->configure_flow_control_out(0 /* cycs off */, fc_handle_window);
 
     UHD_LOG << "TX Flow Control Window = " << fc_window << ", TX Flow Control Handler Window = " << fc_handle_window << std::endl;
     UHD_MSG(status) << "TX Flow Control Window = " << fc_window << ", TX Flow Control Handler Window = " << fc_handle_window << std::endl;
