@@ -100,6 +100,17 @@ void e300_impl::_update_rx_subdev_spec(const uhd::usrp::subdev_spec_t &spec)
         _fe_control_settings[1].rx_enb = true;
     }
 
+    const fs_path mb_path = "/mboards/0";
+    for (size_t i = 0; i < spec.size(); i++)
+    {
+        const std::string conn = _tree->access<std::string>(
+            mb_path / "dboards" / spec[i].db_name /
+            ("rx_frontends") / spec[i].sd_name / "connection").get();
+
+        const bool fe_swapped = (conn == "QI" or conn == "Q");
+        _radio_perifs[i].ddc->set_mux(conn, fe_swapped);
+        _radio_perifs[i].rx_fe->set_mux(fe_swapped);
+    }
     this->_update_enables();
 }
 
@@ -129,6 +140,14 @@ void e300_impl::_update_tx_subdev_spec(const uhd::usrp::subdev_spec_t &spec)
         _fe_control_settings[1].tx_enb = true;
     }
 
+    const fs_path mb_path = "/mboards/0";
+    for (size_t i = 0; i < spec.size(); i++)
+    {
+        const std::string conn = _tree->access<std::string>(
+            mb_path / "dboards" / spec[i].db_name /
+            ("tx_frontends") / spec[i].sd_name / "connection").get();
+        _radio_perifs[i].tx_fe->set_mux(conn);
+    }
     this->_update_enables();
 }
 

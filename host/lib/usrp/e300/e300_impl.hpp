@@ -30,6 +30,8 @@
 #include <boost/thread/mutex.hpp>
 #include "e300_fifo_config.hpp"
 #include "radio_ctrl_core_3000.hpp"
+#include "rx_frontend_core_200.hpp"
+#include "tx_frontend_core_200.hpp"
 #include "rx_vita_core_3000.hpp"
 #include "tx_vita_core_3000.hpp"
 #include "time_core_3000.hpp"
@@ -133,6 +135,9 @@ private: // types
         rx_dsp_core_3000::sptr ddc;
         tx_vita_core_3000::sptr deframer;
         tx_dsp_core_3000::sptr duc;
+        rx_frontend_core_200::sptr rx_fe;
+        tx_frontend_core_200::sptr tx_fe;
+
 
         uhd::transport::zero_copy_if::sptr send_ctrl_xport;
         uhd::transport::zero_copy_if::sptr recv_ctrl_xport;
