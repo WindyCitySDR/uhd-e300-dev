@@ -164,6 +164,24 @@ private: // types
 
     enum compat_t {FPGA_MAJOR, FPGA_MINOR};
 
+    struct gpio_t
+    {
+        boost::uint32_t pps_sel;
+        boost::uint32_t mimo;
+        boost::uint32_t codec_arst;
+        boost::uint32_t tx_bandsels;
+        boost::uint32_t rx_bandsels0;
+        boost::uint32_t rx_bandsels1;
+
+        static const size_t PPS_SEL    = 0;
+        static const size_t MIMO       = 2;
+        static const size_t CODEC_ARST = 3;
+        static const size_t TX_BANDSELS0  = 4;
+        static const size_t RX_BANDSELS0  = 7;
+        static const size_t TX_BANDSELS1  = 14;
+        static const size_t RX_BANDSELS1  = 17;
+    };
+
 private: // methods
     void _load_fpga_image(const std::string &path);
 
@@ -183,6 +201,10 @@ private: // methods
     double _get_tick_rate(void){return _tick_rate;}
     double _set_tick_rate(const double rate);
 
+    void _update_gpio_state(void);
+    void _update_enables(void);
+    void _reset_codec_mmcm(void);
+
     void _update_tick_rate(const double);
     void _update_rx_samp_rate(const size_t, const double);
     void _update_tx_samp_rate(const size_t, const double);
@@ -198,7 +220,6 @@ private: // methods
     void _update_atrs(const size_t &fe);
     void _update_antenna_sel(const size_t &fe, const std::string &ant);
     void _update_fe_lo_freq(const std::string &fe, const double freq);
-    void _update_active_frontends(void);
 
     // overflow handling is special for MIMO case
     void _handle_overflow(
@@ -237,6 +258,7 @@ private: // members
     global_regs::sptr           _global_regs;
     e300_sensor_manager::sptr   _sensor_manager;
     e300_eeprom_manager::sptr   _eeprom_manager;
+    gpio_t                      _misc;
 };
 
 }}} // namespace

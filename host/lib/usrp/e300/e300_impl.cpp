@@ -470,18 +470,8 @@ e300_impl::e300_impl(const uhd::device_addr_t &device_addr) : _sid_framer(0)
     _codec_ctrl->data_port_loopback(true);
 
     // Radio 0 loopback through AD9361
-    _fe_control_settings[0].rx_enb = true;
-    _fe_control_settings[0].tx_enb = true;
-    _fe_control_settings[1].rx_enb = false;
-    _fe_control_settings[1].tx_enb = false;
-    this->_update_active_frontends();
     this->_codec_loopback_self_test(_radio_perifs[0].ctrl);
     // Radio 1 loopback through AD9361
-    _fe_control_settings[0].rx_enb = false;
-    _fe_control_settings[0].tx_enb = false;
-    _fe_control_settings[1].rx_enb = true;
-    _fe_control_settings[1].tx_enb = true;
-    this->_update_active_frontends();
     this->_codec_loopback_self_test(_radio_perifs[1].ctrl);
 
     _codec_ctrl->data_port_loopback(false);
@@ -634,7 +624,7 @@ e300_impl::~e300_impl(void)
 
 double e300_impl::_set_tick_rate(const double rate)
 {
-    const size_t factor = 2; // set_clock_rate() sets 2x the input rate which this factor corrects
+    const size_t factor = 1;
     UHD_MSG(status) << "Asking for clock rate " << rate/1e6 << " MHz\n";
     _tick_rate = _codec_ctrl->set_clock_rate(rate/factor)*factor;
     UHD_MSG(status) << "Actually got clock rate " << _tick_rate/1e6 << " MHz\n";
@@ -791,14 +781,15 @@ void e300_impl::_setup_dest_mapping(const boost::uint32_t sid, const size_t whic
 void e300_impl::_update_time_source(const std::string &source)
 {
     if (source == "none" or source == "internal") {
-        _global_regs->poke32(global_regs::SR_CORE_PPS_SEL, global_regs::PPS_INT);
+        _misc.pps_sel = global_regs::PPS_INT;
     } else if (source == "gpsdo") {
-        _global_regs->poke32(global_regs::SR_CORE_PPS_SEL, global_regs::PPS_GPS);
+        _misc.pps_sel = global_regs::PPS_GPS;
     } else if (source == "external") {
-        _global_regs->poke32(global_regs::SR_CORE_PPS_SEL, global_regs::PPS_EXT);
+        _misc.pps_sel = global_regs::PPS_EXT;
     } else {
         throw uhd::key_error("update_time_source: unknown source: " + source);
     }
+    _update_gpio_state();
 }
 
 void e300_impl::_update_clock_source(const std::string &)
@@ -819,18 +810,6 @@ void e300_impl::_update_fe_lo_freq(const std::string &fe, const double freq)
         if (fe[0] == 'T') _fe_control_settings[i].tx_freq = freq;
         this->_update_atrs(i);
     }
-}
-
-void e300_impl::_update_active_frontends(void)
-{
-    _codec_ctrl->set_active_chains(
-        _fe_control_settings[0].tx_enb,
-        _fe_control_settings[1].tx_enb,
-        _fe_control_settings[0].rx_enb,
-        _fe_control_settings[1].rx_enb
-    );
-    this->_update_atrs(0);
-    this->_update_atrs(1);
 }
 
 void e300_impl::_setup_radio(const size_t dspno)
@@ -975,6 +954,61 @@ void e300_impl::_setup_radio(const size_t dspno)
     }
 }
 
+void e300_impl::_update_enables(void)
+{
+    //extract settings from state variables
+    const bool enb_tx1 = bool(_radio_perifs[0].tx_streamer.lock());
+    const bool enb_rx1 = bool(_radio_perifs[0].rx_streamer.lock());
+    const bool enb_tx2 = bool(_radio_perifs[1].tx_streamer.lock());
+    const bool enb_rx2 = bool(_radio_perifs[1].rx_streamer.lock());
+    const size_t num_rx = (enb_rx1 ? 1 : 0) + (enb_rx2 ? 1:0);
+    const size_t num_tx = (enb_tx1 ? 1 : 0) + (enb_tx2 ? 1:0);
+    const bool mimo = num_rx == 2 or num_tx == 2;
+
+    //setup the active chains in the codec
+    _codec_ctrl->set_active_chains(enb_tx1, enb_tx2, enb_rx1, enb_rx2);
+    if ((num_rx + num_tx) == 0)
+        _codec_ctrl->set_active_chains(
+            true,
+            false,
+            true,
+            false); //enable something
+    //set_active_chains could cause a clock rate change - reset dcm
+    _reset_codec_mmcm();
+
+    //figure out if mimo is enabled based on new state
+    _misc.mimo = (mimo)? 1 : 0;
+    _update_gpio_state();
+
+    //atrs change based on enables
+    _update_atrs(0);
+    _update_atrs(1);
+}
+
+void e300_impl::_update_gpio_state(void)
+{
+    boost::uint32_t misc_reg = 0
+        | (_misc.pps_sel    << gpio_t::PPS_SEL)
+        | (_misc.mimo       << gpio_t::MIMO)
+        | (_misc.codec_arst << gpio_t::CODEC_ARST)
+        | (_misc.rx_bandsels0  << gpio_t::TX_BANDSELS0)
+        | (_misc.tx_bandsels   << gpio_t::RX_BANDSELS0)
+        | (_misc.rx_bandsels1  << gpio_t::TX_BANDSELS1)
+        | (_misc.tx_bandsels   << gpio_t::RX_BANDSELS1);
+    _global_regs->poke32(global_regs::SR_CORE_MISC, misc_reg);
+
+    UHD_MSG(status) << boost::format("updating gpio state, misc_reg = %lx") % int(misc_reg) << std::endl;
+}
+
+void e300_impl::_reset_codec_mmcm(void)
+{
+    _misc.codec_arst = 1;
+    _update_gpio_state();
+    boost::this_thread::sleep(boost::posix_time::milliseconds(10));
+    _misc.codec_arst = 0;
+    _update_gpio_state();
+}
+
 ////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////
 //////////////// ATR SETUP FOR FRONTEND CONTROL VIA GPIO ///////////////
@@ -1110,8 +1144,6 @@ void e300_impl::_update_atrs(const size_t &fe)
         | (rx_bandsels << RX_BANDSEL)
         | (rx_bandsel_b << RXB_BANDSEL)
         | (rx_bandsel_c << RXC_BANDSEL)
-        | ((settings.rx_enb? 1 : 0) << ST_RX_ENABLE)
-        | ((settings.tx_enb? 1 : 0) << ST_TX_ENABLE)
     ;
     const int tx_enables = 0
         | (tx_enable_a << TX_ENABLEA)

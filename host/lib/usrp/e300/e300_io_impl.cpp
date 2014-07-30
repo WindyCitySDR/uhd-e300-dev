@@ -100,7 +100,7 @@ void e300_impl::_update_rx_subdev_spec(const uhd::usrp::subdev_spec_t &spec)
         _fe_control_settings[1].rx_enb = true;
     }
 
-    this->_update_active_frontends();
+    this->_update_enables();
 }
 
 void e300_impl::_update_tx_subdev_spec(const uhd::usrp::subdev_spec_t &spec)
@@ -129,7 +129,7 @@ void e300_impl::_update_tx_subdev_spec(const uhd::usrp::subdev_spec_t &spec)
         _fe_control_settings[1].tx_enb = true;
     }
 
-    this->_update_active_frontends();
+    this->_update_enables();
 }
 
 /***********************************************************************
@@ -455,6 +455,7 @@ rx_streamer::sptr e300_impl::get_rx_stream(const uhd::stream_args_t &args_)
         _tree->access<double>(str(boost::format("/mboards/0/rx_dsps/%u/rate/value") % radio_index)).update();
 
     }
+    _update_enables();
     return my_streamer;
 }
 
@@ -560,7 +561,7 @@ tx_streamer::sptr e300_impl::get_tx_stream(const uhd::stream_args_t &args_)
         this->_update_tick_rate(this->_get_tick_rate());
         _tree->access<double>(str(boost::format("/mboards/0/tx_dsps/%u/rate/value") % radio_index)).update();
     }
-
+    _update_enables();
     return my_streamer;
 }
 }}} // namespace
