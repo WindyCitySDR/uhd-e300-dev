@@ -990,11 +990,7 @@ void e300_impl::_update_gpio_state(void)
     boost::uint32_t misc_reg = 0
         | (_misc.pps_sel    << gpio_t::PPS_SEL)
         | (_misc.mimo       << gpio_t::MIMO)
-        | (_misc.codec_arst << gpio_t::CODEC_ARST)
-        | (_misc.rx_bandsels0  << gpio_t::TX_BANDSELS0)
-        | (_misc.tx_bandsels   << gpio_t::RX_BANDSELS0)
-        | (_misc.rx_bandsels1  << gpio_t::TX_BANDSELS1)
-        | (_misc.tx_bandsels   << gpio_t::RX_BANDSELS1);
+        | (_misc.codec_arst << gpio_t::CODEC_ARST);
     _global_regs->poke32(global_regs::SR_CORE_MISC, misc_reg);
 
     UHD_MSG(status) << boost::format("updating gpio state, misc_reg = %lx") % int(misc_reg) << std::endl;

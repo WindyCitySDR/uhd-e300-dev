@@ -169,17 +169,10 @@ private: // types
         boost::uint32_t pps_sel;
         boost::uint32_t mimo;
         boost::uint32_t codec_arst;
-        boost::uint32_t tx_bandsels;
-        boost::uint32_t rx_bandsels0;
-        boost::uint32_t rx_bandsels1;
 
         static const size_t PPS_SEL    = 0;
         static const size_t MIMO       = 2;
         static const size_t CODEC_ARST = 3;
-        static const size_t TX_BANDSELS0  = 4;
-        static const size_t RX_BANDSELS0  = 7;
-        static const size_t TX_BANDSELS1  = 14;
-        static const size_t RX_BANDSELS1  = 17;
     };
 
 private: // methods
