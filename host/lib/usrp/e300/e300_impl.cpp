@@ -1017,8 +1017,6 @@ void e300_impl::_update_gpio_state(void)
         | (_misc.mimo       << gpio_t::MIMO)
         | (_misc.codec_arst << gpio_t::CODEC_ARST);
     _global_regs->poke32(global_regs::SR_CORE_MISC, misc_reg);
-
-    UHD_MSG(status) << boost::format("updating gpio state, misc_reg = %lx") % int(misc_reg) << std::endl;
 }
 
 void e300_impl::_reset_codec_mmcm(void)
