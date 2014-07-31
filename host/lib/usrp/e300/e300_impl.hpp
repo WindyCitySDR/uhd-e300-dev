@@ -227,7 +227,7 @@ private: // methods
 
     void _codec_loopback_self_test(uhd::wb_iface::sptr iface);
 
-    void _update_atrs(const size_t &fe);
+    void _update_atrs(void);
     void _update_antenna_sel(const size_t &fe, const std::string &ant);
     void _update_fe_lo_freq(const std::string &fe, const double freq);
 
@@ -264,7 +264,7 @@ private: // members
     double                      _tick_rate;
     ad9361_ctrl_transport::sptr _codec_xport;
     ad9361_ctrl::sptr           _codec_ctrl;
-    fe_control_settings_t       _fe_control_settings[2];
+    fe_control_settings_t       _settings;
     global_regs::sptr           _global_regs;
     e300_sensor_manager::sptr   _sensor_manager;
     e300_eeprom_manager::sptr   _eeprom_manager;
