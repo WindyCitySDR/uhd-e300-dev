@@ -171,13 +171,27 @@ private: // types
 
     struct gpio_t
     {
+        gpio_t() : pps_sel(global_regs::PPS_INT),
+            mimo(0), codec_arst(0), tx_bandsels(0),
+            rx_bandsel_a(0), rx_bandsel_b(0), rx_bandsel_c(0)
+        {}
+
         boost::uint32_t pps_sel;
         boost::uint32_t mimo;
         boost::uint32_t codec_arst;
 
-        static const size_t PPS_SEL    = 0;
-        static const size_t MIMO       = 2;
-        static const size_t CODEC_ARST = 3;
+        boost::uint32_t tx_bandsels;
+        boost::uint32_t rx_bandsel_a;
+        boost::uint32_t rx_bandsel_b;
+        boost::uint32_t rx_bandsel_c;
+
+        static const size_t PPS_SEL     = 0;
+        static const size_t MIMO        = 2;
+        static const size_t CODEC_ARST  = 3;
+        static const size_t TX_BANDSEL  = 4;
+        static const size_t RX_BANDSELA = 7;
+        static const size_t RX_BANDSELB = 12;
+        static const size_t RX_BANDSELC = 16;
     };
 
 private: // methods
@@ -202,6 +216,8 @@ private: // methods
     void _update_gpio_state(void);
     void _update_enables(void);
     void _reset_codec_mmcm(void);
+    void _update_bandsel(const std::string& which, double freq);
+
 
     void _update_tick_rate(const double);
     void _update_rx_samp_rate(const size_t, const double);
