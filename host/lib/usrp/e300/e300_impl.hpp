@@ -138,15 +138,17 @@ private: // types
         rx_frontend_core_200::sptr rx_fe;
         tx_frontend_core_200::sptr tx_fe;
 
-
         uhd::transport::zero_copy_if::sptr send_ctrl_xport;
         uhd::transport::zero_copy_if::sptr recv_ctrl_xport;
         uhd::transport::zero_copy_if::sptr tx_data_xport;
         uhd::transport::zero_copy_if::sptr tx_flow_xport;
         uhd::transport::zero_copy_if::sptr rx_data_xport;
         uhd::transport::zero_copy_if::sptr rx_flow_xport;
+
         boost::weak_ptr<uhd::rx_streamer> rx_streamer;
         boost::weak_ptr<uhd::tx_streamer> tx_streamer;
+
+        bool ant_rx2;
     };
 
     //frontend cache so we can update gpios
@@ -154,15 +156,9 @@ private: // types
     {
         fe_control_settings_t(void)
         {
-            rx_ant = "RX2";
-            tx_enb = false;
-            rx_enb = false;
             rx_freq = 1e9;
             tx_freq = 1e9;
         }
-        std::string rx_ant;
-        bool tx_enb;
-        bool rx_enb;
         double rx_freq;
         double tx_freq;
     };

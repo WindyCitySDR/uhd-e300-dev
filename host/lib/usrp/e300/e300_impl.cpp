@@ -796,10 +796,12 @@ void e300_impl::_update_clock_source(const std::string &)
 {
 }
 
-void e300_impl::_update_antenna_sel(const size_t &fe, const std::string &ant)
+void e300_impl::_update_antenna_sel(const size_t &which, const std::string &ant)
 {
-    _fe_control_settings[fe].rx_ant = ant;
-    this->_update_atrs(fe);
+    if (ant != "TX/RX" and ant != "RX2")
+        throw uhd::value_error("e300: unknown RX antenna option: " + ant);
+    _radio_perifs[which].ant_rx2 = (ant == "RX2");
+    this->_update_atrs(which);
 }
 
 void e300_impl::_update_fe_lo_freq(const std::string &fe, const double freq)
@@ -1107,9 +1109,15 @@ void e300_impl::_update_atrs(const size_t &fe)
 {
     const fe_control_settings_t &settings = _fe_control_settings[fe];
 
-    //----------------- rx ant comprehension --------------------//
-    const bool rx_ant_rx2 = settings.rx_ant == "RX2";
-    const bool rx_ant_txrx = settings.rx_ant == "TX/RX";
+    // if we're not ready, no point ...
+    if (not _radio_perifs[fe].atr)
+        return;
+
+    radio_perifs_t &perif = _radio_perifs[fe];
+    const bool enb_rx = bool(perif.rx_streamer.lock());
+    const bool enb_tx = bool(perif.tx_streamer.lock());
+    const bool rx_ant_rx2  = perif.ant_rx2;
+    const bool rx_ant_txrx = not perif.ant_rx2;
 
     //----------------- high/low band decision --------------------//
     const bool rx_low_band = settings.rx_freq < 2.6e9;
@@ -1169,8 +1177,8 @@ void e300_impl::_update_atrs(const size_t &fe)
     if (fe == 1) std::swap(vctxrx_1_txing, vctxrx_2_txing);
 
     //----------------- TX ENABLES ----------------------------//
-    const int tx_enable_a = (tx_high_band and settings.tx_enb)? 1 : 0;
-    const int tx_enable_b = (tx_low_band and settings.tx_enb)? 1 : 0;
+    int tx_enable_a = (tx_high_band and enb_tx) ? 1 : 0;
+    int tx_enable_b = (tx_low_band and  enb_tx) ? 1 : 0;
 
     //----------------- LEDS ----------------------------//
     const int led_rx2 = (rx_ant_rx2)? 1 : 0;
@@ -1207,10 +1215,14 @@ void e300_impl::_update_atrs(const size_t &fe)
     int fd_reg = tx_selects; //tx selects dominate in fd mode
 
     //add in leds and tx enables based on fe enable
-    if (settings.rx_enb) rx_reg |= rx_leds;
-    if (settings.rx_enb) fd_reg |= xx_leds;
-    if (settings.tx_enb) tx_reg |= tx_enables | tx_leds;
-    if (settings.tx_enb) fd_reg |= tx_enables | xx_leds;
+    if (enb_rx)
+        rx_reg |= rx_leds;
+    if (enb_rx)
+        fd_reg |= xx_leds;
+    if (enb_tx)
+        tx_reg |= tx_enables | tx_leds;
+    if (enb_tx)
+        fd_reg |= tx_enables | xx_leds;
 
     /*
     UHD_VAR(fe);
