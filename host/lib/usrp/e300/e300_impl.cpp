@@ -17,6 +17,7 @@
 
 #include "e300_impl.hpp"
 #include "e300_defaults.hpp"
+#include "e300_fpga_defs.hpp"
 #include "e300_spi.hpp"
 #include "e300_regs.hpp"
 #include "e300_eeprom_manager.hpp"
@@ -32,6 +33,8 @@
 #include <uhd/transport/udp_simple.hpp>
 #include <uhd/types/sensors.hpp>
 #include <boost/make_shared.hpp>
+#include <boost/algorithm/string.hpp>
+#include <boost/format.hpp>
 #include <boost/filesystem.hpp>
 #include <boost/functional/hash.hpp>
 #include <boost/bind.hpp>
@@ -237,6 +240,8 @@ static device::sptr e300_make(const device_addr_t &device_addr)
  **********************************************************************/
 e300_impl::e300_impl(const uhd::device_addr_t &device_addr) : _sid_framer(0)
 {
+    _type = uhd::device::USRP;
+
     _async_md.reset(new async_md_type(1000/*messages deep*/));
 
     e300_impl_begin:
@@ -245,15 +250,33 @@ e300_impl::e300_impl(const uhd::device_addr_t &device_addr) : _sid_framer(0)
     ////////////////////////////////////////////////////////////////////
     if (not device_addr.has_key("addr"))
     {
-        //extract the FPGA path for the e300
-        const std::string e300_fpga_image = find_image_path(
-            device_addr.get(
-                "fpga",
-                device_addr["product"] == "E300" ?
-                E300_FPGA_FILE_NAME : E310_FPGA_FILE_NAME));
-
-        if (not device_addr.has_key("no_reload_fpga"))
-            this->_load_fpga_image(e300_fpga_image);
+        if (not device_addr.has_key("no_reload_fpga")) {
+            // Load FPGA image if provided via args
+            if (device_addr.has_key("fpga")) {
+                this->_load_fpga_image(device_addr["fpga"]);
+            // Else load the FPGA image based on the product ID
+            } else {
+                //extract the FPGA path for the e300
+                const boost::uint16_t pid = boost::lexical_cast<boost::uint16_t>(
+                    device_addr["product"]);
+                std::string fpga_image;
+                switch(e300_eeprom_manager::get_mb_type(pid)) {
+                case e300_eeprom_manager::USRP_E310_MB:
+                    fpga_image = find_image_path(E310_FPGA_FILE_NAME);
+                    break;
+                case e300_eeprom_manager::USRP_E300_MB:
+                    fpga_image = find_image_path(E300_FPGA_FILE_NAME);
+                    break;
+                case e300_eeprom_manager::UNKNOWN:
+                default:
+                    UHD_MSG(warning) << "Unknown motherboard type, loading e300 image."
+                                     << std::endl;
+                    fpga_image = find_image_path(E300_FPGA_FILE_NAME);
+                    break;
+                }
+                this->_load_fpga_image(fpga_image);
+            }
+        }
     }
 
     ////////////////////////////////////////////////////////////////////
@@ -363,15 +386,16 @@ e300_impl::e300_impl(const uhd::device_addr_t &device_addr) : _sid_framer(0)
     UHD_MSG(status) << "Initializing core control..." << std::endl;
     this->_register_loopback_self_test(_global_regs);
 
-    // TODO: Put this in the right place
-    const boost::uint32_t git_hash = _global_regs->peek32(global_regs::RB32_CORE_GITHASH);
-    const boost::uint32_t compat = _global_regs->peek32(global_regs::RB32_CORE_COMPAT);
-    UHD_MSG(status) << "Getting version information... " << std::flush;
-    UHD_MSG(status) << boost::format("%u.%02d (git %7x%s)")
-        % (compat & 0xff) % ((compat & 0xff00) >> 8)
-        % (git_hash & 0x0FFFFFFF)
-        % ((git_hash & 0xF000000) ? "-dirty" : "") << std::endl;
-
+    // Verify fpga compatibility version matches at least for the major
+    if (_get_version(FPGA_MAJOR) != fpga::COMPAT_MAJOR) {
+        throw uhd::runtime_error(str(boost::format(
+            "Expected FPGA compatibility number %lu.x, but got %lu.%lu:\n"
+            "The FPGA build is not compatible with the host code build.\n"
+            "%s"
+        ) % fpga::COMPAT_MAJOR
+          % _get_version(FPGA_MAJOR) % _get_version(FPGA_MINOR)
+          % print_images_error()));
+    }
 
 
     ////////////////////////////////////////////////////////////////////
@@ -405,8 +429,18 @@ e300_impl::e300_impl(const uhd::device_addr_t &device_addr) : _sid_framer(0)
     _tree = property_tree::make();
     _tree->create<std::string>("/name").set("E-Series Device");
     const fs_path mb_path = "/mboards/0";
-    _tree->create<std::string>(mb_path / "name").set("E3x0");
+    _tree->create<std::string>(mb_path / "name")
+        .set(_eeprom_manager->get_mb_type_string());
+
     _tree->create<std::string>(mb_path / "codename").set("Troll");
+
+    _tree->create<std::string>(mb_path / "fpga_version").set(
+        str(boost::format("%u.%u")
+            % _get_version(FPGA_MAJOR)
+            % _get_version(FPGA_MINOR)));
+
+    _tree->create<std::string>(mb_path / "fpga_version_hash").set(
+        _get_version_hash());
 
     ////////////////////////////////////////////////////////////////////
     // and do the misc mboard sensors
@@ -439,8 +473,8 @@ e300_impl::e300_impl(const uhd::device_addr_t &device_addr) : _sid_framer(0)
     ////////////////////////////////////////////////////////////////////
     // setup radios
     ////////////////////////////////////////////////////////////////////
-    this->_setup_radio(0);
-    this->_setup_radio(1);
+    for(size_t instance = 0; instance < fpga::NUM_RADIOS; instance++)
+        this->_setup_radio(instance);
 
     _codec_ctrl->data_port_loopback(true);
 
@@ -509,67 +543,15 @@ e300_impl::e300_impl(const uhd::device_addr_t &device_addr) : _sid_framer(0)
     ////////////////////////////////////////////////////////////////////
     // create RF frontend interfacing
     ////////////////////////////////////////////////////////////////////
-    static const std::vector<std::string> frontends = boost::assign::list_of
-        ("TX1")("TX2")("RX1")("RX2");
-
     {
         const fs_path codec_path = mb_path / ("rx_codecs") / "A";
-        _tree->create<std::string>(codec_path / "name").set("E300 RX dual ADC");
+        _tree->create<std::string>(codec_path / "name").set("E3x0 RX dual ADC");
         _tree->create<int>(codec_path / "gains"); //empty cuz gains are in frontend
     }
     {
         const fs_path codec_path = mb_path / ("tx_codecs") / "A";
-        _tree->create<std::string>(codec_path / "name").set("E300 TX dual DAC");
+        _tree->create<std::string>(codec_path / "name").set("E3x0 TX dual DAC");
         _tree->create<int>(codec_path / "gains"); //empty cuz gains are in frontend
-    }
-
-    BOOST_FOREACH(const std::string &fe_name, frontends)
-    {
-        const std::string x = std::string(1, tolower(fe_name[0]));
-        const fs_path rf_fe_path = mb_path / "dboards" / "A" / (x+"x_frontends") / fe_name;
-
-        _tree->create<std::string>(rf_fe_path / "name").set(fe_name);
-        _tree->create<int>(rf_fe_path / "sensors"); //empty TODO
-        BOOST_FOREACH(const std::string &name, ad9361_ctrl::get_gain_names(fe_name))
-        {
-            _tree->create<meta_range_t>(rf_fe_path / "gains" / name / "range")
-                .set(ad9361_ctrl::get_gain_range(fe_name));
-
-            _tree->create<double>(rf_fe_path / "gains" / name / "value")
-                .coerce(boost::bind(&ad9361_ctrl::set_gain, _codec_ctrl, fe_name, _1))
-                .set(e300::DEFAULT_FE_GAIN);
-        }
-        _tree->create<std::string>(rf_fe_path / "connection").set("IQ");
-        _tree->create<bool>(rf_fe_path / "enabled").set(true);
-        _tree->create<bool>(rf_fe_path / "use_lo_offset").set(false);
-        _tree->create<double>(rf_fe_path / "bandwidth" / "value")
-            .coerce(boost::bind(&ad9361_ctrl::set_bw_filter, _codec_ctrl, fe_name, _1))
-            .set(e300::DEFAULT_FE_BW);
-        _tree->create<meta_range_t>(rf_fe_path / "bandwidth" / "range")
-            .publish(boost::bind(&ad9361_ctrl::get_bw_filter_range, fe_name));
-        _tree->create<double>(rf_fe_path / "freq" / "value")
-            .set(e300::DEFAULT_FE_FREQ)
-            .coerce(boost::bind(&ad9361_ctrl::tune, _codec_ctrl, fe_name, _1))
-            .subscribe(boost::bind(&e300_impl::_update_fe_lo_freq, this, fe_name, _1));
-        _tree->create<meta_range_t>(rf_fe_path / "freq" / "range")
-            .publish(boost::bind(&ad9361_ctrl::get_rf_freq_range));
-
-        //setup antenna stuff
-        if (fe_name[0] == 'R')
-        {
-            static const std::vector<std::string> ants = boost::assign::list_of("TX/RX")("RX2");
-            _tree->create<std::vector<std::string> >(rf_fe_path / "antenna" / "options").set(ants);
-            _tree->create<std::string>(rf_fe_path / "antenna" / "value")
-                .subscribe(boost::bind(&e300_impl::_update_antenna_sel, this, fe_name, _1))
-                .set("RX2");
-        }
-        if (fe_name[0] == 'T')
-        {
-            static const std::vector<std::string> ants(1, "TX/RX");
-            _tree->create<std::vector<std::string> >(rf_fe_path / "antenna" / "options").set(ants);
-            _tree->create<std::string>(rf_fe_path / "antenna" / "value").set("TX/RX");
-        }
-
     }
 
     ////////////////////////////////////////////////////////////////////
@@ -594,18 +576,28 @@ e300_impl::e300_impl(const uhd::device_addr_t &device_addr) : _sid_framer(0)
     // do some post-init tasks
     ////////////////////////////////////////////////////////////////////
 
-    //init the clock rate to something, but only when we have active chains
-    //init the clock rate to something reasonable
+    // init the clock rate to something reasonable
     _tree->access<double>(mb_path / "tick_rate").set(
         device_addr.cast<double>("master_clock_rate", e300::DEFAULT_TICK_RATE));
-    //_codec_ctrl->set_active_chains(false, false, false, false);
 
-    _tree->access<subdev_spec_t>(mb_path / "rx_subdev_spec").set(subdev_spec_t("A:RX1 A:RX2"));
-    _tree->access<subdev_spec_t>(mb_path / "tx_subdev_spec").set(subdev_spec_t("A:TX1 A:TX2"));
+    // subdev spec contains full width of selections
+    subdev_spec_t rx_spec, tx_spec;
+    BOOST_FOREACH(const std::string &fe, _tree->list(mb_path / "dboards" / "A" / "rx_frontends"))
+    {
+        rx_spec.push_back(subdev_spec_pair_t("A", fe));
+    }
+    BOOST_FOREACH(const std::string &fe, _tree->list(mb_path / "dboards" / "A" / "tx_frontends"))
+    {
+        tx_spec.push_back(subdev_spec_pair_t("A", fe));
+    }
+    _tree->access<subdev_spec_t>(mb_path / "rx_subdev_spec").set(rx_spec);
+    _tree->access<subdev_spec_t>(mb_path / "tx_subdev_spec").set(tx_spec);
 
-    _tree->access<std::string>(mb_path / "clock_source" / "value").set(e300::DEFAULT_CLOCK_SRC);
-    _tree->access<std::string>(mb_path / "time_source" / "value").set(e300::DEFAULT_TIME_SRC);
-
+    // init to default time and clock source
+    _tree->access<std::string>(mb_path / "clock_source" / "value").set(
+        e300::DEFAULT_CLOCK_SRC);
+    _tree->access<std::string>(mb_path / "time_source" / "value").set(
+        e300::DEFAULT_TIME_SRC);
 }
 
 boost::uint8_t e300_impl::_get_internal_gpio(
@@ -634,6 +626,14 @@ void e300_impl::_set_internal_gpio(
         return gpio->set_atr_reg(dboard_iface::UNIT_RX, dboard_iface::ATR_REG_TX_ONLY, value);
     else if (attr == "ATR_XX")
         return gpio->set_atr_reg(dboard_iface::UNIT_RX, dboard_iface::ATR_REG_FULL_DUPLEX, value);
+}
+
+uhd::sensor_value_t e300_impl::_get_fe_pll_lock(const bool is_tx)
+{
+    const boost::uint32_t st =
+        _global_regs->peek32(global_regs::RB32_CORE_PLL);
+    const bool locked = is_tx ? st & 0x1 : st & 0x2;
+    return sensor_value_t("LO", locked, "locked", "unlocked");
 }
 
 e300_impl::~e300_impl(void)
@@ -698,6 +698,30 @@ void e300_impl::_register_loopback_self_test(wb_iface::sptr iface)
         if (test_fail) break; //exit loop on any failure
     }
     UHD_MSG(status) << ((test_fail)? " fail" : "pass") << std::endl;
+}
+
+boost::uint32_t e300_impl::_get_version(compat_t which)
+{
+    const boost::uint16_t compat_num
+        = _global_regs->peek32(global_regs::RB32_CORE_COMPAT);
+
+    switch(which) {
+    case FPGA_MINOR:
+        return compat_num & 0xff;
+    case FPGA_MAJOR:
+        return (compat_num & 0xff00) >> 8;
+    default:
+        throw uhd::value_error("Requested unknown version.");
+    };
+}
+
+std::string e300_impl::_get_version_hash(void)
+{
+    const boost::uint32_t git_hash
+        = _global_regs->peek32(global_regs::RB32_CORE_GITHASH);
+    return str(boost::format("%7x%s")
+        % (git_hash & 0x0FFFFFFF)
+        % ((git_hash & 0xF000000) ? "-dirty" : ""));
 }
 
 void e300_impl::_codec_loopback_self_test(wb_iface::sptr iface)
@@ -790,11 +814,10 @@ void e300_impl::_update_clock_source(const std::string &)
 {
 }
 
-void e300_impl::_update_antenna_sel(const std::string &fe, const std::string &ant)
+void e300_impl::_update_antenna_sel(const size_t &fe, const std::string &ant)
 {
-    const size_t i = (fe == "RX1")? 0 : 1;
-    _fe_control_settings[i].rx_ant = ant;
-    this->_update_atrs(i);
+    _fe_control_settings[fe].rx_ant = ant;
+    this->_update_atrs(fe);
 }
 
 void e300_impl::_update_fe_lo_freq(const std::string &fe, const double freq)
@@ -851,6 +874,31 @@ void e300_impl::_setup_radio(const size_t dspno)
     perif.atr = gpio_core_200_32wo::make(perif.ctrl, TOREG(SR_GPIO));
 
     ////////////////////////////////////////////////////////////////////
+    // front end corrections
+    ////////////////////////////////////////////////////////////////////
+    std::string slot_name = (dspno == 0) ? "A" : "B";
+    perif.rx_fe = rx_frontend_core_200::make(perif.ctrl, TOREG(SR_RX_FRONT));
+    const fs_path rx_fe_path = mb_path / "rx_frontends" / slot_name;
+    _tree->create<std::complex<double> >(rx_fe_path / "dc_offset" / "value")
+        .coerce(boost::bind(&rx_frontend_core_200::set_dc_offset, perif.rx_fe, _1))
+        .set(std::complex<double>(0.0, 0.0));
+    _tree->create<bool>(rx_fe_path / "dc_offset" / "enable")
+        .subscribe(boost::bind(&rx_frontend_core_200::set_dc_offset_auto, perif.rx_fe, _1))
+        .set(true);
+    _tree->create<std::complex<double> >(rx_fe_path / "iq_balance" / "value")
+        .subscribe(boost::bind(&rx_frontend_core_200::set_iq_balance, perif.rx_fe, _1))
+        .set(std::complex<double>(0.0, 0.0));
+
+    perif.tx_fe = tx_frontend_core_200::make(perif.ctrl, TOREG(SR_TX_FRONT));
+    const fs_path tx_fe_path = mb_path / "tx_frontends" / slot_name;
+    _tree->create<std::complex<double> >(tx_fe_path / "dc_offset" / "value")
+        .coerce(boost::bind(&tx_frontend_core_200::set_dc_offset, perif.tx_fe, _1))
+        .set(std::complex<double>(0.0, 0.0));
+    _tree->create<std::complex<double> >(tx_fe_path / "iq_balance" / "value")
+        .subscribe(boost::bind(&tx_frontend_core_200::set_iq_balance, perif.tx_fe, _1))
+        .set(std::complex<double>(0.0, 0.0));
+
+    ////////////////////////////////////////////////////////////////////
     // create rx dsp control objects
     ////////////////////////////////////////////////////////////////////
     perif.framer = rx_vita_core_3000::make(perif.ctrl, TOREG(SR_RX_CTRL));
@@ -903,6 +951,62 @@ void e300_impl::_setup_radio(const size_t dspno)
     time64_rb_bases.rb_now = RB64_TIME_NOW;
     time64_rb_bases.rb_pps = RB64_TIME_PPS;
     perif.time64 = time_core_3000::make(perif.ctrl, TOREG(SR_TIME), time64_rb_bases);
+
+    ////////////////////////////////////////////////////////////////////
+    // create RF frontend interfacing
+    ////////////////////////////////////////////////////////////////////
+    static const std::vector<std::string> data_directions = boost::assign::list_of("tx")("rx");
+    BOOST_FOREACH(const std::string& direction, data_directions)
+    {
+        const std::string key = boost::to_upper_copy(direction) + str(boost::format("%u") % (dspno + 1));
+        const fs_path rf_fe_path
+            = mb_path / "dboards" / "A" / (direction + "_frontends") / ((dspno == 0) ? "A" : "B");
+
+        _tree->create<std::string>(rf_fe_path / "name").set("FE-"+key);
+        _tree->create<int>(rf_fe_path / "sensors"); //empty TODO
+        _tree->create<sensor_value_t>(rf_fe_path / "sensors" / "lo_locked")
+            .publish(boost::bind(&e300_impl::_get_fe_pll_lock, this, direction == "tx"));
+        BOOST_FOREACH(const std::string &name, ad9361_ctrl::get_gain_names(key))
+        {
+            _tree->create<meta_range_t>(rf_fe_path / "gains" / name / "range")
+                .set(ad9361_ctrl::get_gain_range(key));
+
+            _tree->create<double>(rf_fe_path / "gains" / name / "value")
+                .coerce(boost::bind(&ad9361_ctrl::set_gain, _codec_ctrl, key, _1))
+                .set(e300::DEFAULT_FE_BW);
+        }
+        _tree->create<std::string>(rf_fe_path / "connection").set("IQ");
+        _tree->create<bool>(rf_fe_path / "enabled").set(true);
+        _tree->create<bool>(rf_fe_path / "use_lo_offset").set(false);
+        _tree->create<double>(rf_fe_path / "bandwidth" / "value")
+            .coerce(boost::bind(&ad9361_ctrl::set_bw_filter, _codec_ctrl, key, _1))
+            .set(e300::DEFAULT_FE_BW);
+        _tree->create<meta_range_t>(rf_fe_path / "bandwidth" / "range")
+            .publish(boost::bind(&ad9361_ctrl::get_bw_filter_range, key));
+        _tree->create<double>(rf_fe_path / "freq" / "value")
+            .set(e300::DEFAULT_FE_FREQ)
+            .coerce(boost::bind(&ad9361_ctrl::tune, _codec_ctrl, key, _1))
+            .subscribe(boost::bind(&e300_impl::_update_fe_lo_freq, this, key, _1));
+        _tree->create<meta_range_t>(rf_fe_path / "freq" / "range")
+            .publish(boost::bind(&ad9361_ctrl::get_rf_freq_range));
+
+        //setup antenna stuff
+        if (key[0] == 'R')
+        {
+            static const std::vector<std::string> ants = boost::assign::list_of("TX/RX")("RX2");
+            _tree->create<std::vector<std::string> >(rf_fe_path / "antenna" / "options").set(ants);
+            _tree->create<std::string>(rf_fe_path / "antenna" / "value")
+                .subscribe(boost::bind(&e300_impl::_update_antenna_sel, this, dspno, _1))
+                .set("RX2");
+
+        }
+        if (key[0] == 'T')
+        {
+            static const std::vector<std::string> ants(1, "TX/RX");
+            _tree->create<std::vector<std::string> >(rf_fe_path / "antenna" / "options").set(ants);
+            _tree->create<std::string>(rf_fe_path / "antenna" / "value").set("TX/RX");
+        }
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////
@@ -1092,5 +1196,5 @@ void e300_impl::_update_atrs(const size_t &fe)
 
 UHD_STATIC_BLOCK(register_e300_device)
 {
-    device::register_device(&uhd::usrp::e300::e300_find, &uhd::usrp::e300::e300_make);
+    device::register_device(&uhd::usrp::e300::e300_find, &uhd::usrp::e300::e300_make, uhd::device::USRP);
 }

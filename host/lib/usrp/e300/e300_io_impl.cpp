@@ -17,6 +17,7 @@
 
 #include "e300_regs.hpp"
 #include "e300_impl.hpp"
+#include "e300_fpga_defs.hpp"
 #include "validate_subdev_spec.hpp"
 #include "../../transport/super_recv_packet_handler.hpp"
 #include "../../transport/super_send_packet_handler.hpp"
@@ -76,28 +77,41 @@ void e300_impl::_update_tx_samp_rate(const size_t dspno, const double rate)
 void e300_impl::_update_rx_subdev_spec(const uhd::usrp::subdev_spec_t &spec)
 {
     //sanity checking
-    if (spec.size()) validate_subdev_spec(_tree, spec, "rx");
-    UHD_ASSERT_THROW(spec.size() <= 2);
+    if (spec.size())
+        validate_subdev_spec(_tree, spec, "rx");
+
+    UHD_ASSERT_THROW(spec.size() <= fpga::NUM_RADIOS);
 
     _fe_control_settings[0].rx_enb = false;
     _fe_control_settings[1].rx_enb = false;
 
-    if (spec.size() == 1)
-    {
+    if (spec.size() == 1) {
         UHD_ASSERT_THROW(spec[0].db_name == "A");
-        _fe_control_settings[0].rx_enb = spec[0].sd_name == "RX1";
-        _fe_control_settings[1].rx_enb = spec[0].sd_name == "RX2";
+        _fe_control_settings[0].rx_enb = spec[0].sd_name == "A";
+        _fe_control_settings[1].rx_enb = spec[0].sd_name == "B";
     }
-    if (spec.size() == 2)
-    {
+    if (spec.size() == 2) {
         //TODO we can support swapping at a later date, only this combo is supported
         UHD_ASSERT_THROW(spec[0].db_name == "A");
-        UHD_ASSERT_THROW(spec[0].sd_name == "RX1");
+        UHD_ASSERT_THROW(spec[0].sd_name == "A");
         UHD_ASSERT_THROW(spec[1].db_name == "A");
-        UHD_ASSERT_THROW(spec[1].sd_name == "RX2");
+        UHD_ASSERT_THROW(spec[1].sd_name == "B");
         _fe_control_settings[0].rx_enb = true;
         _fe_control_settings[1].rx_enb = true;
     }
+
+    const fs_path mb_path = "/mboards/0";
+    for (size_t i = 0; i < spec.size(); i++)
+    {
+        const std::string conn = _tree->access<std::string>(
+            mb_path / "dboards" / spec[i].db_name /
+            ("rx_frontends") / spec[i].sd_name / "connection").get();
+
+        const bool fe_swapped = (conn == "QI" or conn == "Q");
+        _radio_perifs[i].ddc->set_mux(conn, fe_swapped);
+        _radio_perifs[i].rx_fe->set_mux(fe_swapped);
+    }
+
 
     this->_update_active_frontends();
 }
@@ -105,29 +119,37 @@ void e300_impl::_update_rx_subdev_spec(const uhd::usrp::subdev_spec_t &spec)
 void e300_impl::_update_tx_subdev_spec(const uhd::usrp::subdev_spec_t &spec)
 {
     //sanity checking
-    if (spec.size()) validate_subdev_spec(_tree, spec, "tx");
-    UHD_ASSERT_THROW(spec.size() <= 2);
+    if (spec.size())
+        validate_subdev_spec(_tree, spec, "tx");
+
+    UHD_ASSERT_THROW(spec.size() <= fpga::NUM_RADIOS);
 
     _fe_control_settings[0].tx_enb = false;
     _fe_control_settings[1].tx_enb = false;
 
-    if (spec.size() == 1)
-    {
+    if (spec.size() == 1) {
         UHD_ASSERT_THROW(spec[0].db_name == "A");
-        _fe_control_settings[0].tx_enb = spec[0].sd_name == "TX1";
-        _fe_control_settings[1].tx_enb = spec[0].sd_name == "TX2";
+        _fe_control_settings[0].tx_enb = spec[0].sd_name == "A";
+        _fe_control_settings[1].tx_enb = spec[0].sd_name == "B";
     }
-    if (spec.size() == 2)
-    {
+    if (spec.size() == 2) {
         //TODO we can support swapping at a later date, only this combo is supported
         UHD_ASSERT_THROW(spec[0].db_name == "A");
-        UHD_ASSERT_THROW(spec[0].sd_name == "TX1");
+        UHD_ASSERT_THROW(spec[0].sd_name == "A");
         UHD_ASSERT_THROW(spec[1].db_name == "A");
-        UHD_ASSERT_THROW(spec[1].sd_name == "TX2");
+        UHD_ASSERT_THROW(spec[1].sd_name == "B");
         _fe_control_settings[0].tx_enb = true;
         _fe_control_settings[1].tx_enb = true;
     }
 
+    const fs_path mb_path = "/mboards/0";
+    for (size_t i = 0; i < spec.size(); i++)
+    {
+        const std::string conn = _tree->access<std::string>(
+            mb_path / "dboards" / spec[i].db_name /
+            ("tx_frontends") / spec[i].sd_name / "connection").get();
+        _radio_perifs[i].tx_fe->set_mux(conn);
+    }
     this->_update_active_frontends();
 }
 
@@ -468,7 +490,7 @@ tx_streamer::sptr e300_impl::get_tx_stream(const uhd::stream_args_t &args_)
     //setup defaults for unspecified values
     if (not args.otw_format.empty() and args.otw_format != "sc16")
     {
-        throw uhd::value_error("e300_impl::get_rx_stream only supports otw_format sc16");
+        throw uhd::value_error("e300_impl::get_tx_stream only supports otw_format sc16");
     }
     args.otw_format = "sc16";
     args.channels = args.channels.empty()? std::vector<size_t>(1, 0) : args.channels;
@@ -504,7 +526,7 @@ tx_streamer::sptr e300_impl::get_tx_stream(const uhd::stream_args_t &args_)
             - sizeof(vrt::if_packet_info_t().cid) //no class id ever used
             - sizeof(vrt::if_packet_info_t().tsi) //no int time ever used
         ;
-        const size_t bpp = perif.rx_data_xport->get_recv_frame_size() - hdr_size;
+        const size_t bpp = perif.tx_data_xport->get_send_frame_size() - hdr_size;
         const size_t bpi = convert::get_bytes_per_item(args.otw_format);
         const size_t spp = unsigned(args.args.cast<double>("spp", bpp/bpi));
 

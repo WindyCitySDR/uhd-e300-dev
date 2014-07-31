@@ -192,6 +192,7 @@ int UHD_SAFE_MAIN(int argc, char *argv[]){
         ("args", po::value<std::string>()->default_value(""), "device address args")
         ("tree", "specify to print a complete property tree")
         ("string", po::value<std::string>(), "query a string value from the properties tree")
+        ("init-only", "skip all queries, only initialize device")
     ;
 
     po::variables_map vm;
@@ -209,7 +210,7 @@ int UHD_SAFE_MAIN(int argc, char *argv[]){
         return EXIT_SUCCESS;
     }
 
-    device::sptr dev = device::make(vm["args"].as<std::string>());
+    device::sptr dev = device::make(vm["args"].as<std::string>(), device::USRP);
     property_tree::sptr tree = dev->get_tree();
 
     if (vm.count("string")){
@@ -218,7 +219,7 @@ int UHD_SAFE_MAIN(int argc, char *argv[]){
     }
 
     if (vm.count("tree") != 0) print_tree("/", tree);
-    else std::cout << make_border(get_device_pp_string(tree)) << std::endl;
+    else if (not vm.count("init-only")) std::cout << make_border(get_device_pp_string(tree)) << std::endl;
 
     return EXIT_SUCCESS;
 }

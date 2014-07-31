@@ -326,7 +326,7 @@ static device::sptr x300_make(const device_addr_t &device_addr)
 
 UHD_STATIC_BLOCK(register_x300_device)
 {
-    device::register_device(&x300_find, &x300_make);
+    device::register_device(&x300_find, &x300_make, device::USRP);
 }
 
 static void x300_load_fw(wb_iface::sptr fw_reg_ctrl, const std::string &file_name)
@@ -355,6 +355,7 @@ static void x300_load_fw(wb_iface::sptr fw_reg_ctrl, const std::string &file_nam
 x300_impl::x300_impl(const uhd::device_addr_t &dev_addr)
 {
     UHD_MSG(status) << "X300 initialization sequence..." << std::endl;
+    _type = device::USRP;
     _async_md.reset(new async_md_type(1000/*messages deep*/));
     _tree = uhd::property_tree::make();
     _tree->create<std::string>("/name").set("X-Series Device");
@@ -839,8 +840,9 @@ void x300_impl::setup_mb(const size_t mb_i, const uhd::device_addr_t &dev_addr)
             try {
                 wait_for_ref_locked(mb.zpu_ctrl, 1.0);
             } catch (uhd::exception::runtime_error &e) {
-                UHD_MSG(warning) << "Clock reference failed to lock to internal source during device initialization.  " <<
-                    "Check for the lock before operation or ignore this warning if using another clock source." << std::endl;
+                // Ignore for now - It can sometimes take longer than 1 second to lock and that is OK.
+                //UHD_MSG(warning) << "Clock reference failed to lock to internal source during device initialization.  " <<
+                //    "Check for the lock before operation or ignore this warning if using another clock source." << std::endl;
             }
             _tree->access<std::string>(mb_path / "time_source" / "value").set("internal");
             UHD_MSG(status) << "References initialized to internal sources" << std::endl;
@@ -1129,12 +1131,12 @@ x300_impl::both_xports_t x300_impl::make_transport(
     if (mb.xport_path == "nirio") {
         default_buff_args.send_frame_size =
             (prefix == X300_RADIO_DEST_PREFIX_TX)
-            ? X300_PCIE_DATA_FRAME_SIZE
+            ? X300_PCIE_TX_DATA_FRAME_SIZE
             : X300_PCIE_MSG_FRAME_SIZE;
 
         default_buff_args.recv_frame_size =
             (prefix == X300_RADIO_DEST_PREFIX_RX)
-            ? X300_PCIE_DATA_FRAME_SIZE
+            ? X300_PCIE_RX_DATA_FRAME_SIZE
             : X300_PCIE_MSG_FRAME_SIZE;
 
         default_buff_args.num_send_frames =

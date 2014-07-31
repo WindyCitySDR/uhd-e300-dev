@@ -30,6 +30,8 @@
 #include <boost/thread/mutex.hpp>
 #include "e300_fifo_config.hpp"
 #include "radio_ctrl_core_3000.hpp"
+#include "rx_frontend_core_200.hpp"
+#include "tx_frontend_core_200.hpp"
 #include "rx_vita_core_3000.hpp"
 #include "tx_vita_core_3000.hpp"
 #include "time_core_3000.hpp"
@@ -133,6 +135,9 @@ private: // types
         rx_dsp_core_3000::sptr ddc;
         tx_vita_core_3000::sptr deframer;
         tx_dsp_core_3000::sptr duc;
+        rx_frontend_core_200::sptr rx_fe;
+        tx_frontend_core_200::sptr tx_fe;
+
 
         uhd::transport::zero_copy_if::sptr send_ctrl_xport;
         uhd::transport::zero_copy_if::sptr recv_ctrl_xport;
@@ -162,10 +167,15 @@ private: // types
         double tx_freq;
     };
 
+    enum compat_t {FPGA_MAJOR, FPGA_MINOR};
+
 private: // methods
     void _load_fpga_image(const std::string &path);
 
     void _register_loopback_self_test(uhd::wb_iface::sptr iface);
+
+    boost::uint32_t _get_version(compat_t which);
+    std::string _get_version_hash(void);
 
     void _setup_radio(const size_t which_radio);
 
@@ -191,7 +201,7 @@ private: // methods
     void _codec_loopback_self_test(uhd::wb_iface::sptr iface);
 
     void _update_atrs(const size_t &fe);
-    void _update_antenna_sel(const std::string &fe, const std::string &ant);
+    void _update_antenna_sel(const size_t &fe, const std::string &ant);
     void _update_fe_lo_freq(const std::string &fe, const double freq);
     void _update_active_frontends(void);
 
@@ -199,6 +209,10 @@ private: // methods
     void _handle_overflow(
         radio_perifs_t &perif,
         boost::weak_ptr<uhd::rx_streamer> streamer);
+
+
+    // get frontend lock sensor
+    uhd::sensor_value_t _get_fe_pll_lock(const bool is_tx);
 
     // internal gpios
     boost::uint8_t _get_internal_gpio(
