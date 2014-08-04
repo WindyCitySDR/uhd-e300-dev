@@ -71,6 +71,9 @@ static std::vector<std::string> discover_ip_addrs(
         UHD_MSG(error) << boost::format("Cannot open UDP transport on %s for discovery\n%s")
         % addr_hint % e.what() << std::endl;
         return addrs;
+    } catch(...) {
+        UHD_MSG(error) << "E300 Network discovery unknown error" << std::endl;
+        return addrs;
     }
 
     // TODO: Do not abuse the I2C transport here ...
@@ -82,7 +85,15 @@ static std::vector<std::string> discover_ip_addrs(
     req.reg = 0;
 
     // send dummy request
+    try {
     udp_bcast_xport->send(boost::asio::buffer(&req, sizeof(req)));
+    } catch (const std::exception &ex) {
+        UHD_MSG(error) << "E300 Network discovery error " << ex.what() << std::endl;
+        return addrs;
+    } catch(...) {
+        UHD_MSG(error) << "E300 Network discovery unknown error" << std::endl;
+        return addrs;
+    }
 
     // loop for replies until timeout
     while (true) {
@@ -97,6 +108,11 @@ static std::vector<std::string> discover_ip_addrs(
     }
 
     return addrs;
+}
+
+static bool is_loopback(const if_addrs_t &if_addrs)
+{
+       return if_addrs.inet == asio::ip::address_v4::loopback().to_string();
 }
 
 static device_addrs_t e300_find(const device_addr_t &multi_dev_hint)
@@ -135,55 +151,61 @@ static device_addrs_t e300_find(const device_addr_t &multi_dev_hint)
     if (hint.has_key("type") and hint["type"] != "e3x0")
         return e300_addrs;
 
-    // if no address or node has been specified, send a broadcast
-    if ((not hint.has_key("addr")) and (not hint.has_key("node"))) {
-        BOOST_FOREACH(const if_addrs_t &if_addrs, get_if_addrs())
-        {
-            // avoid the loopback device
-            if (if_addrs.inet == asio::ip::address_v4::loopback().to_string())
-                continue;
+    const bool loopback_only =
+        get_if_addrs().size() == 1 and is_loopback(get_if_addrs().at(0));
 
-            // create a new hint with this broadcast address
-            device_addr_t new_hint = hint;
-            new_hint["addr"] = if_addrs.bcast;
+    // if we don't have connectivity, we might as well skip the network part
+    if (not loopback_only) {
+        // if no address or node has been specified, send a broadcast
+        if ((not hint.has_key("addr")) and (not hint.has_key("node"))) {
+            BOOST_FOREACH(const if_addrs_t &if_addrs, get_if_addrs())
+            {
+                // avoid the loopback device
+                if (is_loopback(if_addrs))
+                    continue;
 
-            // call discover with the new hint ad append results
-            device_addrs_t new_e300_addrs = e300_find(new_hint);
-            e300_addrs.insert(e300_addrs.begin(),
-                new_e300_addrs.begin(), new_e300_addrs.end());
+                // create a new hint with this broadcast address
+                device_addr_t new_hint = hint;
+                new_hint["addr"] = if_addrs.bcast;
 
+                // call discover with the new hint ad append results
+                device_addrs_t new_e300_addrs = e300_find(new_hint);
+                e300_addrs.insert(e300_addrs.begin(),
+                    new_e300_addrs.begin(), new_e300_addrs.end());
+
+            }
+            return e300_addrs;
         }
-        return e300_addrs;
-    }
 
-    std::vector<std::string> ip_addrs = discover_ip_addrs(
-        hint["addr"], E300_SERVER_I2C_PORT);
+        std::vector<std::string> ip_addrs = discover_ip_addrs(
+            hint["addr"], E300_SERVER_I2C_PORT);
 
-    BOOST_FOREACH(const std::string &ip_addr, ip_addrs)
-    {
-        device_addr_t new_addr;
-        new_addr["type"] = "e3x0";
-        new_addr["addr"] = ip_addr;
-
-        // see if we can read the eeprom
-        try {
-            e300_eeprom_manager eeprom_manager(
-                i2c::make_simple_udp(new_addr["addr"], E300_SERVER_I2C_PORT));
-            const mboard_eeprom_t eeprom = eeprom_manager.get_mb_eeprom();
-            new_addr["name"] = eeprom["name"];
-            new_addr["serial"] = eeprom["serial"];
-            new_addr["product"] = eeprom["product"];
-        } catch (...) {
-            // set these values as empty string, so the device may still be found
-            // and the filters below can still operate on the discovered device
-            new_addr["name"] = "";
-            new_addr["serial"] = "";
-        }
-        // filter the discovered device below by matching optional keys
-        if ((not hint.has_key("name")   or hint["name"]   == new_addr["name"]) and
-            (not hint.has_key("serial") or hint["serial"] == new_addr["serial"]))
+        BOOST_FOREACH(const std::string &ip_addr, ip_addrs)
         {
-            e300_addrs.push_back(new_addr);
+            device_addr_t new_addr;
+            new_addr["type"] = "e3x0";
+            new_addr["addr"] = ip_addr;
+
+            // see if we can read the eeprom
+            try {
+                e300_eeprom_manager eeprom_manager(
+                    i2c::make_simple_udp(new_addr["addr"], E300_SERVER_I2C_PORT));
+                const mboard_eeprom_t eeprom = eeprom_manager.get_mb_eeprom();
+                new_addr["name"] = eeprom["name"];
+                new_addr["serial"] = eeprom["serial"];
+                new_addr["product"] = eeprom["product"];
+            } catch (...) {
+                // set these values as empty string, so the device may still be found
+                // and the filters below can still operate on the discovered device
+                new_addr["name"] = "";
+                new_addr["serial"] = "";
+            }
+            // filter the discovered device below by matching optional keys
+            if ((not hint.has_key("name")   or hint["name"]   == new_addr["name"]) and
+                (not hint.has_key("serial") or hint["serial"] == new_addr["serial"]))
+            {
+                e300_addrs.push_back(new_addr);
+            }
         }
     }
 
