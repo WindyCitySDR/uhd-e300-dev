@@ -501,18 +501,8 @@ e300_impl::e300_impl(const uhd::device_addr_t &device_addr) : _sid_framer(0)
     _codec_ctrl->data_port_loopback(true);
 
     // Radio 0 loopback through AD9361
-    _fe_control_settings[0].rx_enb = true;
-    _fe_control_settings[0].tx_enb = true;
-    _fe_control_settings[1].rx_enb = false;
-    _fe_control_settings[1].tx_enb = false;
-    this->_update_active_frontends();
     this->_codec_loopback_self_test(_radio_perifs[0].ctrl);
     // Radio 1 loopback through AD9361
-    _fe_control_settings[0].rx_enb = false;
-    _fe_control_settings[0].tx_enb = false;
-    _fe_control_settings[1].rx_enb = true;
-    _fe_control_settings[1].tx_enb = true;
-    this->_update_active_frontends();
     this->_codec_loopback_self_test(_radio_perifs[1].ctrl);
 
     _codec_ctrl->data_port_loopback(false);
@@ -665,7 +655,7 @@ e300_impl::~e300_impl(void)
 
 double e300_impl::_set_tick_rate(const double rate)
 {
-    const size_t factor = 2; // set_clock_rate() sets 2x the input rate which this factor corrects
+    const size_t factor = 1;
     UHD_MSG(status) << "Asking for clock rate " << rate/1e6 << " MHz\n";
     _tick_rate = _codec_ctrl->set_clock_rate(rate/factor)*factor;
     UHD_MSG(status) << "Actually got clock rate " << _tick_rate/1e6 << " MHz\n";
@@ -822,46 +812,37 @@ void e300_impl::_setup_dest_mapping(const boost::uint32_t sid, const size_t whic
 void e300_impl::_update_time_source(const std::string &source)
 {
     if (source == "none" or source == "internal") {
-        _global_regs->poke32(global_regs::SR_CORE_PPS_SEL, global_regs::PPS_INT);
+        _misc.pps_sel = global_regs::PPS_INT;
     } else if (source == "gpsdo") {
-        _global_regs->poke32(global_regs::SR_CORE_PPS_SEL, global_regs::PPS_GPS);
+        _misc.pps_sel = global_regs::PPS_GPS;
     } else if (source == "external") {
-        _global_regs->poke32(global_regs::SR_CORE_PPS_SEL, global_regs::PPS_EXT);
+        _misc.pps_sel = global_regs::PPS_EXT;
     } else {
         throw uhd::key_error("update_time_source: unknown source: " + source);
     }
+    _update_gpio_state();
 }
 
 void e300_impl::_update_clock_source(const std::string &)
 {
 }
 
-void e300_impl::_update_antenna_sel(const size_t &fe, const std::string &ant)
+void e300_impl::_update_antenna_sel(const size_t &which, const std::string &ant)
 {
-    _fe_control_settings[fe].rx_ant = ant;
-    this->_update_atrs(fe);
+    if (ant != "TX/RX" and ant != "RX2")
+        throw uhd::value_error("e300: unknown RX antenna option: " + ant);
+    _radio_perifs[which].ant_rx2 = (ant == "RX2");
+    this->_update_atrs();
 }
 
 void e300_impl::_update_fe_lo_freq(const std::string &fe, const double freq)
 {
-    for (size_t i = 0; i < 2; i++)
-    {
-        if (fe[0] == 'R') _fe_control_settings[i].rx_freq = freq;
-        if (fe[0] == 'T') _fe_control_settings[i].tx_freq = freq;
-        this->_update_atrs(i);
-    }
-}
-
-void e300_impl::_update_active_frontends(void)
-{
-    _codec_ctrl->set_active_chains(
-        _fe_control_settings[0].tx_enb,
-        _fe_control_settings[1].tx_enb,
-        _fe_control_settings[0].rx_enb,
-        _fe_control_settings[1].rx_enb
-    );
-    this->_update_atrs(0);
-    this->_update_atrs(1);
+    if (fe[0] == 'R')
+        _settings.rx_freq = freq;
+    if (fe[0] == 'T')
+        _settings.tx_freq = freq;
+    this->_update_atrs();
+    _update_bandsel(fe, freq);
 }
 
 void e300_impl::_setup_radio(const size_t dspno)
@@ -1006,9 +987,9 @@ void e300_impl::_setup_radio(const size_t dspno)
         _tree->create<meta_range_t>(rf_fe_path / "bandwidth" / "range")
             .publish(boost::bind(&ad9361_ctrl::get_bw_filter_range, key));
         _tree->create<double>(rf_fe_path / "freq" / "value")
-            .set(e300::DEFAULT_FE_FREQ)
             .coerce(boost::bind(&ad9361_ctrl::tune, _codec_ctrl, key, _1))
-            .subscribe(boost::bind(&e300_impl::_update_fe_lo_freq, this, key, _1));
+            .subscribe(boost::bind(&e300_impl::_update_fe_lo_freq, this, key, _1))
+            .set(e300::DEFAULT_FE_FREQ);
         _tree->create<meta_range_t>(rf_fe_path / "freq" / "range")
             .publish(boost::bind(&ad9361_ctrl::get_rf_freq_range));
 
@@ -1031,187 +1012,231 @@ void e300_impl::_setup_radio(const size_t dspno)
     }
 }
 
+void e300_impl::_update_enables(void)
+{
+    //extract settings from state variables
+    const bool enb_tx1 = bool(_radio_perifs[0].tx_streamer.lock());
+    const bool enb_rx1 = bool(_radio_perifs[0].rx_streamer.lock());
+    const bool enb_tx2 = bool(_radio_perifs[1].tx_streamer.lock());
+    const bool enb_rx2 = bool(_radio_perifs[1].rx_streamer.lock());
+    const size_t num_rx = (enb_rx1 ? 1 : 0) + (enb_rx2 ? 1:0);
+    const size_t num_tx = (enb_tx1 ? 1 : 0) + (enb_tx2 ? 1:0);
+    const bool mimo = num_rx == 2 or num_tx == 2;
+
+    //setup the active chains in the codec
+    _codec_ctrl->set_active_chains(enb_tx1, enb_tx2, enb_rx1, enb_rx2);
+    if ((num_rx + num_tx) == 0)
+        _codec_ctrl->set_active_chains(
+            true,
+            false,
+            true,
+            false); //enable something
+    //set_active_chains could cause a clock rate change - reset dcm
+    _reset_codec_mmcm();
+
+    //figure out if mimo is enabled based on new state
+    _misc.mimo = (mimo)? 1 : 0;
+    _update_gpio_state();
+
+    //atrs change based on enables
+    _update_atrs();
+}
+
+void e300_impl::_update_gpio_state(void)
+{
+    boost::uint32_t misc_reg = 0
+        | (_misc.pps_sel      << gpio_t::PPS_SEL)
+        | (_misc.mimo         << gpio_t::MIMO)
+        | (_misc.codec_arst   << gpio_t::CODEC_ARST)
+        | (_misc.tx_bandsels  << gpio_t::TX_BANDSEL)
+        | (_misc.rx_bandsel_a << gpio_t::RX_BANDSELA)
+        | (_misc.rx_bandsel_b << gpio_t::RX_BANDSELB)
+        | (_misc.rx_bandsel_c << gpio_t::RX_BANDSELC);
+    _global_regs->poke32(global_regs::SR_CORE_MISC, misc_reg);
+}
+
+void e300_impl::_reset_codec_mmcm(void)
+{
+    _misc.codec_arst = 1;
+    _update_gpio_state();
+    boost::this_thread::sleep(boost::posix_time::milliseconds(10));
+    _misc.codec_arst = 0;
+    _update_gpio_state();
+}
+
 ////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////
 //////////////// ATR SETUP FOR FRONTEND CONTROL VIA GPIO ///////////////
 ////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////
 
-void e300_impl::_update_atrs(const size_t &fe)
+void e300_impl::_update_bandsel(const std::string& which, double freq)
 {
-    const fe_control_settings_t &settings = _fe_control_settings[fe];
-
-    //----------------- rx ant comprehension --------------------//
-    const bool rx_ant_rx2 = settings.rx_ant == "RX2";
-    const bool rx_ant_txrx = settings.rx_ant == "TX/RX";
-
-    //----------------- high/low band decision --------------------//
-    const bool rx_low_band = settings.rx_freq < 2.6e9;
-    const bool rx_high_band = not rx_low_band;
-    const bool tx_low_band = settings.tx_freq < 2940.0e6;
-    const bool tx_high_band = not tx_low_band;
-
-    //------------------- TX low band bandsel ----------------------//
-    int tx_bandsels = 0;
-    if      (settings.tx_freq < 117.7e6)   tx_bandsels = 0;
-    else if (settings.tx_freq < 178.2e6)   tx_bandsels = 1;
-    else if (settings.tx_freq < 284.3e6)   tx_bandsels = 2;
-    else if (settings.tx_freq < 453.7e6)   tx_bandsels = 3;
-    else if (settings.tx_freq < 723.8e6)   tx_bandsels = 4;
-    else if (settings.tx_freq < 1154.9e6)  tx_bandsels = 5;
-    else if (settings.tx_freq < 1842.6e6)  tx_bandsels = 6;
-    else if (settings.tx_freq < 2940.0e6)  tx_bandsels = 7;
-    else                                   tx_bandsels = 0;
-
-    //------------------- RX low band bandsel ----------------------//
-    int rx_bandsels = 0, rx_bandsel_b = 0, rx_bandsel_c = 0;
-    if(fe == 0) {
-        if      (settings.rx_freq < 450e6)   {rx_bandsels = 4; rx_bandsel_b = 0; rx_bandsel_c = 2;}
-        else if (settings.rx_freq < 700e6)   {rx_bandsels = 2; rx_bandsel_b = 0; rx_bandsel_c = 3;}
-        else if (settings.rx_freq < 1200e6)  {rx_bandsels = 0; rx_bandsel_b = 0; rx_bandsel_c = 1;}
-        else if (settings.rx_freq < 1800e6)  {rx_bandsels = 1; rx_bandsel_b = 2; rx_bandsel_c = 0;}
-        else if (settings.rx_freq < 2350e6)  {rx_bandsels = 3; rx_bandsel_b = 3; rx_bandsel_c = 0;}
-        else if (settings.rx_freq < 2600e6)  {rx_bandsels = 5; rx_bandsel_b = 1; rx_bandsel_c = 0;}
-        else                                 {rx_bandsels = 0; rx_bandsel_b = 0; rx_bandsel_c = 0;}
+    if(which[0] == 'R') {
+        if (freq < 450e6) {
+            _misc.rx_bandsel_a  = 44; // 4 | (5 << 3)
+            _misc.rx_bandsel_b  = 0;  // 0 | (0 << 2)
+            _misc.rx_bandsel_c  = 6;  // 2 | (1 << 2)
+        } else if (freq < 700e6) {
+            _misc.rx_bandsel_a  = 26; // 2 | (3 << 3)
+            _misc.rx_bandsel_b  = 0;  // 0 | (0 << 2)
+            _misc.rx_bandsel_c  = 15; // 3 | (3 << 2)
+        } else if (freq < 1200e6) {
+            _misc.rx_bandsel_a  = 8; // 0 | (1 << 3)
+            _misc.rx_bandsel_b  = 0; // 0 | (0 << 2)
+            _misc.rx_bandsel_c  = 9; // 1 | (2 << 2)
+        } else if (freq < 1800e6) {
+            _misc.rx_bandsel_a  = 1; // 1 | (0 << 3)
+            _misc.rx_bandsel_b  = 6; // 2 | (1 << 2)
+            _misc.rx_bandsel_c  = 0; // 0 | (0 << 2)
+        } else if (freq < 2350e6){
+            _misc.rx_bandsel_a  = 19; // 3 | (2 << 3)
+            _misc.rx_bandsel_b  = 15; // 3 | (3 << 2)
+            _misc.rx_bandsel_c  = 0;  // 0 | (0 << 2)
+        } else if (freq < 2600e6){
+            _misc.rx_bandsel_a  = 37; // 5 | (4 << 3)
+            _misc.rx_bandsel_b  = 9;  // 1 | (2 << 2)
+            _misc.rx_bandsel_c  = 0;  // 0 | (0 << 2)
+        } else {
+            _misc.rx_bandsel_a  = 0;
+            _misc.rx_bandsel_b  = 0;
+            _misc.rx_bandsel_c  = 0;
+        }
+        _update_gpio_state();
+    } else if(which[0] == 'T') {
+        if (freq < 117.7e6)
+            _misc.tx_bandsels = 0;
+        else if (freq < 178.2e6)
+            _misc.tx_bandsels = 1;
+        else if (freq < 284.3e6)
+            _misc.tx_bandsels = 2;
+        else if (freq < 453.7e6)
+            _misc.tx_bandsels = 3;
+        else if (freq < 453.7e6)
+            _misc.tx_bandsels = 3;
+        else if (freq < 723.8e6)
+            _misc.tx_bandsels = 4;
+        else if (freq < 1154.9e6)
+            _misc.tx_bandsels = 5;
+        else if (freq < 1842.6e6)
+            _misc.tx_bandsels = 6;
+        else if (freq < 2940.0e6)
+            _misc.tx_bandsels = 7;
+        else
+            _misc.tx_bandsels = 0;
+        _update_gpio_state();
     } else {
-        if      (settings.rx_freq < 450e6)   {rx_bandsels = 5; rx_bandsel_b = 0; rx_bandsel_c = 1;}
-        else if (settings.rx_freq < 700e6)   {rx_bandsels = 3; rx_bandsel_b = 0; rx_bandsel_c = 3;}
-        else if (settings.rx_freq < 1200e6)  {rx_bandsels = 1; rx_bandsel_b = 0; rx_bandsel_c = 2;}
-        else if (settings.rx_freq < 1800e6)  {rx_bandsels = 0; rx_bandsel_b = 1; rx_bandsel_c = 0;}
-        else if (settings.rx_freq < 2350e6)  {rx_bandsels = 2; rx_bandsel_b = 3; rx_bandsel_c = 0;}
-        else if (settings.rx_freq < 2600e6)  {rx_bandsels = 4; rx_bandsel_b = 2; rx_bandsel_c = 0;}
-        else                                 {rx_bandsels = 0; rx_bandsel_b = 0; rx_bandsel_c = 0;}
+        UHD_THROW_INVALID_CODE_PATH();
     }
+}
 
-    //-------------------- VCRX - rx mode -------------------------//
-    int vcrx_1_rxing = 1, vcrx_2_rxing = 0;
-    if ((rx_ant_rx2 and rx_low_band) or (rx_ant_txrx and rx_high_band))
+
+void e300_impl::_update_atrs(void)
+{
+    for (size_t instance = 0; instance < fpga::NUM_RADIOS; instance++)
     {
-        vcrx_1_rxing = 0; vcrx_2_rxing = 1;
+        // if we're not ready, no point ...
+        if (not _radio_perifs[instance].atr)
+            return;
+
+        radio_perifs_t &perif = _radio_perifs[instance];
+        const bool enb_rx = bool(perif.rx_streamer.lock());
+        const bool enb_tx = bool(perif.tx_streamer.lock());
+        const bool rx_ant_rx2  = perif.ant_rx2;
+
+        const bool rx_low_band = _settings.rx_freq < 2.6e9;
+        const bool tx_low_band = _settings.tx_freq < 2940.0e6;
+
+        // VCRX
+        int vcrx_1_rxing = 1;
+        int vcrx_2_rxing = 0;
+        int vcrx_1_txing = 1;
+        int vcrx_2_txing = 0;
+
+        if (rx_low_band) {
+            vcrx_1_rxing = rx_ant_rx2 ? 0 : 1;
+            vcrx_2_rxing = rx_ant_rx2 ? 1 : 0;
+            vcrx_1_txing = 0;
+            vcrx_2_txing = 1;
+        } else {
+            vcrx_1_rxing = rx_ant_rx2 ? 1 : 0;
+            vcrx_2_rxing = rx_ant_rx2 ? 0 : 1;
+            vcrx_1_txing = 1;
+            vcrx_2_txing = 0;
+        }
+
+        // VCTX
+        int vctxrx_1_rxing = 0;
+        int vctxrx_2_rxing = 1;
+        int vctxrx_1_txing = 0;
+        int vctxrx_2_txing = 1;
+
+        if (tx_low_band) {
+            vctxrx_1_rxing = rx_ant_rx2 ? 0 : 1;
+            vctxrx_2_rxing = rx_ant_rx2 ? 1 : 0;
+            vctxrx_1_txing = 0;
+            vctxrx_2_txing = 1;
+        } else {
+            vctxrx_1_rxing = rx_ant_rx2 ? 1 : 1;
+            vctxrx_2_rxing = rx_ant_rx2 ? 0 : 0;
+            vctxrx_1_txing = 1;
+            vctxrx_2_txing = 1;
+        }
+        //swapped for routing reasons, reswap it here
+        if (instance == 1)
+            std::swap(vctxrx_1_txing, vctxrx_2_txing);
+
+        int tx_enable_a = (!tx_low_band and enb_tx) ? 1 : 0;
+        int tx_enable_b = (tx_low_band and  enb_tx) ? 1 : 0;
+
+        //----------------- LEDS ----------------------------//
+        const int led_rx2  = rx_ant_rx2  ? 1 : 0;
+        const int led_txrx = !rx_ant_rx2 ? 1 : 0;
+        const int led_tx   = 1;
+
+        const int rx_leds = (led_rx2 << LED_RX_RX) | (led_txrx << LED_TXRX_RX);
+        const int tx_leds = (led_tx << LED_TXRX_TX);
+        const int xx_leds = tx_leds | (1 << LED_RX_RX); //forced to rx2
+
+        const int rx_selects = 0
+            | (vcrx_1_rxing << VCRX_V1)
+            | (vcrx_2_rxing << VCRX_V2)
+            | (vctxrx_1_rxing << VCTXRX_V1)
+            | (vctxrx_2_rxing << VCTXRX_V2)
+        ;
+        const int tx_selects = 0
+            | (vcrx_1_txing << VCRX_V1)
+            | (vcrx_2_txing << VCRX_V2)
+            | (vctxrx_1_txing << VCTXRX_V1)
+            | (vctxrx_2_txing << VCTXRX_V2)
+        ;
+        const int tx_enables = 0
+            | (tx_enable_a << TX_ENABLEA)
+            | (tx_enable_b << TX_ENABLEB)
+        ;
+
+        //default selects
+        int oo_reg = rx_selects;
+        int rx_reg = rx_selects;
+        int tx_reg = tx_selects;
+        int fd_reg = tx_selects; //tx selects dominate in fd mode
+
+        //add in leds and tx enables based on fe enable
+        if (enb_rx)
+            rx_reg |= rx_leds;
+        if (enb_rx)
+            fd_reg |= xx_leds;
+        if (enb_tx)
+            tx_reg |= tx_enables | tx_leds;
+        if (enb_tx)
+            fd_reg |= tx_enables | xx_leds;
+
+        gpio_core_200_32wo::sptr atr = _radio_perifs[instance].atr;
+        atr->set_atr_reg(dboard_iface::ATR_REG_IDLE, oo_reg);
+        atr->set_atr_reg(dboard_iface::ATR_REG_RX_ONLY, rx_reg);
+        atr->set_atr_reg(dboard_iface::ATR_REG_TX_ONLY, tx_reg);
+        atr->set_atr_reg(dboard_iface::ATR_REG_FULL_DUPLEX, fd_reg);
     }
-    if ((rx_ant_rx2 and rx_high_band) or (rx_ant_txrx and rx_low_band))
-    {
-        vcrx_1_rxing = 1; vcrx_2_rxing = 0;
-    }
-
-    //-------------------- VCRX - tx mode -------------------------//
-    int vcrx_1_txing = 1, vcrx_2_txing = 0;
-    if (rx_low_band)
-    {
-        vcrx_1_txing = 0; vcrx_2_txing = 1;
-    }
-    if (rx_high_band)
-    {
-        vcrx_1_txing = 1; vcrx_2_txing = 0;
-    }
-
-    //-------------------- VCTX - rx mode -------------------------//
-    int vctxrx_1_rxing = 0, vctxrx_2_rxing = 1;
-    if (rx_ant_txrx)
-    {
-        vctxrx_1_rxing = 1; vctxrx_2_rxing = 0;
-    }
-    if (rx_ant_rx2 and tx_high_band)
-    {
-        vctxrx_1_rxing = 1; vctxrx_2_rxing = 1;
-    }
-    if (rx_ant_rx2 and tx_low_band)
-    {
-        vctxrx_1_rxing = 0; vctxrx_2_rxing = 1;
-    }
-
-    //-------------------- VCTX - tx mode -------------------------//
-    int vctxrx_1_txing = 0, vctxrx_2_txing = 1;
-    if (tx_high_band)
-    {
-        vctxrx_1_txing = 1; vctxrx_2_txing = 1;
-    }
-    if (tx_low_band)
-    {
-        vctxrx_1_txing = 0; vctxrx_2_txing = 1;
-    }
-
-    //swapped for routing reasons, reswap it here
-    if (fe == 1) std::swap(vctxrx_1_txing, vctxrx_2_txing);
-
-    //----------------- TX ENABLES ----------------------------//
-    const int tx_enable_a = (tx_high_band and settings.tx_enb)? 1 : 0;
-    const int tx_enable_b = (tx_low_band and settings.tx_enb)? 1 : 0;
-
-    //----------------- LEDS ----------------------------//
-    const int led_rx2 = (rx_ant_rx2)? 1 : 0;
-    const int led_txrx = (rx_ant_txrx)? 1 : 0;
-    const int led_tx = 1;
-
-    const int rx_leds = (led_rx2 << LED_RX_RX) | (led_txrx << LED_TXRX_RX);
-    const int tx_leds = (led_tx << LED_TXRX_TX);
-    const int xx_leds = tx_leds | (1 << LED_RX_RX); //forced to rx2
-
-    //----------------- ATR values ---------------------------//
-
-    const int rx_selects = 0
-        | (vcrx_1_rxing << VCRX_V1)
-        | (vcrx_2_rxing << VCRX_V2)
-        | (vctxrx_1_rxing << VCTXRX_V1)
-        | (vctxrx_2_rxing << VCTXRX_V2)
-    ;
-    const int tx_selects = 0
-        | (vcrx_1_txing << VCRX_V1)
-        | (vcrx_2_txing << VCRX_V2)
-        | (vctxrx_1_txing << VCTXRX_V1)
-        | (vctxrx_2_txing << VCTXRX_V2)
-    ;
-    const int xx_selects = 0
-        | (tx_bandsels << TX_BANDSEL)
-        | (rx_bandsels << RX_BANDSEL)
-        | (rx_bandsel_b << RXB_BANDSEL)
-        | (rx_bandsel_c << RXC_BANDSEL)
-        | ((settings.rx_enb? 1 : 0) << ST_RX_ENABLE)
-        | ((settings.tx_enb? 1 : 0) << ST_TX_ENABLE)
-    ;
-    const int tx_enables = 0
-        | (tx_enable_a << TX_ENABLEA)
-        | (tx_enable_b << TX_ENABLEB)
-    ;
-
-    //default selects
-    int oo_reg = xx_selects | rx_selects;
-    int rx_reg = xx_selects | rx_selects;
-    int tx_reg = xx_selects | tx_selects;
-    int fd_reg = xx_selects | tx_selects; //tx selects dominate in fd mode
-
-    //add in leds and tx enables based on fe enable
-    if (settings.rx_enb) rx_reg |= rx_leds;
-    if (settings.rx_enb) fd_reg |= xx_leds;
-    if (settings.tx_enb) tx_reg |= tx_enables | tx_leds;
-    if (settings.tx_enb) fd_reg |= tx_enables | xx_leds;
-
-    /*
-    UHD_VAR(fe);
-    UHD_VAR(settings.rx_enb);
-    UHD_VAR(settings.tx_enb);
-    UHD_VAR(settings.rx_freq);
-    UHD_VAR(settings.tx_freq);
-    UHD_VAR(tx_bandsels);
-    UHD_VAR(rx_bandsels);
-    UHD_VAR(rx_bandsel_b);
-    UHD_VAR(rx_bandsel_c);
-    UHD_VAR(rx_ant_rx2);
-    UHD_VAR(rx_ant_txrx);
-    UHD_VAR(rx_low_band);
-    UHD_VAR(rx_high_band);
-    UHD_VAR(vcrx_1_rxing);
-    UHD_VAR(vcrx_2_rxing);
-    UHD_VAR(vcrx_1_txing);
-    UHD_VAR(vcrx_2_txing);
-    */
-
-    //load actual values into atr registers
-    gpio_core_200_32wo::sptr atr = _radio_perifs[fe].atr;
-    atr->set_atr_reg(dboard_iface::ATR_REG_IDLE, oo_reg);
-    atr->set_atr_reg(dboard_iface::ATR_REG_RX_ONLY, rx_reg);
-    atr->set_atr_reg(dboard_iface::ATR_REG_TX_ONLY, tx_reg);
-    atr->set_atr_reg(dboard_iface::ATR_REG_FULL_DUPLEX, fd_reg);
 }
 
 }}} // namespace

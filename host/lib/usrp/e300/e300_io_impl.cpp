@@ -82,13 +82,8 @@ void e300_impl::_update_rx_subdev_spec(const uhd::usrp::subdev_spec_t &spec)
 
     UHD_ASSERT_THROW(spec.size() <= fpga::NUM_RADIOS);
 
-    _fe_control_settings[0].rx_enb = false;
-    _fe_control_settings[1].rx_enb = false;
-
     if (spec.size() == 1) {
         UHD_ASSERT_THROW(spec[0].db_name == "A");
-        _fe_control_settings[0].rx_enb = spec[0].sd_name == "A";
-        _fe_control_settings[1].rx_enb = spec[0].sd_name == "B";
     }
     if (spec.size() == 2) {
         //TODO we can support swapping at a later date, only this combo is supported
@@ -96,8 +91,6 @@ void e300_impl::_update_rx_subdev_spec(const uhd::usrp::subdev_spec_t &spec)
         UHD_ASSERT_THROW(spec[0].sd_name == "A");
         UHD_ASSERT_THROW(spec[1].db_name == "A");
         UHD_ASSERT_THROW(spec[1].sd_name == "B");
-        _fe_control_settings[0].rx_enb = true;
-        _fe_control_settings[1].rx_enb = true;
     }
 
     const fs_path mb_path = "/mboards/0";
@@ -111,9 +104,7 @@ void e300_impl::_update_rx_subdev_spec(const uhd::usrp::subdev_spec_t &spec)
         _radio_perifs[i].ddc->set_mux(conn, fe_swapped);
         _radio_perifs[i].rx_fe->set_mux(fe_swapped);
     }
-
-
-    this->_update_active_frontends();
+    this->_update_enables();
 }
 
 void e300_impl::_update_tx_subdev_spec(const uhd::usrp::subdev_spec_t &spec)
@@ -124,13 +115,8 @@ void e300_impl::_update_tx_subdev_spec(const uhd::usrp::subdev_spec_t &spec)
 
     UHD_ASSERT_THROW(spec.size() <= fpga::NUM_RADIOS);
 
-    _fe_control_settings[0].tx_enb = false;
-    _fe_control_settings[1].tx_enb = false;
-
     if (spec.size() == 1) {
         UHD_ASSERT_THROW(spec[0].db_name == "A");
-        _fe_control_settings[0].tx_enb = spec[0].sd_name == "A";
-        _fe_control_settings[1].tx_enb = spec[0].sd_name == "B";
     }
     if (spec.size() == 2) {
         //TODO we can support swapping at a later date, only this combo is supported
@@ -138,8 +124,6 @@ void e300_impl::_update_tx_subdev_spec(const uhd::usrp::subdev_spec_t &spec)
         UHD_ASSERT_THROW(spec[0].sd_name == "A");
         UHD_ASSERT_THROW(spec[1].db_name == "A");
         UHD_ASSERT_THROW(spec[1].sd_name == "B");
-        _fe_control_settings[0].tx_enb = true;
-        _fe_control_settings[1].tx_enb = true;
     }
 
     const fs_path mb_path = "/mboards/0";
@@ -150,7 +134,7 @@ void e300_impl::_update_tx_subdev_spec(const uhd::usrp::subdev_spec_t &spec)
             ("tx_frontends") / spec[i].sd_name / "connection").get();
         _radio_perifs[i].tx_fe->set_mux(conn);
     }
-    this->_update_active_frontends();
+    this->_update_enables();
 }
 
 /***********************************************************************
@@ -476,6 +460,7 @@ rx_streamer::sptr e300_impl::get_rx_stream(const uhd::stream_args_t &args_)
         _tree->access<double>(str(boost::format("/mboards/0/rx_dsps/%u/rate/value") % radio_index)).update();
 
     }
+    _update_enables();
     return my_streamer;
 }
 
@@ -581,7 +566,7 @@ tx_streamer::sptr e300_impl::get_tx_stream(const uhd::stream_args_t &args_)
         this->_update_tick_rate(this->_get_tick_rate());
         _tree->access<double>(str(boost::format("/mboards/0/tx_dsps/%u/rate/value") % radio_index)).update();
     }
-
+    _update_enables();
     return my_streamer;
 }
 }}} // namespace
