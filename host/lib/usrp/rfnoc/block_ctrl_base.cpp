@@ -81,7 +81,7 @@ block_ctrl_base::~block_ctrl_base() {
 }
 
 void block_ctrl_base::sr_write(const boost::uint32_t reg, const boost::uint32_t data) {
-    UHD_MSG(status) << str(boost::format("sr_write(%d, %08x)") % reg % data) << std::endl;
+    UHD_MSG(status) << str(boost::format("sr_write(%d, %08x) on %s") % reg % data % get_block_id()) << std::endl;
     _ctrl_iface->poke32(_sr_to_addr(reg), data);
 }
 

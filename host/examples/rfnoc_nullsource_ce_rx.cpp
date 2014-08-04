@@ -254,11 +254,13 @@ int UHD_SAFE_MAIN(int argc, char *argv[])
     // Configure packet size and rate
     std::cout << "Configuring blocks..." << std::endl;
     // TODO: Implement null_block_ctrl and replace these calls with nicer ones
-    std::cout << str(boost::format("Requested rate: %.2f Msps (%.2f MByte/s).") % (rate / 1e6) % (rate * 4 / 1e6)) << std::endl;
+    std::cout << "Samples per packet coming from null source: " << spp << std::endl;
+    null_src_ctrl->set_bytes_per_packet(spp * 4);
     null_src_ctrl->sr_write(
             9, // Register number
-            spp * 2 // This register is 'lines per packet', and there's 2 sc16-samples per line
+            spp / 2 // This register is 'lines per packet', and there's 2 sc16-samples per line
     );
+    std::cout << str(boost::format("Requested rate: %.2f Msps (%.2f MByte/s).") % (rate / 1e6) % (rate * 4 / 1e6)) << std::endl;
     boost::uint32_t cycs_between_pkts = (2 * block_rate / rate) - 1;
     if (cycs_between_pkts > 0xFFFF) {
         std::cout << "Warning: Requested rate is lower than minimum rate." << std::endl;

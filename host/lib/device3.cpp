@@ -25,8 +25,6 @@ using namespace uhd::rfnoc;
 
 block_ctrl_base::sptr device3::get_block_ctrl(const block_id_t &block_id) const
 {
-    UHD_MSG(status) << "get_block_ctrl() " << block_id << std::endl;
-
     for (size_t i = 0; i < _rfnoc_block_ctrl.size(); i++) {
         if (_rfnoc_block_ctrl[i]->get_block_id() == block_id) {
             return _rfnoc_block_ctrl[i];
@@ -38,8 +36,6 @@ block_ctrl_base::sptr device3::get_block_ctrl(const block_id_t &block_id) const
 
 block_ctrl_base::sptr device3::find_block_ctrl(const std::string &block_id) const
 {
-    UHD_MSG(status) << "find_block_ctrl() " << block_id << std::endl;
-
     for (size_t i = 0; i < _rfnoc_block_ctrl.size(); i++) {
         if (_rfnoc_block_ctrl[i]->get_block_id().match(block_id)) {
             return _rfnoc_block_ctrl[i];
