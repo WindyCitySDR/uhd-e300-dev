@@ -22,6 +22,7 @@
 #include "e300_regs.hpp"
 #include "e300_eeprom_manager.hpp"
 #include "e300_sensor_manager.hpp"
+#include "e300_common.hpp"
 
 #include <uhd/utils/msg.hpp>
 #include <uhd/utils/log.hpp>
@@ -254,7 +255,12 @@ static device_addrs_t e300_find(const device_addr_t &multi_dev_hint)
 static device::sptr e300_make(const device_addr_t &device_addr)
 {
     UHD_LOG << "e300_make with args " << device_addr.to_pp_string() << std::endl;
-    return device::sptr(new e300_impl(device_addr));
+    if(device_addr.has_key("server"))
+        throw uhd::runtime_error(
+            str(boost::format("Please run the server executable \"%s\"")
+                % "usrp_e3x0_network_mode"));
+    else
+        return device::sptr(new e300_impl(device_addr));
 }
 
 /***********************************************************************
@@ -266,7 +272,6 @@ e300_impl::e300_impl(const uhd::device_addr_t &device_addr) : _sid_framer(0)
 
     _async_md.reset(new async_md_type(1000/*messages deep*/));
 
-    e300_impl_begin:
     ////////////////////////////////////////////////////////////////////
     // load the fpga image
     ////////////////////////////////////////////////////////////////////
@@ -275,7 +280,7 @@ e300_impl::e300_impl(const uhd::device_addr_t &device_addr) : _sid_framer(0)
         if (not device_addr.has_key("no_reload_fpga")) {
             // Load FPGA image if provided via args
             if (device_addr.has_key("fpga")) {
-                this->_load_fpga_image(device_addr["fpga"]);
+                common::load_fpga_image(device_addr["fpga"]);
             // Else load the FPGA image based on the product ID
             } else {
                 //extract the FPGA path for the e300
@@ -296,7 +301,7 @@ e300_impl::e300_impl(const uhd::device_addr_t &device_addr) : _sid_framer(0)
                     fpga_image = find_image_path(E300_FPGA_FILE_NAME);
                     break;
                 }
-                this->_load_fpga_image(fpga_image);
+                common::load_fpga_image(fpga_image);
             }
         }
     }
@@ -319,7 +324,7 @@ e300_impl::e300_impl(const uhd::device_addr_t &device_addr) : _sid_framer(0)
     _network_mode = device_addr.has_key("addr");
 
     // until we figure out why this goes wrong we'll keep this hack around
-    if (device_addr.has_key("addr") or device_addr.has_key("server")) {
+    if (device_addr.has_key("addr")) {
         data_xport_params.recv_frame_size =
             std::min(e300::MAX_NET_RX_DATA_FRAME_SIZE, data_xport_params.recv_frame_size);
         data_xport_params.send_frame_size =
@@ -418,32 +423,6 @@ e300_impl::e300_impl(const uhd::device_addr_t &device_addr) : _sid_framer(0)
           % _get_version(FPGA_MAJOR) % _get_version(FPGA_MINOR)
           % print_images_error()));
     }
-
-
-    ////////////////////////////////////////////////////////////////////
-    // optional udp server
-    ////////////////////////////////////////////////////////////////////
-    if (device_addr.has_key("server"))
-    {
-        boost::thread_group tg;
-        tg.create_thread(boost::bind(&e300_impl::_run_server, this, E300_SERVER_RX_PORT0, "RX",0));
-        tg.create_thread(boost::bind(&e300_impl::_run_server, this, E300_SERVER_TX_PORT0, "TX",0));
-        tg.create_thread(boost::bind(&e300_impl::_run_server, this, E300_SERVER_CTRL_PORT0, "CTRL",0));
-
-        tg.create_thread(boost::bind(&e300_impl::_run_server, this, E300_SERVER_RX_PORT1, "RX",1));
-        tg.create_thread(boost::bind(&e300_impl::_run_server, this, E300_SERVER_TX_PORT1, "TX",1));
-        tg.create_thread(boost::bind(&e300_impl::_run_server, this, E300_SERVER_CTRL_PORT1, "CTRL",1));
-
-        tg.create_thread(boost::bind(&e300_impl::_run_server, this, E300_SERVER_SENSOR_PORT, "SENSOR", 0 /*don't care */));
-
-        tg.create_thread(boost::bind(&e300_impl::_run_server, this, E300_SERVER_CODEC_PORT, "CODEC", 0 /*don't care */));
-        tg.create_thread(boost::bind(&e300_impl::_run_server, this, E300_SERVER_GREGS_PORT, "GREGS", 0 /*don't care */));
-        tg.create_thread(boost::bind(&e300_impl::_run_server, this, E300_SERVER_I2C_PORT, "I2C", 0 /*don't care */));
-        tg.join_all();
-        goto e300_impl_begin;
-    }
-
-
 
     ////////////////////////////////////////////////////////////////////
     // Initialize the properties tree

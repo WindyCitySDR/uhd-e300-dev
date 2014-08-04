@@ -27,6 +27,7 @@ SET(util_runtime_sources
     uhd_cal_tx_dc_offset.cpp
     uhd_cal_tx_iq_balance.cpp
     usrp_n2xx_simple_net_burner.cpp
+    usrp_e3x0_network_mode.cpp
     nirio_programmer.cpp
 )
 

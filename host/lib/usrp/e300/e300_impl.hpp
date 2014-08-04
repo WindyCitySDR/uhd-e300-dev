@@ -250,12 +250,6 @@ private: // methods
         const std::string &attr,
         const boost::uint32_t value);
 
-    // server stuff for network access
-    void _run_server(
-        const std::string &port,
-        const std::string &what,
-        const size_t fe);
-
 private: // members
     bool                        _network_mode;
     e300_fifo_interface::sptr   _fifo_iface;
