@@ -272,13 +272,26 @@ int UHD_SAFE_MAIN(int argc, char *argv[])
             cycs_between_pkts // This register is 'clock cycles between packets'
     );
 
-    std::cout << uhd::rfnoc::block_id_t(blockid) << std::endl;
+    // Reset blocks TODO this should probably go somewhere, like connect()
+    // to do automatically
+    null_src_ctrl->reset_flow_control();
+    proc_block_ctrl->reset_flow_control();
+
 
     // Connect blocks
     std::cout << "Connecting blocks..." << std::endl;
     usrp->connect(
             null_src_ctrl->get_block_id(),
             proc_block_ctrl->get_block_id()
+    );
+    uhd::sid_t sid1(0);
+    sid1.set_src_address(null_src_ctrl->get_address());
+    sid1.set_dst_address(proc_block_ctrl->get_address());
+    // TODO once null source has it's own block, remove this
+    std::cout << "Setting null source SID to " << sid1 << std::endl;
+    null_src_ctrl->sr_write(
+            8,
+            sid1.get_sid()
     );
 
     // Start receiving

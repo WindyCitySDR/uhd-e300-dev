@@ -21,6 +21,9 @@
 namespace uhd {
     namespace rfnoc {
 
+//! For flow control within a single crossbar
+static const size_t DEFAULT_FC_XBAR_PKTS_PER_ACK = 2;
+
 // Common settings registers.
 static const boost::uint32_t SR_FLOW_CTRL_BUF_SIZE     = 0;
 static const boost::uint32_t SR_FLOW_CTRL_ENABLE       = 1;

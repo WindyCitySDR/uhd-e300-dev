@@ -1072,9 +1072,14 @@ public:
         src->set_destination(sid.get_dst_address(), src_block_port);
 
         // Set flow control
-        src->configure_flow_control_out(dst->get_fifo_size(dst_block_port));
+        // FC window (in packets) depends on FIFO size...        ...and packet size.
         size_t buf_size_pkts = dst->get_fifo_size(dst_block_port) / dst->get_bytes_per_packet();
-        dst->configure_flow_control_in(0, buf_size_pkts, dst_block_port);
+        src->configure_flow_control_out(20);
+        dst->configure_flow_control_in(
+                0,
+                uhd::rfnoc::DEFAULT_FC_XBAR_PKTS_PER_ACK,
+                dst_block_port
+        );
 
         // Register blocks
         dst->register_upstream_block(src);

@@ -72,6 +72,7 @@ block_ctrl_base::block_ctrl_base(
     _root_path = "xbar/" + _block_id.get_local();
     _tree->create<boost::uint64_t>(_root_path / "noc_id").set(noc_id);
     _tree->create<std::vector<size_t> >(_root_path / "input_buffer_size").set(buf_sizes);
+    // TODO this must be per output port, or even as part of io sig
     _tree->create<size_t>(_root_path / "bytes_per_packet").set(1456);
 
     // TODO: Add IO signature
@@ -115,7 +116,11 @@ void block_ctrl_base::issue_stream_cmd(
     }
 }
 
-void block_ctrl_base::configure_flow_control_in(boost::uint32_t cycles, boost::uint32_t packets, size_t block_port) {
+void block_ctrl_base::configure_flow_control_in(
+        boost::uint32_t cycles,
+        boost::uint32_t packets,
+        size_t block_port
+) {
     UHD_LOG
         << "Setting upstream flow control on " << _block_id << " (Block Port: " << block_port
         << ") to: cycles==" << cycles << ", packets==" << packets << std::endl;
