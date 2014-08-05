@@ -41,7 +41,13 @@ class UHD_API device3 : public uhd::device {
      *
      * \param block_id Canonical block name (e.g. "0/FFT_1").
      */
-    virtual rfnoc::block_ctrl_base::sptr get_block_ctrl(const rfnoc::block_id_t &block_id) const;
+    rfnoc::block_ctrl_base::sptr get_block_ctrl(const rfnoc::block_id_t &block_id) const;
+
+    template <typename T>
+    boost::shared_ptr<T> get_block_ctrl(const rfnoc::block_id_t &block_id) const
+    {
+        return boost::dynamic_pointer_cast<T>(get_block_ctrl(block_id));
+    }
 
     /*! Like get_block_ctrl(), but uses a less strict method for finding blocks.
      *
@@ -52,7 +58,13 @@ class UHD_API device3 : public uhd::device {
      *
      * \param block_id Block name (e.g. "FFT").
      */
-    virtual rfnoc::block_ctrl_base::sptr find_block_ctrl(const std::string &block_id) const;
+    rfnoc::block_ctrl_base::sptr find_block_ctrl(const std::string &block_id) const;
+
+    template <typename T>
+    boost::shared_ptr<T> find_block_ctrl(const std::string &block_id) const
+    {
+        return boost::dynamic_pointer_cast<T>(find_block_ctrl(block_id));
+    }
 
     /*!
      * \param dst Who gets this command (radio0, ce1, ...)

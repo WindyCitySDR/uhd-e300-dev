@@ -44,4 +44,5 @@ block_ctrl_base::sptr device3::find_block_ctrl(const std::string &block_id) cons
 
     throw uhd::lookup_error(str(boost::format("Can't find a block with ID: %s") % block_id));
 }
+
 // vim: sw=4 et:

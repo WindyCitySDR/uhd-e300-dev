@@ -242,11 +242,17 @@ int UHD_SAFE_MAIN(int argc, char *argv[])
     }
 
     // Get block control objects
-    uhd::rfnoc::null_block_ctrl::sptr null_src_ctrl = uhd::rfnoc::null_block_ctrl::cast(usrp->get_device3()->find_block_ctrl(nullid));
+    // For the streaming block, we don't care what type this block is,
+    // so we make it a block_ctrl_base (default):
     uhd::rfnoc::block_ctrl_base::sptr proc_block_ctrl = usrp->get_device3()->find_block_ctrl(blockid);
+    // For the null source control, we want to use the subclassed access,
+    // so we create a null_block_ctrl:
+    uhd::rfnoc::null_block_ctrl::sptr null_src_ctrl = usrp->get_device3()->find_block_ctrl<uhd::rfnoc::null_block_ctrl>(nullid);
     std::cout
-        << "Connecting blocks: " << null_src_ctrl->get_block_id()
-        << " -> " << proc_block_ctrl->get_block_id() << std::endl;
+        << "Setting up Stream: " << null_src_ctrl->get_block_id()
+        << " ==> " << proc_block_ctrl->get_block_id()
+        << " ==> HOST"
+        << std::endl;
 
     // Set channel definitions
     // TODO: tbw
@@ -273,11 +279,9 @@ int UHD_SAFE_MAIN(int argc, char *argv[])
             proc_block_ctrl->get_block_id()
     );
 
-    //return EXIT_SUCCESS;
-
     // Start receiving
 #define recv_to_file_args(format) \
-	(usrp, proc_block_ctrl, format, file, spb, total_num_samps, total_time, bw_summary, stats, null, continue_on_bad_packet)
+        (usrp, proc_block_ctrl, format, file, spb, total_num_samps, total_time, bw_summary, stats, null, continue_on_bad_packet)
     //recv to file
     if (type == "double") recv_to_file<std::complex<double> >recv_to_file_args("fc64");
     else if (type == "float") recv_to_file<std::complex<float> >recv_to_file_args("fc32");
