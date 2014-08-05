@@ -46,7 +46,7 @@ private:
     wb_iface::sptr _ctrl_iface;
 
     //! The SID of the control transport.
-    //_ctrl_sid.get_dst_address() must yield this block's address.
+    // _ctrl_sid.get_dst_address() yields this block's address.
     uhd::sid_t _ctrl_sid;
 
     //! The (unique) block ID.
@@ -60,7 +60,8 @@ protected:
 
     /*!
      * \param ctrl_iface A valid interface that allows us to do peeks and pokes
-     * \param ctrl_sid The SID corresponding to ctrl_iface
+     * \param ctrl_sid The SID corresponding to ctrl_iface. ctrl_sid.get_dst_address() must
+     *                 yield this block's address.
      * \param device_index The device index (or motherboard index).
      * \param tree A property tree for this motherboard. Example: If the root a device's
      *             property tree is /mboards/0, pass a subtree starting at /mboards/0
@@ -82,9 +83,13 @@ protected:
 public:
     typedef boost::shared_ptr<block_ctrl_base> sptr;
 
+    //! Returns a shared_ptr of type T. Use this to access the derived block types.
+    template <class T> UHD_INLINE T cast(void) const { return boost::dynamic_pointer_cast<T>(shared_from_this()); };
+
     /*! Allows setting one register on the settings bus.
      *
-     * Note: There is no address translation necessary. Register 0 is 0, 1 is 1 etc.
+     * Note: There is no address translation ("memory mapping") necessary.
+     * Register 0 is 0, 1 is 1 etc.
      *
      * \param reg The settings register to write to.
      * \param data New value of this register.
@@ -117,11 +122,11 @@ public:
      *
      * Returns the size of the buffer in bytes.
      */
-    virtual size_t get_fifo_size(size_t block_port=0) const;
+    size_t get_fifo_size(size_t block_port=0) const;
 
     /*! Returns the 16-Bit address for this block.
      */
-    virtual boost::uint32_t get_address();
+    boost::uint32_t get_address(size_t block_port=0);
 
     /*! Returns the unique block ID for this block (e.g. "0/FFT_1").
      */
@@ -130,6 +135,10 @@ public:
     /*! Returns the SID for the control transport.
      */
     uhd::sid_t get_ctrl_sid() const { return _ctrl_sid; };
+
+    /*! Return the clock rate in Hz for this block.
+     */
+    virtual double get_clock_rate() const;
 
     /*! Issue a stream command for this block.
      *
@@ -181,15 +190,48 @@ public:
      */
     virtual void reset_flow_control();
 
-    /*! Set the packet size in bytes.
+    /*! Configure the size (in bytes) of the packets this block produces.
      *
      * Note: block_ctrl_base only stores this value internally, but does not
      * set any registers. It is recommended to overload this function
      * to actually change settings.
+     *
+     * If this block is not capable of setting the packet size as requested,
+     * this block returns false (does not throw). The calling function must
+     * check this and handle accordingly.
+     *
+     * Setting \p bpp to 0 indicates a variable packet size.
      */
-    virtual void set_bytes_per_packet(size_t bpp);
+    virtual bool set_bytes_per_output_packet(size_t bpp, size_t out_block_port=0);
 
-    virtual size_t get_bytes_per_packet(size_t in_block_port=0, size_t out_block_port=0);
+    /*! Inform the block of the packet size (in bytes) it is to expect on a given input port.
+     *
+     * This usually is called after configuring an upstream block. That block will
+     * probably produce data at a certain packet size, and this function is used
+     * to tell this block about the packet size.
+     *
+     * If this block is not capable of receiving the specified packet size,
+     * this block returns false (does not throw). The caller must check this
+     * and handle accordingly.
+     *
+     * *Important*: It may be that calling this function also changes the size
+     * of outgoing packets. Call get_bytes_per_output_packet() to get the
+     * definitive value.
+     *
+     * *Default behaviour*: Does nothing, just returns true. This function
+     * is most definitely one you want to override when subclassing
+     * block_ctrl_base.
+     *
+     * Setting \p bpp to 0 indicates a variable packet size.
+     */
+    virtual bool set_bytes_per_input_packet(size_t bpp, size_t in_block_port=0);
+
+    /*! Query the size of packets (in bytes) produced on a given output port.
+     *
+     * A return value of 0 indicates that the packet size is not yet set on this
+     * port, or is variable in size.
+     */
+    virtual size_t get_bytes_per_output_packet(size_t out_block_port=0);
 
     /*! Configures data flowing from port \p output_block_port to go to \p next_address
      *

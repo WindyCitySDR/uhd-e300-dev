@@ -15,18 +15,24 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 //
 
+// This is a simple example for RFNoC apps written in UHD.
+// It connects a null source block to any other block on the
+// crossbar (provided it has stream-through capabilities)
+// and then streams the result to the host, writing it into a file.
+
+#include <iostream>
+#include <fstream>
+#include <csignal>
+#include <complex>
+#include <boost/program_options.hpp>
+#include <boost/format.hpp>
+#include <boost/thread.hpp>
 #include <uhd/utils/thread_priority.hpp>
 #include <uhd/utils/safe_main.hpp>
 #include <uhd/usrp/multi_usrp.hpp>
 #include <uhd/exception.hpp>
 #include <uhd/usrp/rfnoc/block_ctrl.hpp>
-#include <boost/program_options.hpp>
-#include <boost/format.hpp>
-#include <boost/thread.hpp>
-#include <iostream>
-#include <fstream>
-#include <csignal>
-#include <complex>
+#include <uhd/usrp/rfnoc/null_block_ctrl.hpp>
 
 namespace po = boost::program_options;
 
@@ -242,7 +248,9 @@ int UHD_SAFE_MAIN(int argc, char *argv[])
     }
 
     // Get block control objects
-    uhd::rfnoc::block_ctrl_base::sptr null_src_ctrl   = usrp->get_device3()->find_block_ctrl(nullid);
+    // TODO make these block_ctrl and null_block_ctrl
+    uhd::rfnoc::block_ctrl_base::sptr null_src_ctrl_base   = usrp->get_device3()->find_block_ctrl(nullid);
+    uhd::rfnoc::null_block_ctrl::sptr null_src_ctrl = boost::dynamic_pointer_cast<uhd::rfnoc::null_block_ctrl>(null_src_ctrl_base);
     uhd::rfnoc::block_ctrl_base::sptr proc_block_ctrl = usrp->get_device3()->find_block_ctrl(blockid);
     std::cout
         << "Setting up crossbar connection: " << null_src_ctrl->get_block_id()
@@ -250,32 +258,18 @@ int UHD_SAFE_MAIN(int argc, char *argv[])
 
     // Set channel definitions
     // TODO: tbw
+    // Here, we define that there is only 1 channel, and it points
+    // to the null source.
 
     // Configure packet size and rate
     std::cout << "Configuring blocks..." << std::endl;
-    // TODO: Implement null_block_ctrl and replace these calls with nicer ones
     std::cout << "Samples per packet coming from null source: " << spp << std::endl;
-    null_src_ctrl->set_bytes_per_packet(spp * 4);
-    null_src_ctrl->sr_write(
-            9, // Register number
-            spp / 2 // This register is 'lines per packet', and there's 2 sc16-samples per line
-    );
-    std::cout << str(boost::format("Requested rate: %.2f Msps (%.2f MByte/s).") % (rate / 1e6) % (rate * 4 / 1e6)) << std::endl;
-    boost::uint32_t cycs_between_pkts = (2 * block_rate / rate) - 1;
-    if (cycs_between_pkts > 0xFFFF) {
-        std::cout << "Warning: Requested rate is lower than minimum rate." << std::endl;
-    }
-    double actual_rate = 2 * block_rate / (cycs_between_pkts + 1);
-    std::cout << str(boost::format("Setting rate to: %.2f Msps (%.2f MByte/s).") % (actual_rate / 1e6) % (actual_rate * 4 / 1e6)) << std::endl;
-    null_src_ctrl->sr_write(
-            10, // Register number
-            cycs_between_pkts // This register is 'clock cycles between packets'
-    );
+    null_src_ctrl->set_bytes_per_output_packet(spp * 4);
 
-    // Reset blocks TODO this should probably go somewhere, like connect()
-    // to do automatically
-    null_src_ctrl->reset_flow_control();
-    proc_block_ctrl->reset_flow_control();
+    std::cout << str(boost::format("Requesting rate:   %.2f Msps (%.2f MByte/s).") % (rate / 1e6) % (rate * 4 / 1e6)) << std::endl;
+    // Factor 2 for switching between line rate and sample rate:
+    double actual_rate = null_src_ctrl->set_line_rate(rate / 2) * 2;
+    std::cout << str(boost::format("Actually got rate: %.2f Msps (%.2f MByte/s).") % (actual_rate / 1e6) % (actual_rate * 4 / 1e6)) << std::endl;
 
 
     // Connect blocks
@@ -284,15 +278,8 @@ int UHD_SAFE_MAIN(int argc, char *argv[])
             null_src_ctrl->get_block_id(),
             proc_block_ctrl->get_block_id()
     );
-    uhd::sid_t sid1(0);
-    sid1.set_src_address(null_src_ctrl->get_address());
-    sid1.set_dst_address(proc_block_ctrl->get_address());
-    // TODO once null source has it's own block, remove this
-    std::cout << "Setting null source SID to " << sid1 << std::endl;
-    null_src_ctrl->sr_write(
-            8,
-            sid1.get_sid()
-    );
+
+    //return EXIT_SUCCESS;
 
     // Start receiving
 #define recv_to_file_args(format) \

@@ -21,6 +21,9 @@
 namespace uhd {
     namespace rfnoc {
 
+static const size_t MAX_PACKET_SIZE = 8000; // bytes
+static const size_t DEFAULT_PACKET_SIZE = 1456; // bytes
+
 //! For flow control within a single crossbar
 static const size_t DEFAULT_FC_XBAR_PKTS_PER_ACK = 2;
 

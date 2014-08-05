@@ -32,8 +32,8 @@ namespace uhd {
 class UHD_API block_ctrl : virtual public block_ctrl_base
 {
 public:
+    // TODO replace with macro
     typedef boost::shared_ptr<block_ctrl> sptr;
-
     static sptr make(
             uhd::wb_iface::sptr ctrl_iface,
             uhd::sid_t ctrl_sid,

@@ -39,6 +39,10 @@
 #include <uhd/transport/nirio/niusrprio_session.h>
 #include <uhd/utils/platform.hpp>
 
+////// RFNOC ////////////
+#include <uhd/usrp/rfnoc/null_block_ctrl.hpp>
+////// RFNOC ////////////
+
 #define NIUSRPRIO_DEFAULT_RPC_PORT "5444"
 
 #define X300_REV(x) (x - "A" + 1)
@@ -890,16 +894,28 @@ void x300_impl::setup_mb(const size_t mb_i, const uhd::device_addr_t &dev_addr)
         UHD_MSG(status) << str(boost::format("Port %d: Found NoC-Block with ID %016x.") % ce_map[i] % noc_id) << std::endl;
         // TODO: Implement cunning method to figure out the right block_ctrl_base
         // derivative using the noc-id
+        if (noc_id == 0xaaaabbbbcccc0000) {
+            UHD_MSG(status) << "It's a... null block!" << std::endl;
+            _rfnoc_block_ctrl.push_back(
+                uhd::rfnoc::null_block_ctrl::make(
+                    ctrl,
+                    ctrl_sid,
+                    mb_i,
+                    _tree->subtree(mb_path)
+                )
+            );
+        } else {
+            // For now, it's just block_ctrl
+            _rfnoc_block_ctrl.push_back(
+                uhd::rfnoc::block_ctrl::make(
+                    ctrl,
+                    ctrl_sid,
+                    mb_i,
+                    _tree->subtree(mb_path)
+                )
+            );
+        }
 
-        // For now, it's just block_ctrl
-        _rfnoc_block_ctrl.push_back(
-            uhd::rfnoc::block_ctrl::make(
-                ctrl,
-                ctrl_sid,
-                mb_i,
-                _tree->subtree(mb_path)
-            )
-        );
     }
     //////////////// RFNOC /////////////////
 }

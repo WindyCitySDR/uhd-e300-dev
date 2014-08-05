@@ -20,7 +20,8 @@
 #include <boost/format.hpp>
 
 #include <uhd/usrp/rfnoc/block_ctrl_base.hpp>
-#include "radio_ctrl_core_3000.hpp"
+// TODO can I delete this line? (5th august)
+//#include "radio_ctrl_core_3000.hpp"
 
 //! Convert register to a peek/poke compatible address
 inline boost::uint32_t _sr_to_addr(boost::uint32_t reg) { return reg * 4; };
@@ -52,15 +53,14 @@ block_ctrl_base::block_ctrl_base(
         settingsbus_reg_t reg =
             (port_offset == 0) ? SR_READBACK_REG_BUFFALLOC0 : SR_READBACK_REG_BUFFALLOC1;
         boost::uint64_t value = sr_read64(reg);
-        UHD_MSG(status) << "On port offset " << port_offset << ", read from reg " << reg << ", got size value " << value << std::endl;
         for (size_t i = 0; i < 8; i++) {
             size_t buf_size_log2 = (value >> (i * 8)) & 0xFF; // Buffer size in x = log2(lines)
             buf_sizes[i + port_offset] = BYTES_PER_LINE * (1 << buf_size_log2); // Bytes == 8 * 2^x
         }
     }
-    UHD_MSG(status) << "Buffer size 0: " << buf_sizes[0] << std::endl;
 
     // Figure out block ID
+    // TODO replace with something that actually sets a name
     std::string blockname = "CE"; // Until we can read the actual block names
     _block_id.set(device_index, blockname, 0);
     while (_tree->exists("xbar/" + _block_id.get_local())) {
@@ -72,10 +72,15 @@ block_ctrl_base::block_ctrl_base(
     _root_path = "xbar/" + _block_id.get_local();
     _tree->create<boost::uint64_t>(_root_path / "noc_id").set(noc_id);
     _tree->create<std::vector<size_t> >(_root_path / "input_buffer_size").set(buf_sizes);
-    // TODO this must be per output port, or even as part of io sig
-    _tree->create<size_t>(_root_path / "bytes_per_packet").set(1456);
+
+    _tree->create<size_t>(_root_path / "bytes_per_packet/default").set(DEFAULT_PACKET_SIZE);
+    // TODO this value might be different.
+    _tree->create<double>(_root_path / "clock_rate").set(160e6);
 
     // TODO: Add IO signature
+
+
+    reset_flow_control();
 }
 
 block_ctrl_base::~block_ctrl_base() {
@@ -99,8 +104,15 @@ size_t block_ctrl_base::get_fifo_size(size_t block_port) const {
     return _tree->access<std::vector<size_t> >(_root_path / "input_buffer_size").get().at(block_port);
 }
 
-boost::uint32_t block_ctrl_base::get_address() {
+boost::uint32_t block_ctrl_base::get_address(size_t block_port) {
+    // TODO use this line once the block port feature is implemented on the crossbar
+    //return (_ctrl_sid.get_dst_address() & 0xFFF0) | (block_port & 0xF);
     return _ctrl_sid.get_dst_address();
+}
+
+double block_ctrl_base::get_clock_rate() const
+{
+    return _tree->access<double>(_root_path / "clock_rate").get();
 }
 
 void block_ctrl_base::issue_stream_cmd(
@@ -153,19 +165,34 @@ void block_ctrl_base::reset_flow_control() {
     return;
 }
 
-void block_ctrl_base::set_bytes_per_packet(size_t bpp) {
-    _tree->access<size_t>(_root_path / "bytes_per_packet").set(bpp);
-    return;
+
+bool block_ctrl_base::set_bytes_per_output_packet(size_t bpp, UHD_UNUSED(size_t out_block_port))
+{
+    if (bpp % BYTES_PER_LINE) {
+        return false;
+    }
+
+    fs_path bpp_path = _root_path / str(boost::format("bytes_per_packet/%d") % out_block_port);
+    if (_tree->exists(bpp_path)) {
+        _tree->access<size_t>(bpp_path).set(bpp);
+    } else {
+        _tree->create<size_t>(bpp_path).set(bpp);
+    }
+    return true;
 }
 
-size_t block_ctrl_base::get_bytes_per_packet(size_t in_block_port, size_t out_block_port)
+bool block_ctrl_base::set_bytes_per_input_packet(UHD_UNUSED(size_t bpp), UHD_UNUSED(size_t in_block_port))
 {
-    UHD_LOG
-        << "In block: " << _block_id
-        << "Querying bytes per packet for in_port: " << in_block_port
-        << " out_port: " << out_block_port
-        << std::endl;
-    return _tree->access<size_t>(_root_path / "bytes_per_packet").get();
+    return true;
+}
+
+size_t block_ctrl_base::get_bytes_per_output_packet(size_t out_block_port)
+{
+    fs_path bpp_path = _root_path / str(boost::format("bytes_per_packet/%d") % out_block_port);
+    if (_tree->exists(bpp_path)) {
+        return _tree->access<size_t>(bpp_path).get();
+    }
+    return _tree->access<size_t>(_root_path / "bytes_per_packet/default").get();
 }
 
 void block_ctrl_base::set_destination(

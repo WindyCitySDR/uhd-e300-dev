@@ -1060,23 +1060,34 @@ public:
         rfnoc::block_ctrl_base::sptr src = get_device3()->get_block_ctrl(src_block);
         rfnoc::block_ctrl_base::sptr dst = get_device3()->get_block_ctrl(dst_block);
 
+        src_block_port &= 0xF;
+        dst_block_port &= 0xF;
+
         // Check IO signatures match
         // TODO
 
+
+        UHD_MSG(status) << "src->get_address(src_block_port): " << std::hex << src->get_address(src_block_port) << std::endl;
+        UHD_MSG(status) << "dst->get_address(src_block_port): " << std::hex << dst->get_address(dst_block_port) << std::endl;
         // Calculate SID
-        sid_t sid = dst->get_ctrl_sid();
-        sid.set_src_address((src->get_ctrl_sid().get_dst_address() & 0xFFF0) | src_block_port);
-        sid.set_local_dst_address((sid.get_local_dst_address() & 0xF0) | dst_block_port);
+        sid_t sid = dst->get_address(dst_block_port);
+        sid.set_src_address(src->get_address(src_block_port));
+        UHD_MSG(status) << "Is this the right SID? " << sid << std::endl;
 
         // Set next destination
         src->set_destination(sid.get_dst_address(), src_block_port);
 
         // Set flow control
-        // FC window (in packets) depends on FIFO size...        ...and packet size.
-        size_t buf_size_pkts = dst->get_fifo_size(dst_block_port) / dst->get_bytes_per_packet();
-        src->configure_flow_control_out(20);
+        size_t pkt_size = dst->get_bytes_per_output_packet(dst_block_port);
+        if (pkt_size == 0) { // Variable packet rate? Hm, assume max packet size.
+            pkt_size = uhd::rfnoc::MAX_PACKET_SIZE;
+        }
+        // FC window (in packets) depends on FIFO size...           ...and packet size.
+        size_t buf_size_pkts = dst->get_fifo_size(dst_block_port) / pkt_size;
+        src->configure_flow_control_out(20); // FIXME change this value to buf_size_pkts
         dst->configure_flow_control_in(
                 0,
+                // FIXME this value depends on if we're on the same xbar or not!
                 uhd::rfnoc::DEFAULT_FC_XBAR_PKTS_PER_ACK,
                 dst_block_port
         );

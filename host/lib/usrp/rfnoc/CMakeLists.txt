@@ -22,7 +22,8 @@
 INCLUDE_DIRECTORIES(${CMAKE_CURRENT_SOURCE_DIR})
 
 LIBUHD_APPEND_SOURCES(
+    ${CMAKE_CURRENT_SOURCE_DIR}/block_id.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/block_ctrl_base.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/block_ctrl_impl.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/block_id.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/null_block_ctrl_impl.cpp
 )
