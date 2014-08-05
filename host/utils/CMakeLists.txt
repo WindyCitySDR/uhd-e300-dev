@@ -27,7 +27,6 @@ SET(util_runtime_sources
     uhd_cal_tx_dc_offset.cpp
     uhd_cal_tx_iq_balance.cpp
     usrp_n2xx_simple_net_burner.cpp
-    usrp_e3x0_network_mode.cpp
     nirio_programmer.cpp
 )
 
@@ -35,6 +34,10 @@ SET(x3xx_burner_sources
     usrp_x3xx_fpga_burner.cpp
     cdecode.c
 )
+
+IF(ENABLE_E300 AND LIBUDEV_FOUND)
+    LIST(APPEND util_sources usrp_e3x0_network_mode.cpp)
+ENDIF(ENABLE_E300 AND LIBUDEV_FOUND)
 
 #for each source: build an executable and install
 FOREACH(util_source ${util_runtime_sources})
