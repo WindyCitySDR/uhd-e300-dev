@@ -47,6 +47,7 @@ public:
             size_t device_index,
             uhd::property_tree::sptr tree
     );
+    static sptr cast(block_ctrl_base::sptr P) { return boost::dynamic_pointer_cast<null_block_ctrl>(P); };
 
     //! Set this register to number of lines per packet
     static const boost::uint32_t SR_LINES_PER_PACKET = 9;

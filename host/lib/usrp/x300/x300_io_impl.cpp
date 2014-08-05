@@ -674,10 +674,10 @@ rx_streamer::sptr x300_impl::get_rx_stream_ce(const uhd::stream_args_t &args_, b
     );
     //Give the streamer a functor issue stream cmd
     //bind requires a rx_vita_core_3000::sptr to add a streamer->framer lifetime dependency
-    // TODO connect stream command
-    //my_streamer->set_issue_stream_cmd(
-        //0, boost::bind(&x300_impl::dummy_issue_stream_command, this, _1)
-    //);
+    my_streamer->set_issue_stream_cmd(
+        0, // xport_chan == 0? maybe needs fixing FIXME
+        boost::bind(&uhd::rfnoc::block_ctrl_base::issue_stream_cmd, ce_ctrl, _1)
+    );
     my_streamer->set_xport_chan_sid(stream_i, true, data_sid);
 
     //Store a weak pointer to prevent a streamer->x300_impl->streamer circular dependency

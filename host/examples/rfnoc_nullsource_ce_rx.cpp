@@ -42,7 +42,6 @@ void sig_int_handler(int){stop_signal_called = true;}
 
 template<typename samp_type> void recv_to_file(
     uhd::usrp::multi_usrp::sptr usrp,
-    uhd::rfnoc::block_ctrl_base::sptr null_src_ctrl,
     uhd::rfnoc::block_ctrl_base::sptr proc_block_ctrl,
     const std::string &cpu_format,
     const std::string &file,
@@ -70,28 +69,24 @@ template<typename samp_type> void recv_to_file(
     bool overflow_message = true;
 
     //setup streaming
-    //uhd::stream_cmd_t stream_cmd((num_requested_samples == 0)?
-        //uhd::stream_cmd_t::STREAM_MODE_START_CONTINUOUS:
-        //uhd::stream_cmd_t::STREAM_MODE_NUM_SAMPS_AND_DONE
-    //);
-    //stream_cmd.num_samps = num_requested_samples;
-    //stream_cmd.stream_now = true;
-    //stream_cmd.time_spec = uhd::time_spec_t();
-    //std::cout << "Issueing stream cmd" << std::endl;
-    //rx_stream->issue_stream_cmd(stream_cmd);
-    //std::cout << "Done" << std::endl;
+    uhd::stream_cmd_t stream_cmd((num_requested_samples == 0)?
+        uhd::stream_cmd_t::STREAM_MODE_START_CONTINUOUS:
+        uhd::stream_cmd_t::STREAM_MODE_NUM_SAMPS_AND_DONE
+    );
+    stream_cmd.num_samps = num_requested_samples;
+    stream_cmd.stream_now = true;
+    stream_cmd.time_spec = uhd::time_spec_t();
+    std::cout << "Issueing start stream cmd" << std::endl;
+    // This actually goes to the null source; the processing block
+    // should propagate it.
+    rx_stream->issue_stream_cmd(stream_cmd);
+    std::cout << "Done" << std::endl;
 
     boost::system_time start = boost::get_system_time();
     unsigned long long ticks_requested = (long)(time_requested * (double)boost::posix_time::time_duration::ticks_per_second());
     boost::posix_time::time_duration ticks_diff;
     boost::system_time last_update = start;
     unsigned long long last_update_samps = 0;
-
-    // TODO replace this with issue stream command and remove null_src_ctrl from function arguments
-    null_src_ctrl->sr_write(
-            11, // Register number
-            true // This register is 'enable streaming'
-    );
 
     while(
         not stop_signal_called
@@ -151,11 +146,10 @@ template<typename samp_type> void recv_to_file(
         }
     }
 
-    // TODO again, replace this with issue_stream_cmd
-    null_src_ctrl->sr_write(
-            11, // Register number
-            false // This register is 'enable streaming'
-    );
+    stream_cmd.stream_mode = uhd::stream_cmd_t::STREAM_MODE_STOP_CONTINUOUS;
+    std::cout << "Issueing stop stream cmd" << std::endl;
+    rx_stream->issue_stream_cmd(stream_cmd);
+    std::cout << "Done" << std::endl;
 
     if (outfile.is_open())
         outfile.close();
@@ -248,12 +242,10 @@ int UHD_SAFE_MAIN(int argc, char *argv[])
     }
 
     // Get block control objects
-    // TODO make these block_ctrl and null_block_ctrl
-    uhd::rfnoc::block_ctrl_base::sptr null_src_ctrl_base   = usrp->get_device3()->find_block_ctrl(nullid);
-    uhd::rfnoc::null_block_ctrl::sptr null_src_ctrl = boost::dynamic_pointer_cast<uhd::rfnoc::null_block_ctrl>(null_src_ctrl_base);
+    uhd::rfnoc::null_block_ctrl::sptr null_src_ctrl = uhd::rfnoc::null_block_ctrl::cast(usrp->get_device3()->find_block_ctrl(nullid));
     uhd::rfnoc::block_ctrl_base::sptr proc_block_ctrl = usrp->get_device3()->find_block_ctrl(blockid);
     std::cout
-        << "Setting up crossbar connection: " << null_src_ctrl->get_block_id()
+        << "Connecting blocks: " << null_src_ctrl->get_block_id()
         << " -> " << proc_block_ctrl->get_block_id() << std::endl;
 
     // Set channel definitions
@@ -285,7 +277,7 @@ int UHD_SAFE_MAIN(int argc, char *argv[])
 
     // Start receiving
 #define recv_to_file_args(format) \
-	(usrp, null_src_ctrl, proc_block_ctrl, format, file, spb, total_num_samps, total_time, bw_summary, stats, null, continue_on_bad_packet)
+	(usrp, proc_block_ctrl, format, file, spb, total_num_samps, total_time, bw_summary, stats, null, continue_on_bad_packet)
     //recv to file
     if (type == "double") recv_to_file<std::complex<double> >recv_to_file_args("fc64");
     else if (type == "float") recv_to_file<std::complex<float> >recv_to_file_args("fc32");
