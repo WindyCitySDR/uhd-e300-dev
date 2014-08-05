@@ -165,28 +165,52 @@ public:
 
     /*! Configure flow control for incoming streams.
      *
+     * If flow control is enabled for incoming streams, this block will periodically
+     * send out ACKs, telling the upstream block which packets have been consumed,
+     * so the upstream block can increase his flow control credit.
+     *
+     * In the default implementation, this just sets registers
+     * SR_FLOW_CTRL_CYCS_PER_ACK and SR_FLOW_CTRL_PKTS_PER_ACK accordingly.
+     *
+     * Override this function if your block has port-specific flow control settings.
+     *
      * \param cycles Send an ACK after this many clock cycles.
      *               Setting this to zero disables this type of flow control acknowledgement.
      * \param packets Send an ACK after this many packets have been consumed.
      *               Setting this to zero disables this type of flow control acknowledgement.
      * \param block_port Set up flow control for a stream coming in on this particular block port.
-     *
-     * Returns true on success. When false is returned, the flow control is in an undefined state.
      */
-    virtual void configure_flow_control_in(boost::uint32_t cycles, boost::uint32_t packets, size_t block_port=0);
+    virtual void configure_flow_control_in(
+            size_t cycles,
+            size_t packets,
+            size_t block_port=0
+     );
 
     /*! Configure flow control for outgoing streams.
+     *
+     * In the default implementation, this just sets registers SR_FLOW_CTRL_BUF_SIZE
+     * and SR_FLOW_CTRL_ENABLE accordingly; \b block_port and \p sid are ignored.
+     *
+     * Override this function if your block has port-specific flow control settings.
      *
      * \param buf_size_pkts The size of the downstream block's input FIFO size in number of packets. Setting
      *                      this to zero disables flow control. The block will then produce data as fast as it can.
      *                     \b Warning: This can cause head-of-line blocking, and potentially lock up your device!
-     * \param sid The SID for which this is valid.
-     *
-     * Returns true on success. When false is returned, the flow control is in an undefined state.
+     * \param Specify on which outgoing port this setting is valid.
+     * \param sid The SID for which this is valid. This is meant for cases where the outgoing block port is
+     *            not sufficient to set the flow control, and as such is rarely used.
      */
-    virtual void configure_flow_control_out(boost::uint32_t buf_size_pkts, const uhd::sid_t &sid=uhd::sid_t());
+    virtual void configure_flow_control_out(
+            size_t buf_size_pkts,
+            size_t block_port=0,
+            const uhd::sid_t &sid=uhd::sid_t()
+     );
 
     /*! Reset seqnum on flow control.
+     *
+     * This function is called in the constructor.
+     *
+     * TODO explain when this is necessary
      */
     virtual void reset_flow_control();
 

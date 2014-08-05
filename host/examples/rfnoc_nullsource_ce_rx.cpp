@@ -197,7 +197,7 @@ int UHD_SAFE_MAIN(int argc, char *argv[])
         ("progress", "periodically display short-term bandwidth")
         ("stats", "show average bandwidth on exit")
         ("continue", "don't abort on a bad packet")
-        // TODO: change default block ID to 0/NullSource_0 when proper block names work
+        // TODO: change default block ID to NullBlock when proper block names work
         ("nullid", po::value<std::string>(&nullid)->default_value("0/CE_0"), "The block ID for the null source.")
         ("blockid", po::value<std::string>(&blockid)->default_value(""), "The block ID for the processing block.")
     ;
@@ -264,13 +264,15 @@ int UHD_SAFE_MAIN(int argc, char *argv[])
     // Configure packet size and rate
     std::cout << "Configuring blocks..." << std::endl;
     std::cout << "Samples per packet coming from null source: " << spp << std::endl;
-    null_src_ctrl->set_bytes_per_output_packet(spp * 4);
+    if (not null_src_ctrl->set_bytes_per_output_packet(spp * 4)) {
+        std::cout << "[ERROR] Could not set samples per packet!" << std::endl;
+        return ~0;
+    }
 
     std::cout << str(boost::format("Requesting rate:   %.2f Msps (%.2f MByte/s).") % (rate / 1e6) % (rate * 4 / 1e6)) << std::endl;
     // Factor 2 for switching between line rate and sample rate:
     double actual_rate = null_src_ctrl->set_line_rate(rate / 2) * 2;
     std::cout << str(boost::format("Actually got rate: %.2f Msps (%.2f MByte/s).") % (actual_rate / 1e6) % (actual_rate * 4 / 1e6)) << std::endl;
-
 
     // Connect blocks
     std::cout << "Connecting blocks..." << std::endl;

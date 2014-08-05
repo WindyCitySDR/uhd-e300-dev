@@ -1066,29 +1066,29 @@ public:
         // Check IO signatures match
         // TODO
 
-
-        UHD_MSG(status) << "src->get_address(src_block_port): " << std::hex << src->get_address(src_block_port) << std::endl;
-        UHD_MSG(status) << "dst->get_address(src_block_port): " << std::hex << dst->get_address(dst_block_port) << std::endl;
         // Calculate SID
         sid_t sid = dst->get_address(dst_block_port);
         sid.set_src_address(src->get_address(src_block_port));
-        UHD_MSG(status) << "Is this the right SID? " << sid << std::endl;
 
-        // Set next destination
+        // Set SID on source block
         src->set_destination(sid.get_dst_address(), src_block_port);
 
         // Set flow control
-        size_t pkt_size = dst->get_bytes_per_output_packet(dst_block_port);
-        if (pkt_size == 0) { // Variable packet rate? Hm, assume max packet size.
+        size_t pkt_size = src->get_bytes_per_output_packet(src_block_port);
+        if (pkt_size == 0) { // Unspecified packet rate. Assume max packet size.
             pkt_size = uhd::rfnoc::MAX_PACKET_SIZE;
         }
-        // FC window (in packets) depends on FIFO size...           ...and packet size.
+        // FC window (in packets) depends on FIFO size...          ...and packet size.
         size_t buf_size_pkts = dst->get_fifo_size(dst_block_port) / pkt_size;
-        src->configure_flow_control_out(20); // FIXME change this value to buf_size_pkts
+        src->configure_flow_control_out(buf_size_pkts, src_block_port);
+
+        size_t pkts_per_ack = uhd::rfnoc::DEFAULT_FC_XBAR_PKTS_PER_ACK;
+        if (sid.get_remote_src_address() != sid.get_remote_dst_address()) {
+            pkts_per_ack = std::max<size_t>(buf_size_pkts / uhd::rfnoc::DEFAULT_FC_TX_RESPONSE_FREQ, 1);
+        }
         dst->configure_flow_control_in(
-                0,
-                // FIXME this value depends on if we're on the same xbar or not!
-                uhd::rfnoc::DEFAULT_FC_XBAR_PKTS_PER_ACK,
+                0, // Default to not use cycles
+                pkts_per_ack,
                 dst_block_port
         );
 

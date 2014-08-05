@@ -104,7 +104,7 @@ size_t block_ctrl_base::get_fifo_size(size_t block_port) const {
     return _tree->access<std::vector<size_t> >(_root_path / "input_buffer_size").get().at(block_port);
 }
 
-boost::uint32_t block_ctrl_base::get_address(size_t block_port) {
+boost::uint32_t block_ctrl_base::get_address(size_t block_port) { // Accept the 'unused' warning as a reminder we actually need it!
     // TODO use this line once the block port feature is implemented on the crossbar
     //return (_ctrl_sid.get_dst_address() & 0xFFF0) | (block_port & 0xF);
     return _ctrl_sid.get_dst_address();
@@ -129,13 +129,10 @@ void block_ctrl_base::issue_stream_cmd(
 }
 
 void block_ctrl_base::configure_flow_control_in(
-        boost::uint32_t cycles,
-        boost::uint32_t packets,
-        size_t block_port
+        size_t cycles,
+        size_t packets,
+        UHD_UNUSED(size_t block_port)
 ) {
-    UHD_LOG
-        << "Setting upstream flow control on " << _block_id << " (Block Port: " << block_port
-        << ") to: cycles==" << cycles << ", packets==" << packets << std::endl;
     boost::uint32_t cycles_word = 0;
     if (cycles) {
         cycles_word = (1<<31) | cycles;
@@ -149,11 +146,11 @@ void block_ctrl_base::configure_flow_control_in(
     sr_write(SR_FLOW_CTRL_PKTS_PER_ACK, packets_word);
 }
 
-void block_ctrl_base::configure_flow_control_out(boost::uint32_t buf_size_pkts, const uhd::sid_t &sid) {
-    UHD_LOG
-        << "In block: " << _block_id
-        << " (SID == " << sid << ") "
-        << "Setting downstream flow control to: buf_size_pkts == " << buf_size_pkts << std::endl;
+void block_ctrl_base::configure_flow_control_out(
+            size_t buf_size_pkts,
+            UHD_UNUSED(size_t block_port),
+            UHD_UNUSED(const uhd::sid_t &sid)
+) {
     // This actually takes counts between acks. So if the buffer size is 1 packet, we set
     // set this to zero.
     sr_write(SR_FLOW_CTRL_BUF_SIZE, (buf_size_pkts == 0) ? 0 : buf_size_pkts-1);

@@ -26,6 +26,10 @@ static const size_t DEFAULT_PACKET_SIZE = 1456; // bytes
 
 //! For flow control within a single crossbar
 static const size_t DEFAULT_FC_XBAR_PKTS_PER_ACK = 2;
+//! For flow control when data is flowing from device to host (rx)
+static const size_t DEFAULT_FC_RX_RESPONSE_FREQ = 32; // ACKs per flow control window
+//! For flow control when data is flowing from host to device (tx)
+static const size_t DEFAULT_FC_TX_RESPONSE_FREQ = 8; // ACKs per flow control window
 
 // Common settings registers.
 static const boost::uint32_t SR_FLOW_CTRL_BUF_SIZE     = 0;
