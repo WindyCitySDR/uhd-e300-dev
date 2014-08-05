@@ -138,15 +138,17 @@ private: // types
         rx_frontend_core_200::sptr rx_fe;
         tx_frontend_core_200::sptr tx_fe;
 
-
         uhd::transport::zero_copy_if::sptr send_ctrl_xport;
         uhd::transport::zero_copy_if::sptr recv_ctrl_xport;
         uhd::transport::zero_copy_if::sptr tx_data_xport;
         uhd::transport::zero_copy_if::sptr tx_flow_xport;
         uhd::transport::zero_copy_if::sptr rx_data_xport;
         uhd::transport::zero_copy_if::sptr rx_flow_xport;
+
         boost::weak_ptr<uhd::rx_streamer> rx_streamer;
         boost::weak_ptr<uhd::tx_streamer> tx_streamer;
+
+        bool ant_rx2;
     };
 
     //frontend cache so we can update gpios
@@ -154,20 +156,39 @@ private: // types
     {
         fe_control_settings_t(void)
         {
-            rx_ant = "RX2";
-            tx_enb = false;
-            rx_enb = false;
             rx_freq = 1e9;
             tx_freq = 1e9;
         }
-        std::string rx_ant;
-        bool tx_enb;
-        bool rx_enb;
         double rx_freq;
         double tx_freq;
     };
 
     enum compat_t {FPGA_MAJOR, FPGA_MINOR};
+
+    struct gpio_t
+    {
+        gpio_t() : pps_sel(global_regs::PPS_INT),
+            mimo(0), codec_arst(0), tx_bandsels(0),
+            rx_bandsel_a(0), rx_bandsel_b(0), rx_bandsel_c(0)
+        {}
+
+        boost::uint32_t pps_sel;
+        boost::uint32_t mimo;
+        boost::uint32_t codec_arst;
+
+        boost::uint32_t tx_bandsels;
+        boost::uint32_t rx_bandsel_a;
+        boost::uint32_t rx_bandsel_b;
+        boost::uint32_t rx_bandsel_c;
+
+        static const size_t PPS_SEL     = 0;
+        static const size_t MIMO        = 2;
+        static const size_t CODEC_ARST  = 3;
+        static const size_t TX_BANDSEL  = 4;
+        static const size_t RX_BANDSELA = 7;
+        static const size_t RX_BANDSELB = 12;
+        static const size_t RX_BANDSELC = 16;
+    };
 
 private: // methods
     void _load_fpga_image(const std::string &path);
@@ -188,6 +209,12 @@ private: // methods
     double _get_tick_rate(void){return _tick_rate;}
     double _set_tick_rate(const double rate);
 
+    void _update_gpio_state(void);
+    void _update_enables(void);
+    void _reset_codec_mmcm(void);
+    void _update_bandsel(const std::string& which, double freq);
+
+
     void _update_tick_rate(const double);
     void _update_rx_samp_rate(const size_t, const double);
     void _update_tx_samp_rate(const size_t, const double);
@@ -200,10 +227,9 @@ private: // methods
 
     void _codec_loopback_self_test(uhd::wb_iface::sptr iface);
 
-    void _update_atrs(const size_t &fe);
+    void _update_atrs(void);
     void _update_antenna_sel(const size_t &fe, const std::string &ant);
     void _update_fe_lo_freq(const std::string &fe, const double freq);
-    void _update_active_frontends(void);
 
     // overflow handling is special for MIMO case
     void _handle_overflow(
@@ -224,12 +250,6 @@ private: // methods
         const std::string &attr,
         const boost::uint32_t value);
 
-    // server stuff for network access
-    void _run_server(
-        const std::string &port,
-        const std::string &what,
-        const size_t fe);
-
 private: // members
     bool                        _network_mode;
     e300_fifo_interface::sptr   _fifo_iface;
@@ -238,10 +258,11 @@ private: // members
     double                      _tick_rate;
     ad9361_ctrl_transport::sptr _codec_xport;
     ad9361_ctrl::sptr           _codec_ctrl;
-    fe_control_settings_t       _fe_control_settings[2];
+    fe_control_settings_t       _settings;
     global_regs::sptr           _global_regs;
     e300_sensor_manager::sptr   _sensor_manager;
     e300_eeprom_manager::sptr   _eeprom_manager;
+    gpio_t                      _misc;
 };
 
 }}} // namespace

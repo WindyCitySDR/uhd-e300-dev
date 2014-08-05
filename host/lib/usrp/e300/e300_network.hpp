@@ -15,15 +15,29 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 //
 
-#ifndef INCLUDED_E300_FPGA_DEFS_HPP
-#define INCLUDED_E300_FPGA_DEFS_HPP
-namespace uhd { namespace usrp { namespace e300 { namespace fpga {
+#ifndef INCLUDED_E300_NETWORK_HPP
+#define INCLUDED_E300_NETWORK_HPP
 
-static const size_t NUM_RADIOS = 2;
+#include <string>
+#include <boost/noncopyable.hpp>
 
-static const boost::uint32_t COMPAT_MAJOR = 2;
-static const boost::uint32_t COMPAT_MINOR = 0;
+#include <uhd/device.hpp>
 
-}}}} // namespace
 
-#endif // INCLUDED_E300_FPGA_DEFS_HPP
+static const std::string E310_FPGA_FILE_NAME = "usrp_e310_fpga.bit";
+static const std::string E300_FPGA_FILE_NAME = "usrp_e300_fpga.bit";
+
+namespace uhd { namespace usrp { namespace e300 {
+
+class UHD_API network_server : boost::noncopyable
+{
+public:
+    typedef boost::shared_ptr<network_server> sptr;
+    virtual void run(void) = 0;
+
+    static sptr make(const uhd::device_addr_t &device_addr);
+};
+
+
+}}}
+#endif // INCLUDED_E300_NETWORK_HPP

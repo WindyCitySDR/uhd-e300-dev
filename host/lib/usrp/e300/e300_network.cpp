@@ -21,15 +21,28 @@
 #include "ad9361_driver/ad9361_transaction.h"
 
 #include "e300_sensor_manager.hpp"
+#include "e300_network.hpp"
+#include "e300_fifo_config.hpp"
+#include "e300_spi.hpp"
+#include "e300_i2c.hpp"
+#include "e300_defaults.hpp"
+#include "e300_common.hpp"
 
 #include <uhd/utils/msg.hpp>
 #include <uhd/utils/byteswap.hpp>
+#include <uhd/utils/images.hpp>
+
 #include <boost/asio.hpp>
 #include <boost/thread.hpp>
+#include <boost/filesystem.hpp>
+#include <boost/make_shared.hpp>
+
+#include <fstream>
 
 using namespace uhd;
 using namespace uhd::transport;
 namespace asio = boost::asio;
+namespace fs = boost::filesystem;
 
 namespace uhd { namespace usrp { namespace e300 {
 
@@ -331,10 +344,50 @@ static void e300_i2c_tunnel(
 }
 
 
+
+
+class network_server_impl : public network_server
+{
+public:
+    network_server_impl(const uhd::device_addr_t &device_addr);
+    virtual ~network_server_impl(void);
+    void run(void);
+
+private:
+    struct xports_t
+    {
+        uhd::transport::zero_copy_if::sptr send_ctrl_xport;
+        uhd::transport::zero_copy_if::sptr recv_ctrl_xport;
+        uhd::transport::zero_copy_if::sptr tx_data_xport;
+        uhd::transport::zero_copy_if::sptr tx_flow_xport;
+        uhd::transport::zero_copy_if::sptr rx_data_xport;
+        uhd::transport::zero_copy_if::sptr rx_flow_xport;
+    };
+
+private:
+    void _run_server(
+        const std::string &port,
+        const std::string &what,
+        const size_t fe);
+
+private:
+    boost::shared_ptr<e300_fifo_interface>   _fifo_iface;
+    xports_t                    _xports[2];
+    boost::shared_ptr<ad9361_ctrl_transport> _codec_xport;
+    boost::shared_ptr<ad9361_ctrl>           _codec_ctrl;
+    boost::shared_ptr<global_regs>           _global_regs;
+    boost::shared_ptr<e300_sensor_manager>   _sensor_manager;
+    boost::shared_ptr<e300_eeprom_manager>   _eeprom_manager;
+};
+
+network_server_impl::~network_server_impl(void)
+{
+}
+
 /***********************************************************************
  * The TCP server itself
  **********************************************************************/
-void e300_impl::_run_server(
+void network_server_impl::_run_server(
     const std::string &port,
     const std::string &what,
     const size_t fe)
@@ -362,7 +415,7 @@ void e300_impl::_run_server(
             //socket->set_option(option);
             boost::thread_group tg;
             bool running = true;
-            radio_perifs_t &perif = _radio_perifs[fe];
+            xports_t &perif = _xports[fe];
             if (what == "RX")
             {
                 tg.create_thread(boost::bind(&e300_recv_tunnel, "RX data tunnel", perif.rx_data_xport, socket, &endpoint, &running));
@@ -395,8 +448,6 @@ void e300_impl::_run_server(
                 tg.create_thread(boost::bind(&e300_sensor_tunnel, "SENSOR tunnel", socket, _sensor_manager, &endpoint, &running));
             }
 
-
-
             tg.join_all();
             socket->close();
             socket.reset();
@@ -404,4 +455,106 @@ void e300_impl::_run_server(
         catch(...){}
     }
 }
+
+void network_server_impl::run()
+{
+    for(;;)
+    {
+        boost::thread_group tg;
+        tg.create_thread(boost::bind(&network_server_impl::_run_server, this, E300_SERVER_RX_PORT0, "RX",0));
+        tg.create_thread(boost::bind(&network_server_impl::_run_server, this, E300_SERVER_TX_PORT0, "TX",0));
+        tg.create_thread(boost::bind(&network_server_impl::_run_server, this, E300_SERVER_CTRL_PORT0, "CTRL",0));
+
+        tg.create_thread(boost::bind(&network_server_impl::_run_server, this, E300_SERVER_RX_PORT1, "RX",1));
+        tg.create_thread(boost::bind(&network_server_impl::_run_server, this, E300_SERVER_TX_PORT1, "TX",1));
+        tg.create_thread(boost::bind(&network_server_impl::_run_server, this, E300_SERVER_CTRL_PORT1, "CTRL",1));
+
+        tg.create_thread(boost::bind(&network_server_impl::_run_server, this, E300_SERVER_SENSOR_PORT, "SENSOR", 0 /*don't care */));
+
+        tg.create_thread(boost::bind(&network_server_impl::_run_server, this, E300_SERVER_CODEC_PORT, "CODEC", 0 /*don't care */));
+        tg.create_thread(boost::bind(&network_server_impl::_run_server, this, E300_SERVER_GREGS_PORT, "GREGS", 0 /*don't care */));
+        tg.create_thread(boost::bind(&network_server_impl::_run_server, this, E300_SERVER_I2C_PORT, "I2C", 0 /*don't care */));
+        tg.join_all();
+    }
+}
+network_server_impl::network_server_impl(const uhd::device_addr_t &device_addr)
+{
+    _eeprom_manager = boost::make_shared<e300_eeprom_manager>(i2c::make_i2cdev(E300_I2CDEV_DEVICE));
+    if (not device_addr.has_key("no_reload_fpga")) {
+        // Load FPGA image if provided via args
+        if (device_addr.has_key("fpga")) {
+            common::load_fpga_image(device_addr["fpga"]);
+        // Else load the FPGA image based on the product ID
+        } else {
+            //extract the FPGA path for the e300
+            const boost::uint16_t pid = boost::lexical_cast<boost::uint16_t>(
+                _eeprom_manager->get_mb_eeprom()["product"]);
+            std::string fpga_image;
+            switch(e300_eeprom_manager::get_mb_type(pid)) {
+            case e300_eeprom_manager::USRP_E310_MB:
+                fpga_image = find_image_path(E310_FPGA_FILE_NAME);
+                break;
+            case e300_eeprom_manager::USRP_E300_MB:
+                fpga_image = find_image_path(E300_FPGA_FILE_NAME);
+                break;
+            case e300_eeprom_manager::UNKNOWN:
+            default:
+                UHD_MSG(warning) << "Unknown motherboard type, loading e300 image."
+                                 << std::endl;
+                fpga_image = find_image_path(E300_FPGA_FILE_NAME);
+                break;
+            }
+            common::load_fpga_image(fpga_image);
+        }
+    }
+
+    uhd::transport::zero_copy_xport_params ctrl_xport_params;
+    ctrl_xport_params.recv_frame_size = e300::DEFAULT_CTRL_FRAME_SIZE;
+    ctrl_xport_params.num_recv_frames = e300::DEFAULT_CTRL_NUM_FRAMES;
+    ctrl_xport_params.send_frame_size = e300::DEFAULT_CTRL_FRAME_SIZE;
+    ctrl_xport_params.num_send_frames = e300::DEFAULT_CTRL_NUM_FRAMES;
+
+    uhd::transport::zero_copy_xport_params data_xport_params;
+    data_xport_params.recv_frame_size = device_addr.cast<size_t>("recv_frame_size", e300::DEFAULT_RX_DATA_FRAME_SIZE);
+    data_xport_params.num_recv_frames = device_addr.cast<size_t>("num_recv_frames", e300::DEFAULT_RX_DATA_NUM_FRAMES);
+    data_xport_params.send_frame_size = device_addr.cast<size_t>("send_frame_size", e300::DEFAULT_TX_DATA_FRAME_SIZE);
+    data_xport_params.num_send_frames = device_addr.cast<size_t>("num_send_frames", e300::DEFAULT_TX_DATA_NUM_FRAMES);
+
+    e300_fifo_config_t fifo_cfg;
+    try {
+        fifo_cfg = e300_read_sysfs();
+    } catch (uhd::lookup_error &e) {
+        throw uhd::runtime_error("Failed to get driver parameters from sysfs.");
+    }
+    _fifo_iface = e300_fifo_interface::make(fifo_cfg);
+    _global_regs = global_regs::make(_fifo_iface->get_global_regs_base());
+
+    // static mapping, boooohhhhhh
+    _xports[0].send_ctrl_xport = _fifo_iface->make_send_xport(E300_R0_CTRL_STREAM, ctrl_xport_params);
+    _xports[0].recv_ctrl_xport = _fifo_iface->make_recv_xport(E300_R0_CTRL_STREAM, ctrl_xport_params);
+    _xports[0].tx_data_xport   = _fifo_iface->make_send_xport(E300_R0_TX_DATA_STREAM, data_xport_params);
+    _xports[0].tx_flow_xport   = _fifo_iface->make_recv_xport(E300_R0_TX_DATA_STREAM, ctrl_xport_params);
+    _xports[0].rx_data_xport   = _fifo_iface->make_recv_xport(E300_R0_RX_DATA_STREAM, data_xport_params);
+    _xports[0].rx_flow_xport   = _fifo_iface->make_send_xport(E300_R0_RX_DATA_STREAM, ctrl_xport_params);
+
+    _xports[1].send_ctrl_xport = _fifo_iface->make_send_xport(E300_R1_CTRL_STREAM, ctrl_xport_params);
+    _xports[1].recv_ctrl_xport = _fifo_iface->make_recv_xport(E300_R1_CTRL_STREAM, ctrl_xport_params);
+    _xports[1].tx_data_xport   = _fifo_iface->make_send_xport(E300_R1_TX_DATA_STREAM, data_xport_params);
+    _xports[1].tx_flow_xport   = _fifo_iface->make_recv_xport(E300_R1_TX_DATA_STREAM, ctrl_xport_params);
+    _xports[1].rx_data_xport   = _fifo_iface->make_recv_xport(E300_R1_RX_DATA_STREAM, data_xport_params);
+    _xports[1].rx_flow_xport   = _fifo_iface->make_send_xport(E300_R1_RX_DATA_STREAM, ctrl_xport_params);
+
+    _codec_xport = ad9361_ctrl_transport::make_software_spi(AD9361_E300, spi::make(E300_SPIDEV_DEVICE), 1);
+    _codec_ctrl = ad9361_ctrl::make(_codec_xport);
+    // This is horrible ... why do I have to sleep here?
+    boost::this_thread::sleep(boost::posix_time::milliseconds(100));
+    _sensor_manager = e300_sensor_manager::make_local();
+}
+
 }}} // namespace
+
+using namespace uhd::usrp::e300;
+network_server::sptr network_server::make(const uhd::device_addr_t &device_addr)
+{
+    return sptr(new network_server_impl(device_addr));
+}
