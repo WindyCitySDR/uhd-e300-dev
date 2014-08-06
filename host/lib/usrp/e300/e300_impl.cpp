@@ -255,7 +255,12 @@ static device_addrs_t e300_find(const device_addr_t &multi_dev_hint)
 static device::sptr e300_make(const device_addr_t &device_addr)
 {
     UHD_LOG << "e300_make with args " << device_addr.to_pp_string() << std::endl;
-    return device::sptr(new e300_impl(device_addr));
+    if(device_addr.has_key("server"))
+        throw uhd::runtime_error(
+            str(boost::format("Please run the server executable \"%s\"")
+            % "usrp_e3x0_network_mode"));
+    else
+        return device::sptr(new e300_impl(device_addr));
 }
 
 /***********************************************************************
