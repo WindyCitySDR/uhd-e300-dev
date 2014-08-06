@@ -214,6 +214,11 @@ private: // methods
     void _reset_codec_mmcm(void);
     void _update_bandsel(const std::string& which, double freq);
 
+    void _check_tick_rate_with_current_streamers(const double rate);
+    void _enforce_tick_rate_limits(
+        const size_t change,
+        const double tick_rate,
+        const std::string &direction);
 
     void _update_tick_rate(const double);
     void _update_rx_samp_rate(const size_t, const double);

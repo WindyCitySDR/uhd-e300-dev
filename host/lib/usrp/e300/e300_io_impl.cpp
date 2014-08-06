@@ -39,20 +39,53 @@ static const boost::uint32_t HW_SEQ_NUM_MASK = 0xfff;
 /***********************************************************************
  * update streamer rates
  **********************************************************************/
+void e300_impl::_check_tick_rate_with_current_streamers(const double rate)
+{
+    size_t max_tx_chan_count = 0, max_rx_chan_count = 0;
+    BOOST_FOREACH(radio_perifs_t &perif, _radio_perifs)
+    {
+        {
+            boost::shared_ptr<sph::recv_packet_streamer> rx_streamer =
+                boost::dynamic_pointer_cast<sph::recv_packet_streamer>(
+                    perif.rx_streamer.lock());
+            if (rx_streamer)
+                max_rx_chan_count = std::max(
+                    max_rx_chan_count,
+                    rx_streamer->get_num_channels());
+        }
+
+        {
+            boost::shared_ptr<sph::send_packet_streamer> tx_streamer =
+                boost::dynamic_pointer_cast<sph::send_packet_streamer>(
+                    perif.tx_streamer.lock());
+            if (tx_streamer)
+                max_tx_chan_count = std::max(
+                    max_tx_chan_count,
+                    tx_streamer->get_num_channels());
+        }
+    }
+    _enforce_tick_rate_limits(max_rx_chan_count, rate, "RX");
+    _enforce_tick_rate_limits(max_tx_chan_count, rate, "TX");
+}
+
 void e300_impl::_update_tick_rate(const double rate)
 {
+    _check_tick_rate_with_current_streamers(rate);
+
     BOOST_FOREACH(radio_perifs_t &perif, _radio_perifs)
     {
         boost::shared_ptr<sph::recv_packet_streamer> my_streamer =
             boost::dynamic_pointer_cast<sph::recv_packet_streamer>(perif.rx_streamer.lock());
-        if (my_streamer) my_streamer->set_tick_rate(rate);
+        if (my_streamer)
+            my_streamer->set_tick_rate(rate);
         perif.framer->set_tick_rate(_tick_rate);
     }
     BOOST_FOREACH(radio_perifs_t &perif, _radio_perifs)
     {
         boost::shared_ptr<sph::send_packet_streamer> my_streamer =
             boost::dynamic_pointer_cast<sph::send_packet_streamer>(perif.tx_streamer.lock());
-        if (my_streamer) my_streamer->set_tick_rate(rate);
+        if (my_streamer)
+            my_streamer->set_tick_rate(rate);
         perif.deframer->set_tick_rate(_tick_rate);
     }
 }
@@ -61,14 +94,16 @@ void e300_impl::_update_rx_samp_rate(const size_t dspno, const double rate)
 {
     boost::shared_ptr<sph::recv_packet_streamer> my_streamer =
         boost::dynamic_pointer_cast<sph::recv_packet_streamer>(_radio_perifs[dspno].rx_streamer.lock());
-    if (my_streamer) my_streamer->set_samp_rate(rate);
+    if (my_streamer)
+        my_streamer->set_samp_rate(rate);
 }
 
 void e300_impl::_update_tx_samp_rate(const size_t dspno, const double rate)
 {
     boost::shared_ptr<sph::send_packet_streamer> my_streamer =
         boost::dynamic_pointer_cast<sph::send_packet_streamer>(_radio_perifs[dspno].tx_streamer.lock());
-    if (my_streamer) my_streamer->set_samp_rate(rate);
+    if (my_streamer)
+        my_streamer->set_samp_rate(rate);
 }
 
 /***********************************************************************

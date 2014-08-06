@@ -632,6 +632,34 @@ e300_impl::~e300_impl(void)
     /* NOP */
 }
 
+void e300_impl::_enforce_tick_rate_limits(
+        const size_t chan_count,
+        const double tick_rate,
+        const std::string &direction)
+{
+    const size_t max_chans = 2;
+    if (chan_count > max_chans) {
+        throw uhd::value_error(boost::str(
+            boost::format("cannot not setup %d %s channels (maximum is %d)")
+                % chan_count
+                % direction
+                % max_chans
+        ));
+    } else {
+        const double max_tick_rate = ((chan_count <= 1) ? AD9361_1_CHAN_CLOCK_RATE_MAX : AD9361_2_CHAN_CLOCK_RATE_MAX);
+        if (tick_rate - max_tick_rate >= 1.0)
+        {
+            throw uhd::value_error(boost::str(
+                boost::format("current master clock rate (%.6f MHz) exceeds maximum possible master clock rate (%.6f MHz) when using %d %s channels")
+                    % (tick_rate/1e6)
+                    % (max_tick_rate/1e6)
+                    % chan_count
+                    % direction
+            ));
+        }
+    }
+}
+
 double e300_impl::_set_tick_rate(const double rate)
 {
     const size_t factor = 1;
