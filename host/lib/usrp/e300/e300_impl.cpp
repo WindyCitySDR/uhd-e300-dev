@@ -261,19 +261,19 @@ static device::sptr e300_make(const device_addr_t &device_addr)
 /***********************************************************************
  * Structors
  **********************************************************************/
-e300_impl::e300_impl(const uhd::device_addr_t &device_addr) : _sid_framer(0)
+e300_impl::e300_impl(const uhd::device_addr_t &device_addr)
+    : _device_addr(device_addr)
+    , _xport_path(device_addr.has_key("addr") ? ETH : AXI)
+    , _sid_framer(0)
 {
     _type = uhd::device::USRP;
-    _device_addr = device_addr;
-    _xport_path = device_addr.has_key("addr") ? ETH : AXI;
 
     _async_md.reset(new async_md_type(1000/*messages deep*/));
 
     ////////////////////////////////////////////////////////////////////
     // load the fpga image
     ////////////////////////////////////////////////////////////////////
-    if (not device_addr.has_key("addr"))
-    {
+    if (_xport_path == AXI) {
         //extract the FPGA path for the e300
         const boost::uint16_t pid = boost::lexical_cast<boost::uint16_t>(
             device_addr["product"]);
@@ -335,7 +335,7 @@ e300_impl::e300_impl(const uhd::device_addr_t &device_addr) : _sid_framer(0)
     _data_xport_params.num_send_frames = e300::DEFAULT_TX_DATA_NUM_FRAMES;
 
     // until we figure out why this goes wrong we'll keep this hack around
-    if (device_addr.has_key("addr")) {
+    if (_xport_path == ETH) {
         _data_xport_params.recv_frame_size =
             std::min(e300::MAX_NET_RX_DATA_FRAME_SIZE, _data_xport_params.recv_frame_size);
         _data_xport_params.send_frame_size =
@@ -365,9 +365,7 @@ e300_impl::e300_impl(const uhd::device_addr_t &device_addr) : _sid_framer(0)
         sensors_xport = udp_zero_copy::make(device_addr["addr"], E300_SERVER_SENSOR_PORT, sensor_xport_params, dummy_buff_params_out, device_addr);
         _sensor_manager = e300_sensor_manager::make_proxy(sensors_xport);
 
-    }
-    else
-    {
+    } else {
         e300_fifo_config_t fifo_cfg;
         try {
             fifo_cfg = e300_read_sysfs();
@@ -376,8 +374,6 @@ e300_impl::e300_impl(const uhd::device_addr_t &device_addr) : _sid_framer(0)
         }
         _fifo_iface = e300_fifo_interface::make(fifo_cfg);
         _global_regs = global_regs::make(_fifo_iface->get_global_regs_base());
-
-        _xport_path = AXI;
 
         _codec_xport = ad9361_ctrl_transport::make_software_spi(AD9361_E300, spi::make(E300_SPIDEV_DEVICE), 1);
         _codec_ctrl = ad9361_ctrl::make(_codec_xport);
@@ -942,12 +938,12 @@ void e300_impl::_setup_radio(const size_t dspno)
     ////////////////////////////////////////////////////////////////////
     // radio control
     ////////////////////////////////////////////////////////////////////
-    perif.ctrl = radio_ctrl_core_3000::make(false/*lilE*/,
-                                            perif.send_ctrl_xport,
-                                            perif.recv_ctrl_xport,
-                                            ctrl_sid,
-                                            dspno ? "1" : "0"
-                                            );
+    perif.ctrl = radio_ctrl_core_3000::make(
+        false/*lilE*/,
+        perif.send_ctrl_xport,
+        perif.recv_ctrl_xport,
+        ctrl_sid,
+        dspno ? "1" : "0");
     this->_register_loopback_self_test(perif.ctrl);
     perif.atr = gpio_core_200_32wo::make(perif.ctrl, TOREG(SR_GPIO));
 
