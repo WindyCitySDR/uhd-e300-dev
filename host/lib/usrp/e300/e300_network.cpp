@@ -15,13 +15,16 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 //
 
+#include "e300_network.hpp"
+
+#ifdef E300_NATIVE
+
 #include "e300_impl.hpp"
 
 #include "ad9361_ctrl.hpp"
 #include "ad9361_driver/ad9361_transaction.h"
 
 #include "e300_sensor_manager.hpp"
-#include "e300_network.hpp"
 #include "e300_fifo_config.hpp"
 #include "e300_spi.hpp"
 #include "e300_i2c.hpp"
@@ -558,3 +561,13 @@ network_server::sptr network_server::make(const uhd::device_addr_t &device_addr)
 {
     return sptr(new network_server_impl(device_addr));
 }
+
+#else
+
+using namespace uhd::usrp::e300;
+
+network_server::sptr network_server::make(const uhd::device_addr_t &)
+{
+    throw uhd::assertion_error("network_server::make() !E300_NATIVE");
+}
+#endif

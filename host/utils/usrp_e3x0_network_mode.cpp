@@ -17,6 +17,7 @@
 
 #include "../lib/usrp/e300/e300_network.hpp"
 #include <uhd/device.hpp>
+#include <uhd/exception.hpp>
 
 #include <uhd/utils/msg.hpp>
 
@@ -49,6 +50,13 @@ int main(int argc, char *argv[])
         args["fpga"] = vm["fpga"].as<std::string>();
     }
 
-    uhd::usrp::e300::network_server::sptr server = uhd::usrp::e300::network_server::make(args);
-    server->run();
+    try {
+        uhd::usrp::e300::network_server::sptr server = uhd::usrp::e300::network_server::make(args);
+        server->run();
+    } catch (uhd::assertion_error &e) {
+        UHD_MSG(error) << "This executable is supposed to run on the device, not on the host." << std::endl
+                       << "Please refer to the manual section on operating your e3x0 device in network mode." << std::endl;
+        return EXIT_FAILURE;
+    }
+    return EXIT_SUCCESS;
 }
