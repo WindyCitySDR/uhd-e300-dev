@@ -279,24 +279,6 @@ e300_impl::e300_impl(const uhd::device_addr_t &device_addr)
     // load the fpga image
     ////////////////////////////////////////////////////////////////////
     if (_xport_path == AXI) {
-        //extract the FPGA path for the e300
-        const boost::uint16_t pid = boost::lexical_cast<boost::uint16_t>(
-            device_addr["product"]);
-        std::string fpga_image;
-        switch(e300_eeprom_manager::get_mb_type(pid)) {
-        case e300_eeprom_manager::USRP_E310_MB:
-            fpga_image = find_image_path(E310_FPGA_FILE_NAME);
-            break;
-        case e300_eeprom_manager::USRP_E300_MB:
-            fpga_image = find_image_path(E300_FPGA_FILE_NAME);
-            break;
-        case e300_eeprom_manager::UNKNOWN:
-        default:
-            UHD_MSG(warning) << "Unknown motherboard type, loading e300 image."
-                             << std::endl;
-            fpga_image = find_image_path(E300_FPGA_FILE_NAME);
-            break;
-        }
         if (not device_addr.has_key("no_reload_fpga")) {
             // Load FPGA image if provided via args
             if (device_addr.has_key("fpga")) {
