@@ -222,7 +222,9 @@ int UHD_SAFE_MAIN(int argc, char *argv[])
         return ~0;
     }
 
-    //create a usrp device
+    /////////////////////////////////////////////////////////////////////////
+    //////// 1. Setup a USRP device /////////////////////////////////////////
+    /////////////////////////////////////////////////////////////////////////
     std::cout << std::endl;
     std::cout << boost::format("Creating the USRP device with: %s...") % args << std::endl;
     uhd::usrp::multi_usrp::sptr usrp = uhd::usrp::multi_usrp::make(args);
@@ -241,7 +243,9 @@ int UHD_SAFE_MAIN(int argc, char *argv[])
         std::cout << "Press Ctrl + C to stop streaming..." << std::endl;
     }
 
-    // Get block control objects
+    /////////////////////////////////////////////////////////////////////////
+    //////// 2. Get block control objects ///////////////////////////////////
+    /////////////////////////////////////////////////////////////////////////
     // For the streaming block, we don't care what type this block is,
     // so we make it a block_ctrl_base (default):
     uhd::rfnoc::block_ctrl_base::sptr proc_block_ctrl = usrp->get_device3()->find_block_ctrl(blockid);
@@ -254,32 +258,50 @@ int UHD_SAFE_MAIN(int argc, char *argv[])
         << " ==> HOST"
         << std::endl;
 
-    // Set channel definitions
+    /////////////////////////////////////////////////////////////////////////
+    //////// 3. Set channel definitions /////////////////////////////////////
+    /////////////////////////////////////////////////////////////////////////
     // TODO: tbw
     // Here, we define that there is only 1 channel, and it points
-    // to the null source.
+    // to the processing block.
 
-    // Configure packet size and rate
-    std::cout << "Configuring blocks..." << std::endl;
+    /////////////////////////////////////////////////////////////////////////
+    //////// 4. Configure blocks (packet size and rate) /////////////////////
+    /////////////////////////////////////////////////////////////////////////
     std::cout << "Samples per packet coming from null source: " << spp << std::endl;
     if (not null_src_ctrl->set_bytes_per_output_packet(spp * 4)) {
         std::cout << "[ERROR] Could not set samples per packet!" << std::endl;
         return ~0;
     }
 
+    // To access properties, there's two ways. Either, you can directly
+    // call setters and getters:
     std::cout << str(boost::format("Requesting rate:   %.2f Msps (%.2f MByte/s).") % (rate / 1e6) % (rate * 4 / 1e6)) << std::endl;
     // Factor 2 for switching between line rate and sample rate:
-    double actual_rate = null_src_ctrl->set_line_rate(rate / 2) * 2;
-    std::cout << str(boost::format("Actually got rate: %.2f Msps (%.2f MByte/s).") % (actual_rate / 1e6) % (actual_rate * 4 / 1e6)) << std::endl;
+    null_src_ctrl->set_line_rate(rate / 2) * 2;
+    // Now, it's possible that this requested rate is not available.
+    // null_src_ctrl->get_line_rate() would return the actual value
+    // this block is currently set to (in fact, set_line_rate() already
+    // returns that value).
+    //
+    // But let's use the other way to access these properties through
+    // the property tree:
+    uhd::fs_path line_rate_path = "/mboards/" + null_src_ctrl->get_block_id().get_tree_path() + "/line_rate/value";
+    double actual_rate_mega = usrp->get_device()->get_tree()->access<double>(line_rate_path).get() / 1e6;
+    std::cout << str(boost::format("Actually got rate: %.2f Msps (%.2f MByte/s).") % actual_rate_mega % (actual_rate_mega * 4)) << std::endl;
 
-    // Connect blocks
+    /////////////////////////////////////////////////////////////////////////
+    //////// 5. Connect blocks //////////////////////////////////////////////
+    /////////////////////////////////////////////////////////////////////////
     std::cout << "Connecting blocks..." << std::endl;
-    usrp->connect(
+    usrp->connect( // Yes, it's that easy!
             null_src_ctrl->get_block_id(),
             proc_block_ctrl->get_block_id()
     );
 
-    // Start receiving
+    /////////////////////////////////////////////////////////////////////////
+    //////// 6. Spawn receiver //////////////////////////////////////////////
+    /////////////////////////////////////////////////////////////////////////
 #define recv_to_file_args(format) \
         (usrp, proc_block_ctrl, format, file, spb, total_num_samps, total_time, bw_summary, stats, null, continue_on_bad_packet)
     //recv to file

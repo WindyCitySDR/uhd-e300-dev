@@ -93,6 +93,9 @@ namespace uhd {
         //! Like get(), but only returns the local part ("FFT_1")
         std::string get_local() const;
 
+        //! Returns the property tree sub-path for this block (e.g. "0/xbar/FFT_1/")
+        std::string get_tree_path() const;
+
         //! Return device number
         size_t get_device_no() const { return _device_no; };
 

@@ -63,14 +63,23 @@ public:
     // Note: This is 'cycles per line', so the bit rate is actually
     // 64 times this value (byte/s is 8*rate etc.)
     //
+    // Equivalent to writing to line_rate/value in the property tree.
+    //
     // \returns the actual line rate (will find closest possible).
     virtual double set_line_rate(double rate) = 0;
 
+    //! Return the current line rate. Equivalent to reading line_rate/value
+    // from the property tree.
+    virtual double get_line_rate(void) const = 0;
+
     //! This block can actually initiate streaming, so we need
-    // override this.
+    // override this. It supports STREAM_MODE_START_CONTINUOUS and
+    // STREAM_MODE_STOP_CONTINUOUS. Other stream modes will cause
+    // a uhd::not_implemented_error to be thrown.
     virtual void issue_stream_cmd(const uhd::stream_cmd_t &stream_cmd) = 0;
 
-    //! This is important for the 'source' component.
+    //! This is important for the 'source' component. The 'sink' does
+    // not care about packet sizes.
     virtual bool set_bytes_per_output_packet(
             size_t bpp,
             size_t out_block_port=0

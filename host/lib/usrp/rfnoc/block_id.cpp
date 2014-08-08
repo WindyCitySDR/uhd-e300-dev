@@ -79,6 +79,14 @@ std::string block_id_t::get_local() const
     );
 }
 
+std::string block_id_t::get_tree_path() const
+{
+    return str(boost::format("%d/xbar/%s")
+        % get_device_no()
+        % get_local()
+    );
+}
+
 bool block_id_t::match(const std::string &block_str)
 {
     boost::cmatch matches;

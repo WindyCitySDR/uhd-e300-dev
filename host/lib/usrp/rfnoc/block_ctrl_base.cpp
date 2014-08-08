@@ -75,6 +75,7 @@ block_ctrl_base::block_ctrl_base(
 
     _tree->create<size_t>(_root_path / "bytes_per_packet/default").set(DEFAULT_PACKET_SIZE);
     // TODO this value might be different.
+    // Figure out true value, or allow setter, or register publisher
     _tree->create<double>(_root_path / "clock_rate").set(160e6);
 
     // TODO: Add IO signature
