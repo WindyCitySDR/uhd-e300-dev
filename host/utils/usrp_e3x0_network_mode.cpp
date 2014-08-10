@@ -20,13 +20,27 @@
 #include <uhd/exception.hpp>
 
 #include <uhd/utils/msg.hpp>
+#include <uhd/transport/if_addrs.hpp>
 
 #include <boost/program_options.hpp>
 #include <boost/format.hpp>
+#include <boost/asio.hpp>
 
 #include <iostream>
 
 namespace po = boost::program_options;
+
+static void check_network_ok(void)
+{
+    using namespace uhd::transport;
+    using namespace boost::asio::ip;
+    std::vector<if_addrs_t> addrs = get_if_addrs();
+
+    if(addrs.size() == 1 and addrs.at(0).inet == address_v4::loopback().to_string())
+        throw uhd::runtime_error(
+            "No network address except for loopback found.\n"
+            "Make sure your DHCP server is working or configure a static IP");
+}
 
 int main(int argc, char *argv[])
 {
@@ -51,11 +65,15 @@ int main(int argc, char *argv[])
     }
 
     try {
+        check_network_ok();
         uhd::usrp::e300::network_server::sptr server = uhd::usrp::e300::network_server::make(args);
         server->run();
     } catch (uhd::assertion_error &e) {
         UHD_MSG(error) << "This executable is supposed to run on the device, not on the host." << std::endl
                        << "Please refer to the manual section on operating your e3x0 device in network mode." << std::endl;
+        return EXIT_FAILURE;
+    } catch (uhd::runtime_error &e) {
+        UHD_MSG(error) << e.what() << std::endl;
         return EXIT_FAILURE;
     }
     return EXIT_SUCCESS;
