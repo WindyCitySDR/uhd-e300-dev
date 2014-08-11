@@ -31,6 +31,7 @@
 #include <boost/thread/thread.hpp>
 #include <boost/lexical_cast.hpp>
 #include <boost/functional/hash.hpp>
+#include <boost/make_shared.hpp>
 #include <cstdio>
 #include <ctime>
 #include <cmath>
@@ -339,10 +340,17 @@ b200_impl::b200_impl(const device_addr_t &device_addr)
     _demux = recv_packet_demuxer_3000::make(_data_transport);
 
     ////////////////////////////////////////////////////////////////////
+    // create time and clock control objects
+    ////////////////////////////////////////////////////////////////////
+    _spi_iface = b200_local_spi_core::make(_local_ctrl);
+    _adf4001_iface = boost::make_shared<b200_ref_pll_ctrl>(_spi_iface);
+
+    ////////////////////////////////////////////////////////////////////
     // Init codec - turns on clocks
     ////////////////////////////////////////////////////////////////////
     UHD_MSG(status) << "Initialize CODEC control..." << std::endl;
-    _codec_ctrl = ad9361_ctrl::make(_iface);
+    _codec_ctrl = ad9361_ctrl::make(
+        ad9361_ctrl_transport::make_software_spi(AD9361_B200, _spi_iface, AD9361_SLAVENO));
     this->reset_codec_dcm();
 
     ////////////////////////////////////////////////////////////////////
@@ -404,13 +412,6 @@ b200_impl::b200_impl(const device_addr_t &device_addr)
         this->codec_loopback_self_test(perif.ctrl);
     }
     _codec_ctrl->data_port_loopback(false);
-
-    ////////////////////////////////////////////////////////////////////
-    // create time and clock control objects
-    ////////////////////////////////////////////////////////////////////
-    _spi_iface = spi_core_3000::make(_local_ctrl, TOREG(SR_CORE_SPI), RB32_CORE_SPI);
-    _spi_iface->set_divider(B200_BUS_CLOCK_RATE/ADF4001_SPI_RATE);
-    _adf4001_iface = boost::shared_ptr<adf4001_ctrl>(new adf4001_ctrl(_spi_iface, ADF4001_SLAVENO));
 
     //register time now and pps onto available radio cores
     _tree->create<time_spec_t>(mb_path / "time" / "now")

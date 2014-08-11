@@ -485,7 +485,7 @@ void calibrate_secondary_tx_filter() {
     } else if((bbbw_mhz * 2) > 24) {
         reg0d0 = 0x57;
     } else {
-        post_err_msg("Cal2ndTxFil: INVALID_CODE_PATH bad bbbw_mhz");
+        post_err_msg("Cal2ndTxFil: bad bbbw_mhz INV_PATH");
         reg0d0 = 0x00;
     }
 
@@ -548,7 +548,7 @@ void calibrate_rx_TIAs() {
     } else if(ceil_bbbw_mhz > 10) {
         reg1db = 0x20;
     } else {
-        post_err_msg("CalRxTias: INVALID_CODE_PATH bad bbbw_mhz");
+        post_err_msg("CalRxTias: bad bbbw_mhz INV_PATH");
     }
 
     if(CTIA_fF > 2920) {
@@ -718,7 +718,7 @@ void calibrate_baseband_dc_offset() {
     write_ad9361_reg(0x016, 0x01);
     while(read_ad9361_reg(0x016) & 0x01) {
         if(count > 100) {
-            post_err_msg("Baseband DC Offset Calibration Failure");
+            post_err_msg("Baseband DC Offset Cal Failure");
             break;
         }
 
@@ -752,7 +752,7 @@ void calibrate_rf_dc_offset() {
     write_ad9361_reg(0x016, 0x02);
     while(read_ad9361_reg(0x016) & 0x02) {
         if(count > 100) {
-            post_err_msg("RF DC Offset Calibration Failure");
+            post_err_msg("RF DC Offset Cal Failure");
             break;
         }
 
@@ -837,7 +837,7 @@ void tx_quadrature_cal_routine(void) {
     write_ad9361_reg(0x016, 0x10);
     while(read_ad9361_reg(0x016) & 0x10) {
         if(count > 100) {
-            post_err_msg("TX Quadrature Calibration Failure");
+            post_err_msg("TX Quadrature Cal Failure");
             break;
         }
 
@@ -854,7 +854,7 @@ void calibrate_tx_quadrature(void) {
     /* Make sure we are, in fact, in the ALERT state. If not, something is
      * terribly wrong in the driver execution flow. */
     if((read_ad9361_reg(0x017) & 0x0F) != 5) {
-        post_err_msg("TX Quad Cal started, but not in ALERT");
+        post_err_msg("TXQuadCal started,but not in ALERT");
     }
 
     /* Turn off free-running and continuous calibrations. Note that this
@@ -1486,6 +1486,7 @@ void init_ad9361(void) {
     write_ad9361_reg(0x019, 0x00); // AuxDAC2 Word[9:2]
     write_ad9361_reg(0x01A, 0x00); // AuxDAC1 Config and Word[1:0]
     write_ad9361_reg(0x01B, 0x00); // AuxDAC2 Config and Word[1:0]
+    write_ad9361_reg(0x022, 0x4A); // Invert Bypassed LNA
     write_ad9361_reg(0x023, 0xFF); // AuxDAC Manaul/Auto Control
     write_ad9361_reg(0x026, 0x00); // AuxDAC Manual Select Bit/GPO Manual Select
     write_ad9361_reg(0x030, 0x00); // AuxDAC1 Rx Delay
@@ -1599,7 +1600,7 @@ void init_ad9361(void) {
  * This is the only clock setting function that is exposed to the outside. */
 double set_clock_rate(const double req_rate) {
     if(req_rate > 61.44e6) {
-        post_err_msg("Requested master clock rate outside range");
+        post_err_msg("Req. master clk rate outside range");
     }
     
     msg("[set_clock_rate] req_rate=%.10f", req_rate);
@@ -1628,7 +1629,7 @@ double set_clock_rate(const double req_rate) {
             break;
 
         default:
-            post_err_msg("[set_clock_rate:1] AD9361 in unknown state");
+            post_err_msg("[set_clock_rate:1] Unknown state");
             break;
     };
 
@@ -1692,7 +1693,7 @@ double set_clock_rate(const double req_rate) {
             break;
 
         default:
-            post_err_msg("[set_clock_rate:2] AD9361 in unknown state");
+            post_err_msg("[set_clock_rate:2] Unknown state");
             break;
     };
 
@@ -1729,9 +1730,27 @@ void set_active_chains(bool tx1, bool tx2, bool rx1, bool rx2) {
     if(rx1) { reg_rxfilt = reg_rxfilt | 0x40; }
     if(rx2) { reg_rxfilt = reg_rxfilt | 0x80; }
 
+    /* Check for FDD state */
+    bool set_back_to_fdd = false;
+    uint8_t ensm_state = read_ad9361_reg(0x017) & 0x0F;
+    if (ensm_state == 0xA)   // FDD
+    {
+        /* Put into ALERT state (via the FDD flush state). */
+        write_ad9361_reg(0x014, 0x01);
+        set_back_to_fdd = true;
+    }
+
+    /* Wait for FDD flush state to complete (if necessary) */
+    while (ensm_state == 0xA || ensm_state == 0xB)
+        ensm_state = read_ad9361_reg(0x017) & 0x0F;
+
     /* Turn on / off the chains. */
     write_ad9361_reg(0x002, reg_txfilt);
     write_ad9361_reg(0x003, reg_rxfilt);
+
+    /* Put back into FDD state if necessary */
+    if (set_back_to_fdd)
+        write_ad9361_reg(0x014, 0x21);
 }
 
 /* Tune the RX or TX frequency.
