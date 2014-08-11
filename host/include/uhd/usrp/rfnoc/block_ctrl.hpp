@@ -32,14 +32,8 @@ namespace uhd {
 class UHD_API block_ctrl : virtual public block_ctrl_base
 {
 public:
-    // TODO replace with macro
-    typedef boost::shared_ptr<block_ctrl> sptr;
-    static sptr make(
-            uhd::wb_iface::sptr ctrl_iface,
-            uhd::sid_t ctrl_sid,
-            size_t device_index,
-            uhd::property_tree::sptr tree
-    );
+    // Required macro in RFNoC block classes
+    UHD_RFNOC_BLOCK_OBJECT(block_ctrl)
 
     // Nothing else here -- all function definitions are in block_ctrl_base
 

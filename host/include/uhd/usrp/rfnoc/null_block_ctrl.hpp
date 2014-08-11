@@ -39,15 +39,8 @@ namespace uhd {
 class null_block_ctrl : virtual public block_ctrl_base
 {
 public:
-    // TODO replace with macro
-    typedef boost::shared_ptr<null_block_ctrl> sptr;
-    static sptr make(
-            uhd::wb_iface::sptr ctrl_iface,
-            uhd::sid_t ctrl_sid,
-            size_t device_index,
-            uhd::property_tree::sptr tree
-    );
-    static sptr cast(block_ctrl_base::sptr P) { return boost::dynamic_pointer_cast<null_block_ctrl>(P); };
+    // This macro must always be at the top of the public section in an RFNoC block class
+    UHD_RFNOC_BLOCK_OBJECT(null_block_ctrl)
 
     //! Set this register to number of lines per packet
     static const boost::uint32_t SR_LINES_PER_PACKET = 9;

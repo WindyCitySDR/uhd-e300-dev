@@ -22,12 +22,7 @@ using namespace uhd::rfnoc;
 class block_ctrl_impl : public block_ctrl
 {
 public:
-    block_ctrl_impl(
-            uhd::wb_iface::sptr ctrl_iface,
-            uhd::sid_t ctrl_sid,
-            size_t device_index,
-            uhd::property_tree::sptr tree
-    ) : block_ctrl_base(ctrl_iface, ctrl_sid, device_index, tree)
+    UHD_RFNOC_BLOCK_CONSTRUCTOR(block_ctrl)
     {
         // nop
     }
@@ -35,16 +30,4 @@ public:
     // Very empty class, this one
 };
 
-block_ctrl::sptr block_ctrl::make(
-    uhd::wb_iface::sptr ctrl_iface,
-    uhd::sid_t ctrl_sid,
-    size_t device_index,
-    uhd::property_tree::sptr tree
-) {
-    return sptr(
-        new block_ctrl_impl(
-            ctrl_iface, ctrl_sid, device_index, tree
-        )
-    );
-}
-
+UHD_RFNOC_BLOCK_MAKE_CALL(block_ctrl);

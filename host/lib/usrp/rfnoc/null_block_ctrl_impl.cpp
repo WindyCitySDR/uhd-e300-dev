@@ -26,22 +26,17 @@ using namespace uhd::rfnoc;
 class null_block_ctrl_impl : public null_block_ctrl
 {
 public:
-    null_block_ctrl_impl(
-            uhd::wb_iface::sptr ctrl_iface,
-            uhd::sid_t ctrl_sid,
-            size_t device_index,
-            uhd::property_tree::sptr tree
-    ) : block_ctrl_base(ctrl_iface, ctrl_sid, device_index, tree),
+    UHD_RFNOC_BLOCK_CONSTRUCTOR(null_block_ctrl),
         _line_rate(0.0) // This is set implicitly by the subscriber in the prop tree
     {
 
         // Add prop tree entry for line rate
-        // We actually use this to store the rate, because we can't
+        // We actually use _line_rate to store the rate, because we can't
         // read back the actual register (yet)
         UHD_MSG(status) << "populating " << _root_path / "line_rate/value" << std::endl;
         _tree->create<double>(_root_path / "line_rate/value")
             .subscribe(boost::bind(&null_block_ctrl_impl::set_line_rate, this, _1))
-            .set(_line_rate_from_reg_val(0xFFFF)); // Slowest rate possible
+            .set(_line_rate_from_reg_val(0xFFFF)); // Default: slowest rate possible
         _tree->create<uhd::meta_range_t>(_root_path / "line_rate/range")
             .set(uhd::meta_range_t(_line_rate_from_reg_val(0xFFFF), _line_rate_from_reg_val(0)));
     }
@@ -133,18 +128,5 @@ private:
 
 };
 
-// TODO replace with macro
-null_block_ctrl::sptr null_block_ctrl::make(
-    uhd::wb_iface::sptr ctrl_iface,
-    uhd::sid_t ctrl_sid,
-    size_t device_index,
-    uhd::property_tree::sptr tree
-) {
-    return sptr(
-        new null_block_ctrl_impl(
-            ctrl_iface, ctrl_sid, device_index, tree
-        )
-    );
-}
-
+UHD_RFNOC_BLOCK_MAKE_CALL(null_block_ctrl);
 
