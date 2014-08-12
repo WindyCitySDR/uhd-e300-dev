@@ -138,13 +138,6 @@ private: // types
         rx_frontend_core_200::sptr rx_fe;
         tx_frontend_core_200::sptr tx_fe;
 
-        uhd::transport::zero_copy_if::sptr send_ctrl_xport;
-        uhd::transport::zero_copy_if::sptr recv_ctrl_xport;
-        uhd::transport::zero_copy_if::sptr tx_data_xport;
-        uhd::transport::zero_copy_if::sptr tx_flow_xport;
-        uhd::transport::zero_copy_if::sptr rx_data_xport;
-        uhd::transport::zero_copy_if::sptr rx_flow_xport;
-
         boost::weak_ptr<uhd::rx_streamer> rx_streamer;
         boost::weak_ptr<uhd::tx_streamer> tx_streamer;
 

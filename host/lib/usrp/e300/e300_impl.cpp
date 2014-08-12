@@ -915,8 +915,6 @@ void e300_impl::_setup_radio(const size_t dspno)
        E300_RADIO_DEST_PREFIX_CTRL,
        _ctrl_xport_params,
        ctrl_sid);
-    perif.send_ctrl_xport = ctrl_xports.send;
-    perif.recv_ctrl_xport = ctrl_xports.recv;
 
     this->_setup_dest_mapping(ctrl_sid,
                               dspno ? E300_R1_CTRL_STREAM
@@ -927,8 +925,8 @@ void e300_impl::_setup_radio(const size_t dspno)
     ////////////////////////////////////////////////////////////////////
     perif.ctrl = radio_ctrl_core_3000::make(
         false/*lilE*/,
-        perif.send_ctrl_xport,
-        perif.recv_ctrl_xport,
+        ctrl_xports.send,
+        ctrl_xports.recv,
         ctrl_sid,
         dspno ? "1" : "0");
     this->_register_loopback_self_test(perif.ctrl);

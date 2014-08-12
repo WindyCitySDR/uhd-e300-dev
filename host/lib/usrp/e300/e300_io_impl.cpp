@@ -434,8 +434,6 @@ rx_streamer::sptr e300_impl::get_rx_stream(const uhd::stream_args_t &args_)
            E300_RADIO_DEST_PREFIX_RX,
            _data_xport_params,
            data_sid);
-        perif.rx_data_xport = data_xports.recv;
-        perif.rx_flow_xport = data_xports.send;
 
         //calculate packet size
         static const size_t hdr_size = 0
@@ -445,7 +443,7 @@ rx_streamer::sptr e300_impl::get_rx_stream(const uhd::stream_args_t &args_)
             - sizeof(vrt::if_packet_info_t().cid) //no class id ever used
             - sizeof(vrt::if_packet_info_t().tsi) //no int time ever used
         ;
-        const size_t bpp = perif.rx_data_xport->get_recv_frame_size() - hdr_size;
+        const size_t bpp = data_xports.recv->get_recv_frame_size() - hdr_size;
         const size_t bpi = convert::get_bytes_per_item(args.otw_format);
         const size_t spp = unsigned(args.args.cast<double>("spp", bpp/bpi));
 
@@ -470,18 +468,18 @@ rx_streamer::sptr e300_impl::get_rx_stream(const uhd::stream_args_t &args_)
         perif.framer->setup(args);
         perif.ddc->setup(args);
         my_streamer->set_xport_chan_get_buff(stream_i, boost::bind(
-            &zero_copy_if::get_recv_buff, perif.rx_data_xport, _1
+            &zero_copy_if::get_recv_buff, data_xports.recv, _1
         ), true /*flush*/);
         my_streamer->set_overflow_handler(stream_i,
             boost::bind(&rx_vita_core_3000::handle_overflow, perif.framer)
         );
 
         //setup flow control
-        const size_t fc_window = perif.rx_data_xport->get_num_recv_frames();
+        const size_t fc_window = data_xports.recv->get_num_recv_frames();
         perif.framer->configure_flow_control(fc_window);
         boost::shared_ptr<e300_rx_fc_cache_t> fc_cache(new e300_rx_fc_cache_t());
         my_streamer->set_xport_handle_flowctrl(stream_i,
-            boost::bind(&handle_rx_flowctrl, data_sid, perif.rx_flow_xport, fc_cache, _1),
+            boost::bind(&handle_rx_flowctrl, data_sid, data_xports.send, fc_cache, _1),
             static_cast<size_t>(static_cast<double>(fc_window) * E300_RX_SW_BUFF_FULLNESS),
             true/*init*/);
 
@@ -535,8 +533,6 @@ tx_streamer::sptr e300_impl::get_tx_stream(const uhd::stream_args_t &args_)
            E300_RADIO_DEST_PREFIX_TX,
            _data_xport_params,
            data_sid);
-        perif.tx_data_xport = data_xports.send;
-        perif.tx_flow_xport = data_xports.recv;
 
         //calculate packet size
         static const size_t hdr_size = 0
@@ -546,7 +542,7 @@ tx_streamer::sptr e300_impl::get_tx_stream(const uhd::stream_args_t &args_)
             - sizeof(vrt::if_packet_info_t().cid) //no class id ever used
             - sizeof(vrt::if_packet_info_t().tsi) //no int time ever used
         ;
-        const size_t bpp = perif.tx_data_xport->get_send_frame_size() - hdr_size;
+        const size_t bpp = data_xports.send->get_send_frame_size() - hdr_size;
         const size_t bpi = convert::get_bytes_per_item(args.otw_format);
         const size_t spp = unsigned(args.args.cast<double>("spp", bpp/bpi));
 
@@ -571,7 +567,7 @@ tx_streamer::sptr e300_impl::get_tx_stream(const uhd::stream_args_t &args_)
         perif.duc->setup(args);
 
         //flow control setup
-        const size_t fc_window = perif.tx_data_xport->get_num_send_frames();
+        const size_t fc_window = data_xports.send->get_num_send_frames();
         perif.deframer->configure_flow_control(0/*cycs off*/, fc_window/8/*pkts*/);
         boost::shared_ptr<e300_tx_fc_cache_t> fc_cache(new e300_tx_fc_cache_t());
         fc_cache->stream_channel = stream_i;
@@ -582,12 +578,12 @@ tx_streamer::sptr e300_impl::get_tx_stream(const uhd::stream_args_t &args_)
         tick_rate_retriever_t get_tick_rate_fn = boost::bind(&e300_impl::_get_tick_rate, this);
 
         task::sptr task = task::make(boost::bind(&handle_tx_async_msgs,
-                                                 fc_cache, perif.tx_flow_xport,
+                                                 fc_cache, data_xports.recv,
                                                  get_tick_rate_fn));
 
         my_streamer->set_xport_chan_get_buff(
             stream_i,
-            boost::bind(&get_tx_buff_with_flowctrl, task, fc_cache, perif.tx_data_xport, fc_window, _1)
+            boost::bind(&get_tx_buff_with_flowctrl, task, fc_cache, data_xports.send, fc_window, _1)
         );
 
         my_streamer->set_async_receiver(
