@@ -23,10 +23,10 @@
 // constants coded into the fpga parameters
 static const size_t ZF_CONFIG_BASE    = 0x40000000;
 static const size_t ZF_PAGE_WIDTH     = 10;
-static const size_t H2S_STREAMS_WIDTH = 3;
-static const size_t H2S_CMDFIFO_DEPTH = 10;
-static const size_t S2H_STREAMS_WIDTH = 3;
-static const size_t S2H_CMDFIFO_DEPTH = 10;
+static const size_t H2S_STREAMS_WIDTH = 4;
+static const size_t H2S_CMDFIFO_DEPTH = 5;
+static const size_t S2H_STREAMS_WIDTH = 4;
+static const size_t S2H_CMDFIFO_DEPTH = 5;
 
 // calculate more useful constants for this module
 static const size_t ZF_PAGE_SIZE(1 << ZF_PAGE_WIDTH);
@@ -306,8 +306,8 @@ public:
     e300_fifo_interface_impl(const e300_fifo_config_t &config):
         _config(config),
         _bytes_in_use(0),
-        _recv_entries_in_use(0),
-        _send_entries_in_use(0)
+        _recv_entries_in_use(std::vector<size_t>(S2H_NUM_STREAMS, 0)),
+        _send_entries_in_use(std::vector<size_t>(H2S_NUM_STREAMS, 0))
     {
         //open the file descriptor to our kernel module
         const std::string dev = "/dev/axi_fpga";
@@ -376,7 +376,8 @@ private:
 
         const size_t frame_size = is_recv ? params.recv_frame_size : params.send_frame_size;
         const size_t num_frames = is_recv ? params.num_recv_frames : params.num_send_frames;
-        size_t &entries_in_use = (is_recv)? _recv_entries_in_use : _send_entries_in_use;
+        size_t &entries_in_use = (is_recv)? _recv_entries_in_use.at(which_stream)
+                                          : _send_entries_in_use.at(which_stream);
 
         __mem_addrz_t addrs;
         addrs.which = which_stream;
@@ -391,24 +392,24 @@ private:
         _bytes_in_use += num_frames*frame_size;
         entries_in_use += num_frames;
 
-        UHD_ASSERT_THROW(_recv_entries_in_use <= S2H_NUM_CMDS);
-        UHD_ASSERT_THROW(_send_entries_in_use <= H2S_NUM_CMDS);
+        UHD_ASSERT_THROW(_recv_entries_in_use.at(which_stream) <= S2H_NUM_CMDS);
+        UHD_ASSERT_THROW(_send_entries_in_use.at(which_stream) <= H2S_NUM_CMDS);
         UHD_ASSERT_THROW(_bytes_in_use <= _config.buff_length);
 
 
         return xport;
     }
 
-    e300_fifo_config_t _config;
+    e300_fifo_config_t     _config;
     e300_fifo_poll_waiter *_waiter;
-    size_t _bytes_in_use;
-    int _fd;
-    void *_buff;
-    size_t _ctrl_space;
-    size_t _data_space;
-    size_t _recv_entries_in_use;
-    size_t _send_entries_in_use;
-    boost::mutex _setup_mutex;
+    size_t                 _bytes_in_use;
+    int                    _fd;
+    void                  *_buff;
+    size_t                 _ctrl_space;
+    size_t                 _data_space;
+    std::vector<size_t>    _recv_entries_in_use;
+    std::vector<size_t>    _send_entries_in_use;
+    boost::mutex           _setup_mutex;
 };
 
 e300_fifo_interface::sptr e300_fifo_interface::make(const e300_fifo_config_t &config)
