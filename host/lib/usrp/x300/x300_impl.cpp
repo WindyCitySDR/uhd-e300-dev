@@ -869,6 +869,7 @@ void x300_impl::setup_mb(const size_t mb_i, const uhd::device_addr_t &dev_addr)
     // - If yes, add that sptr to the list of block controls
     // - Else, just add the original block_ctrl sptr
     //
+    // TODO: don't hardcode the loop boundaries but ask the xbar first
     const boost::uint8_t ce_map[] = {X300_XB_DST_CE0, X300_XB_DST_CE1, X300_XB_DST_CE2};
     for (size_t i = 0; i < 3; i++) {
         boost::uint32_t ctrl_sid_;
@@ -889,8 +890,6 @@ void x300_impl::setup_mb(const size_t mb_i, const uhd::device_addr_t &dev_addr)
                 str(boost::format("CE_%02d_Port_%02d") % i % ce_map[i])
         );
         boost::uint64_t noc_id = ctrl->peek64(0);
-        // TODO: Implement a clever check to see if this port is connected.
-        //  Could just be as simple as waiting for a timeout in the previous peek.
         UHD_MSG(status) << str(boost::format("Port %d: Found NoC-Block with ID %016x.") % ce_map[i] % noc_id) << std::endl;
         // TODO: Implement cunning method to figure out the right block_ctrl_base
         // derivative using the noc-id

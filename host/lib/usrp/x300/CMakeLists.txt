@@ -34,6 +34,5 @@ IF(ENABLE_X300)
         ${CMAKE_CURRENT_SOURCE_DIR}/x300_io_impl.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/x300_dboard_iface.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/x300_clock_ctrl.cpp
-        #${CMAKE_CURRENT_SOURCE_DIR}/x300_radio_ctrl_impl.cpp
     )
 ENDIF(ENABLE_X300)
