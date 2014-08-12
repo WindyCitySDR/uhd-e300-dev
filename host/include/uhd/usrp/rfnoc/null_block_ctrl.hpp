@@ -84,7 +84,7 @@ public:
     // set the source address.
     virtual void set_destination(boost::uint32_t next_address, size_t output_block_port = 0) = 0;
 
-}; /* class block_ctrl*/
+}; /* class null_block_ctrl*/
 
 }} /* namespace uhd::rfnoc */
 

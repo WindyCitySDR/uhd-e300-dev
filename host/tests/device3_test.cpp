@@ -87,7 +87,8 @@ class pseudo_device3_impl : public uhd::device3
                 ctrl_iface,
                 sid1,
                 0,
-                _tree
+                _tree,
+                false
             )
         );
 
@@ -97,7 +98,8 @@ class pseudo_device3_impl : public uhd::device3
                 ctrl_iface,
                 sid2,
                 0,
-                _tree
+                _tree,
+                false
             )
         );
     }

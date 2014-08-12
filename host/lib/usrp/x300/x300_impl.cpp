@@ -901,7 +901,8 @@ void x300_impl::setup_mb(const size_t mb_i, const uhd::device_addr_t &dev_addr)
                     ctrl,
                     ctrl_sid,
                     mb_i,
-                    _tree->subtree(mb_path)
+                    _tree->subtree(mb_path),
+                    mb.if_pkt_is_big_endian
                 )
             );
         } else {
@@ -911,7 +912,8 @@ void x300_impl::setup_mb(const size_t mb_i, const uhd::device_addr_t &dev_addr)
                     ctrl,
                     ctrl_sid,
                     mb_i,
-                    _tree->subtree(mb_path)
+                    _tree->subtree(mb_path),
+                    mb.if_pkt_is_big_endian
                 )
             );
         }

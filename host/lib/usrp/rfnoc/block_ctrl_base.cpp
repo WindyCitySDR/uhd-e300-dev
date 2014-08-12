@@ -37,10 +37,12 @@ block_ctrl_base::block_ctrl_base(
         wb_iface::sptr ctrl_iface,
         sid_t ctrl_sid,
         size_t device_index,
-        property_tree::sptr tree
-) : _ctrl_iface(ctrl_iface),
-    _ctrl_sid(ctrl_sid),
-    _tree(tree)
+        property_tree::sptr tree,
+        bool transport_is_big_endian
+) : _ctrl_sid(ctrl_sid),
+    _ctrl_iface(ctrl_iface),
+    _tree(tree),
+    _transport_is_big_endian(transport_is_big_endian)
 {
     UHD_MSG(status) << "block_ctrl_base()" << std::endl;
     // Read NoC-ID

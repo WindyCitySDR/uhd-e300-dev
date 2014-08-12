@@ -39,7 +39,8 @@
             uhd::wb_iface::sptr ctrl_iface, \
             uhd::sid_t ctrl_sid, \
             size_t device_index, \
-            uhd::property_tree::sptr tree \
+            uhd::property_tree::sptr tree, \
+            bool is_big_endian \
     );
 
 //! This macro must be placed inside a block implementation class
@@ -48,11 +49,12 @@
         uhd::wb_iface::sptr ctrl_iface, \
         uhd::sid_t ctrl_sid, \
         size_t device_index, \
-        uhd::property_tree::sptr tree \
+        uhd::property_tree::sptr tree, \
+        bool is_big_endian \
     ) { \
         return sptr( \
             new CLASS_NAME##_impl( \
-                ctrl_iface, ctrl_sid, device_index, tree \
+                ctrl_iface, ctrl_sid, device_index, tree, is_big_endian \
             ) \
         ); \
     }
@@ -64,8 +66,9 @@
             uhd::wb_iface::sptr ctrl_iface, \
             uhd::sid_t ctrl_sid, \
             size_t device_index, \
-            uhd::property_tree::sptr tree \
-    ) : block_ctrl_base(ctrl_iface, ctrl_sid, device_index, tree)
+            uhd::property_tree::sptr tree, \
+            bool is_big_endian \
+    ) : block_ctrl_base(ctrl_iface, ctrl_sid, device_index, tree, is_big_endian)
 
 namespace uhd {
     namespace rfnoc {
@@ -79,9 +82,6 @@ class UHD_API block_ctrl_base;
 class block_ctrl_base : boost::noncopyable, public boost::enable_shared_from_this<block_ctrl_base>
 {
 private:
-    //! An object to actually send and receive the commands
-    wb_iface::sptr _ctrl_iface;
-
     //! The SID of the control transport.
     // _ctrl_sid.get_dst_address() yields this block's address.
     uhd::sid_t _ctrl_sid;
@@ -108,14 +108,21 @@ protected:
             uhd::wb_iface::sptr ctrl_iface,
             uhd::sid_t ctrl_sid,
             size_t device_index,
-            uhd::property_tree::sptr tree
+            uhd::property_tree::sptr tree,
+            bool transport_is_big_endian
     );
+
+    //! An object to actually send and receive the commands
+    wb_iface::sptr _ctrl_iface;
 
     //! Property sub-tree
     uhd::property_tree::sptr _tree;
 
     //! Root node of this block's properties
     uhd::fs_path _root_path;
+
+    //! Endianness of underlying transport (for data transport)
+    bool _transport_is_big_endian;
 
 public:
     typedef boost::shared_ptr<block_ctrl_base> sptr;
