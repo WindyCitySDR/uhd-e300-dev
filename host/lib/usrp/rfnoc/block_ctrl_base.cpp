@@ -64,6 +64,16 @@ block_ctrl_base::block_ctrl_base(
     // Figure out block ID
     // TODO replace with something that actually sets a name
     std::string blockname = "CE"; // Until we can read the actual block names
+    switch (noc_id) {
+        case 0xaaaabbbbcccc0000:
+            blockname = "NullSrcSink";
+            break;
+
+        default:
+            break;
+    }
+
+
     _block_id.set(device_index, blockname, 0);
     while (_tree->exists("xbar/" + _block_id.get_local())) {
         _block_id++;

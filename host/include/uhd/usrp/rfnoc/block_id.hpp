@@ -48,6 +48,9 @@ namespace uhd {
     public:
         block_id_t();
         block_id_t(const std::string &block_str);
+        //! \param device_no Device number
+        //! \param block_name Block name
+        //! \param block_ctr Which block of this type is this on this device?
         block_id_t(const size_t device_no, const std::string &block_name, const size_t block_ctr=0);
 
         //! Return a string like this: "0/FFT_1" (includes all components, if set)

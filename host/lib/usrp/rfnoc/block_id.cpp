@@ -43,8 +43,11 @@ block_id_t::block_id_t(const std::string &block_str)
     }
 }
 
-block_id_t::block_id_t(const size_t device_no, const std::string &block_name, const size_t block_ctr)
-    : _device_no(device_no),
+block_id_t::block_id_t(
+        const size_t device_no,
+        const std::string &block_name,
+        const size_t block_ctr
+) : _device_no(device_no),
     _block_name(block_name),
     _block_ctr(block_ctr)
 {

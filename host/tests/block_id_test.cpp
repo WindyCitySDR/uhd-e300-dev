@@ -90,8 +90,10 @@ BOOST_AUTO_TEST_CASE(test_block_id) {
     BOOST_CHECK(not other_block_id.match("BlockName_4"));
     BOOST_CHECK(not other_block_id.match("BlockName_X"));
     BOOST_CHECK(not other_block_id.match("2093ksdjfflsdkjf"));
+}
 
-    // set()
+BOOST_AUTO_TEST_CASE(test_block_id_set) {
+    // test set()
     block_id_t block_id_for_set(5, "Blockname", 9);
     block_id_for_set.set("FirFilter");
     BOOST_CHECK_EQUAL(block_id_for_set.get_device_no(), 5);

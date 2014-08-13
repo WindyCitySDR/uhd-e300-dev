@@ -191,8 +191,7 @@ int UHD_SAFE_MAIN(int argc, char *argv[])
         ("progress", "periodically display short-term bandwidth")
         ("stats", "show average bandwidth on exit")
         ("continue", "don't abort on a bad packet")
-        // TODO: change default block ID to NullBlock when proper block names work
-        ("nullid", po::value<std::string>(&nullid)->default_value("0/CE_0"), "The block ID for the null source.")
+        ("nullid", po::value<std::string>(&nullid)->default_value("0/NullSrcSink_0"), "The block ID for the null source.")
         ("blockid", po::value<std::string>(&blockid)->default_value(""), "The block ID for the processing block.")
     ;
     po::variables_map vm;
