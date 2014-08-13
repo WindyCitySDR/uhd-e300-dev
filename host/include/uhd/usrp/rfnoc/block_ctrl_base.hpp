@@ -24,6 +24,7 @@
 #include <boost/utility.hpp>
 #include <boost/enable_shared_from_this.hpp>
 #include <uhd/property_tree.hpp>
+#include <uhd/stream.hpp>
 #include <uhd/types/sid.hpp>
 #include <uhd/types/stream_cmd.hpp>
 #include <uhd/types/wb_iface.hpp>
@@ -324,6 +325,39 @@ public:
      * block_ctrl_base::issue_stream_cmd() will not do anything but issue a warning.
      */
     void clear_upstream_blocks() { _upstream_blocks.clear(); };
+
+    // Streamer related methods
+
+    /*! Set stream args and SID before opening an RX streamer to this block.
+     *
+     * This does nothing in the default implementation.
+     *
+     * TODO: It probably should check if the otw format is compatible.
+     */
+    //virtual void setup_rx_streamer(uhd::stream_args_t &args, const uhd::sid_t &data_sid);
+
+    /*! Set stream args before opening a TX streamer to this block.
+     *
+     * This does nothing in the default implementation.
+     *
+     * TODO: It probably should check if the otw format is compatible.
+     */
+    //virtual void setup_tx_streamer(uhd::stream_args_t &args);
+
+    /*! If an overrun ("O") is received, this function is called to straighten
+     * things out, if necessary.
+     *
+     * Does nothing in the default implementation.
+     */
+    virtual void handle_overrun(void);
+
+    /*! Returns the current time of this block, whatever that means.
+     *
+     * For radio blocks, this returns the actual, current time.
+     *
+     * In the default implementation, always returns a zero.
+     */
+    virtual uhd::time_spec_t get_time_now(void);
 
     virtual ~block_ctrl_base();
 

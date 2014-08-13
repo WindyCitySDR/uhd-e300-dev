@@ -39,6 +39,24 @@ public:
     //! Pass stream commands to the radio
     virtual void issue_stream_cmd(const uhd::stream_cmd_t &stream_cmd) = 0;
 
+    //! Configure flow control in the VITA core
+    virtual void configure_flow_control_in(
+            size_t cycles,
+            size_t packets,
+            size_t block_port=0
+     ) = 0;
+
+    //! Configure flow control in the VITA core
+    virtual void configure_flow_control_out(
+            size_t buf_size_pkts,
+            size_t block_port=0,
+            const uhd::sid_t &sid=uhd::sid_t()
+     ) = 0;
+
+    //! Don't reset flow control
+    virtual void reset_flow_control() = 0;
+
+    //! Set packet size in the VITA framer
     virtual bool set_bytes_per_output_packet(
             size_t bpp,
             size_t out_block_port=0
@@ -50,6 +68,15 @@ public:
     // set the source address.
     virtual void set_destination(boost::uint32_t next_address, size_t output_block_port = 0) = 0;
 
+    virtual void setup_rx_streamer(uhd::stream_args_t &args, const uhd::sid_t &data_sid) = 0;
+    virtual void setup_tx_streamer(uhd::stream_args_t &args) = 0;
+
+    virtual void handle_overrun(void) = 0;
+
+    //! Read the time from the time64 core
+    virtual uhd::time_spec_t get_time_now(void) = 0;
+
+    //! radio_ctrl specific function
     virtual void set_perifs(
         time_core_3000::sptr    time64,
         rx_vita_core_3000::sptr framer,
@@ -57,6 +84,7 @@ public:
         tx_vita_core_3000::sptr deframer,
         tx_dsp_core_3000::sptr  duc
     ) = 0;
+
 
 }; /* class radio_ctrl*/
 
