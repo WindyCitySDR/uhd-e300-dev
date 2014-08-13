@@ -41,6 +41,7 @@
 
 ////// RFNOC ////////////
 #include <uhd/usrp/rfnoc/null_block_ctrl.hpp>
+#include "../rfnoc/radio_ctrl.hpp"
 ////// RFNOC ////////////
 
 #define NIUSRPRIO_DEFAULT_RPC_PORT "5444"
@@ -890,7 +891,7 @@ void x300_impl::setup_mb(const size_t mb_i, const uhd::device_addr_t &dev_addr)
                 str(boost::format("CE_%02d_Port_%02d") % i % ce_map[i])
         );
         boost::uint64_t noc_id = ctrl->peek64(0);
-        UHD_MSG(status) << str(boost::format("Port %d: Found NoC-Block with ID %016x.") % ce_map[i] % noc_id) << std::endl;
+        UHD_MSG(status) << str(boost::format("Port %d: Found NoC-Block with ID %016x.") % int(ce_map[i]) % noc_id) << std::endl;
         // TODO: Implement cunning method to figure out the right block_ctrl_base
         // derivative using the noc-id
         if (noc_id == 0xaaaabbbbcccc0000) {
@@ -1158,6 +1159,17 @@ void x300_impl::setup_radio(const size_t mb_i, const std::string &slot_name)
         _tree->access<double>(db_rx_fe_path / name / "freq" / "value")
             .subscribe(boost::bind(&x300_impl::set_rx_fe_corrections, this, mb_path, slot_name, _1));
     }
+
+    /////// Create the RFNoC block
+    _rfnoc_block_ctrl.push_back(
+        uhd::rfnoc::radio_ctrl::make(
+            perif.ctrl,
+            ctrl_sid,
+            mb_i,
+            _tree->subtree(mb_path),
+            mb.if_pkt_is_big_endian
+        )
+    );
 }
 
 void x300_impl::set_rx_fe_corrections(const uhd::fs_path &mb_path, const std::string &fe_name, const double lo_freq)

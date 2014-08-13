@@ -178,7 +178,7 @@ public:
 
 private:
     /////////////////////// RFNOC ///////////////////////////////////////////
-    uhd::rx_streamer::sptr get_rx_stream_ce(const uhd::stream_args_t &, boost::uint16_t src_addr);
+    uhd::rx_streamer::sptr get_rx_stream_ce(const uhd::stream_args_t &);
     uhd::tx_streamer::sptr get_tx_stream_ce(const uhd::stream_args_t &, boost::uint16_t dst_addr);
     /////////////////////// RFNOC ///////////////////////////////////////////
 
@@ -210,7 +210,7 @@ private:
         uhd::dict<size_t, boost::weak_ptr<uhd::rx_streamer> > rx_streamers;
         uhd::dict<size_t, boost::weak_ptr<uhd::tx_streamer> > tx_streamers;
         //////////////////// RFNOC ///////////////////////////////////
-        uhd::dict<size_t, boost::weak_ptr<uhd::rx_streamer> > ce_rx_streamers;
+        uhd::dict<std::string, boost::weak_ptr<uhd::rx_streamer> > ce_rx_streamers;
         uhd::dict<size_t, boost::weak_ptr<uhd::tx_streamer> > ce_tx_streamers;
         //////////////////// RFNOC ///////////////////////////////////
 

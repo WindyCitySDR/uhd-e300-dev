@@ -55,22 +55,22 @@ void x300_impl::update_tick_rate(mboard_members_t &mb, const double rate)
         if (my_streamer) my_streamer->set_tick_rate(rate);
     }
     //////// RFNOC ///////////////
-    BOOST_FOREACH(const size_t &ce_no, mb.ce_rx_streamers.keys())
+    BOOST_FOREACH(const std::string &block_id, mb.ce_rx_streamers.keys())
     {
-        UHD_MSG(status) << "setting ce rx streamer " << ce_no << " rate to " << rate << std::endl;
+        UHD_MSG(status) << "setting ce rx streamer " << block_id << " rate to " << rate << std::endl;
         boost::shared_ptr<sph::recv_packet_streamer> my_streamer =
-            boost::dynamic_pointer_cast<sph::recv_packet_streamer>(mb.ce_rx_streamers[ce_no].lock());
+            boost::dynamic_pointer_cast<sph::recv_packet_streamer>(mb.ce_rx_streamers[block_id].lock());
         if (my_streamer) my_streamer->set_tick_rate(rate);
         if (my_streamer) my_streamer->set_samp_rate(rate);
     }
-    BOOST_FOREACH(const size_t &ce_no, mb.ce_tx_streamers.keys())
-    {
-        UHD_MSG(status) << "setting ce tx streamer " << ce_no << std::endl;
-        boost::shared_ptr<sph::send_packet_streamer> my_streamer =
-            boost::dynamic_pointer_cast<sph::send_packet_streamer>(mb.ce_tx_streamers[ce_no].lock());
-        if (my_streamer) my_streamer->set_tick_rate(rate);
-        if (my_streamer) my_streamer->set_samp_rate(rate);
-    }
+    //BOOST_FOREACH(const std::string &block_id, mb.ce_tx_streamers.keys())
+    //{
+        //UHD_MSG(status) << "setting ce tx streamer " << block_id << std::endl;
+        //boost::shared_ptr<sph::send_packet_streamer> my_streamer =
+            //boost::dynamic_pointer_cast<sph::send_packet_streamer>(mb.ce_tx_streamers[block_id].lock());
+        //if (my_streamer) my_streamer->set_tick_rate(rate);
+        //if (my_streamer) my_streamer->set_samp_rate(rate);
+    //}
     //////// RFNOC ///////////////
 }
 
@@ -402,10 +402,9 @@ rx_streamer::sptr x300_impl::get_rx_stream(const uhd::stream_args_t &args_)
     args.otw_format = "sc16";
     args.channels = args.channels.empty()? std::vector<size_t>(1, 0) : args.channels;
 
-    if (args.args.has_key("src_addr")) {
-        boost::uint16_t src_addr = uhd::cast::hexstr_cast<boost::uint16_t>(args.args["src_addr"]);
+    if (args.args.has_key("block_id")) {
         UHD_ASSERT_THROW(args.channels.size() == 1);
-        return get_rx_stream_ce(args, src_addr);
+        return get_rx_stream_ce(args);
     }
 
     boost::shared_ptr<sph::recv_packet_streamer> my_streamer;
@@ -541,7 +540,7 @@ rx_streamer::sptr x300_impl::get_rx_stream(const uhd::stream_args_t &args_)
     return my_streamer;
 }
 
-rx_streamer::sptr x300_impl::get_rx_stream_ce(const uhd::stream_args_t &args_, boost::uint16_t src_addr)
+rx_streamer::sptr x300_impl::get_rx_stream_ce(const uhd::stream_args_t &args_)
 {
     UHD_MSG(status) << "get_rx_stream_ce()" << std::endl;
     stream_args_t args = args_;
@@ -555,36 +554,22 @@ rx_streamer::sptr x300_impl::get_rx_stream_ce(const uhd::stream_args_t &args_, b
 
     boost::shared_ptr<sph::recv_packet_streamer> my_streamer;
 
-    // TODO: Find the right mainboard depending on the address
-    size_t mb_index = 0;
+    uhd::rfnoc::block_id_t block_id(args.args["block_id"]);
+    UHD_MSG(status) << "args block ID: " << block_id << std::endl;
+    uhd::rfnoc::block_ctrl_base::sptr ce_ctrl = get_block_ctrl(block_id);
+    UHD_MSG(status) << "rx streamer goes to block: " << ce_ctrl->get_block_id() << std::endl;
+
+    size_t mb_index = ce_ctrl->get_block_id().get_device_no();
     UHD_ASSERT_THROW(mb_index < _mb.size());
 
-    // Find the right CE TODO this is ugly
-    size_t ce_index = src_addr;
-    boost::uint8_t sid_lower;
-    switch (src_addr) { // Right now this is ce index (should this be sid? TODO)
-        case 0:
-            sid_lower = X300_XB_DST_CE0;
-            break;
-        case 1:
-            sid_lower = X300_XB_DST_CE1;
-            break;
-        case 2:
-            sid_lower = X300_XB_DST_CE2;
-            break;
-    }
-    UHD_ASSERT_THROW(ce_index <= 2);
-    if (ce_index <= 2) {
-        UHD_MSG(status) << "Creating streamer to CE " << ce_index << std::endl;
-    }
+    boost::uint8_t sid_lower = ce_ctrl->get_address() & 0xFF;
+    sid_lower /= 4; // TODO remove this line ASAP
+
     UHD_MSG(status) << "mb_index==" << mb_index << std::endl;
-    _ce_index = ce_index;
 
     // Setup
     mboard_members_t &mb = _mb[mb_index];
     size_t stream_i = 0;
-    uhd::rfnoc::block_ctrl_base::sptr ce_ctrl = _rfnoc_block_ctrl[_ce_index];
-    UHD_MSG(status) << "rx streamer goes to block: " << ce_ctrl->get_block_id() << std::endl;
 
     //setup the dsp transport hints (default to a large recv buff)
     device_addr_t device_addr = mb.recv_args;
@@ -681,7 +666,7 @@ rx_streamer::sptr x300_impl::get_rx_stream_ce(const uhd::stream_args_t &args_, b
     my_streamer->set_xport_chan_sid(stream_i, true, data_sid);
 
     //Store a weak pointer to prevent a streamer->x300_impl->streamer circular dependency
-    mb.ce_rx_streamers[ce_index] = boost::weak_ptr<sph::recv_packet_streamer>(my_streamer);
+    mb.ce_rx_streamers[ce_ctrl->get_block_id().get()] = boost::weak_ptr<sph::recv_packet_streamer>(my_streamer);
 
     //sets all tick and samp rates on this streamer
     const fs_path mb_path = "/mboards/"+boost::lexical_cast<std::string>(mb_index);
@@ -1020,7 +1005,7 @@ tx_streamer::sptr x300_impl::get_tx_stream_ce(const uhd::stream_args_t &args_, b
 
     // Setup
     mboard_members_t &mb = _mb[mb_index];
-    uhd::rfnoc::block_ctrl_base::sptr ce_ctrl = _rfnoc_block_ctrl[_ce_index];
+    uhd::rfnoc::block_ctrl_base::sptr ce_ctrl = _rfnoc_block_ctrl[ce_index];
 
     //setup the dsp transport hints (TODO)
     device_addr_t device_addr = mb.send_args;

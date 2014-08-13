@@ -57,8 +57,8 @@ template<typename samp_type> void recv_to_file(
     //create a receive streamer
     uhd::stream_args_t stream_args(cpu_format, "sc16");
     // TODO This goes away when channel defs feature is in place
-    stream_args.args["src_addr"] = boost::lexical_cast<std::string>(proc_block_ctrl->get_block_id().get_block_count());
-    std::cout << "stream_args.args['src_addr'] == " << stream_args.args["src_addr"] << std::endl;
+    stream_args.args["block_id"] = proc_block_ctrl->get_block_id().to_string();
+    std::cout << "stream_args.args == " << stream_args.args.to_pp_string() << std::endl;
     uhd::rx_streamer::sptr rx_stream = usrp->get_rx_stream(stream_args);
 
     uhd::rx_metadata_t md;
