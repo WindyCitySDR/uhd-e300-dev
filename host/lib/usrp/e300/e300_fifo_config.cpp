@@ -184,7 +184,6 @@ struct e300_fifo_mb : managed_buffer
 /***********************************************************************
  * transport
  **********************************************************************/
-template <typename BaseClass>
 class e300_transport : public zero_copy_if
 {
 public:
@@ -386,8 +385,8 @@ private:
         addrs.ctrl = ((is_recv)? S2H_BASE(_ctrl_space) : H2S_BASE(_ctrl_space)) + ZF_STREAM_OFF(which_stream);
 
         uhd::transport::zero_copy_if::sptr xport;
-        if (is_recv) xport.reset(new e300_transport<managed_recv_buffer>(shared_from_this(), addrs, num_frames, frame_size, _waiter, is_recv));
-        else         xport.reset(new e300_transport<managed_send_buffer>(shared_from_this(), addrs, num_frames, frame_size, _waiter, is_recv));
+        if (is_recv) xport.reset(new e300_transport(shared_from_this(), addrs, num_frames, frame_size, _waiter, is_recv));
+        else         xport.reset(new e300_transport(shared_from_this(), addrs, num_frames, frame_size, _waiter, is_recv));
 
         _bytes_in_use += num_frames*frame_size;
         entries_in_use += num_frames;
