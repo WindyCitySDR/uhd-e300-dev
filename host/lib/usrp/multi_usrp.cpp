@@ -1100,6 +1100,32 @@ public:
         connect(src_block, 0, dst_block, 0);
     }
 
+    void clear_channels(void)
+    {
+        _tree->remove("/channels");
+    }
+
+    size_t set_channel(
+            const uhd::rfnoc::block_id_t &block_id,
+            const uhd::device_addr_t &args,
+            int chan_idx
+    ) {
+        if (chan_idx == -1) {
+            chan_idx = 0;
+            while (_tree->exists(str(boost::format("/channels/%d") % chan_idx))) {
+                chan_idx++;
+            }
+        }
+        fs_path chan_root = str(boost::format("/channels/%d") % chan_idx);
+        if (_tree->exists(chan_root)) {
+            _tree->remove(chan_root);
+        }
+        _tree->create<uhd::rfnoc::block_id_t>(chan_root).set(block_id);
+        _tree->create<uhd::device_addr_t>(chan_root / "args").set(args);
+        return chan_idx;
+    }
+
+
 private:
     device::sptr _dev;
     property_tree::sptr _tree;

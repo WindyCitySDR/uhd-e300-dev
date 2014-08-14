@@ -260,9 +260,11 @@ int UHD_SAFE_MAIN(int argc, char *argv[])
     /////////////////////////////////////////////////////////////////////////
     //////// 3. Set channel definitions /////////////////////////////////////
     /////////////////////////////////////////////////////////////////////////
-    // TODO: tbw
     // Here, we define that there is only 1 channel, and it points
     // to the processing block.
+    usrp->clear_channels(); // The default is to use the radios. Let's not do that.
+    size_t chan_idx = usrp->set_channel(null_src_ctrl->get_block_id());
+    std::cout << "chan_idx " << chan_idx << std::endl;
 
     /////////////////////////////////////////////////////////////////////////
     //////// 4. Configure blocks (packet size and rate) /////////////////////

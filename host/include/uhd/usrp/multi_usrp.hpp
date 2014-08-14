@@ -935,7 +935,19 @@ public:
      */
     virtual boost::uint32_t get_gpio_attr(const std::string &bank, const std::string &attr, const size_t mboard = 0) = 0;
 
+    /*******************************************************************
+     * RFNoC Methods
+     ******************************************************************/
 
+    /*! Connect a RFNOC block with block ID \p src_block to another with block ID \p dst_block.
+     *
+     * This will:
+     * - Check if this connection is valid (IO signatures, see if types match)
+     * - Configure the flow control for the blocks
+     * - Configure SID for the upstream block
+     * - Register the upstream block in the downstream block
+     *
+     */
     virtual void connect(
                 const uhd::rfnoc::block_id_t &src_block,
                 size_t src_block_port,
@@ -943,11 +955,38 @@ public:
                 size_t dst_block_port
     ) = 0;
 
+    /*! Shorthand for connect().
+     *
+     * Defaults to using ports 0 for both source and destination.
+     */
     virtual void connect(
             const uhd::rfnoc::block_id_t &src_block,
             const uhd::rfnoc::block_id_t &dst_block
     ) = 0;
 
+    /*! Reset the channel definitions.
+     *
+     * This clears all previously defined channels.
+     */
+    virtual void clear_channels(void) = 0;
+
+    /*! Defines a channel.
+     *
+     * \param block_id The block ID this channel will map to.
+     *                 If no such block exists in the device,
+     *                 a uhd::value_error is thrown.
+     * \param args Arguments for this channel.
+     * \param chan_idx. The channel index. If this is left out,
+     *                  the next available channel is used.
+     * \returns the channel index of this channel. If \p chan_idx
+     *          is provided and no exception is thrown, this returns
+     *          chan_idx.
+     */
+    virtual size_t set_channel(
+            const uhd::rfnoc::block_id_t &block_id,
+            const uhd::device_addr_t &args = uhd::device_addr_t(),
+            int chan_idx = -1
+    ) = 0;
 
 };
 
