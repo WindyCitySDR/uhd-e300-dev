@@ -1161,15 +1161,21 @@ void x300_impl::setup_radio(const size_t mb_i, const std::string &slot_name)
     }
 
     /////// Create the RFNoC block
-    _rfnoc_block_ctrl.push_back(
-        uhd::rfnoc::radio_ctrl::make(
+    uhd::rfnoc::radio_ctrl::sptr r_ctrl = uhd::rfnoc::radio_ctrl::make(
             perif.ctrl,
             ctrl_sid,
             mb_i,
             _tree->subtree(mb_path),
             mb.if_pkt_is_big_endian
-        )
     );
+    r_ctrl->set_perifs(
+        perif.time64,
+        perif.framer,
+        perif.ddc,
+        perif.deframer,
+        perif.duc
+    );
+    _rfnoc_block_ctrl.push_back(r_ctrl);
 }
 
 void x300_impl::set_rx_fe_corrections(const uhd::fs_path &mb_path, const std::string &fe_name, const double lo_freq)

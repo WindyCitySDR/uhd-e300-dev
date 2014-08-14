@@ -433,6 +433,9 @@ rx_streamer::sptr x300_impl::get_rx_stream(const uhd::stream_args_t &args_)
         UHD_ASSERT_THROW(radio_index < 2);
         radio_perifs_t &perif = mb.radio_perifs[radio_index];
 
+        uhd::rfnoc::block_id_t block_id((radio_index == 0) ? "0/Radio_0" : "0/Radio_1");
+        uhd::rfnoc::block_ctrl_base::sptr ce_ctrl = get_block_ctrl(block_id);
+
         //setup the dsp transport hints (default to a large recv buff)
         device_addr_t device_addr = mb.recv_args;
         if (not device_addr.has_key("recv_buff_size"))
@@ -525,7 +528,8 @@ rx_streamer::sptr x300_impl::get_rx_stream(const uhd::stream_args_t &args_)
         //Give the streamer a functor issue stream cmd
         //bind requires a rx_vita_core_3000::sptr to add a streamer->framer lifetime dependency
         my_streamer->set_issue_stream_cmd(
-            stream_i, boost::bind(&rx_vita_core_3000::issue_stream_command, perif.framer, _1)
+            //stream_i, boost::bind(&rx_vita_core_3000::issue_stream_command, perif.framer, _1)
+            stream_i, boost::bind(&uhd::rfnoc::block_ctrl_base::issue_stream_cmd, ce_ctrl, _1)
         );
 
         //Store a weak pointer to prevent a streamer->x300_impl->streamer circular dependency
