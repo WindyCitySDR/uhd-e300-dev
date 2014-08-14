@@ -134,4 +134,29 @@ BOOST_AUTO_TEST_CASE(test_device3) {
     block_ctrl_base::sptr block1 = my_device->get_block_ctrl(block_id_t("0/CE_1"));
     BOOST_CHECK_EQUAL(block1->get_block_id(), "0/CE_1");
 }
+
+BOOST_AUTO_TEST_CASE(test_device3_cast) {
+    device3::sptr my_device = make_pseudo_device();
+
+    std::cout << "Getting block 0..." << std::endl;
+    block_ctrl::sptr block0 = my_device->find_block_ctrl<block_ctrl>("CE");
+    BOOST_CHECK_EQUAL(block0->get_block_id(), "0/CE_0");
+
+    std::cout << "Getting block 1..." << std::endl;
+    block_ctrl_base::sptr block1 = my_device->get_block_ctrl<block_ctrl>(block_id_t("0/CE_1"));
+    BOOST_CHECK_EQUAL(block1->get_block_id(), "0/CE_1");
+}
+
+BOOST_AUTO_TEST_CASE(test_device3_fail) {
+    device3::sptr my_device = make_pseudo_device();
+
+    BOOST_CHECK(not my_device->find_block_ctrl("FooBarBlock"));
+    BOOST_CHECK(not my_device->find_block_ctrl<block_ctrl>("FooBarBlock"));
+
+    BOOST_REQUIRE_THROW(
+            my_device->get_block_ctrl(block_id_t("0/FooBarBlock_17")),
+            uhd::lookup_error
+    );
+}
+
 // vim: sw=4 et:

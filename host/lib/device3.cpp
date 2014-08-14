@@ -31,7 +31,7 @@ block_ctrl_base::sptr device3::get_block_ctrl(const block_id_t &block_id) const
         }
     }
 
-    throw uhd::lookup_error(str(boost::format("Can't find a block with ID: %s") % block_id.to_string()));
+    throw uhd::lookup_error(str(boost::format("This device does not have a block with ID: %s") % block_id.to_string()));
 }
 
 block_ctrl_base::sptr device3::find_block_ctrl(const std::string &block_id) const
@@ -42,7 +42,7 @@ block_ctrl_base::sptr device3::find_block_ctrl(const std::string &block_id) cons
         }
     }
 
-    throw uhd::lookup_error(str(boost::format("Can't find a block with ID: %s") % block_id));
+    return block_ctrl_base::sptr();
 }
 
 // vim: sw=4 et:
