@@ -1169,13 +1169,26 @@ void x300_impl::setup_radio(const size_t mb_i, const std::string &slot_name)
             mb.if_pkt_is_big_endian
     );
     r_ctrl->set_perifs(
-        perif.time64,
-        perif.framer,
-        perif.ddc,
-        perif.deframer,
-        perif.duc
+            perif.time64,
+            perif.framer,
+            perif.ddc,
+            perif.deframer,
+            perif.duc
     );
     _rfnoc_block_ctrl.push_back(r_ctrl);
+
+    ////// Add default channels
+    size_t channel_idx = 0;
+    while (_tree->exists(str(boost::format("/channels/%d") % channel_idx))) {
+        channel_idx++;
+    }
+    _tree->create<uhd::rfnoc::block_id_t>(str(boost::format("/channels/%d") % channel_idx))
+            .set(r_ctrl->get_block_id());
+    UHD_MSG(status)
+        << _tree->access<uhd::rfnoc::block_id_t>(str(boost::format("/channels/%d") % channel_idx)).get()
+        << std::endl;
+    _tree->create<uhd::device_addr_t>(str(boost::format("/channels/%d/args") % channel_idx))
+            .set(uhd::device_addr_t());
 }
 
 void x300_impl::set_rx_fe_corrections(const uhd::fs_path &mb_path, const std::string &fe_name, const double lo_freq)
