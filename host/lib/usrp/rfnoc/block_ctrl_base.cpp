@@ -218,15 +218,15 @@ void block_ctrl_base::register_upstream_block(block_ctrl_base::sptr upstream_blo
     _upstream_blocks.push_back(boost::weak_ptr<block_ctrl_base>(upstream_block));
 }
 
-//void block_ctrl_base::setup_rx_streamer(uhd::stream_args_t &, const uhd::sid_t &)
-//{
-    //// nop
-//}
+void block_ctrl_base::setup_rx_streamer(uhd::stream_args_t &, const uhd::sid_t &)
+{
+    // nop
+}
 
-//void block_ctrl_base::setup_tx_streamer(uhd::stream_args_t &args)
-//{
-    //// nop
-//}
+void block_ctrl_base::setup_tx_streamer(uhd::stream_args_t &args)
+{
+    // nop
+}
 
 void block_ctrl_base::handle_overrun()
 {
@@ -236,6 +236,11 @@ void block_ctrl_base::handle_overrun()
 uhd::time_spec_t block_ctrl_base::get_time_now(void)
 {
     return uhd::time_spec_t();
+}
+
+bool block_ctrl_base::in_continuous_streaming_mode(void)
+{
+    return false;
 }
 
 // vim: sw=4 et:

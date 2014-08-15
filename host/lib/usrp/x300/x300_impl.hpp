@@ -202,7 +202,7 @@ private:
     };
 
     //overflow recovery impl
-    void handle_overflow(radio_perifs_t &perif, boost::weak_ptr<uhd::rx_streamer> streamer);
+    void handle_overflow(boost::weak_ptr<uhd::rfnoc::block_ctrl_base> blk_ctrl, boost::weak_ptr<uhd::rx_streamer> streamer);
 
     //vector of member objects per motherboard
     struct mboard_members_t

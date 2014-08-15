@@ -334,7 +334,7 @@ public:
      *
      * TODO: It probably should check if the otw format is compatible.
      */
-    //virtual void setup_rx_streamer(uhd::stream_args_t &args, const uhd::sid_t &data_sid);
+    virtual void setup_rx_streamer(uhd::stream_args_t &args, const uhd::sid_t &data_sid);
 
     /*! Set stream args before opening a TX streamer to this block.
      *
@@ -342,7 +342,7 @@ public:
      *
      * TODO: It probably should check if the otw format is compatible.
      */
-    //virtual void setup_tx_streamer(uhd::stream_args_t &args);
+    virtual void setup_tx_streamer(uhd::stream_args_t &args);
 
     /*! If an overrun ("O") is received, this function is called to straighten
      * things out, if necessary.
@@ -358,6 +358,12 @@ public:
      * In the default implementation, always returns a zero.
      */
     virtual uhd::time_spec_t get_time_now(void);
+
+    /*! Returns true if this block is in continuous streaming mode.
+     *
+     * Default behaviour is to return false.
+     */
+    virtual bool in_continuous_streaming_mode(void);
 
     virtual ~block_ctrl_base();
 

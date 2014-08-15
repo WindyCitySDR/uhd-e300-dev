@@ -35,9 +35,8 @@ public:
         _rx_bpi = uhd::convert::get_bytes_per_item(_rx_stream_args.otw_format);
         // Default: 1 Channel
         _rx_stream_args.channels = std::vector<size_t>(1, 0);
-        // SPP is important, and will be stored in the stream args
-        _rx_stream_args.args["spp"] = get_bytes_per_output_packet(0) / _rx_bpi;
-
+        // SPP is stored for calls to set_bytes_per_output_packet etc.
+        _rx_spp = get_bytes_per_output_packet(0) / _rx_bpi;
     }
 
 
@@ -78,9 +77,9 @@ public:
         }
         _tree->access<size_t>(_root_path / "bytes_per_packet/default").set(bpp);
 
-        size_t spp = bpp / _rx_bpi;
-        _rx_stream_args.args["spp"] = spp;
-        _perifs.framer->set_nsamps_per_packet(spp);
+        _rx_spp = bpp / _rx_bpi;
+        UHD_MSG(status) << "radio_ctrl::set_bytes_per_output_packet(): Setting spp to " << _rx_spp << std::endl;
+        _perifs.framer->set_nsamps_per_packet(_rx_spp);
         return true;
     }
 
@@ -98,6 +97,8 @@ public:
         if (sid.get_src_address() == 0) {
             sid.set_src_address(get_address());
         }
+        UHD_MSG(status) << "radio: setting sid to " << sid << std::endl;
+
         _perifs.framer->set_sid(sid.get());
     }
 
@@ -106,16 +107,16 @@ public:
         _perifs.framer->clear();
         // Set spp, if applicable
         if (not args.args.has_key("spp")) {
-            args.args["spp"] = _rx_stream_args.args["spp"];
+            args.args["spp"] = str(boost::format("%d") % _rx_spp);
         } else {
-            _rx_stream_args.args["spp"] = args.args["spp"];
+            _rx_spp = boost::lexical_cast<size_t>(args.args["spp"]);
         }
-        size_t spp = boost::lexical_cast<size_t>(args.args["spp"]);
-        if (not set_bytes_per_output_packet(spp * _rx_bpi, 0)) {
+        if (not set_bytes_per_output_packet(_rx_spp * _rx_bpi, 0)) {
             throw uhd::value_error("radio_ctrl::setup_rx_streamer(): Invalid spp value.");
         }
+        UHD_MSG(status) << "spp ====== " << _rx_spp << std::endl;
 
-        set_destination(data_sid.get_dst_address(), 0);
+        set_destination(data_sid.get_src_address(), 0);
 
         _perifs.framer->setup(args);
         _perifs.ddc->setup(args);
@@ -134,6 +135,10 @@ public:
 
     uhd::time_spec_t get_time_now(void) {
         return _perifs.time64->get_time_now();
+    }
+
+    bool in_continuous_streaming_mode(void) {
+        return _perifs.framer->in_continuous_streaming_mode();
     }
 
     void set_perifs(
@@ -165,6 +170,7 @@ private:
     uhd::stream_args_t _rx_stream_args;
     //! Bytes per item
     size_t _rx_bpi;
+    size_t _rx_spp;
 
 };
 

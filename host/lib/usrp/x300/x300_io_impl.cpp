@@ -455,17 +455,18 @@ rx_streamer::sptr x300_impl::get_rx_stream(const uhd::stream_args_t &args_)
         }
 
         //allocate sid and create transport
-        boost::uint8_t dest = (radio_index == 0)? X300_XB_DST_R0 : X300_XB_DST_R1;
+        boost::uint8_t sid_lower = ce_ctrl->get_address() & 0xFF;
+        sid_lower /= 4; // TODO remove this line ASAP
         boost::uint32_t data_sid;
         UHD_LOG << "creating rx stream " << device_addr.to_string() << std::endl;
-        both_xports_t xport = this->make_transport(mb_index, dest, X300_RADIO_DEST_PREFIX_RX, device_addr, data_sid);
+        both_xports_t xport = this->make_transport(mb_index, sid_lower, 0x00, device_addr, data_sid);
         UHD_LOG << boost::format("data_sid = 0x%08x, actual recv_buff_size = %d\n") % data_sid % xport.recv_buff_size << std::endl;
 
-	// To calculate the max number of samples per packet, we assume the maximum header length
-	// to avoid fragmentation should the entire header be used.
+        // To calculate the max number of samples per packet, we assume the maximum header length
+        // to avoid fragmentation should the entire header be used.
         const size_t bpp = xport.recv->get_recv_frame_size() - X300_RX_MAX_HDR_LEN; // bytes per packet
         const size_t bpi = convert::get_bytes_per_item(args.otw_format); // bytes per item
-        const size_t spp = unsigned(args.args.cast<double>("spp", bpp/bpi)); // samples per packet
+        const size_t spp = std::min(args.args.cast<size_t>("spp", bpp/bpi), bpp/bpi); // samples per packet
 
         //make the new streamer given the samples per packet
         if (not my_streamer) my_streamer = boost::make_shared<sph::recv_packet_streamer>(spp);
@@ -489,19 +490,17 @@ rx_streamer::sptr x300_impl::get_rx_stream(const uhd::stream_args_t &args_)
         id.num_outputs = 1;
         my_streamer->set_converter(id);
 
-        perif.framer->clear();
-        perif.framer->set_nsamps_per_packet(spp); //seems to be a good place to set this
-        perif.framer->set_sid((data_sid << 16) | (data_sid >> 16));
-        perif.framer->setup(args);
-        perif.ddc->setup(args);
+        ce_ctrl->setup_rx_streamer(args, data_sid);
 
         //flow control setup
-        const size_t fc_window = get_rx_flow_control_window(xport.recv->get_recv_frame_size(), xport.recv_buff_size, device_addr);
+        const size_t pkt_size = spp * bpi + X300_RX_MAX_HDR_LEN;
+        UHD_VAR(pkt_size);
+        const size_t fc_window = get_rx_flow_control_window(pkt_size, xport.recv_buff_size, device_addr);
         const size_t fc_handle_window = std::max<size_t>(1, fc_window / X300_RX_FC_REQUEST_FREQ);
 
         UHD_LOG << "RX Flow Control Window = " << fc_window << ", RX Flow Control Handler Window = " << fc_handle_window << std::endl;
 
-        perif.framer->configure_flow_control(fc_window);
+        ce_ctrl->configure_flow_control_out(fc_window);
 
         boost::shared_ptr<boost::uint32_t> seq32(new boost::uint32_t(0));
         //Give the streamer a functor to get the recv_buffer
@@ -516,7 +515,11 @@ rx_streamer::sptr x300_impl::get_rx_stream(const uhd::stream_args_t &args_)
         //Using "this" is OK because we know that x300_impl will outlive the streamer
         my_streamer->set_overflow_handler(
             stream_i,
-            boost::bind(&x300_impl::handle_overflow, this, boost::ref(perif), boost::weak_ptr<uhd::rx_streamer>(my_streamer))
+            boost::bind(
+                &x300_impl::handle_overflow, this,
+                boost::weak_ptr<uhd::rfnoc::block_ctrl_base>(ce_ctrl),
+                boost::weak_ptr<uhd::rx_streamer>(my_streamer)
+            )
         );
         //Give the streamer a functor to send flow control messages
         //handle_rx_flowctrl is static and has no lifetime issues
@@ -528,17 +531,18 @@ rx_streamer::sptr x300_impl::get_rx_stream(const uhd::stream_args_t &args_)
         //Give the streamer a functor issue stream cmd
         //bind requires a rx_vita_core_3000::sptr to add a streamer->framer lifetime dependency
         my_streamer->set_issue_stream_cmd(
-            //stream_i, boost::bind(&rx_vita_core_3000::issue_stream_command, perif.framer, _1)
             stream_i, boost::bind(&uhd::rfnoc::block_ctrl_base::issue_stream_cmd, ce_ctrl, _1)
         );
 
         //Store a weak pointer to prevent a streamer->x300_impl->streamer circular dependency
-        mb.rx_streamers[radio_index] = boost::weak_ptr<sph::recv_packet_streamer>(my_streamer);
+        mb.ce_rx_streamers[ce_ctrl->get_block_id().get()] = boost::weak_ptr<sph::recv_packet_streamer>(my_streamer);
 
         //sets all tick and samp rates on this streamer
         const fs_path mb_path = "/mboards/"+boost::lexical_cast<std::string>(mb_index);
         _tree->access<double>(mb_path / "tick_rate").update();
-        _tree->access<double>(mb_path / "rx_dsps" / boost::lexical_cast<std::string>(radio_index) / "rate" / "value").update();
+        if (ce_ctrl->get_block_id().get_block_name() == "Radio") {
+            _tree->access<double>(mb_path / "rx_dsps" / boost::lexical_cast<std::string>(ce_ctrl->get_block_id().get_block_count()) / "rate" / "value").update();
+        }
     }
 
     return my_streamer;
@@ -798,15 +802,19 @@ boost::uint32_t x300_impl::rfnoc_cmd(
 }
 //////////////// RFNOC ////////////////////////////////
 
-void x300_impl::handle_overflow(x300_impl::radio_perifs_t &perif, boost::weak_ptr<uhd::rx_streamer> streamer)
-{
+void x300_impl::handle_overflow(
+        boost::weak_ptr<uhd::rfnoc::block_ctrl_base> blk_ctrl,
+        boost::weak_ptr<uhd::rx_streamer> streamer
+) {
     boost::shared_ptr<sph::recv_packet_streamer> my_streamer =
             boost::dynamic_pointer_cast<sph::recv_packet_streamer>(streamer.lock());
     if (not my_streamer) return; //If the rx_streamer has expired then overflow handling makes no sense.
 
+    uhd::rfnoc::block_ctrl_base::sptr my_blk_ctrl = blk_ctrl.lock();
+
     if (my_streamer->get_num_channels() == 1)
     {
-        perif.framer->handle_overflow();
+        my_blk_ctrl->handle_overrun();
         return;
     }
 
@@ -814,7 +822,7 @@ void x300_impl::handle_overflow(x300_impl::radio_perifs_t &perif, boost::weak_pt
     // MIMO overflow recovery time
     /////////////////////////////////////////////////////////////
     //find out if we were in continuous mode before stopping
-    const bool in_continuous_streaming_mode = perif.framer->in_continuous_streaming_mode();
+    const bool in_continuous_streaming_mode = my_blk_ctrl->in_continuous_streaming_mode();
     //stop streaming
     my_streamer->issue_stream_cmd(stream_cmd_t::STREAM_MODE_STOP_CONTINUOUS);
     //flush transports
@@ -824,7 +832,7 @@ void x300_impl::handle_overflow(x300_impl::radio_perifs_t &perif, boost::weak_pt
     {
         stream_cmd_t stream_cmd(stream_cmd_t::STREAM_MODE_START_CONTINUOUS);
         stream_cmd.stream_now = false;
-        stream_cmd.time_spec = perif.time64->get_time_now() + time_spec_t(0.01);
+        stream_cmd.time_spec = my_blk_ctrl->get_time_now() + time_spec_t(0.01);
         my_streamer->issue_stream_cmd(stream_cmd);
     }
 }

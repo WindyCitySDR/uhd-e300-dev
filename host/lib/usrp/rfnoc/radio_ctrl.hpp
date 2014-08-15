@@ -76,6 +76,8 @@ public:
     //! Read the time from the time64 core
     virtual uhd::time_spec_t get_time_now(void) = 0;
 
+    virtual bool in_continuous_streaming_mode(void) = 0;
+
     //! radio_ctrl specific function
     virtual void set_perifs(
         time_core_3000::sptr    time64,
