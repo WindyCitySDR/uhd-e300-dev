@@ -23,6 +23,8 @@
 #include <boost/shared_ptr.hpp>
 
 namespace uhd {
+    struct fs_path;
+
     namespace rfnoc {
 
     /*!
@@ -96,8 +98,8 @@ namespace uhd {
         //! Like get(), but only returns the local part ("FFT_1")
         std::string get_local() const;
 
-        //! Returns the property tree sub-path for this block (e.g. "0/xbar/FFT_1/")
-        std::string get_tree_path() const;
+        //! Returns the property tree root for this block (e.g. "/mboards/0/xbar/FFT_1/")
+        uhd::fs_path get_tree_root() const;
 
         //! Return device number
         size_t get_device_no() const { return _device_no; };

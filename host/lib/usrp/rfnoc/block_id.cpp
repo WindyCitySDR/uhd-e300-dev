@@ -19,6 +19,7 @@
 #include <boost/regex.hpp>
 #include <boost/lexical_cast.hpp>
 #include <uhd/exception.hpp>
+#include <uhd/property_tree.hpp>
 #include <uhd/usrp/rfnoc/constants.hpp>
 #include <uhd/usrp/rfnoc/block_id.hpp>
 
@@ -82,9 +83,9 @@ std::string block_id_t::get_local() const
     );
 }
 
-std::string block_id_t::get_tree_path() const
+uhd::fs_path block_id_t::get_tree_root() const
 {
-    return str(boost::format("%d/xbar/%s")
+    return str(boost::format("/mboards/%d/xbar/%s")
         % get_device_no()
         % get_local()
     );
