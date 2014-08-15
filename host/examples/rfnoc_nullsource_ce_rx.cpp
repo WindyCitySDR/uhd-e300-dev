@@ -56,9 +56,8 @@ template<typename samp_type> void recv_to_file(
     unsigned long long num_total_samps = 0;
     //create a receive streamer
     uhd::stream_args_t stream_args(cpu_format, "sc16");
-    // TODO This goes away when channel defs feature is in place
-    stream_args.args["block_id"] = proc_block_ctrl->get_block_id().to_string();
-    std::cout << "stream_args.args == " << stream_args.args.to_pp_string() << std::endl;
+    // Note: Any settings in stream_args will trump those
+    // previously set!
     uhd::rx_streamer::sptr rx_stream = usrp->get_rx_stream(stream_args);
 
     uhd::rx_metadata_t md;
@@ -263,14 +262,14 @@ int UHD_SAFE_MAIN(int argc, char *argv[])
     // Here, we define that there is only 1 channel, and it points
     // to the processing block.
     usrp->clear_channels(); // The default is to use the radios. Let's not do that.
-    size_t chan_idx = usrp->set_channel(null_src_ctrl->get_block_id());
-    std::cout << "chan_idx " << chan_idx << std::endl;
+    usrp->set_channel(null_src_ctrl->get_block_id()); // Defaults to being channel 0.
 
     /////////////////////////////////////////////////////////////////////////
     //////// 4. Configure blocks (packet size and rate) /////////////////////
     /////////////////////////////////////////////////////////////////////////
     std::cout << "Samples per packet coming from null source: " << spp << std::endl;
-    if (not null_src_ctrl->set_bytes_per_output_packet(spp * 4)) {
+    const size_t BYTES_PER_SAMPLE = 4;
+    if (not null_src_ctrl->set_bytes_per_output_packet(spp * BYTES_PER_SAMPLE)) {
         std::cout << "[ERROR] Could not set samples per packet!" << std::endl;
         return ~0;
     }
@@ -278,8 +277,8 @@ int UHD_SAFE_MAIN(int argc, char *argv[])
     // To access properties, there's two ways. Either, you can directly
     // call setters and getters:
     std::cout << str(boost::format("Requesting rate:   %.2f Msps (%.2f MByte/s).") % (rate / 1e6) % (rate * 4 / 1e6)) << std::endl;
-    // Factor 2 for switching between line rate and sample rate:
-    null_src_ctrl->set_line_rate(rate / 2) * 2;
+    const size_t SAMPLES_PER_LINE = 2;
+    null_src_ctrl->set_line_rate(rate / SAMPLES_PER_LINE);
     // Now, it's possible that this requested rate is not available.
     // null_src_ctrl->get_line_rate() would return the actual value
     // this block is currently set to (in fact, set_line_rate() already
@@ -287,7 +286,7 @@ int UHD_SAFE_MAIN(int argc, char *argv[])
     //
     // But let's use the other way to access these properties through
     // the property tree:
-    uhd::fs_path line_rate_path = "/mboards/" + null_src_ctrl->get_block_id().get_tree_path() + "/line_rate/value";
+    uhd::fs_path line_rate_path = null_src_ctrl->get_block_id().get_tree_root() + "/line_rate/value";
     double actual_rate_mega = usrp->get_device()->get_tree()->access<double>(line_rate_path).get() / 1e6;
     std::cout << str(boost::format("Actually got rate: %.2f Msps (%.2f MByte/s).") % actual_rate_mega % (actual_rate_mega * 4)) << std::endl;
 
