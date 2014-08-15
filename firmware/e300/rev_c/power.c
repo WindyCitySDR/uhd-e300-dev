@@ -34,13 +34,13 @@
 io_pin_t PWR_SDA     = IO_PC(4);
 io_pin_t PWR_SCL     = IO_PC(5);
 
-io_pin_t USBHUB_RESET= IO_PA(2);
+io_pin_t USB_RESETn= IO_PA(2);
 #endif // I2C_REWORK
 
 //volatile bool powered = false;
 
 #ifdef DDR3L
-#define DRAM_VOLTAGE	1350
+#define DRAM_VOLTAGE	1350 // TODO: Misleading, actual DRAM voltage is 1.5V. This sets the regular voltage.
 #else
 #define DRAM_VOLTAGE	0	// Hardware default
 #endif // DDR3
@@ -100,10 +100,9 @@ static io_pin_t AVR_MOSI    = IO_PB(3);
 static io_pin_t AVR_MISO    = IO_PB(4);
 static io_pin_t AVR_SCK     = IO_PB(5);
 
-#ifndef ATTINY88_DIP
-static io_pin_t FTDI_BCD    = IO_PB(6);
-static io_pin_t FTDI_PWREN2 = IO_PB(7);
-#endif // ATTINY88_DIP
+static io_pin_t FTDI_RESETn = IO_PB(6);
+static io_pin_t FTDI_CBUS3 = IO_PB(7);
+static io_pin_t USB_CLK_EN = IO_PA(1);
 
 static io_pin_t AVR_RESET   = IO_PC(6);
 static io_pin_t AVR_IRQ     = IO_PD(5);
@@ -229,19 +228,6 @@ void charge_notify(bool charging)
 	_state.battery_charging = charging;
 	
 	charge_set_led(charging);
-}
-
-///////////////////////////////////////////////////////////////////////////////
-
-void usbhub_reset(void)
-{
-#ifndef I2C_REWORK
-	io_clear_pin(USBHUB_RESET);
-	
-	_delay_us(1 * 10);	// Minimum active low pulse is 1us
-	
-	io_set_pin(USBHUB_RESET);
-#endif // I2C_REWORK
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -463,8 +449,14 @@ bool power_init(void)
 #ifndef I2C_REWORK
 	i2c_init(PWR_SDA, PWR_SCL);
 	
-	io_output_pin(USBHUB_RESET);
+
+	
 #endif // I2C_REWORK
+	io_input_pin(USB_RESETn);  
+	io_output_pin(FTDI_RESETn); 
+	io_output_pin(USB_CLK_EN);
+	io_input_pin(FTDI_CBUS3);
+	
 #ifdef CHARGER_TI
 	if (bq24190_init(true) == false)
 		return false;
@@ -564,6 +556,8 @@ bool power_on(void)
 	
 	power_set_led(last_power_led_state);
 	
+	fpga_reset(true);
+	
 	uint8_t step_count, retry;
 	for (step_count = 0; step_count < ARRAY_SIZE(boot_steps); step_count++)
 	{
@@ -635,17 +629,11 @@ bool power_on(void)
 	
 	///////////////////////////////////
 	
-	//bool was_hub_in_reset = (io_is_pin_set(USBHUB_RESET) == false);
-	
-	usbhub_reset();
-	
-	/*if (was_hub_in_reset)
-	{
-		_delay_ms(10);
-		usbhub_reset();
-	}*/
-	
+	io_set_pin(USB_CLK_EN);
+	_delay_ms(200);
+	io_set_pin(FTDI_RESETn);
 	fpga_reset(false);  // Power has been brought up, so let FPGA run
+	_delay_ms(100);
 	
 	///////////////////////////////////
 	
@@ -675,6 +663,9 @@ uint8_t power_off(void)
 	pmc_mask_irqs(true);
 	
 	io_clear_pin(PS_SRST);	// FIXME: Hold it low to stop FPGA running
+	
+	fpga_reset(true);
+	io_clear_pin(USB_CLK_EN);
 	
 	bool last_power_led_state = /*false*/true;
 	
