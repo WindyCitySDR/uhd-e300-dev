@@ -16,6 +16,7 @@
 //
 
 #include <iostream>
+#include <sstream>
 #include <boost/test/unit_test.hpp>
 #include <uhd/types/sid.hpp>
 
@@ -24,8 +25,8 @@ BOOST_AUTO_TEST_CASE(test_sid_t) {
     uhd::sid_t sid(sid_value);
 
     BOOST_CHECK_EQUAL(sid.is_set(), true);
-    BOOST_CHECK_EQUAL(sid.to_pp_string(), "1.2.3.16");
-    BOOST_CHECK_EQUAL(sid.to_pp_string_hex(), "01:02:03:10");
+    BOOST_CHECK_EQUAL(sid.to_pp_string(), "1.2/3.16");
+    BOOST_CHECK_EQUAL(sid.to_pp_string_hex(), "01:02/03:10");
     BOOST_CHECK_EQUAL(sid.get_src_address(), 0x0102);
     BOOST_CHECK_EQUAL(sid.get_dst_address(), 0x0310);
     BOOST_CHECK_EQUAL(sid.get_remote_src_address(), 0x01);
@@ -37,31 +38,26 @@ BOOST_AUTO_TEST_CASE(test_sid_t) {
 
     boost::uint32_t check_sid_val = (boost::uint32_t) sid;
     BOOST_CHECK_EQUAL(check_sid_val, sid_value);
-    std::cout
-        << "Testing pretty-printing: "
-        << sid.to_pp_string()
-        << " /  "
-        << sid.to_pp_string_hex()
-        << std::endl;
-    std::cout << "Testing ostream: " << sid << std::endl;
+
+    std::stringstream ss_dec;
+    ss_dec << sid;
+    BOOST_CHECK_EQUAL(ss_dec.str(), "1.2/3.16");
+
+    std::stringstream ss_hex;
+    ss_hex << std::hex << sid;
+    BOOST_CHECK_EQUAL(ss_hex.str(), "01:02/03:10");
 
     uhd::sid_t empty_sid;
     BOOST_CHECK_EQUAL(empty_sid.is_set(), false);
-    BOOST_CHECK_EQUAL(empty_sid.to_pp_string(), "x.x.x.x");
-    BOOST_CHECK_EQUAL(empty_sid.to_pp_string_hex(), "xx:xx:xx:xx");
+    BOOST_CHECK_EQUAL(empty_sid.to_pp_string(), "x.x/x.x");
+    BOOST_CHECK_EQUAL(empty_sid.to_pp_string_hex(), "xx:xx/xx:xx");
     BOOST_CHECK_EQUAL(empty_sid == sid, false);
     BOOST_CHECK_EQUAL(empty_sid == sid_value, false);
     BOOST_CHECK_EQUAL((bool) empty_sid, false);
-    std::cout
-        << "Testing pretty-printing: "
-        << empty_sid.to_pp_string()
-        << " /  "
-        << empty_sid.to_pp_string_hex()
-        << std::endl;
+
     empty_sid = sid_value; // No longer empty
     BOOST_CHECK_EQUAL(empty_sid.is_set(), true);
     BOOST_CHECK_EQUAL(empty_sid == sid, true);
-
 }
 
 BOOST_AUTO_TEST_CASE(test_sid_t_set) {
@@ -102,4 +98,7 @@ BOOST_AUTO_TEST_CASE(test_sid_t_set) {
     BOOST_CHECK_EQUAL(sid.get_local_src_address(), 0x0b);
     BOOST_CHECK_EQUAL(sid.get_remote_dst_address(), 0x0c);
     BOOST_CHECK_EQUAL(sid.get_local_dst_address(), 0x0d);
+
+    uhd::sid_t flipped_sid = sid.reversed();
+    BOOST_CHECK_EQUAL(flipped_sid.get(), 0x0c0d0a0b);
 }

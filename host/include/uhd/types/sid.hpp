@@ -46,9 +46,9 @@ namespace uhd{
         sid_t(boost::uint32_t sid);
         sid_t();
 
-        //! Return a string like this: 2.12.0.18 (decimal numbers)
+        //! Return a string like this: 2.12/0.18 (decimal numbers)
         std::string to_pp_string() const;
-        //! Return a string like this: 02.B.00.12 (hexadecimal numbers)
+        //! Return a string like this: 02:B/00:12 (hexadecimal numbers)
         std::string to_pp_string_hex() const;
 
         //! Returns true if this actually holds a valid SID
@@ -106,6 +106,11 @@ namespace uhd{
         //! Return local part of source address
         void set_local_dst_address(boost::uint32_t new_addr);
 
+        // Manipulators
+
+        //! Swaps dst and src address and returns the new SID.
+        sid_t reversed();
+
         // Overloaded operators
 
         sid_t operator = (boost::uint32_t new_sid) {
@@ -144,8 +149,14 @@ namespace uhd{
         bool _set;
     };
 
+    //! Stream output operator. Honors std::ios::hex.
     inline std::ostream& operator<< (std::ostream& out, const sid_t &sid) {
-        out << sid.to_pp_string();
+        std::ios_base::fmtflags ff = out.flags();
+        if (ff & std::ios::hex) {
+            out << sid.to_pp_string_hex();
+        } else {
+            out << sid.to_pp_string();
+        }
         return out;
     }
 
