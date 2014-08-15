@@ -156,11 +156,10 @@ public:
     uhd::rx_streamer::sptr get_rx_stream(const uhd::stream_args_t &);
     uhd::tx_streamer::sptr get_tx_stream(const uhd::stream_args_t &);
     ///////////// RFNOC ////////////////////////
-    void handle_overflow_ce(boost::weak_ptr<uhd::rx_streamer> streamer);
-    int _ce_index;
     boost::uint32_t rfnoc_cmd(
-		    const std::string &dst, const std::string &type,
-		    boost::uint32_t arg1=0, boost::uint32_t arg2=0);
+                const std::string &dst, const std::string &type,
+                boost::uint32_t arg1=0, boost::uint32_t arg2=0
+    );
     ///////////// RFNOC ////////////////////////
 
     //support old async call
@@ -178,7 +177,6 @@ public:
 
 private:
     /////////////////////// RFNOC ///////////////////////////////////////////
-    uhd::rx_streamer::sptr get_rx_stream_ce(const uhd::stream_args_t &);
     uhd::tx_streamer::sptr get_tx_stream_ce(const uhd::stream_args_t &, boost::uint16_t dst_addr);
     /////////////////////// RFNOC ///////////////////////////////////////////
 
@@ -241,10 +239,6 @@ private:
         x300_clock_ctrl::sptr clock;
         uhd::gps_ctrl::sptr gps;
         gpio_core_200::sptr fp_gpio;
-
-	///////////// RFNOC /////////////////////
-        //std::vector< uhd::rfnoc::block_ctrl_base::sptr > _rfnoc_block_ctrl;
-	///////////// RFNOC /////////////////////
 
         //clock control register bits
         int clock_control_regs_clock_source;

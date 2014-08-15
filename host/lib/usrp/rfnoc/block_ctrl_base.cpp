@@ -218,9 +218,9 @@ void block_ctrl_base::register_upstream_block(block_ctrl_base::sptr upstream_blo
     _upstream_blocks.push_back(boost::weak_ptr<block_ctrl_base>(upstream_block));
 }
 
-void block_ctrl_base::setup_rx_streamer(uhd::stream_args_t &, const uhd::sid_t &)
+void block_ctrl_base::setup_rx_streamer(uhd::stream_args_t &, const uhd::sid_t &data_sid)
 {
-    // nop
+    set_destination(data_sid.get_src_address());
 }
 
 void block_ctrl_base::setup_tx_streamer(uhd::stream_args_t &args)

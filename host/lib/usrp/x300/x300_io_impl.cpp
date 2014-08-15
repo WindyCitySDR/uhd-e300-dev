@@ -394,7 +394,8 @@ rx_streamer::sptr x300_impl::get_rx_stream(const uhd::stream_args_t &args_)
     boost::mutex::scoped_lock lock(_transport_setup_mutex);
     stream_args_t args = args_;
 
-    //setup defaults for unspecified values
+    // 0. Sanity check on stream args
+    // TODO: This check should be performed by the block controls
     if (not args.otw_format.empty() and args.otw_format != "sc16")
     {
         throw uhd::value_error("x300_impl::get_rx_stream only supports otw_format sc16");
@@ -402,41 +403,46 @@ rx_streamer::sptr x300_impl::get_rx_stream(const uhd::stream_args_t &args_)
     args.otw_format = "sc16";
     args.channels = args.channels.empty()? std::vector<size_t>(1, 0) : args.channels;
 
-    if (args.args.has_key("block_id")) {
-        UHD_ASSERT_THROW(args.channels.size() == 1);
-        return get_rx_stream_ce(args);
+    // I. Generate the channel list
+    std::vector<uhd::rfnoc::block_id_t> chan_list;
+    std::vector<device_addr_t> chan_args;
+    if (args.args.has_key("block_id")) { // Override channel settings
+        // TODO: Figure out how to put in more than one block ID in the stream args args
+        if (not (args.channels.size() == 1 and args.channels[0] == 0)) {
+            throw uhd::runtime_error("When specifying the block ID in stream args, channels must start at 0.");
+        }
+        chan_list.push_back(uhd::rfnoc::block_id_t(args.args["block_id"]));
+        chan_args.push_back(device_addr_t());
+    } else {
+        BOOST_FOREACH(const size_t chan_idx, args.channels) {
+            fs_path chan_root = str(boost::format("/channels/%d") % args.channels[chan_idx]);
+            if (not _tree->exists(chan_root)) {
+                throw uhd::runtime_error("No channel definition for " + chan_root);
+            }
+            device_addr_t this_chan_args;
+            if (not _tree->exists(chan_root / "args")) {
+                this_chan_args = _tree->access<device_addr_t>(chan_root / "args").get();
+            }
+            chan_list.push_back(_tree->access<uhd::rfnoc::block_id_t>(chan_root).get());
+            chan_args.push_back(this_chan_args);
+        }
     }
 
+
+    // II. Iterate over all channels
     boost::shared_ptr<sph::recv_packet_streamer> my_streamer;
-    for (size_t stream_i = 0; stream_i < args.channels.size(); stream_i++)
+    for (size_t stream_i = 0; stream_i < chan_list.size(); stream_i++)
     {
-        // Find the mainboard and subdev that corresponds to channel args.channels[stream_i]
-        const size_t chan = args.channels[stream_i];
-        size_t mb_chan = chan, mb_index;
-        for (mb_index = 0; mb_index < _mb.size(); mb_index++) {
-            const subdev_spec_t &curr_subdev_spec =
-                _tree->access<subdev_spec_t>("/mboards/" + boost::lexical_cast<std::string>(mb_index) / "rx_subdev_spec").get();
-            if (mb_chan < curr_subdev_spec.size()) {
-                break;
-            } else {
-                mb_chan -= curr_subdev_spec.size();
-            }
-        }
-
-        // Find the DSP that corresponds to this mainboard and subdev
+        // Get block ID and mb index
+        uhd::rfnoc::block_id_t block_id = chan_list[stream_i];
+        size_t mb_index = block_id.get_device_no();
         UHD_ASSERT_THROW(mb_index < _mb.size());
-        mboard_members_t &mb = _mb[mb_index];
-        const std::vector<size_t> dsp_map = _tree->access<std::vector<size_t> >("/mboards/" + boost::lexical_cast<std::string>(mb_index) / "rx_chan_dsp_mapping")
-                                            .get(); //.at(mb_chan);
-        UHD_ASSERT_THROW(mb_chan < dsp_map.size());
-        const size_t radio_index = dsp_map[mb_chan];
-        UHD_ASSERT_THROW(radio_index < 2);
-        radio_perifs_t &perif = mb.radio_perifs[radio_index];
 
-        uhd::rfnoc::block_id_t block_id((radio_index == 0) ? "0/Radio_0" : "0/Radio_1");
+        // Access to this channel's mboard and block control
+        mboard_members_t &mb = _mb[mb_index];
         uhd::rfnoc::block_ctrl_base::sptr ce_ctrl = get_block_ctrl(block_id);
 
-        //setup the dsp transport hints (default to a large recv buff)
+        // Setup the DSP transport hints (default to a large recv buff)
         device_addr_t device_addr = mb.recv_args;
         if (not device_addr.has_key("recv_buff_size"))
         {
@@ -502,7 +508,6 @@ rx_streamer::sptr x300_impl::get_rx_stream(const uhd::stream_args_t &args_)
 
         ce_ctrl->configure_flow_control_out(fc_window);
 
-        boost::shared_ptr<boost::uint32_t> seq32(new boost::uint32_t(0));
         //Give the streamer a functor to get the recv_buffer
         //bind requires a zero_copy_if::sptr to add a streamer->xport lifetime dependency
         my_streamer->set_xport_chan_get_buff(
@@ -510,6 +515,7 @@ rx_streamer::sptr x300_impl::get_rx_stream(const uhd::stream_args_t &args_)
             boost::bind(&zero_copy_if::get_recv_buff, xport.recv, _1),
             true /*flush*/
         );
+
         //Give the streamer a functor to handle overflows
         //bind requires a weak_ptr to break the a streamer->streamer circular dependency
         //Using "this" is OK because we know that x300_impl will outlive the streamer
@@ -521,174 +527,39 @@ rx_streamer::sptr x300_impl::get_rx_stream(const uhd::stream_args_t &args_)
                 boost::weak_ptr<uhd::rx_streamer>(my_streamer)
             )
         );
+
         //Give the streamer a functor to send flow control messages
         //handle_rx_flowctrl is static and has no lifetime issues
+        boost::shared_ptr<boost::uint32_t> seq32(new boost::uint32_t(0));
         my_streamer->set_xport_handle_flowctrl(
             stream_i, boost::bind(&handle_rx_flowctrl, data_sid, xport.send, mb.if_pkt_is_big_endian, seq32, _1),
             fc_handle_window,
             true/*init*/
         );
+
         //Give the streamer a functor issue stream cmd
-        //bind requires a rx_vita_core_3000::sptr to add a streamer->framer lifetime dependency
+        //bind requires a shared pointer to add a streamer->framer lifetime dependency
         my_streamer->set_issue_stream_cmd(
             stream_i, boost::bind(&uhd::rfnoc::block_ctrl_base::issue_stream_cmd, ce_ctrl, _1)
         );
 
-        //Store a weak pointer to prevent a streamer->x300_impl->streamer circular dependency
+        // Tell the streamer which SID is valid for this channel
+        my_streamer->set_xport_chan_sid(stream_i, true, data_sid);
+
+        // Store a weak pointer to prevent a streamer->x300_impl->streamer circular dependency
         mb.ce_rx_streamers[ce_ctrl->get_block_id().get()] = boost::weak_ptr<sph::recv_packet_streamer>(my_streamer);
 
         //sets all tick and samp rates on this streamer
         const fs_path mb_path = "/mboards/"+boost::lexical_cast<std::string>(mb_index);
         _tree->access<double>(mb_path / "tick_rate").update();
+        // TODO this is specific to radios and thus should be done by radio_ctrl
         if (ce_ctrl->get_block_id().get_block_name() == "Radio") {
+            UHD_MSG(status) << "This is a radio, thus updating sample rate" << std::endl;
             _tree->access<double>(mb_path / "rx_dsps" / boost::lexical_cast<std::string>(ce_ctrl->get_block_id().get_block_count()) / "rate" / "value").update();
         }
     }
 
     return my_streamer;
-}
-
-rx_streamer::sptr x300_impl::get_rx_stream_ce(const uhd::stream_args_t &args_)
-{
-    UHD_MSG(status) << "get_rx_stream_ce()" << std::endl;
-    stream_args_t args = args_;
-
-    //setup defaults for unspecified values
-    if (not args.otw_format.empty() and args.otw_format != "sc16")
-    {
-        throw uhd::value_error("x300_impl::get_rx_stream_ce only supports otw_format sc16");
-    }
-    args.otw_format = "sc16";
-
-    boost::shared_ptr<sph::recv_packet_streamer> my_streamer;
-
-    uhd::rfnoc::block_id_t block_id(args.args["block_id"]);
-    UHD_MSG(status) << "args block ID: " << block_id << std::endl;
-    uhd::rfnoc::block_ctrl_base::sptr ce_ctrl = get_block_ctrl(block_id);
-    UHD_MSG(status) << "rx streamer goes to block: " << ce_ctrl->get_block_id() << std::endl;
-
-    size_t mb_index = ce_ctrl->get_block_id().get_device_no();
-    UHD_ASSERT_THROW(mb_index < _mb.size());
-
-    boost::uint8_t sid_lower = ce_ctrl->get_address() & 0xFF;
-    sid_lower /= 4; // TODO remove this line ASAP
-
-    UHD_MSG(status) << "mb_index==" << mb_index << std::endl;
-
-    // Setup
-    mboard_members_t &mb = _mb[mb_index];
-    size_t stream_i = 0;
-
-    //setup the dsp transport hints (default to a large recv buff)
-    device_addr_t device_addr = mb.recv_args;
-    if (not device_addr.has_key("recv_buff_size"))
-    {
-        if (mb.xport_path != "nirio") {
-            //For the ethernet transport, the buffer has to be set before creating
-            //the transport because it is independent of the frame size and # frames
-            //For nirio, the buffer size is not configurable by the user
-            #if defined(UHD_PLATFORM_MACOS) || defined(UHD_PLATFORM_BSD)
-                //limit buffer resize on macos or it will error
-                device_addr["recv_buff_size"] = boost::lexical_cast<std::string>(X300_RX_SW_BUFF_SIZE_ETH_MACOS);
-            #elif defined(UHD_PLATFORM_LINUX) || defined(UHD_PLATFORM_WIN32)
-                //set to half-a-second of buffering at max rate
-                device_addr["recv_buff_size"] = boost::lexical_cast<std::string>(X300_RX_SW_BUFF_SIZE_ETH);
-            #endif
-        }
-    }
-
-    //allocate sid and create transport
-    boost::uint32_t data_sid;
-    UHD_LOG << "creating rx stream " << device_addr.to_string() << std::endl;
-    both_xports_t xport = this->make_transport(mb_index, sid_lower, 0x00, device_addr, data_sid);
-    UHD_LOG << boost::format("data_sid = 0x%08x, actual recv_buff_size = %d\n") % data_sid % xport.recv_buff_size << std::endl;
-    UHD_MSG(status) << str(boost::format("rx data_sid = 0x%08x") % data_sid) << std::endl;
-    ce_ctrl->set_destination((data_sid >> 16) & 0xFFFF);
-
-    // To calculate the max number of samples per packet, we assume the maximum header length
-    // to avoid fragmentation should the entire header be used.
-    const size_t bpp = xport.recv->get_recv_frame_size() - X300_RX_MAX_HDR_LEN; // bytes per packet
-    const size_t bpi = convert::get_bytes_per_item(args.otw_format); // bytes per item
-    const size_t spp = unsigned(args.args.cast<double>("spp", bpp/bpi)); // samples per packet
-
-    //make the new streamer given the samples per packet
-    if (not my_streamer) my_streamer = boost::make_shared<sph::recv_packet_streamer>(spp);
-    my_streamer->resize(args.channels.size());
-
-    //init some streamer stuff
-    std::string conv_endianness;
-    if (mb.if_pkt_is_big_endian) {
-        my_streamer->set_vrt_unpacker(&x300_if_hdr_unpack_be);
-        conv_endianness = "be";
-    } else {
-        my_streamer->set_vrt_unpacker(&x300_if_hdr_unpack_le);
-        conv_endianness = "le";
-    }
-
-    //set the converter
-    uhd::convert::id_type id;
-    id.input_format = args.otw_format + "_item32_" + conv_endianness;
-    id.num_inputs = 1;
-    id.output_format = args.cpu_format;
-    id.num_outputs = 1;
-    UHD_MSG(status) << "RX Streamer: Selecting converter " << id.to_pp_string() << std::endl;
-    my_streamer->set_converter(id);
-
-    //flow control setup
-    const size_t fc_window = get_rx_flow_control_window(xport.recv->get_recv_frame_size(), xport.recv_buff_size, device_addr);
-    //const size_t fc_handle_window = std::max<size_t>(1, fc_window / X300_RX_FC_REQUEST_FREQ);
-    const size_t fc_handle_window = unsigned(args.args.cast<double>("fc_pkts_per_ack", std::max<size_t>(1, fc_window / X300_RX_FC_REQUEST_FREQ)));
-    ce_ctrl->configure_flow_control_out(fc_window);
-
-    //UHD_LOG << "RX Flow Control Window = " << fc_window << ", RX Flow Control Handler Window = " << fc_handle_window << std::endl;
-    UHD_MSG(status) << "RX Flow Control Window = " << fc_window << ", RX Flow Control Handler Window = " << fc_handle_window << std::endl;
-
-    boost::shared_ptr<boost::uint32_t> seq32(new boost::uint32_t(0));
-    //Give the streamer a functor to get the recv_buffer
-    //bind requires a zero_copy_if::sptr to add a streamer->xport lifetime dependency
-    my_streamer->set_xport_chan_get_buff(
-        stream_i,
-        boost::bind(&zero_copy_if::get_recv_buff, xport.recv, _1),
-        true /*flush*/
-    );
-    //Give the streamer a functor to handle overflows
-    //bind requires a weak_ptr to break the a streamer->streamer circular dependency
-    //Using "this" is OK because we know that x300_impl will outlive the streamer
-    my_streamer->set_overflow_handler(
-        stream_i,
-        boost::bind(&x300_impl::handle_overflow_ce, this, boost::weak_ptr<uhd::rx_streamer>(my_streamer))
-    );
-    //Give the streamer a functor to send flow control messages
-    //handle_rx_flowctrl is static and has no lifetime issues
-    my_streamer->set_xport_handle_flowctrl(
-        stream_i, boost::bind(&handle_rx_flowctrl, data_sid, xport.send, mb.if_pkt_is_big_endian, seq32, _1),
-        fc_handle_window,
-        true /* init */
-    );
-    //Give the streamer a functor issue stream cmd
-    //bind requires a rx_vita_core_3000::sptr to add a streamer->framer lifetime dependency
-    my_streamer->set_issue_stream_cmd(
-        0, // xport_chan == 0? maybe needs fixing FIXME
-        boost::bind(&uhd::rfnoc::block_ctrl_base::issue_stream_cmd, ce_ctrl, _1)
-    );
-    my_streamer->set_xport_chan_sid(stream_i, true, data_sid);
-
-    //Store a weak pointer to prevent a streamer->x300_impl->streamer circular dependency
-    mb.ce_rx_streamers[ce_ctrl->get_block_id().get()] = boost::weak_ptr<sph::recv_packet_streamer>(my_streamer);
-
-    //sets all tick and samp rates on this streamer
-    const fs_path mb_path = "/mboards/"+boost::lexical_cast<std::string>(mb_index);
-    UHD_MSG(status) << "updating tick rate" << std::endl;
-    _tree->access<double>(mb_path / "tick_rate").update();
-
-    return my_streamer;
-}
-
-
-//  This probably wants a ref to the nocshell controller at some point
-void x300_impl::handle_overflow_ce(boost::weak_ptr<uhd::rx_streamer> streamer)
-{
-    return;
 }
 
 
