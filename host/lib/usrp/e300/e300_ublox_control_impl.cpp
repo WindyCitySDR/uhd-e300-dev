@@ -42,8 +42,6 @@ control_impl::control_impl(const std::string &node, const size_t baud_rate)
 
     configure_antenna(0x001b, 0x8251);
 
-
-    //UHD_MSG(status) << "Turning on PPS output ... " << std::endl;
     configure_pps(0xf4240, 0x3d090, 1, 0 /* utc */, 1, 0, 0, 0);
 
     _sensors = boost::assign::list_of("gps_locked")("gps_time");
@@ -78,7 +76,6 @@ uhd::sensor_value_t control_impl::get_sensor(std::string key)
 
 std::time_t control_impl::_get_epoch_time(void)
 {
-    //std::cout << "EPOCH=" << (_get_time() - boost::posix_time::from_time_t(0)).total_seconds() << std::endl;
     boost::posix_time::ptime ptime;
     _ptime.wait_and_see(ptime);
     return (ptime - boost::posix_time::from_time_t(0)).total_seconds();
@@ -208,11 +205,6 @@ void control_impl::_rx_callback(const char *data, unsigned int len)
     std::vector<char> v(data, data+len);
     BOOST_FOREACH(const char &c, v)
     {
-        //if (std::isprint(c)) {
-            //std::cout << c;
-        //}
-        //if (c == '\n')
-            //std::cout << std::endl;
         _parse_char(c);
     }
 }
@@ -220,7 +212,6 @@ void control_impl::_rx_callback(const char *data, unsigned int len)
 void control_impl::_parse_char(const boost::uint8_t b)
 {
     int ret = 0;
-    //std::cout << boost::format("in state %ld got: 0x%lx") % _decode_state % int(b) << std::endl;
 
     switch (_decode_state) {
 
@@ -243,8 +234,6 @@ void control_impl::_parse_char(const boost::uint8_t b)
 
     // we're expecting the class byte
     case DECODE_CLASS:
-        //std::cout << boost::format("DECODE_CLASS, ck_a = %lx, ck_b= %lx")
-            //% int(_rx_ck_a) % int(_rx_ck_b) << std::endl;
         _add_byte_to_checksum(b);
         _rx_msg = b;
         _decode_state = DECODE_ID;
@@ -252,9 +241,6 @@ void control_impl::_parse_char(const boost::uint8_t b)
 
     // we're expecting the id byte
     case DECODE_ID:
-        //std::cout << boost::format("DECODE_ID, ck_a = %lx, ck_b= %lx")
-            //% int(_rx_ck_a) % int(_rx_ck_b) << std::endl;
-
         _add_byte_to_checksum(b);
         _rx_msg |= (b << 8);
         _decode_state = DECODE_LENGTH1;
@@ -262,9 +248,6 @@ void control_impl::_parse_char(const boost::uint8_t b)
 
     // we're expecting the first length byte
     case DECODE_LENGTH1:
-        //std::cout << boost::format("DECODE_LENGTH1, ck_a = %lx, ck_b= %lx")
-            //% int(_rx_ck_a) % int(_rx_ck_b) << std::endl;
-
         _add_byte_to_checksum(b);
         _rx_payload_length = b;
         _decode_state = DECODE_LENGTH2;
@@ -272,9 +255,6 @@ void control_impl::_parse_char(const boost::uint8_t b)
 
     // we're expecting the second length byte
     case DECODE_LENGTH2:
-        //std::cout << boost::format("DECODE_LENGTH2, ck_a = %lx, ck_b= %lx")
-            //% int(_rx_ck_a) % int(_rx_ck_b) << std::endl;
-
         _add_byte_to_checksum(b);
         _rx_payload_length |= (b << 8);
         if(_payload_rx_init()) {
@@ -287,8 +267,6 @@ void control_impl::_parse_char(const boost::uint8_t b)
 
     // we're expecting payload
     case DECODE_PAYLOAD:
-        //std::cout << boost::format("DECODE_PAYLOAD(%ld), length=%ld, ck_a=%lx, ck_b=%lx")
-            //% _rx_msg % _rx_payload_length % int(_rx_ck_a) % int(_rx_ck_b) << std::endl;
         _add_byte_to_checksum(b);
         switch(_rx_msg) {
         default:
@@ -390,8 +368,6 @@ int control_impl::_payload_rx_init(void)
 int control_impl::_payload_rx_add(const boost::uint8_t b)
 {
     int ret = 0;
-    //std::cout << boost::format("_payload_rx_add 0x%lx index=%ld length=%ld") % int(b)
-        //% _rx_payload_index % _rx_payload_length << std::endl;
     _buf.raw[_rx_payload_index] = b;
     if (++_rx_payload_index >= _rx_payload_length)
         ret = 1;
@@ -407,7 +383,6 @@ int control_impl::_payload_rx_done(void)
 
     switch (_rx_msg) {
     case MSG_MON_VER:
-        //std::cout << boost::format("MON-VER: FW-Version %s") % (_buf.payload_rx_mon_ver_part1.sw_version) << std::endl;
         _detected = true;
         break;
 
@@ -416,24 +391,17 @@ int control_impl::_payload_rx_done(void)
         break;
 
     case MSG_ACK_ACK:
-        //std::cout << boost::format("ACK-ACK for 0x%lx 0x%lx")
-            //% int(_buf.payload_rx_ack_ack.cls_id) % int(_buf.payload_rx_ack_ack.msg_id) << std::endl;
         if ((_ack_state == ACK_WAITING) and (_buf.payload_rx_ack_ack.msg == _ack_waiting_msg))
             _ack_state = ACK_GOT_ACK;
         break;
 
     case MSG_ACK_NAK:
-        //std::cout << boost::format("ACK-NAK for 0x%lx 0x%lx")
-            //% int(_buf.payload_rx_ack_ack.cls_id) % int(_buf.payload_rx_ack_ack.msg_id) << std::endl;
         if ((_ack_state == ACK_WAITING) and (_buf.payload_rx_ack_nak.msg == _ack_waiting_msg))
             _ack_state = ACK_GOT_NAK;
 
         break;
 
     case MSG_CFG_ANT:
-        //std::cout << boost::format("CFG-ANT for 0x%lx 0x%lx")
-            //% uhd::wtohx<boost::uint16_t>(_buf.payload_tx_cfg_ant.flags)
-            //% uhd::wtohx<boost::uint16_t>(_buf.payload_tx_cfg_ant.pins) << std::endl;
         break;
 
     case MSG_NAV_TIMEUTC:
@@ -446,23 +414,11 @@ int control_impl::_payload_rx_done(void)
             (boost::posix_time::hours(_buf.payload_rx_nav_timeutc.hour)
             + boost::posix_time::minutes(_buf.payload_rx_nav_timeutc.min)
             + boost::posix_time::seconds(_buf.payload_rx_nav_timeutc.sec))));
-        //std::cout << boost::format("NAV-TIMEUTC %u/%u/%u %02u:%02u:%02u - valid? 0x%lx")
-            //% boost::uint16_t(_buf.payload_rx_nav_timeutc.day)
-            //% boost::uint16_t(_buf.payload_rx_nav_timeutc.month)
-            //% uhd::wtohx<boost::uint16_t>(_buf.payload_rx_nav_timeutc.year)
-            //% boost::int16_t(_buf.payload_rx_nav_timeutc.hour)
-            //% boost::int16_t(_buf.payload_rx_nav_timeutc.min)
-            //% boost::int16_t(_buf.payload_rx_nav_timeutc.sec)
-            //% boost::int16_t(_buf.payload_rx_nav_timeutc.valid)
-            //<< std::endl;
         break;
 
     case MSG_NAV_SOL:
         _locked.update(_buf.payload_rx_nav_sol.gps_fix > 0);
         break;
-        //std::cout << boost::format("NAV-SOL - valid? 0x%lx")
-            //% boost::int16_t(_buf.payload_rx_nav_sol.gps_fix)
-            //<< std::endl;
 
     default:
         std::cout << boost::format("Got unknown message %lx , with good checksum [") % int(_rx_msg);
