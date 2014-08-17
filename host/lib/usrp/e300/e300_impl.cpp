@@ -594,18 +594,14 @@ e300_impl::e300_impl(const uhd::device_addr_t &device_addr)
                 }
             }
     } else {
-            _tree->access<std::string>(mb_path / "clock_source" / "value").set("internal");
-            _tree->access<std::string>(mb_path / "time_source" / "value").set("internal");
+        // init to default time and clock source
+        _tree->access<std::string>(mb_path / "clock_source" / "value").set(
+            e300::DEFAULT_CLOCK_SRC);
+        _tree->access<std::string>(mb_path / "time_source" / "value").set(
+            e300::DEFAULT_TIME_SRC);
+
             UHD_MSG(status) << "References initialized to internal sources" << std::endl;
     }
-
-    // init to default time and clock source
-    //_tree->access<std::string>(mb_path / "clock_source" / "value").set(
-        //e300::DEFAULT_CLOCK_SRC);
-    //_tree->access<std::string>(mb_path / "time_source" / "value").set(
-        ////e300::DEFAULT_TIME_SRC);
-        //"gpsdo");
-    //UHD_MSG(status) << "INIT DONE" << std::endl;
 }
 
 boost::uint8_t e300_impl::_get_internal_gpio(
