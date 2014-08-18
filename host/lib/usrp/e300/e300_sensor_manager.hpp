@@ -21,6 +21,7 @@
 #include <uhd/transport/zero_copy.hpp>
 #include <uhd/types/sensors.hpp>
 #include <uhd/utils/byteswap.hpp>
+#include <uhd/usrp/gps_ctrl.hpp>
 
 #ifndef INCLUDED_E300_SENSOR_MANAGER_HPP
 #define INCLUDED_E300_SENSOR_MANAGER_HPP
@@ -37,19 +38,24 @@ struct sensor_transaction_t {
 
 
 
-enum sensor {ZYNQ_TEMP=0, GPS_TIME=1,
-             GPS_LOCK=2};
+enum sensor {ZYNQ_TEMP=0, GPS_FOUND=1, GPS_TIME=2,
+             GPS_LOCK=3};
 
 class e300_sensor_manager : boost::noncopyable
 {
 public:
     typedef boost::shared_ptr<e300_sensor_manager> sptr;
+    virtual bool get_gps_found(void) = 0;
+
+    virtual uhd::sensor_value_t get_sensor(const std::string &key) = 0;
+    virtual std::vector<std::string> get_sensors(void) = 0;
+
     virtual uhd::sensor_value_t get_mb_temp(void) = 0;
     virtual uhd::sensor_value_t get_gps_lock(void) = 0;
-    //virtual uhd::sensor_value_t get_gps_time(void) = 0;
+    virtual uhd::sensor_value_t get_gps_time(void) = 0;
 
     static sptr make_proxy(uhd::transport::zero_copy_if::sptr xport);
-    static sptr make_local(void);
+    static sptr make_local(uhd::gps_ctrl::sptr gps_ctrl);
 
     // Note: This is a hack
     static boost::uint32_t pack_float_in_uint32_t(const float &v)
