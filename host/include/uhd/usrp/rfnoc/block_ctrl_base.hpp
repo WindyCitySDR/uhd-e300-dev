@@ -90,9 +90,6 @@ private:
     //! The (unique) block ID.
     block_id_t _block_id;
 
-    //! List of upstream blocks
-    std::vector< boost::weak_ptr<block_ctrl_base> > _upstream_blocks;
-
 protected:
     block_ctrl_base(void) {}; // To allow pure virtual (interface) sub-classes
 
@@ -124,6 +121,9 @@ protected:
 
     //! Endianness of underlying transport (for data transport)
     bool _transport_is_big_endian;
+
+    //! List of upstream blocks
+    std::vector< boost::weak_ptr<block_ctrl_base> > _upstream_blocks;
 
 public:
     typedef boost::shared_ptr<block_ctrl_base> sptr;
@@ -206,7 +206,7 @@ public:
      *
      * \param stream_cmd The stream command.
      */
-    virtual void issue_stream_cmd(const uhd::stream_cmd_t &stream_cmd);
+    //virtual void issue_stream_cmd(const uhd::stream_cmd_t &stream_cmd);
 
     /*! Configure flow control for incoming streams.
      *
@@ -334,7 +334,7 @@ public:
      *
      * TODO: It probably should check if the otw format is compatible.
      */
-    virtual void setup_rx_streamer(uhd::stream_args_t &args, const uhd::sid_t &data_sid);
+    //virtual void setup_rx_streamer(uhd::stream_args_t &args, const uhd::sid_t &data_sid);
 
     /*! Set stream args before opening a TX streamer to this block.
      *
@@ -342,14 +342,14 @@ public:
      *
      * TODO: It probably should check if the otw format is compatible.
      */
-    virtual void setup_tx_streamer(uhd::stream_args_t &args);
+    //virtual void setup_tx_streamer(uhd::stream_args_t &args);
 
     /*! If an overrun ("O") is received, this function is called to straighten
      * things out, if necessary.
      *
      * Does nothing in the default implementation.
      */
-    virtual void handle_overrun(void);
+    //virtual void handle_overrun(void);
 
     /*! Returns the current time of this block, whatever that means.
      *
@@ -357,13 +357,13 @@ public:
      *
      * In the default implementation, always returns a zero.
      */
-    virtual uhd::time_spec_t get_time_now(void);
+    //virtual uhd::time_spec_t get_time_now(void);
 
     /*! Returns true if this block is in continuous streaming mode.
      *
      * Default behaviour is to return false.
      */
-    virtual bool in_continuous_streaming_mode(void);
+    //virtual bool in_continuous_streaming_mode(void);
 
     virtual ~block_ctrl_base();
 

@@ -125,18 +125,18 @@ double block_ctrl_base::get_clock_rate() const
     return _tree->access<double>(_root_path / "clock_rate").get();
 }
 
-void block_ctrl_base::issue_stream_cmd(
-        const uhd::stream_cmd_t &stream_cmd
-) {
-    if (_upstream_blocks.empty()) {
-        UHD_MSG(warning) << "issue_stream_cmd() not implemented for " << _block_id << std::endl;
-        return;
-    }
+//void block_ctrl_base::issue_stream_cmd(
+        //const uhd::stream_cmd_t &stream_cmd
+//) {
+    //if (_upstream_blocks.empty()) {
+        //UHD_MSG(warning) << "issue_stream_cmd() not implemented for " << _block_id << std::endl;
+        //return;
+    //}
 
-    BOOST_FOREACH(const boost::weak_ptr<block_ctrl_base> upstream_block_ctrl, _upstream_blocks) {
-        sptr(upstream_block_ctrl)->issue_stream_cmd(stream_cmd);
-    }
-}
+    //BOOST_FOREACH(const boost::weak_ptr<block_ctrl_base> upstream_block_ctrl, _upstream_blocks) {
+        //sptr(upstream_block_ctrl)->issue_stream_cmd(stream_cmd);
+    //}
+//}
 
 void block_ctrl_base::configure_flow_control_in(
         size_t cycles,
@@ -218,29 +218,29 @@ void block_ctrl_base::register_upstream_block(block_ctrl_base::sptr upstream_blo
     _upstream_blocks.push_back(boost::weak_ptr<block_ctrl_base>(upstream_block));
 }
 
-void block_ctrl_base::setup_rx_streamer(uhd::stream_args_t &, const uhd::sid_t &data_sid)
-{
-    set_destination(data_sid.get_src_address());
-}
+//void block_ctrl_base::setup_rx_streamer(uhd::stream_args_t &, const uhd::sid_t &data_sid)
+//{
+    //set_destination(data_sid.get_src_address());
+//}
 
-void block_ctrl_base::setup_tx_streamer(uhd::stream_args_t &args)
-{
-    // nop
-}
+//void block_ctrl_base::setup_tx_streamer(uhd::stream_args_t &args)
+//{
+    //// nop
+//}
 
-void block_ctrl_base::handle_overrun()
-{
-    // nop
-}
+//void block_ctrl_base::handle_overrun()
+//{
+    //// nop
+//}
 
-uhd::time_spec_t block_ctrl_base::get_time_now(void)
-{
-    return uhd::time_spec_t();
-}
+//uhd::time_spec_t block_ctrl_base::get_time_now(void)
+//{
+    //return uhd::time_spec_t();
+//}
 
-bool block_ctrl_base::in_continuous_streaming_mode(void)
-{
-    return false;
-}
+//bool block_ctrl_base::in_continuous_streaming_mode(void)
+//{
+    //return false;
+//}
 
 // vim: sw=4 et:

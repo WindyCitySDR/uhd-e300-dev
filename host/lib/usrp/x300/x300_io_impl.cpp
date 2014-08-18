@@ -23,6 +23,7 @@
 #include <uhd/transport/nirio_zero_copy.hpp>
 #include "async_packet_handler.hpp"
 #include <uhd/transport/bounded_buffer.hpp>
+#include <uhd/usrp/rfnoc/rx_block_ctrl_base.hpp>
 #include <boost/bind.hpp>
 #include <uhd/utils/tasks.hpp>
 #include <uhd/utils/log.hpp>
@@ -440,7 +441,8 @@ rx_streamer::sptr x300_impl::get_rx_stream(const uhd::stream_args_t &args_)
 
         // Access to this channel's mboard and block control
         mboard_members_t &mb = _mb[mb_index];
-        uhd::rfnoc::block_ctrl_base::sptr ce_ctrl = get_block_ctrl(block_id);
+        uhd::rfnoc::rx_block_ctrl_base::sptr ce_ctrl =
+            boost::dynamic_pointer_cast<uhd::rfnoc::rx_block_ctrl_base>(get_block_ctrl(block_id));
 
         // Setup the DSP transport hints (default to a large recv buff)
         device_addr_t device_addr = mb.recv_args;
@@ -496,6 +498,7 @@ rx_streamer::sptr x300_impl::get_rx_stream(const uhd::stream_args_t &args_)
         id.num_outputs = 1;
         my_streamer->set_converter(id);
 
+        // Configure the block
         ce_ctrl->setup_rx_streamer(args, data_sid);
 
         //flow control setup
@@ -503,9 +506,7 @@ rx_streamer::sptr x300_impl::get_rx_stream(const uhd::stream_args_t &args_)
         UHD_VAR(pkt_size);
         const size_t fc_window = get_rx_flow_control_window(pkt_size, xport.recv_buff_size, device_addr);
         const size_t fc_handle_window = std::max<size_t>(1, fc_window / X300_RX_FC_REQUEST_FREQ);
-
         UHD_LOG << "RX Flow Control Window = " << fc_window << ", RX Flow Control Handler Window = " << fc_handle_window << std::endl;
-
         ce_ctrl->configure_flow_control_out(fc_window);
 
         //Give the streamer a functor to get the recv_buffer
@@ -523,7 +524,7 @@ rx_streamer::sptr x300_impl::get_rx_stream(const uhd::stream_args_t &args_)
             stream_i,
             boost::bind(
                 &x300_impl::handle_overflow, this,
-                boost::weak_ptr<uhd::rfnoc::block_ctrl_base>(ce_ctrl),
+                boost::weak_ptr<uhd::rfnoc::rx_block_ctrl_base>(ce_ctrl),
                 boost::weak_ptr<uhd::rx_streamer>(my_streamer)
             )
         );
@@ -540,7 +541,7 @@ rx_streamer::sptr x300_impl::get_rx_stream(const uhd::stream_args_t &args_)
         //Give the streamer a functor issue stream cmd
         //bind requires a shared pointer to add a streamer->framer lifetime dependency
         my_streamer->set_issue_stream_cmd(
-            stream_i, boost::bind(&uhd::rfnoc::block_ctrl_base::issue_stream_cmd, ce_ctrl, _1)
+            stream_i, boost::bind(&uhd::rfnoc::rx_block_ctrl_base::issue_stream_cmd, ce_ctrl, _1)
         );
 
         // Tell the streamer which SID is valid for this channel
@@ -674,14 +675,14 @@ boost::uint32_t x300_impl::rfnoc_cmd(
 //////////////// RFNOC ////////////////////////////////
 
 void x300_impl::handle_overflow(
-        boost::weak_ptr<uhd::rfnoc::block_ctrl_base> blk_ctrl,
+        boost::weak_ptr<uhd::rfnoc::rx_block_ctrl_base> blk_ctrl,
         boost::weak_ptr<uhd::rx_streamer> streamer
 ) {
     boost::shared_ptr<sph::recv_packet_streamer> my_streamer =
             boost::dynamic_pointer_cast<sph::recv_packet_streamer>(streamer.lock());
     if (not my_streamer) return; //If the rx_streamer has expired then overflow handling makes no sense.
 
-    uhd::rfnoc::block_ctrl_base::sptr my_blk_ctrl = blk_ctrl.lock();
+    uhd::rfnoc::rx_block_ctrl_base::sptr my_blk_ctrl = blk_ctrl.lock();
 
     if (my_streamer->get_num_channels() == 1)
     {

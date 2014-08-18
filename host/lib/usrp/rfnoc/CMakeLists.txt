@@ -27,4 +27,5 @@ LIBUHD_APPEND_SOURCES(
     ${CMAKE_CURRENT_SOURCE_DIR}/block_ctrl_impl.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/null_block_ctrl_impl.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/radio_ctrl_impl.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/rx_block_ctrl_base.cpp
 )

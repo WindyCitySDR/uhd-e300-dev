@@ -18,7 +18,7 @@
 #ifndef INCLUDED_LIBUHD_RFNOC_BLOCK_CTRL_HPP
 #define INCLUDED_LIBUHD_RFNOC_BLOCK_CTRL_HPP
 
-#include <uhd/usrp/rfnoc/block_ctrl_base.hpp>
+#include <uhd/usrp/rfnoc/rx_block_ctrl_base.hpp>
 
 namespace uhd {
     namespace rfnoc {
@@ -29,7 +29,7 @@ namespace uhd {
  * can be set by sr_write(). The default behaviour of functions is documented
  * in uhd::rfnoc::block_ctrl_base.
  */
-class UHD_API block_ctrl : virtual public block_ctrl_base
+class UHD_API block_ctrl : public rx_block_ctrl_base
 {
 public:
     // Required macro in RFNoC block classes

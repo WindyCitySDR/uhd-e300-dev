@@ -18,7 +18,7 @@
 #ifndef INCLUDED_LIBUHD_RFNOC_RADIO_CTRL_HPP
 #define INCLUDED_LIBUHD_RFNOC_RADIO_CTRL_HPP
 
-#include <uhd/usrp/rfnoc/block_ctrl_base.hpp>
+#include <uhd/usrp/rfnoc/rx_block_ctrl_base.hpp>
 #include "rx_vita_core_3000.hpp"
 #include "tx_vita_core_3000.hpp"
 #include "time_core_3000.hpp"
@@ -31,13 +31,12 @@ namespace uhd {
 /*! \brief Provide access to a radio.
  *
  */
-class radio_ctrl : virtual public block_ctrl_base
+class radio_ctrl : public rx_block_ctrl_base
 {
 public:
     UHD_RFNOC_BLOCK_OBJECT(radio_ctrl)
 
-    //! Pass stream commands to the radio
-    virtual void issue_stream_cmd(const uhd::stream_cmd_t &stream_cmd) = 0;
+    ///////// NoC-Shell Methods ////////////////
 
     //! Configure flow control in the VITA core
     virtual void configure_flow_control_in(
@@ -68,8 +67,12 @@ public:
     // set the source address.
     virtual void set_destination(boost::uint32_t next_address, size_t output_block_port = 0) = 0;
 
+    ///////// Rx Streamer Methods ////////////////
+
+    //! Pass stream commands to the radio
+    virtual void issue_stream_cmd(const uhd::stream_cmd_t &stream_cmd) = 0;
+
     virtual void setup_rx_streamer(uhd::stream_args_t &args, const uhd::sid_t &data_sid) = 0;
-    virtual void setup_tx_streamer(uhd::stream_args_t &args) = 0;
 
     virtual void handle_overrun(void) = 0;
 
@@ -78,7 +81,12 @@ public:
 
     virtual bool in_continuous_streaming_mode(void) = 0;
 
-    //! radio_ctrl specific function
+    ///////// Tx Streamer Methods ////////////////
+
+    virtual void setup_tx_streamer(uhd::stream_args_t &args) = 0;
+
+    // radio_ctrl specific methods
+
     virtual void set_perifs(
         time_core_3000::sptr    time64,
         rx_vita_core_3000::sptr framer,

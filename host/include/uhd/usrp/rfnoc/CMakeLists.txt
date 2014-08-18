@@ -21,6 +21,7 @@ UHD_INSTALL(FILES
     block_id.hpp
     constants.hpp
     null_block_ctrl.hpp
+    rx_block_ctrl_base.hpp
     DESTINATION ${INCLUDE_DIR}/uhd/usrp/rfnoc
     COMPONENT headers
 )

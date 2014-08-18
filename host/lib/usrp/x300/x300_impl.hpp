@@ -200,7 +200,7 @@ private:
     };
 
     //overflow recovery impl
-    void handle_overflow(boost::weak_ptr<uhd::rfnoc::block_ctrl_base> blk_ctrl, boost::weak_ptr<uhd::rx_streamer> streamer);
+    void handle_overflow(boost::weak_ptr<uhd::rfnoc::rx_block_ctrl_base> blk_ctrl, boost::weak_ptr<uhd::rx_streamer> streamer);
 
     //vector of member objects per motherboard
     struct mboard_members_t
@@ -299,6 +299,11 @@ private:
         const boost::uint8_t& prefix,
         const uhd::device_addr_t& args,
         boost::uint32_t& sid);
+
+    both_xports_t make_transport(
+        uhd::sid_t &sid, // On input: Provides the endpoint address. On output: The SID of this transport, going to the device.
+        const uhd::device_addr_t& args
+    );
 
     struct frame_size_t
     {

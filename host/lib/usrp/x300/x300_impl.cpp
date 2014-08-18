@@ -1208,6 +1208,26 @@ boost::uint32_t get_pcie_dma_channel(boost::uint8_t destination, boost::uint8_t 
 
 
 x300_impl::both_xports_t x300_impl::make_transport(
+    uhd::sid_t &sid, // On input: Provides the endpoint address. On output: The SID of this transport, going to the device.
+    const uhd::device_addr_t& args
+) {
+    const size_t mb_index = sid.get_remote_dst_address() - X300_DEVICE_THERE;
+    // divide by 4, just to make it confusing:
+    const boost::uint8_t destination = sid.get_local_dst_address() / 4;
+    const boost::uint8_t prefix = 0;
+    boost::uint32_t new_sid;
+
+    x300_impl::both_xports_t xports = make_transport(
+            mb_index,
+            destination,
+            prefix,
+            args,
+            new_sid);
+    sid = new_sid;
+    return xports;
+}
+
+x300_impl::both_xports_t x300_impl::make_transport(
     const size_t mb_index,
     const boost::uint8_t& destination,
     const boost::uint8_t& prefix,
