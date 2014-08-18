@@ -22,7 +22,6 @@
 #include "e300_impl.hpp"
 
 #include "ad9361_ctrl.hpp"
-#include "ad9361_driver/ad9361_transaction.h"
 
 #include "e300_sensor_manager.hpp"
 #include "e300_fifo_config.hpp"
@@ -30,6 +29,7 @@
 #include "e300_i2c.hpp"
 #include "e300_defaults.hpp"
 #include "e300_common.hpp"
+#include "e300_remote_codec_ctrl.hpp"
 
 #include <uhd/utils/msg.hpp>
 #include <uhd/utils/byteswap.hpp>
@@ -163,7 +163,7 @@ static void e300_send_tunnel(
 static void e300_codec_ctrl_tunnel(
     const std::string &name,
     boost::shared_ptr<asio::ip::udp::socket> socket,
-    ad9361_ctrl_transport::sptr _ctrl_xport,
+    ad9361_ctrl::sptr _codec_ctrl,
     asio::ip::udp::endpoint *endpoint,
     bool *running
 )
@@ -183,12 +183,46 @@ static void e300_codec_ctrl_tunnel(
                 continue;
             }
 
-            ad9361_transaction_t *in = reinterpret_cast<ad9361_transaction_t*>(in_buff);
+            typedef e300_remote_codec_ctrl::transaction_t codec_xact_t;
+            codec_xact_t *in = reinterpret_cast<codec_xact_t*>(in_buff);
+            codec_xact_t *out = reinterpret_cast<codec_xact_t*>(out_buff);
+            std::memcpy(out, in, sizeof(codec_xact_t));
 
-            in->handle = _ctrl_xport->get_device_handle();
-            in->version = AD9361_TRANSACTION_VERSION;
+            std::string which_str;
+            switch (in->which) {
+            case codec_xact_t::CHAIN_TX1:
+                which_str = "TX1"; break;
+            case codec_xact_t::CHAIN_TX2:
+                which_str = "TX2"; break;
+            case codec_xact_t::CHAIN_RX1:
+                which_str = "RX1"; break;
+            case codec_xact_t::CHAIN_RX2:
+                which_str = "RX2"; break;
+            default:
+                which_str = ""; break;
+            }
 
-            _ctrl_xport->ad9361_transact(&in_buff[0], &out_buff[0]);
+            switch (in->action) {
+            case codec_xact_t::ACTION_SET_GAIN:
+                out->gain = _codec_ctrl->set_gain(which_str, in->gain);
+                break;
+            case codec_xact_t::ACTION_SET_CLOCK_RATE:
+                out->rate = _codec_ctrl->set_clock_rate(in->rate);
+                break;
+            case codec_xact_t::ACTION_SET_ACTIVE_CHANS:
+                _codec_ctrl->set_active_chains(
+                    in->bits & (1<<0), in->bits & (1<<1), in->bits & (1<<2), in->bits & (1<<3));
+                break;
+            case codec_xact_t::ACTION_TUNE:
+                out->freq = _codec_ctrl->tune(which_str, in->freq);
+                break;
+            case codec_xact_t::ACTION_SET_LOOPBACK:
+                _codec_ctrl->data_port_loopback(in->bits & 1);
+                break;
+            default:
+                UHD_MSG(status) << "Got unknown request?!" << std::endl;
+                out->action = 0;    //Zero out actions to fail this request on client
+            }
 
             socket->send_to(asio::buffer(out_buff, 64), *endpoint);
         }
@@ -386,7 +420,6 @@ private:
 private:
     boost::shared_ptr<e300_fifo_interface>   _fifo_iface;
     xports_t                                 _xports[2];
-    boost::shared_ptr<ad9361_ctrl_transport> _codec_xport;
     boost::shared_ptr<ad9361_ctrl>           _codec_ctrl;
     boost::shared_ptr<global_regs>           _global_regs;
     boost::shared_ptr<e300_sensor_manager>   _sensor_manager;
@@ -442,7 +475,7 @@ void network_server_impl::_run_server(
                 tg.create_thread(boost::bind(&e300_send_tunnel, "control tunnel", socket, perif.send_ctrl_xport, &endpoint, &running));
             }
             if (what == "CODEC") {
-                tg.create_thread(boost::bind(&e300_codec_ctrl_tunnel, "CODEC tunnel", socket, _codec_xport, &endpoint, &running));
+                tg.create_thread(boost::bind(&e300_codec_ctrl_tunnel, "CODEC tunnel", socket, _codec_ctrl, &endpoint, &running));
             }
             if (what == "I2C") {
                 tg.create_thread(boost::bind(&e300_i2c_tunnel, "I2C tunnel", socket, _eeprom_manager->get_i2c_sptr(), &endpoint, &running));
@@ -556,8 +589,8 @@ network_server_impl::network_server_impl(const uhd::device_addr_t &device_addr)
     _xports[1].rx_data_xport   = _fifo_iface->make_recv_xport(E300_R1_RX_DATA_STREAM, data_xport_params);
     _xports[1].rx_flow_xport   = _fifo_iface->make_send_xport(E300_R1_RX_DATA_STREAM, ctrl_xport_params);
 
-    _codec_xport = ad9361_ctrl_transport::make_software_spi(AD9361_E300, spi::make(E300_SPIDEV_DEVICE), 1);
-    _codec_ctrl = ad9361_ctrl::make(_codec_xport);
+    ad9361_params::sptr client_settings = boost::make_shared<e300_ad9361_client_t>();
+    _codec_ctrl = ad9361_ctrl::make_spi(client_settings, spi::make(E300_SPIDEV_DEVICE), 1);
     // This is horrible ... why do I have to sleep here?
     boost::this_thread::sleep(boost::posix_time::milliseconds(100));
     _sensor_manager = e300_sensor_manager::make_local(

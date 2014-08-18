@@ -32,8 +32,6 @@
 #include <cstring>
 #include <iomanip>
 #include <libusb.h>
-#include <ad9361_transaction.h>
-#include <ad9361_dispatch.h>
 
 //! libusb_error_name is only in newer API
 #ifndef HAVE_LIBUSB_ERROR_NAME
