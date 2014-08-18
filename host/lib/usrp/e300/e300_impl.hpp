@@ -44,6 +44,7 @@
 #include "e300_i2c.hpp"
 #include "e300_eeprom_manager.hpp"
 #include "e300_sensor_manager.hpp"
+#include "e300_ublox_control.hpp"
 
 namespace uhd { namespace usrp { namespace e300 {
 
@@ -287,6 +288,7 @@ private: // members
     uhd::transport::zero_copy_xport_params _data_xport_params;
     uhd::transport::zero_copy_xport_params _ctrl_xport_params;
     gpio_t                                 _misc;
+    gps::ublox::ubx::control::sptr _gps;
 };
 
 }}} // namespace

@@ -39,6 +39,8 @@ IF(ENABLE_E300)
         ${CMAKE_CURRENT_SOURCE_DIR}/e300_i2c.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/e300_eeprom_manager.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/e300_common.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/e300_async_serial.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/e300_ublox_control_impl.cpp
     )
     LIBUHD_APPEND_SOURCES(${E300_SOURCES})
     IF(UDEV_FOUND)
