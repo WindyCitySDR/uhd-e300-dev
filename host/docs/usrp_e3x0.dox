@@ -28,7 +28,7 @@
 This will run you through the first steps relevant to get your USRP E300/310
 up and running.
 
-\subsection e3x0_first_boot First boot - General notes
+\subsection e3x0_first_boot First boot
 
 After unpacking and assembling your USRP E300/E310 insert the micro sd card into the micro sd card slot.
 
@@ -42,7 +42,7 @@ is recommended, as it allows to review and modify the network configuration,
 and allows to enter the bootloader in case of issues during the boot.
 
 
-\subsection e3x0_first_boot_serial First boot - Serial connection
+\subsubsection e3x0_first_boot_serial Serial connection
 
 To use the serial connection together with a Linux or OSX machine (most other UNIX variants come with a version of screen, too)
 a terminal emulator such as screen can be used:
@@ -70,7 +70,7 @@ You should be presented with a shell similar to the following
     root@ettus-e300:~#
 
 
-\subsection e3x0_first_boot_ssh First boot - SSH connection
+\subsubsection e3x0_first_boot_ssh SSH connection
 
 The USRP E300/E310 device relies on the DHCP protocol to automatically obtain an IP address.
 In case your network setup does not include a DHCP server, refer to the section \ref e3x0_first_boot_serial or configure a DHCP server to hand out IP addresses on your network.
@@ -294,7 +294,6 @@ usrp->set_rx_subdev_spec("A:RX1 A:RX2");
 The following sensors are available for the USRP-E Series motherboards;
 they can be queried through the API.
 
-- **ref_locked** - clock reference locked (internal/external)
 - **fe_locked** - rx / tx frontend pll locked
 - **temp** - processor temperature value
 - Other sensors are added when the GPSDO is enabled
