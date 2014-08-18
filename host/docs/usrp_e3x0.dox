@@ -20,13 +20,72 @@
 	- 2 TX DUC chain in FPGA
 	- Timed commands in FPGA
 	- Timed sampling in FPGA
-	- 16-bit and 8-bit sample modes (sc8 and sc16)
+	- 16-bit and sample modes (sc16)
 	- Up to 10 MHz of RF bandwidth with 16-bit samples
 
 \section e3x0_getting_started Getting started
 
 This will run you through the first steps relevant to get your USRP E300/310
 up and running.
+
+\subsection e3x0_first_boot First boot - General notes
+
+After unpacking and assembling your USRP E300/E310 insert the micro sd card into the micro sd card slot.
+
+There are two different methods to connect to the device
+
+- using the onboard serial to usb connector
+- using the gigabit ethernet connector and a ssh client on your host computer
+
+For the first boot, booting with the serial cable connected to the device
+is recommended, as it allows to review and modify the network configuration,
+and allows to enter the bootloader in case of issues during the boot.
+
+
+\subsection e3x0_first_boot_serial First boot - Serial connection
+
+To use the serial connection together with a Linux or OSX machine (most other UNIX variants come with a version of screen, too)
+a terminal emulator such as screen can be used:
+
+    $ sudo screen /dev/ttyUSB0 115200
+
+The exact device node /dev/ttyUSB0 depends on your operating system's driver and other USB devices that might be already connected.
+It can be usually found by perusing the output of dmesg or journalctl, after connecting the USRP E300/E310 device to your host computer.
+
+An example of a dmesg output for the serial to usb converter:
+
+    924.102764] usb 1-1: FTDI USB Serial Device converter now attached to ttyUSB0
+
+
+On Microsoft Windows the serial connection can be established using a tool such as Putty by selecting a baudrate of 115200 and the corresponding serial port for the serial to usb converter.
+
+In both cases you should see boot messages fly by and finally end up with a login prompt similar to the following:
+
+TODO!!
+
+Note: The username is 'root' and the default password is empty.
+
+You should be presented with a shell similar to the following
+
+    root@ettus-e300:~#
+
+
+\subsection e3x0_first_boot_ssh First boot - SSH connection
+
+The USRP E300/E310 device relies on the DHCP protocol to automatically obtain an IP address.
+In case your network setup does not include a DHCP server, refer to the section \ref e3x0_first_boot_serial or configure a DHCP server to hand out IP addresses on your network.
+
+After the device obtained an IP address you can log in from a Linux or OSX machine by typing:
+
+    $ ssh root@192.168.10.42
+
+where the IP address depends on your local network setup.
+
+On Microsoft Windows again the connection can be established using a tool such as Putty, by selecting a username of root without password.
+
+You should be presented with a shell similar to the following
+
+    root@ettus-e300:~#
 
 \section e3x0_hw Hardware Setup
 
