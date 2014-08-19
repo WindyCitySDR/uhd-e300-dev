@@ -176,10 +176,6 @@ public:
     static x300_mboard_t get_mb_type_from_eeprom(const uhd::usrp::mboard_eeprom_t& mb_eeprom);
 
 private:
-    /////////////////////// RFNOC ///////////////////////////////////////////
-    uhd::tx_streamer::sptr get_tx_stream_ce(const uhd::stream_args_t &, boost::uint16_t dst_addr);
-    /////////////////////// RFNOC ///////////////////////////////////////////
-
     boost::shared_ptr<async_md_type> _async_md;
 
     //perifs in the radio core
@@ -209,7 +205,7 @@ private:
         uhd::dict<size_t, boost::weak_ptr<uhd::tx_streamer> > tx_streamers;
         //////////////////// RFNOC ///////////////////////////////////
         uhd::dict<std::string, boost::weak_ptr<uhd::rx_streamer> > ce_rx_streamers;
-        uhd::dict<size_t, boost::weak_ptr<uhd::tx_streamer> > ce_tx_streamers;
+        uhd::dict<std::string, boost::weak_ptr<uhd::tx_streamer> > ce_tx_streamers;
         //////////////////// RFNOC ///////////////////////////////////
 
         uhd::task::sptr claimer_task;
@@ -229,7 +225,7 @@ private:
         //perifs in each radio
         radio_perifs_t radio_perifs[2]; //!< This is hardcoded s.t. radio_perifs[0] points to slot A and [1] to B
         uhd::usrp::dboard_eeprom_t db_eeproms[8];
-	//! Return the index of a radio component, given a slot name. This means DSPs, radio_perifs
+        //! Return the index of a radio component, given a slot name. This means DSPs, radio_perifs
         size_t get_radio_index(const std::string &slot_name) {
              UHD_ASSERT_THROW(slot_name == "A" or slot_name == "B");
              return slot_name == "A" ? 0 : 1;
@@ -270,6 +266,7 @@ private:
       * - Self test ADC
       * - Sync DACs (for MIMO)
       * - Initialize the property tree for control objects etc. (gain, rate...)
+      * - Populate the radio ctrl object for RFNoC operation
       *
       * \param mb_i Motherboard index
       * \param slot_name Slot name (A or B).
@@ -277,6 +274,7 @@ private:
     void setup_radio(const size_t, const std::string &slot_name);
 
     size_t _sid_framer;
+    // TODO this evil thing must go
     struct sid_config_t
     {
         boost::uint8_t router_addr_there;

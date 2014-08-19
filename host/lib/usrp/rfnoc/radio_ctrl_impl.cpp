@@ -39,7 +39,6 @@ public:
         _rx_spp = get_bytes_per_output_packet(0) / _rx_bpi;
     }
 
-
     void issue_stream_cmd(const uhd::stream_cmd_t &stream_cmd)
     {
         _perifs.framer->issue_stream_command(stream_cmd);
@@ -104,6 +103,7 @@ public:
 
     void setup_rx_streamer(uhd::stream_args_t &args, const uhd::sid_t &data_sid)
     {
+        UHD_MSG(status) << "radio_ctrl::setup_rx_streamer()" << std::endl;
         _perifs.framer->clear();
         // Set spp, if applicable
         if (not args.args.has_key("spp")) {
@@ -114,8 +114,6 @@ public:
         if (not set_bytes_per_output_packet(_rx_spp * _rx_bpi, 0)) {
             throw uhd::value_error("radio_ctrl::setup_rx_streamer(): Invalid spp value.");
         }
-        UHD_MSG(status) << "spp ====== " << _rx_spp << std::endl;
-
         set_destination(data_sid.get_src_address(), 0);
 
         _perifs.framer->setup(args);
@@ -124,6 +122,7 @@ public:
 
     void setup_tx_streamer(uhd::stream_args_t &args)
     {
+        UHD_MSG(status) << "radio_ctrl::setup_tx_streamer() " << std::endl;
         _perifs.deframer->clear();
         _perifs.deframer->setup(args);
         _perifs.duc->setup(args);
@@ -175,4 +174,4 @@ private:
 };
 
 UHD_RFNOC_BLOCK_MAKE_CALL(radio_ctrl);
-
+// vim: sw=4 expandtab:

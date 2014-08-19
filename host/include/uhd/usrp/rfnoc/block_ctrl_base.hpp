@@ -77,7 +77,11 @@ namespace uhd {
 /*! \brief Base class for all block controller objects.
  *
  * Inside UHD, block controller objects must be derived from
- * uhd::rfnoc::block_ctrl.
+ * uhd::rfnoc::block_ctrl. This class provides all functions
+ * that a block *must* provide. Typically, you would not derive
+ * a block controller class directly from block_ctrl_base, but
+ * from a class such as rx_block_ctrl_base or tx_block_ctrl_base
+ * which extends the functionality.
  */
 class UHD_API block_ctrl_base;
 class block_ctrl_base : boost::noncopyable, public boost::enable_shared_from_this<block_ctrl_base>
@@ -184,29 +188,6 @@ public:
     /*! Return the clock rate in Hz for this block.
      */
     virtual double get_clock_rate() const;
-
-    /*! Issue a stream command for this block.
-     *
-     * There is no guaranteed action for this command. The default implementation
-     * is to send this command to the next upstream block, or issue a warning if
-     * there is no upstream block registered.
-     *
-     * However, implementations of block_ctrl_base might choose to do whatever seems
-     * appropriate, including throwing exceptions. This may also be true for some
-     * stream commands and not for others (i.e. STREAM_MODE_START_CONTINUOUS may be
-     * implemented, and STREAM_MODE_NUM_SAMPS_AND_DONE may be not).
-     *
-     * This function does not check for infinite loops. Example: Say you have two blocks,
-     * which are both registered as upstream from one another. If they both use
-     * block_ctrl_base::issue_stream_cmd(), then the stream command will be passed from
-     * one block to another indefinitely. This will not happen if one the block's
-     * controller classes overrides this function and actually handles it.
-     *
-     * See also register_upstream_block().
-     *
-     * \param stream_cmd The stream command.
-     */
-    //virtual void issue_stream_cmd(const uhd::stream_cmd_t &stream_cmd);
 
     /*! Configure flow control for incoming streams.
      *
@@ -325,45 +306,6 @@ public:
      * block_ctrl_base::issue_stream_cmd() will not do anything but issue a warning.
      */
     void clear_upstream_blocks() { _upstream_blocks.clear(); };
-
-    // Streamer related methods
-
-    /*! Set stream args and SID before opening an RX streamer to this block.
-     *
-     * This does nothing in the default implementation.
-     *
-     * TODO: It probably should check if the otw format is compatible.
-     */
-    //virtual void setup_rx_streamer(uhd::stream_args_t &args, const uhd::sid_t &data_sid);
-
-    /*! Set stream args before opening a TX streamer to this block.
-     *
-     * This does nothing in the default implementation.
-     *
-     * TODO: It probably should check if the otw format is compatible.
-     */
-    //virtual void setup_tx_streamer(uhd::stream_args_t &args);
-
-    /*! If an overrun ("O") is received, this function is called to straighten
-     * things out, if necessary.
-     *
-     * Does nothing in the default implementation.
-     */
-    //virtual void handle_overrun(void);
-
-    /*! Returns the current time of this block, whatever that means.
-     *
-     * For radio blocks, this returns the actual, current time.
-     *
-     * In the default implementation, always returns a zero.
-     */
-    //virtual uhd::time_spec_t get_time_now(void);
-
-    /*! Returns true if this block is in continuous streaming mode.
-     *
-     * Default behaviour is to return false.
-     */
-    //virtual bool in_continuous_streaming_mode(void);
 
     virtual ~block_ctrl_base();
 

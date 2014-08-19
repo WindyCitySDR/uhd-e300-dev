@@ -19,6 +19,7 @@
 #define INCLUDED_LIBUHD_RFNOC_RADIO_CTRL_HPP
 
 #include <uhd/usrp/rfnoc/rx_block_ctrl_base.hpp>
+#include <uhd/usrp/rfnoc/tx_block_ctrl_base.hpp>
 #include "rx_vita_core_3000.hpp"
 #include "tx_vita_core_3000.hpp"
 #include "time_core_3000.hpp"
@@ -31,7 +32,7 @@ namespace uhd {
 /*! \brief Provide access to a radio.
  *
  */
-class radio_ctrl : public rx_block_ctrl_base
+class radio_ctrl : public rx_block_ctrl_base, public tx_block_ctrl_base
 {
 public:
     UHD_RFNOC_BLOCK_OBJECT(radio_ctrl)
@@ -85,7 +86,7 @@ public:
 
     virtual void setup_tx_streamer(uhd::stream_args_t &args) = 0;
 
-    // radio_ctrl specific methods
+    ////// radio_ctrl specific methods Methods ///
 
     virtual void set_perifs(
         time_core_3000::sptr    time64,
