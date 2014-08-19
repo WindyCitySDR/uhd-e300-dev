@@ -517,14 +517,13 @@ rx_streamer::sptr x300_impl::get_rx_stream(const uhd::stream_args_t &args_)
             true /*flush*/
         );
 
-        //Give the streamer a functor to handle overflows
+        //Give the streamer a functor to handle overruns
         //bind requires a weak_ptr to break the a streamer->streamer circular dependency
         //Using "this" is OK because we know that x300_impl will outlive the streamer
         my_streamer->set_overflow_handler(
             stream_i,
             boost::bind(
-                &x300_impl::handle_overflow, this,
-                boost::weak_ptr<uhd::rfnoc::rx_block_ctrl_base>(ce_ctrl),
+                &uhd::rfnoc::rx_block_ctrl_base::handle_overrun, ce_ctrl,
                 boost::weak_ptr<uhd::rx_streamer>(my_streamer)
             )
         );
@@ -674,40 +673,6 @@ boost::uint32_t x300_impl::rfnoc_cmd(
 }
 //////////////// RFNOC ////////////////////////////////
 
-void x300_impl::handle_overflow(
-        boost::weak_ptr<uhd::rfnoc::rx_block_ctrl_base> blk_ctrl,
-        boost::weak_ptr<uhd::rx_streamer> streamer
-) {
-    boost::shared_ptr<sph::recv_packet_streamer> my_streamer =
-            boost::dynamic_pointer_cast<sph::recv_packet_streamer>(streamer.lock());
-    if (not my_streamer) return; //If the rx_streamer has expired then overflow handling makes no sense.
-
-    uhd::rfnoc::rx_block_ctrl_base::sptr my_blk_ctrl = blk_ctrl.lock();
-
-    if (my_streamer->get_num_channels() == 1)
-    {
-        my_blk_ctrl->handle_overrun();
-        return;
-    }
-
-    /////////////////////////////////////////////////////////////
-    // MIMO overflow recovery time
-    /////////////////////////////////////////////////////////////
-    //find out if we were in continuous mode before stopping
-    const bool in_continuous_streaming_mode = my_blk_ctrl->in_continuous_streaming_mode();
-    //stop streaming
-    my_streamer->issue_stream_cmd(stream_cmd_t::STREAM_MODE_STOP_CONTINUOUS);
-    //flush transports
-    my_streamer->flush_all(0.001);
-    //restart streaming
-    if (in_continuous_streaming_mode)
-    {
-        stream_cmd_t stream_cmd(stream_cmd_t::STREAM_MODE_START_CONTINUOUS);
-        stream_cmd.stream_now = false;
-        stream_cmd.time_spec = my_blk_ctrl->get_time_now() + time_spec_t(0.01);
-        my_streamer->issue_stream_cmd(stream_cmd);
-    }
-}
 
 /***********************************************************************
  * Transmit streamer

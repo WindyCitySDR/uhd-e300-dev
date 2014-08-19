@@ -42,7 +42,6 @@ void sig_int_handler(int){stop_signal_called = true;}
 
 template<typename samp_type> void recv_to_file(
     uhd::usrp::multi_usrp::sptr usrp,
-    uhd::rfnoc::block_ctrl_base::sptr proc_block_ctrl,
     const std::string &cpu_format,
     const std::string &file,
     size_t samps_per_buff,
@@ -303,7 +302,7 @@ int UHD_SAFE_MAIN(int argc, char *argv[])
     //////// 6. Spawn receiver //////////////////////////////////////////////
     /////////////////////////////////////////////////////////////////////////
 #define recv_to_file_args(format) \
-        (usrp, proc_block_ctrl, format, file, spb, total_num_samps, total_time, bw_summary, stats, null, continue_on_bad_packet)
+        (usrp, format, file, spb, total_num_samps, total_time, bw_summary, stats, null, continue_on_bad_packet)
     //recv to file
     if (type == "double") recv_to_file<std::complex<double> >recv_to_file_args("fc64");
     else if (type == "float") recv_to_file<std::complex<float> >recv_to_file_args("fc32");

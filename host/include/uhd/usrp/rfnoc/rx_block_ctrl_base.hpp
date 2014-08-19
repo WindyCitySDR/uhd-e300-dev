@@ -66,17 +66,7 @@ public:
     /*! If an overrun ("O") is received, this function is called to straighten
      * things out, if necessary.
      */
-    virtual void handle_overrun(void);
-
-    // TODO remove these, put all in handle_overrun
-
-    /*! Returns the current time of this block, whatever that means.
-     */
-    virtual uhd::time_spec_t get_time_now(void);
-
-    /*! Returns true if this block is in continuous streaming mode.
-     */
-    virtual bool in_continuous_streaming_mode(void);
+    virtual void handle_overrun(boost::weak_ptr<uhd::rx_streamer> streamer);
 
 }; /* class rx_block_ctrl_base */
 

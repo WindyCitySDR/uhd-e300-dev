@@ -195,9 +195,6 @@ private:
         tx_frontend_core_200::sptr tx_fe;
     };
 
-    //overflow recovery impl
-    void handle_overflow(boost::weak_ptr<uhd::rfnoc::rx_block_ctrl_base> blk_ctrl, boost::weak_ptr<uhd::rx_streamer> streamer);
-
     //vector of member objects per motherboard
     struct mboard_members_t
     {
@@ -376,7 +373,6 @@ private:
     void update_atr_leds(gpio_core_200_32wo::sptr, const std::string &ant);
     boost::uint32_t get_fp_gpio(gpio_core_200::sptr, const std::string &);
     void set_fp_gpio(gpio_core_200::sptr, const std::string &, const boost::uint32_t);
-
 
     // Loopback stuff
     void test_rfnoc_loopback(size_t mb_index, int ce_index);

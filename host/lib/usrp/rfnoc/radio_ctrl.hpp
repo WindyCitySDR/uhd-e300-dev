@@ -75,12 +75,7 @@ public:
 
     virtual void setup_rx_streamer(uhd::stream_args_t &args, const uhd::sid_t &data_sid) = 0;
 
-    virtual void handle_overrun(void) = 0;
-
-    //! Read the time from the time64 core
-    virtual uhd::time_spec_t get_time_now(void) = 0;
-
-    virtual bool in_continuous_streaming_mode(void) = 0;
+    virtual void handle_overrun(boost::weak_ptr<uhd::rx_streamer>) = 0;
 
     ///////// Tx Streamer Methods ////////////////
 

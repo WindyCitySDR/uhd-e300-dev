@@ -90,6 +90,7 @@ block_ctrl_base::block_ctrl_base(
     // TODO: Add IO signature
 
 
+    // FIXME remove this from here! It will always call block_ctrl_base::reset_flow_control().
     reset_flow_control();
 }
 
@@ -167,7 +168,8 @@ void block_ctrl_base::configure_flow_control_out(
     sr_write(SR_FLOW_CTRL_ENABLE, (buf_size_pkts != 0));
 }
 
-void block_ctrl_base::reset_flow_control() {
+void block_ctrl_base::reset_flow_control()
+{
     sr_write(SR_FLOW_CTRL_CLR_SEQ, 0x00C1EA12); // 'CLEAR', but we can write anything, really
     return;
 }

@@ -41,19 +41,8 @@ void rx_block_ctrl_base::setup_rx_streamer(uhd::stream_args_t &, const uhd::sid_
     set_destination(data_sid.get_src_address());
 }
 
-void rx_block_ctrl_base::handle_overrun()
+void rx_block_ctrl_base::handle_overrun(boost::weak_ptr<uhd::rx_streamer>)
 {
     // nop
 }
-
-uhd::time_spec_t rx_block_ctrl_base::get_time_now(void)
-{
-    return uhd::time_spec_t();
-}
-
-bool rx_block_ctrl_base::in_continuous_streaming_mode(void)
-{
-    return false;
-}
-
 // vim: sw=4 et:

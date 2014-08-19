@@ -1,4 +1,4 @@
-//
+/
 // Copyright 2014 Ettus Research LLC
 //
 // This program is free software: you can redistribute it and/or modify
@@ -21,7 +21,9 @@
 #include <uhd/utils/msg.hpp>
 #include <uhd/types/ranges.hpp>
 #include "radio_ctrl.hpp"
+#include "../../transport/super_recv_packet_handler.hpp"
 
+using namespace uhd;
 using namespace uhd::rfnoc;
 
 class radio_ctrl_impl : public radio_ctrl
@@ -122,22 +124,39 @@ public:
 
     void setup_tx_streamer(uhd::stream_args_t &args)
     {
-        UHD_MSG(status) << "radio_ctrl::setup_tx_streamer() " << std::endl;
         _perifs.deframer->clear();
         _perifs.deframer->setup(args);
         _perifs.duc->setup(args);
     }
 
-    void handle_overrun(void) {
-        _perifs.framer->handle_overflow();
-    }
+    void handle_overrun(boost::weak_ptr<uhd::rx_streamer> streamer)
+    {
+        boost::shared_ptr<uhd::transport::sph::recv_packet_streamer> my_streamer =
+                boost::dynamic_pointer_cast<transport::sph::recv_packet_streamer>(streamer.lock());
+        if (not my_streamer) return; //If the rx_streamer has expired then overflow handling makes no sense.
 
-    uhd::time_spec_t get_time_now(void) {
-        return _perifs.time64->get_time_now();
-    }
+        if (my_streamer->get_num_channels() == 1) {
+            _perifs.framer->handle_overflow();
+            //return;
+        }
 
-    bool in_continuous_streaming_mode(void) {
-        return _perifs.framer->in_continuous_streaming_mode();
+        /////////////////////////////////////////////////////////////
+        // MIMO overflow recovery time
+        /////////////////////////////////////////////////////////////
+        //find out if we were in continuous mode before stopping
+        const bool in_continuous_streaming_mode = _perifs.framer->in_continuous_streaming_mode();
+        //stop streaming
+        my_streamer->issue_stream_cmd(stream_cmd_t::STREAM_MODE_STOP_CONTINUOUS);
+        //flush transports
+        my_streamer->flush_all(0.001);
+        //restart streaming
+        if (in_continuous_streaming_mode)
+        {
+            stream_cmd_t stream_cmd(stream_cmd_t::STREAM_MODE_START_CONTINUOUS);
+            stream_cmd.stream_now = false;
+            stream_cmd.time_spec = _perifs.time64->get_time_now() + time_spec_t(0.01);
+            my_streamer->issue_stream_cmd(stream_cmd);
+        }
     }
 
     void set_perifs(
