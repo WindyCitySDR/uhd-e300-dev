@@ -178,12 +178,13 @@ static void e300_codec_ctrl_tunnel(
 
             const size_t num_bytes = socket->receive_from(asio::buffer(in_buff), *endpoint);
 
-            if (num_bytes < 64) {
-                std::cout << "Received short packet" << std::endl;
+            typedef e300_remote_codec_ctrl::transaction_t codec_xact_t;
+
+            if (num_bytes < sizeof(codec_xact_t)) {
+                std::cout << "Received short packet of " << num_bytes  << std::endl;
                 continue;
             }
 
-            typedef e300_remote_codec_ctrl::transaction_t codec_xact_t;
             codec_xact_t *in = reinterpret_cast<codec_xact_t*>(in_buff);
             codec_xact_t *out = reinterpret_cast<codec_xact_t*>(out_buff);
             std::memcpy(out, in, sizeof(codec_xact_t));
