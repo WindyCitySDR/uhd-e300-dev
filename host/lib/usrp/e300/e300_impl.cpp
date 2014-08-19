@@ -1070,7 +1070,7 @@ void e300_impl::_setup_radio(const size_t dspno)
 
             _tree->create<double>(rf_fe_path / "gains" / name / "value")
                 .coerce(boost::bind(&ad9361_ctrl::set_gain, _codec_ctrl, key, _1))
-                .set(e300::DEFAULT_FE_BW);
+                .set(e300::DEFAULT_FE_GAIN);
         }
         _tree->create<std::string>(rf_fe_path / "connection").set("IQ");
         _tree->create<bool>(rf_fe_path / "enabled").set(true);
