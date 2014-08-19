@@ -190,7 +190,7 @@ static void e300_codec_ctrl_tunnel(
             std::memcpy(out, in, sizeof(codec_xact_t));
 
             std::string which_str;
-            switch (in->which) {
+            switch (uhd::ntohx<boost::uint32_t>(in->which)) {
             case codec_xact_t::CHAIN_TX1:
                 which_str = "TX1"; break;
             case codec_xact_t::CHAIN_TX2:
@@ -203,7 +203,7 @@ static void e300_codec_ctrl_tunnel(
                 which_str = ""; break;
             }
 
-            switch (in->action) {
+            switch (uhd::ntohx<boost::uint32_t>(in->action)) {
             case codec_xact_t::ACTION_SET_GAIN:
                 out->gain = _codec_ctrl->set_gain(which_str, in->gain);
                 break;
@@ -212,17 +212,22 @@ static void e300_codec_ctrl_tunnel(
                 break;
             case codec_xact_t::ACTION_SET_ACTIVE_CHANS:
                 _codec_ctrl->set_active_chains(
-                    in->bits & (1<<0), in->bits & (1<<1), in->bits & (1<<2), in->bits & (1<<3));
+                    uhd::ntohx<boost::uint32_t>(in->bits) & (1<<0),
+                    uhd::ntohx<boost::uint32_t>(in->bits) & (1<<1),
+                    uhd::ntohx<boost::uint32_t>(in->bits) & (1<<2),
+                    uhd::ntohx<boost::uint32_t>(in->bits) & (1<<3));
                 break;
             case codec_xact_t::ACTION_TUNE:
                 out->freq = _codec_ctrl->tune(which_str, in->freq);
                 break;
             case codec_xact_t::ACTION_SET_LOOPBACK:
-                _codec_ctrl->data_port_loopback(in->bits & 1);
+                _codec_ctrl->data_port_loopback(
+                    uhd::ntohx<boost::uint32_t>(in->bits) & 1);
                 break;
             default:
                 UHD_MSG(status) << "Got unknown request?!" << std::endl;
-                out->action = 0;    //Zero out actions to fail this request on client
+                //Zero out actions to fail this request on client
+                out->action = uhd::htonx<boost::uint32_t>(0);
             }
 
             socket->send_to(asio::buffer(out_buff, 64), *endpoint);

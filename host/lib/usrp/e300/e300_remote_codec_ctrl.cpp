@@ -39,11 +39,11 @@ public:
     double set_gain(const std::string &which, const double value)
     {
         _clear();
-        _args.action = transaction_t::ACTION_SET_GAIN;
-        if (which == "TX1")      _args.which = transaction_t::CHAIN_TX1;
-        else if (which == "TX2") _args.which = transaction_t::CHAIN_TX2;
-        else if (which == "RX1") _args.which = transaction_t::CHAIN_RX1;
-        else if (which == "RX2") _args.which = transaction_t::CHAIN_RX2;
+        _args.action = uhd::htonx<boost::uint32_t>(transaction_t::ACTION_SET_GAIN);
+        if (which == "TX1")      _args.which = uhd::htonx<boost::uint32_t>(transaction_t::CHAIN_TX1);
+        else if (which == "TX2") _args.which = uhd::htonx<boost::uint32_t>(transaction_t::CHAIN_TX2);
+        else if (which == "RX1") _args.which = uhd::htonx<boost::uint32_t>(transaction_t::CHAIN_RX1);
+        else if (which == "RX2") _args.which = uhd::htonx<boost::uint32_t>(transaction_t::CHAIN_RX2);
         else throw std::runtime_error("e300_remote_codec_ctrl_impl incorrect chain string.");
         _args.gain = value;
 
@@ -54,8 +54,10 @@ public:
     double set_clock_rate(const double rate)
     {
         _clear();
-        _args.action = transaction_t::ACTION_SET_CLOCK_RATE;
-        _args.which = transaction_t::CHAIN_NONE;  /*Unused*/
+        _args.action = uhd::htonx<boost::uint32_t>(
+            transaction_t::ACTION_SET_CLOCK_RATE);
+        _args.which = uhd::htonx<boost::uint32_t>(
+            transaction_t::CHAIN_NONE);  /*Unused*/
         _args.rate = rate;
 
         _transact();
@@ -65,12 +67,16 @@ public:
     void set_active_chains(bool tx1, bool tx2, bool rx1, bool rx2)
     {
         _clear();
-        _args.action = transaction_t::ACTION_SET_ACTIVE_CHANS;
-        _args.which = transaction_t::CHAIN_NONE;  /*Unused*/
-        _args.bits = (tx1 ? (1<<0) : 0) |
+        _args.action = uhd::htonx<boost::uint32_t>(
+            transaction_t::ACTION_SET_ACTIVE_CHANS);
+        /*Unused*/
+        _args.which = uhd::htonx<boost::uint32_t>(
+            transaction_t::CHAIN_NONE);
+        _args.bits = uhd::htonx<boost::uint32_t>(
+                     (tx1 ? (1<<0) : 0) |
                      (tx2 ? (1<<1) : 0) |
                      (rx1 ? (1<<2) : 0) |
-                     (rx2 ? (1<<3) : 0);
+                     (rx2 ? (1<<3) : 0));
 
         _transact();
     }
@@ -78,11 +84,11 @@ public:
     double tune(const std::string &which, const double value)
     {
         _clear();
-        _args.action = transaction_t::ACTION_TUNE;
-        if (which == "TX1")      _args.which = transaction_t::CHAIN_TX1;
-        else if (which == "TX2") _args.which = transaction_t::CHAIN_TX2;
-        else if (which == "RX1") _args.which = transaction_t::CHAIN_RX1;
-        else if (which == "RX2") _args.which = transaction_t::CHAIN_RX2;
+        _args.action = uhd::htonx<boost::uint32_t>(transaction_t::ACTION_TUNE);
+        if (which == "TX1")      _args.which = uhd::htonx<boost::uint32_t>(transaction_t::CHAIN_TX1);
+        else if (which == "TX2") _args.which = uhd::htonx<boost::uint32_t>(transaction_t::CHAIN_TX2);
+        else if (which == "RX1") _args.which = uhd::htonx<boost::uint32_t>(transaction_t::CHAIN_RX1);
+        else if (which == "RX2") _args.which = uhd::htonx<boost::uint32_t>(transaction_t::CHAIN_RX2);
         else throw std::runtime_error("e300_remote_codec_ctrl_impl incorrect chain string.");
         _args.freq = value;
 
@@ -93,9 +99,9 @@ public:
     void data_port_loopback(const bool on)
     {
         _clear();
-        _args.action = transaction_t::ACTION_SET_LOOPBACK;
-        _args.which = transaction_t::CHAIN_NONE;  /*Unused*/
-        _args.bits = on ? 1 : 0;
+        _args.action = uhd::htonx<boost::uint32_t>(transaction_t::ACTION_SET_LOOPBACK);
+        _args.which  = uhd::htonx<boost::uint32_t>(transaction_t::CHAIN_NONE);  /*Unused*/
+        _args.bits = uhd::htonx<boost::uint32_t>(on ? 1 : 0);
 
         _transact();
     }
