@@ -266,11 +266,6 @@ public:
         return recv_bytes;
     }
 
-    uint64_t get_device_handle()
-    {
-        return 0;   //Unused in B200 because the chip class is in FX3 firmware
-    }
-
     void load_firmware(const std::string filestring, UHD_UNUSED(bool force) = false)
     {
         const char *filename = filestring.c_str();
