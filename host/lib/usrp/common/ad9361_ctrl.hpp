@@ -11,41 +11,8 @@
 #include <boost/shared_ptr.hpp>
 #include <ad9361_device.h>
 #include <string>
-#include <stdint.h>
-#include "ad9361_transaction.h"
 
-static const double AD9361_CLOCK_RATE_MAX = 61.44e6;
-static const double AD9361_1_CHAN_CLOCK_RATE_MAX = AD9361_CLOCK_RATE_MAX;
-static const double AD9361_2_CHAN_CLOCK_RATE_MAX = (AD9361_1_CHAN_CLOCK_RATE_MAX / 2);
-
-/***********************************************************************
- * AD9361 Transport Interface
- **********************************************************************/
-class ad9361_io
-{
-public:
-    virtual uint8_t peek8(uint32_t reg) = 0;
-    virtual void poke8(uint32_t reg, uint8_t val) = 0;
-};
-
-/***********************************************************************
- * AD9361 Transport Interface
- **********************************************************************/
-class ad9361_ctrl_transport
-{
-public:
-    typedef boost::shared_ptr<ad9361_ctrl_transport> sptr;
-
-    virtual uint64_t get_device_handle() = 0;
-    virtual void ad9361_transact(const unsigned char in_buff[AD9361_DISPATCH_PACKET_SIZE], unsigned char out_buff[AD9361_DISPATCH_PACKET_SIZE]) = 0;
-
-    static ad9361_ctrl_transport::sptr make_zero_copy(
-        uhd::transport::zero_copy_if::sptr xport);
-    static ad9361_ctrl_transport::sptr make_software_spi(
-        ad9361_product_t product,
-        uhd::spi_iface::sptr spi_iface,
-        boost::uint32_t slave_num);
-};
+namespace uhd { namespace usrp {
 
 /***********************************************************************
  * AD9361 Control Interface
@@ -56,7 +23,8 @@ public:
     typedef boost::shared_ptr<ad9361_ctrl> sptr;
 
     //! make a new codec control object
-    static sptr make(ad9361_ctrl_transport::sptr iface);
+    static sptr make_spi(
+        ad9361_params::sptr client_settings, uhd::spi_iface::sptr spi_iface, boost::uint32_t slave_num);
 
     //! Get a list of gain names for RX or TX
     static std::vector<std::string> get_gain_names(const std::string &/*which*/)
@@ -90,7 +58,7 @@ public:
     static uhd::meta_range_t get_clock_rate_range(void)
     {
         //return uhd::meta_range_t(220e3, 61.44e6);
-        return uhd::meta_range_t(5e6, AD9361_CLOCK_RATE_MAX); //5 MHz DCM low end
+        return uhd::meta_range_t(5e6, ad9361_device_t::AD9361_MAX_CLOCK_RATE); //5 MHz DCM low end
     }
 
     //! set the filter bandwidth for the frontend
@@ -114,5 +82,7 @@ public:
     //! turn on/off Catalina's data port loopback
     virtual void data_port_loopback(const bool on) = 0;
 };
+
+}}
 
 #endif /* INCLUDED_AD9361_CTRL_HPP */
