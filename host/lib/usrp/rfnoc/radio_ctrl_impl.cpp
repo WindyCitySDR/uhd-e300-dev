@@ -131,13 +131,13 @@ public:
 
     void handle_overrun(boost::weak_ptr<uhd::rx_streamer> streamer)
     {
-        boost::shared_ptr<uhd::transport::sph::recv_packet_streamer> my_streamer =
+        boost::shared_ptr<transport::sph::recv_packet_streamer> my_streamer =
                 boost::dynamic_pointer_cast<transport::sph::recv_packet_streamer>(streamer.lock());
         if (not my_streamer) return; //If the rx_streamer has expired then overflow handling makes no sense.
 
         if (my_streamer->get_num_channels() == 1) {
             _perifs.framer->handle_overflow();
-            //return;
+            return;
         }
 
         /////////////////////////////////////////////////////////////

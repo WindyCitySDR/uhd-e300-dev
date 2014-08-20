@@ -870,8 +870,8 @@ void x300_impl::setup_mb(const size_t mb_i, const uhd::device_addr_t &dev_addr)
     // - If yes, add that sptr to the list of block controls
     // - Else, just add the original block_ctrl sptr
     //
-    // TODO: don't hardcode the loop boundaries but ask the xbar first
-    const size_t NUM_CE = 3;
+    const size_t NUM_CE = 0;
+    //const size_t NUM_CE = mb.zpu_ctrl->peek32(SR_ADDR(SET0_BASE, ZPU_RB_NUM_CE));
     for (size_t i = 0; i < NUM_CE; i++) {
         boost::uint32_t ctrl_sid_;
         boost::uint8_t block_port = (i & 0xFF) + X300_XB_DST_CE0;
@@ -883,7 +883,7 @@ void x300_impl::setup_mb(const size_t mb_i, const uhd::device_addr_t &dev_addr)
             ctrl_sid_ // sid (output)
         );
         uhd::sid_t ctrl_sid(ctrl_sid_);
-        UHD_MSG(status) << str(boost::format("Setting up NoC-Shell Control #%d (SID: %s)") % i % ctrl_sid.to_pp_string()) << std::endl;
+        UHD_MSG(status) << str(boost::format("Setting up NoC-Shell Control #%d (SID: %s)...") % i % ctrl_sid.to_pp_string());
         radio_ctrl_core_3000::sptr ctrl = radio_ctrl_core_3000::make(
                 mb.if_pkt_is_big_endian,
                 xport.recv,
@@ -891,6 +891,7 @@ void x300_impl::setup_mb(const size_t mb_i, const uhd::device_addr_t &dev_addr)
                 ctrl_sid,
                 str(boost::format("CE_%02d_Port_%02d") % i % block_port)
         );
+        std::cout << "OK" << std::endl;
         boost::uint64_t noc_id = ctrl->peek64(0);
         UHD_MSG(status) << str(boost::format("Port %d: Found NoC-Block with ID %016X.") % int(block_port) % noc_id) << std::endl;
         // TODO: Implement cunning method to figure out the right block_ctrl_base
@@ -918,7 +919,6 @@ void x300_impl::setup_mb(const size_t mb_i, const uhd::device_addr_t &dev_addr)
                 )
             );
         }
-
     }
     //////////////// RFNOC /////////////////
 }
@@ -978,6 +978,7 @@ void x300_impl::setup_radio(const size_t mb_i, const std::string &slot_name)
     perif.ctrl->poke32(TOREG(SR_MISC_OUTS), (1 << 2)); //reset adc + dac
     perif.ctrl->poke32(TOREG(SR_MISC_OUTS),  (1 << 1) | (1 << 0)); //out of reset + dac enable
 
+    // FIXME put this back?
     //this->register_loopback_self_test(perif.ctrl);
 
     perif.spi = spi_core_3000::make(perif.ctrl, TOREG(SR_SPI), RB32_SPI);
