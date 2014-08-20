@@ -101,14 +101,14 @@ static const size_t X300_MAX_RATE_1GIGE             = 100000000; // bytes/s
 #define X300_RADIO_DEST_PREFIX_CTRL 1
 #define X300_RADIO_DEST_PREFIX_RX 2
 
-#define X300_XB_DST_E0 0
-#define X300_XB_DST_E1 1
-#define X300_XB_DST_R0 2 // Radio 0 -> Slot A
-#define X300_XB_DST_R1 3 // Radio 1 -> Slot B
-#define X300_XB_DST_CE0 4
-#define X300_XB_DST_CE1 5
-#define X300_XB_DST_CE2 6
-#define X300_XB_DST_PCI 7
+#define X300_XB_DST_E0  0
+#define X300_XB_DST_E1  1
+#define X300_XB_DST_PCI 2
+#define X300_XB_DST_R0  3 // Radio 0 -> Slot A
+#define X300_XB_DST_R1  4 // Radio 1 -> Slot B
+#define X300_XB_DST_CE0 5
+#define X300_XB_DST_CE1 6
+#define X300_XB_DST_CE2 7
 
 #define X300_DEVICE_THERE 2
 #define X300_DEVICE_HERE 0
