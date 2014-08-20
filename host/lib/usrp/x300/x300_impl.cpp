@@ -871,12 +871,13 @@ void x300_impl::setup_mb(const size_t mb_i, const uhd::device_addr_t &dev_addr)
     // - Else, just add the original block_ctrl sptr
     //
     // TODO: don't hardcode the loop boundaries but ask the xbar first
-    const boost::uint8_t ce_map[] = {X300_XB_DST_CE0, X300_XB_DST_CE1, X300_XB_DST_CE2};
-    for (size_t i = 0; i < 3; i++) {
+    const size_t NUM_CE = 3;
+    for (size_t i = 0; i < NUM_CE; i++) {
         boost::uint32_t ctrl_sid_;
+        boost::uint8_t block_port = (i & 0xFF) + X300_XB_DST_CE0;
         both_xports_t xport = this->make_transport(
             mb_i, // mb index
-            ce_map[i], // destination (top 6 bits of local part of sid)
+            block_port, // destination (top 6 bits of local part of sid)
             0x00, // "prefix" (lower 2 bits of sid, not relevant unless radio)
             dev_addr,
             ctrl_sid_ // sid (output)
@@ -888,10 +889,10 @@ void x300_impl::setup_mb(const size_t mb_i, const uhd::device_addr_t &dev_addr)
                 xport.recv,
                 xport.send,
                 ctrl_sid,
-                str(boost::format("CE_%02d_Port_%02d") % i % ce_map[i])
+                str(boost::format("CE_%02d_Port_%02d") % i % block_port)
         );
         boost::uint64_t noc_id = ctrl->peek64(0);
-        UHD_MSG(status) << str(boost::format("Port %d: Found NoC-Block with ID %016x.") % int(ce_map[i]) % noc_id) << std::endl;
+        UHD_MSG(status) << str(boost::format("Port %d: Found NoC-Block with ID %016X.") % int(block_port) % noc_id) << std::endl;
         // TODO: Implement cunning method to figure out the right block_ctrl_base
         // derivative using the noc-id
         if (noc_id == 0xaaaabbbbcccc0000) {
@@ -972,7 +973,7 @@ void x300_impl::setup_radio(const size_t mb_i, const std::string &slot_name)
     boost::uint32_t ctrl_sid;
     //both_xports_t xport = this->make_transport(mb_i, dest, X300_RADIO_DEST_PREFIX_CTRL, device_addr_t(), ctrl_sid);
     both_xports_t xport = this->make_transport(mb_i, dest, 0x00, device_addr_t(), ctrl_sid);
-    UHD_MSG(status) << "Radio " << radio_index << " Ctrl SID: " << str(boost::format("0x%08x") % ctrl_sid) << std::endl;
+    UHD_MSG(status) << "Radio " << radio_index << " Ctrl SID: " << uhd::sid_t(ctrl_sid) << std::endl;
     perif.ctrl = radio_ctrl_core_3000::make(mb.if_pkt_is_big_endian, xport.recv, xport.send, ctrl_sid, slot_name);
     perif.ctrl->poke32(TOREG(SR_MISC_OUTS), (1 << 2)); //reset adc + dac
     perif.ctrl->poke32(TOREG(SR_MISC_OUTS),  (1 << 1) | (1 << 0)); //out of reset + dac enable
