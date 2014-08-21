@@ -161,14 +161,64 @@ template<typename samp_type> void recv_to_file(
     }
 }
 
+
+void pretty_print_flow_graph(std::vector<std::string> blocks)
+{
+    std::string sep_str = "==>";
+    std::cout << std::endl;
+    // Line 1
+    for (size_t n = 0; n < blocks.size(); n++) {
+        const std::string name = blocks[n];
+        std::cout << "+";
+        for (size_t i = 0; i < name.size() + 2; i++) {
+            std::cout << "-";
+        }
+        std::cout << "+";
+        if (n == blocks.size() - 1) {
+            break;
+        }
+        for (int i = 0; i < sep_str.size(); i++) {
+            std::cout << " ";
+        }
+    }
+    std::cout << std::endl;
+    // Line 2
+    for (size_t n = 0; n < blocks.size(); n++) {
+        const std::string name = blocks[n];
+        std::cout << "| " << name << " |";
+        if (n == blocks.size() - 1) {
+            break;
+        }
+        std::cout << sep_str;
+    }
+    std::cout << std::endl;
+    // Line 3
+    for (size_t n = 0; n < blocks.size(); n++) {
+        const std::string name = blocks[n];
+        std::cout << "+";
+        for (size_t i = 0; i < name.size() + 2; i++) {
+            std::cout << "-";
+        }
+        std::cout << "+";
+        if (n == blocks.size() - 1) {
+            break;
+        }
+        for (int i = 0; i < sep_str.size(); i++) {
+            std::cout << " ";
+        }
+    }
+    std::cout << std::endl << std::endl;
+}
+
 ///////////////////// MAIN ////////////////////////////////////////////////////
 int UHD_SAFE_MAIN(int argc, char *argv[])
 {
     uhd::set_thread_priority_safe();
 
     //variables to be set by po
-    std::string args, file, type, nullid, blockid;
+    std::string args, file, type, nullid, blockid, blockid2;
     size_t total_num_samps, spb, spp;
+    size_t num_proc_blocks = 1;
     double rate, total_time, setup_time, block_rate;
 
     //setup the program options
@@ -191,6 +241,7 @@ int UHD_SAFE_MAIN(int argc, char *argv[])
         ("continue", "don't abort on a bad packet")
         ("nullid", po::value<std::string>(&nullid)->default_value("0/NullSrcSink_0"), "The block ID for the null source.")
         ("blockid", po::value<std::string>(&blockid)->default_value(""), "The block ID for the processing block.")
+        ("blockid2", po::value<std::string>(&blockid2)->default_value(""), "Optional: The block ID for the 2nd processing block.")
     ;
     po::variables_map vm;
     po::store(po::parse_command_line(argc, argv, desc), vm);
@@ -218,6 +269,13 @@ int UHD_SAFE_MAIN(int argc, char *argv[])
         std::cout << "Must specify a valid block ID for the processing block." << std::endl;
         return ~0;
     }
+    if (not blockid2.empty()) {
+        if (not uhd::rfnoc::block_id_t::is_valid_block_id(blockid2)) {
+            std::cout << "Invalid block ID for the 2nd processing block." << std::endl;
+            return ~0;
+        }
+        num_proc_blocks = 2;
+    }
 
     /////////////////////////////////////////////////////////////////////////
     //////// 1. Setup a USRP device /////////////////////////////////////////
@@ -243,25 +301,38 @@ int UHD_SAFE_MAIN(int argc, char *argv[])
     /////////////////////////////////////////////////////////////////////////
     //////// 2. Get block control objects ///////////////////////////////////
     /////////////////////////////////////////////////////////////////////////
-    // For the streaming block, we don't care what type this block is,
+    // For the processing blocks, we don't care what type these block is,
     // so we make it a block_ctrl_base (default):
     uhd::rfnoc::block_ctrl_base::sptr proc_block_ctrl = usrp->get_device3()->find_block_ctrl(blockid);
+    uhd::rfnoc::block_ctrl_base::sptr proc_block_ctrl2;
+    if (num_proc_blocks == 2) {
+        proc_block_ctrl2 = usrp->get_device3()->find_block_ctrl(blockid2);
+    }
+
     // For the null source control, we want to use the subclassed access,
     // so we create a null_block_ctrl:
     uhd::rfnoc::null_block_ctrl::sptr null_src_ctrl = usrp->get_device3()->find_block_ctrl<uhd::rfnoc::null_block_ctrl>(nullid);
-    std::cout
-        << "Setting up Stream: " << null_src_ctrl->get_block_id()
-        << " ==> " << proc_block_ctrl->get_block_id()
-        << " ==> HOST"
-        << std::endl;
+
+    std::vector<std::string> blocks;
+    blocks.push_back(null_src_ctrl->get_block_id());
+    blocks.push_back(proc_block_ctrl->get_block_id());
+    if (num_proc_blocks == 2) {
+        blocks.push_back(proc_block_ctrl2->get_block_id());
+    }
+    blocks.push_back("HOST");
+    pretty_print_flow_graph(blocks);
 
     /////////////////////////////////////////////////////////////////////////
     //////// 3. Set channel definitions /////////////////////////////////////
     /////////////////////////////////////////////////////////////////////////
     // Here, we define that there is only 1 channel, and it points
-    // to the processing block.
+    // to the final processing block.
     usrp->clear_channels(); // The default is to use the radios. Let's not do that.
-    usrp->set_channel(null_src_ctrl->get_block_id()); // Defaults to being channel 0.
+    if (num_proc_blocks == 2) {
+        usrp->set_channel(proc_block_ctrl2->get_block_id()); // Defaults to being channel 0.
+    } else {
+        usrp->set_channel(proc_block_ctrl->get_block_id()); // Defaults to being channel 0.
+    }
 
     /////////////////////////////////////////////////////////////////////////
     //////// 4. Configure blocks (packet size and rate) /////////////////////
@@ -286,8 +357,13 @@ int UHD_SAFE_MAIN(int argc, char *argv[])
     // But let's use the other way to access these properties through
     // the property tree:
     uhd::fs_path line_rate_path = null_src_ctrl->get_block_id().get_tree_root() + "/line_rate/value";
-    double actual_rate_mega = usrp->get_device()->get_tree()->access<double>(line_rate_path).get() / 1e6;
+    double actual_rate_mega = usrp->get_device()->get_tree()->access<double>(line_rate_path).get() / 1e6 * 2;
     std::cout << str(boost::format("Actually got rate: %.2f Msps (%.2f MByte/s).") % actual_rate_mega % (actual_rate_mega * 4)) << std::endl;
+
+    proc_block_ctrl->set_bytes_per_input_packet(spp * BYTES_PER_SAMPLE);
+    if (num_proc_blocks == 2) {
+        proc_block_ctrl2->set_bytes_per_input_packet(proc_block_ctrl->get_bytes_per_output_packet());
+    }
 
     /////////////////////////////////////////////////////////////////////////
     //////// 5. Connect blocks //////////////////////////////////////////////
@@ -297,6 +373,12 @@ int UHD_SAFE_MAIN(int argc, char *argv[])
             null_src_ctrl->get_block_id(),
             proc_block_ctrl->get_block_id()
     );
+    if (num_proc_blocks == 2) {
+        usrp->connect(
+            proc_block_ctrl->get_block_id(),
+            proc_block_ctrl2->get_block_id()
+        );
+    }
 
     /////////////////////////////////////////////////////////////////////////
     //////// 6. Spawn receiver //////////////////////////////////////////////
