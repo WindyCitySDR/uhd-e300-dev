@@ -870,7 +870,7 @@ void x300_impl::setup_mb(const size_t mb_i, const uhd::device_addr_t &dev_addr)
     // - If yes, add that sptr to the list of block controls
     // - Else, just add the original block_ctrl sptr
     //
-    const size_t NUM_CE = 0;
+    const size_t NUM_CE = 3;
     //const size_t NUM_CE = mb.zpu_ctrl->peek32(SR_ADDR(SET0_BASE, ZPU_RB_NUM_CE));
     for (size_t i = 0; i < NUM_CE; i++) {
         boost::uint32_t ctrl_sid_;
