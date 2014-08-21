@@ -109,7 +109,9 @@ void e300_impl::_update_tx_samp_rate(const size_t dspno, const double rate)
 /***********************************************************************
  * frontend selection
  **********************************************************************/
-void e300_impl::_update_rx_subdev_spec(const uhd::usrp::subdev_spec_t &spec)
+void e300_impl::_update_subdev_spec(
+        const std::string &txrx,
+        const uhd::usrp::subdev_spec_t &spec)
 {
     //sanity checking
     if (spec.size())
@@ -129,46 +131,29 @@ void e300_impl::_update_rx_subdev_spec(const uhd::usrp::subdev_spec_t &spec)
     }
 
     const fs_path mb_path = "/mboards/0";
-    for (size_t i = 0; i < spec.size(); i++)
-    {
-        const std::string conn = _tree->access<std::string>(
-            mb_path / "dboards" / spec[i].db_name /
-            ("rx_frontends") / spec[i].sd_name / "connection").get();
 
-        const bool fe_swapped = (conn == "QI" or conn == "Q");
-        _radio_perifs[i].ddc->set_mux(conn, fe_swapped);
-        _radio_perifs[i].rx_fe->set_mux(fe_swapped);
-    }
-    this->_update_enables();
-}
+    if (txrx == "tx") {
+        for (size_t i = 0; i < spec.size(); i++)
+        {
+            const std::string conn = _tree->access<std::string>(
+                mb_path / "dboards" / spec[i].db_name /
+                ("tx_frontends") / spec[i].sd_name / "connection").get();
+            _radio_perifs[i].tx_fe->set_mux(conn);
+        }
 
-void e300_impl::_update_tx_subdev_spec(const uhd::usrp::subdev_spec_t &spec)
-{
-    //sanity checking
-    if (spec.size())
-        validate_subdev_spec(_tree, spec, "tx");
+    } else {
+        for (size_t i = 0; i < spec.size(); i++)
+        {
+            const std::string conn = _tree->access<std::string>(
+                mb_path / "dboards" / spec[i].db_name /
+                ("rx_frontends") / spec[i].sd_name / "connection").get();
 
-    UHD_ASSERT_THROW(spec.size() <= fpga::NUM_RADIOS);
-
-    if (spec.size() == 1) {
-        UHD_ASSERT_THROW(spec[0].db_name == "A");
-    }
-    if (spec.size() == 2) {
-        //TODO we can support swapping at a later date, only this combo is supported
-        UHD_ASSERT_THROW(spec[0].db_name == "A");
-        UHD_ASSERT_THROW(spec[0].sd_name == "A");
-        UHD_ASSERT_THROW(spec[1].db_name == "A");
-        UHD_ASSERT_THROW(spec[1].sd_name == "B");
+            const bool fe_swapped = (conn == "QI" or conn == "Q");
+            _radio_perifs[i].ddc->set_mux(conn, fe_swapped);
+            _radio_perifs[i].rx_fe->set_mux(fe_swapped);
+        }
     }
 
-    const fs_path mb_path = "/mboards/0";
-    for (size_t i = 0; i < spec.size(); i++)
-    {
-        const std::string conn = _tree->access<std::string>(
-            mb_path / "dboards" / spec[i].db_name /
-            ("tx_frontends") / spec[i].sd_name / "connection").get();
-        _radio_perifs[i].tx_fe->set_mux(conn);
-    }
     this->_update_enables();
 }
 

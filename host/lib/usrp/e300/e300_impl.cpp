@@ -534,10 +534,10 @@ e300_impl::e300_impl(const uhd::device_addr_t &device_addr)
 
     _tree->create<subdev_spec_t>(mb_path / "rx_subdev_spec")
         .set(subdev_spec_t())
-        .subscribe(boost::bind(&e300_impl::_update_rx_subdev_spec, this, _1));
+        .subscribe(boost::bind(&e300_impl::_update_subdev_spec, this, "rx", _1));
     _tree->create<subdev_spec_t>(mb_path / "tx_subdev_spec")
         .set(subdev_spec_t())
-        .subscribe(boost::bind(&e300_impl::_update_tx_subdev_spec, this, _1));
+        .subscribe(boost::bind(&e300_impl::_update_subdev_spec, this, "tx", _1));
 
     ////////////////////////////////////////////////////////////////////
     // do some post-init tasks

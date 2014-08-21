@@ -244,8 +244,9 @@ private: // methods
     void _update_time_source(const std::string &source);
     void _update_clock_source(const std::string &);
 
-    void _update_rx_subdev_spec(const uhd::usrp::subdev_spec_t &spec);
-    void _update_tx_subdev_spec(const uhd::usrp::subdev_spec_t &spec);
+    void _update_subdev_spec(
+        const std::string &txrx,
+        const uhd::usrp::subdev_spec_t &spec);
 
     void _codec_loopback_self_test(uhd::wb_iface::sptr iface);
 
