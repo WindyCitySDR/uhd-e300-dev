@@ -279,7 +279,6 @@ private: // members
     size_t                                 _sid_framer;
     radio_perifs_t                         _radio_perifs[2];
     double                                 _tick_rate;
-    ad9361_ctrl_transport::sptr            _codec_xport;
     ad9361_ctrl::sptr                      _codec_ctrl;
     fe_control_settings_t                  _settings;
     global_regs::sptr                      _global_regs;

@@ -23,6 +23,7 @@
 #include "e300_eeprom_manager.hpp"
 #include "e300_sensor_manager.hpp"
 #include "e300_common.hpp"
+#include "e300_remote_codec_ctrl.hpp"
 
 #include <uhd/utils/msg.hpp>
 #include <uhd/utils/log.hpp>
@@ -335,7 +336,7 @@ e300_impl::e300_impl(const uhd::device_addr_t &device_addr)
     if (_xport_path == ETH) {
         zero_copy_if::sptr codec_xport =
             udp_zero_copy::make(device_addr["addr"], E300_SERVER_CODEC_PORT, _ctrl_xport_params, dummy_buff_params_out, device_addr);
-        _codec_ctrl = ad9361_ctrl::make(ad9361_ctrl_transport::make_zero_copy(codec_xport));
+        _codec_ctrl = e300_remote_codec_ctrl::make(codec_xport);
         zero_copy_if::sptr gregs_xport =
             udp_zero_copy::make(device_addr["addr"], E300_SERVER_GREGS_PORT, _ctrl_xport_params, dummy_buff_params_out, device_addr);
         _global_regs = global_regs::make(gregs_xport);
@@ -364,8 +365,8 @@ e300_impl::e300_impl(const uhd::device_addr_t &device_addr)
         _fifo_iface = e300_fifo_interface::make(fifo_cfg);
         _global_regs = global_regs::make(_fifo_iface->get_global_regs_base());
 
-        _codec_xport = ad9361_ctrl_transport::make_software_spi(AD9361_E300, spi::make(E300_SPIDEV_DEVICE), 1);
-        _codec_ctrl = ad9361_ctrl::make(_codec_xport);
+        ad9361_params::sptr client_settings = boost::make_shared<e300_ad9361_client_t>();
+        _codec_ctrl = ad9361_ctrl::make_spi(client_settings, spi::make(E300_SPIDEV_DEVICE), 1);
         // This is horrible ... why do I have to sleep here?
         boost::this_thread::sleep(boost::posix_time::milliseconds(100));
         _eeprom_manager = boost::make_shared<e300_eeprom_manager>(i2c::make_i2cdev(E300_I2CDEV_DEVICE));
@@ -644,7 +645,7 @@ void e300_impl::_enforce_tick_rate_limits(
                 % max_chans
         ));
     } else {
-        const double max_tick_rate = ((chan_count <= 1) ? AD9361_1_CHAN_CLOCK_RATE_MAX : AD9361_2_CHAN_CLOCK_RATE_MAX);
+        const double max_tick_rate = ad9361_device_t::AD9361_MAX_CLOCK_RATE / ((chan_count <= 1) ? 1 : 2);
         if (tick_rate - max_tick_rate >= 1.0)
         {
             throw uhd::value_error(boost::str(
