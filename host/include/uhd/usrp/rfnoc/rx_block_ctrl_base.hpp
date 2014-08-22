@@ -60,13 +60,35 @@ public:
     virtual void issue_stream_cmd(const uhd::stream_cmd_t &stream_cmd);
 
     /*! Set stream args and SID before opening an RX streamer to this block.
+     *
+     * This is called by the streamer generators. Note this is *not* virtual.
+     * To change which settings are set during rx configuration, override init_rx().
      */
-    virtual void setup_rx_streamer(uhd::stream_args_t &args, const uhd::sid_t &data_sid);
+    void setup_rx_streamer(uhd::stream_args_t &args);
 
     /*! If an overrun ("O") is received, this function is called to straighten
      * things out, if necessary.
      */
-    virtual void handle_overrun(boost::weak_ptr<uhd::rx_streamer> streamer);
+    virtual void handle_overrun(boost::weak_ptr<uhd::rx_streamer>) { /* nop */ };
+
+protected:
+    /*! Before any kind of streaming operation, this will be automatically
+     * called to configure the block. Override this to set any rx specific
+     * registers etc.
+     *
+     * Note: \p args may be changed in this function. In a chained operation,
+     * the modified value of \p args will be propagated upstream.
+     */
+    virtual void _init_rx(uhd::stream_args_t &) { /* nop */ };
+
+    /*! If this function returns true, rx-specific settings (such as rx streamer
+     * setup) are not propagated upstream.
+     * An example for a block where this is necessary is a radio: If it's
+     * operating in full duplex mode, it will have an upstream block on the tx
+     * side, but we don't want to configure those while setting up an rx stream
+     * chain.
+     */
+    bool _is_final_rx_block() { return false; };
 
 }; /* class rx_block_ctrl_base */
 

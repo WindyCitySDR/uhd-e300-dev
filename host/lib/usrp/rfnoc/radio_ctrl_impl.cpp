@@ -43,6 +43,7 @@ public:
 
     void issue_stream_cmd(const uhd::stream_cmd_t &stream_cmd)
     {
+        UHD_MSG(status) << "radio_ctrl::issue_stream_cmd()" << std::endl;
         _perifs.framer->issue_stream_command(stream_cmd);
     }
 
@@ -51,6 +52,7 @@ public:
             size_t packets,
             size_t block_port
     ) {
+        UHD_MSG(status) << "radio_ctrl::configure_flow_control_in()" << std::endl;
         UHD_ASSERT_THROW(block_port == 0);
         _perifs.deframer->configure_flow_control(cycles, packets);
     }
@@ -60,6 +62,7 @@ public:
                 size_t,
                 const uhd::sid_t &
     ) {
+        UHD_MSG(status) << "radio_ctrl::configure_flow_control_out()" << std::endl;
         _perifs.framer->configure_flow_control(buf_size_pkts);
     }
 
@@ -72,6 +75,7 @@ public:
             size_t bpp,
             size_t out_block_port
     ) {
+        UHD_MSG(status) << "radio_ctrl::set_bytes_per_output_packet()" << std::endl;
         UHD_ASSERT_THROW(out_block_port == 0);
         if (bpp % _rx_bpi) {
             return false;
@@ -93,6 +97,7 @@ public:
             boost::uint32_t next_address,
             size_t out_block_port
     ) {
+        UHD_MSG(status) << "radio_ctrl::set_destination()" << std::endl;
         UHD_ASSERT_THROW(out_block_port == 0);
         uhd::sid_t sid(next_address);
         if (sid.get_src_address() == 0) {
@@ -103,27 +108,9 @@ public:
         _perifs.framer->set_sid(sid.get());
     }
 
-    void setup_rx_streamer(uhd::stream_args_t &args, const uhd::sid_t &data_sid)
-    {
-        UHD_MSG(status) << "radio_ctrl::setup_rx_streamer()" << std::endl;
-        _perifs.framer->clear();
-        // Set spp, if applicable
-        if (not args.args.has_key("spp")) {
-            args.args["spp"] = str(boost::format("%d") % _rx_spp);
-        } else {
-            _rx_spp = boost::lexical_cast<size_t>(args.args["spp"]);
-        }
-        if (not set_bytes_per_output_packet(_rx_spp * _rx_bpi, 0)) {
-            throw uhd::value_error("radio_ctrl::setup_rx_streamer(): Invalid spp value.");
-        }
-        set_destination(data_sid.get_src_address(), 0);
-
-        _perifs.framer->setup(args);
-        _perifs.ddc->setup(args);
-    }
-
     void setup_tx_streamer(uhd::stream_args_t &args)
     {
+        UHD_MSG(status) << "radio_ctrl::setup_tx_streamer()" << std::endl;
         _perifs.deframer->clear();
         _perifs.deframer->setup(args);
         _perifs.duc->setup(args);
@@ -131,6 +118,7 @@ public:
 
     void handle_overrun(boost::weak_ptr<uhd::rx_streamer> streamer)
     {
+        UHD_MSG(status) << "radio_ctrl::handle_overrun()" << std::endl;
         boost::shared_ptr<transport::sph::recv_packet_streamer> my_streamer =
                 boost::dynamic_pointer_cast<transport::sph::recv_packet_streamer>(streamer.lock());
         if (not my_streamer) return; //If the rx_streamer has expired then overflow handling makes no sense.
@@ -171,6 +159,30 @@ public:
         _perifs.ddc = ddc;
         _perifs.deframer = deframer;
         _perifs.duc = duc;
+    }
+
+protected:
+    void _init_rx(uhd::stream_args_t &args)
+    {
+        UHD_MSG(status) << "radio_ctrl::init_rx()" << std::endl;
+        _perifs.framer->clear();
+        // Set spp, if applicable
+        if (not args.args.has_key("spp")) {
+            args.args["spp"] = str(boost::format("%d") % _rx_spp);
+        } else {
+            _rx_spp = boost::lexical_cast<size_t>(args.args["spp"]);
+        }
+        if (not set_bytes_per_output_packet(_rx_spp * _rx_bpi, 0)) {
+            throw uhd::value_error("radio_ctrl::init_rx(): Invalid spp value.");
+        }
+        _perifs.framer->setup(args);
+        _perifs.ddc->setup(args);
+    }
+
+    bool _is_final_rx_block()
+    {
+        // Radio is the end
+        return true;
     }
 
 private:

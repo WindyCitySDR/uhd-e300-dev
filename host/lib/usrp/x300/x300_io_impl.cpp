@@ -490,7 +490,9 @@ rx_streamer::sptr x300_impl::get_rx_stream(const uhd::stream_args_t &args_)
         my_streamer->set_converter(id);
 
         // Configure the block
-        ce_ctrl->setup_rx_streamer(args, data_sid);
+        ce_ctrl->setup_rx_streamer(args);
+        // TODO: Take care of correct block port
+        ce_ctrl->set_destination(uhd::sid_t(data_sid).get_src_address(), 0);
 
         //flow control setup
         const size_t pkt_size = spp * bpi + X300_RX_MAX_HDR_LEN;

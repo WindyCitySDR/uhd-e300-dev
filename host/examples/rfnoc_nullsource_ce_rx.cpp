@@ -177,7 +177,7 @@ void pretty_print_flow_graph(std::vector<std::string> blocks)
         if (n == blocks.size() - 1) {
             break;
         }
-        for (int i = 0; i < sep_str.size(); i++) {
+        for (size_t i = 0; i < sep_str.size(); i++) {
             std::cout << " ";
         }
     }
@@ -203,7 +203,7 @@ void pretty_print_flow_graph(std::vector<std::string> blocks)
         if (n == blocks.size() - 1) {
             break;
         }
-        for (int i = 0; i < sep_str.size(); i++) {
+        for (size_t i = 0; i < sep_str.size(); i++) {
             std::cout << " ";
         }
     }

@@ -73,8 +73,6 @@ public:
     //! Pass stream commands to the radio
     virtual void issue_stream_cmd(const uhd::stream_cmd_t &stream_cmd) = 0;
 
-    virtual void setup_rx_streamer(uhd::stream_args_t &args, const uhd::sid_t &data_sid) = 0;
-
     virtual void handle_overrun(boost::weak_ptr<uhd::rx_streamer>) = 0;
 
     ///////// Tx Streamer Methods ////////////////
@@ -91,6 +89,12 @@ public:
         tx_dsp_core_3000::sptr  duc
     ) = 0;
 
+protected:
+    //! Configures framer and ddc
+    virtual void _init_rx(uhd::stream_args_t &args) = 0;
+
+    //! Will return true
+    virtual bool _is_final_rx_block() = 0;
 
 }; /* class radio_ctrl*/
 

@@ -20,6 +20,7 @@
 #include <uhd/utils/safe_main.hpp>
 #include <uhd/usrp/multi_usrp.hpp>
 #include <uhd/exception.hpp>
+#include <uhd/usrp/rfnoc/rx_block_ctrl_base.hpp>
 #include <boost/program_options.hpp>
 #include <boost/format.hpp>
 #include <boost/thread.hpp>
@@ -213,7 +214,7 @@ int UHD_SAFE_MAIN(int argc, char *argv[]){
     uhd::set_thread_priority_safe();
 
     //variables to be set by po
-    std::string args, file, type, ant, subdev, ref, wirefmt;
+    std::string args, file, type, ant, subdev, ref, wirefmt, blockid;
     size_t total_num_samps, spb;
     double rate, freq, gain, bw, total_time, setup_time;
 
@@ -243,6 +244,7 @@ int UHD_SAFE_MAIN(int argc, char *argv[]){
         ("continue", "don't abort on a bad packet")
         ("skip-lo", "skip checking LO lock status")
         ("int-n", "tune USRP with integer-N tuning")
+        ("blockid", po::value<std::string>(&blockid)->default_value(""), "rfnoc block id")
     ;
     po::variables_map vm;
     po::store(po::parse_command_line(argc, argv, desc), vm);
@@ -325,6 +327,21 @@ int UHD_SAFE_MAIN(int argc, char *argv[]){
     if (total_num_samps == 0){
         std::signal(SIGINT, &sig_int_handler);
         std::cout << "Press Ctrl + C to stop streaming..." << std::endl;
+    }
+
+    if (not blockid.empty() and usrp->is_device3()) {
+        uhd::rfnoc::rx_block_ctrl_base::sptr blk_ctrl =
+            usrp->get_device3()->find_block_ctrl< uhd::rfnoc::rx_block_ctrl_base >(blockid);
+        if (not blk_ctrl) {
+            std::cout << "Invalid block control selected." << std::endl;
+            return ~0;
+        }
+        usrp->connect(uhd::rfnoc::block_id_t("0/Radio_0"), blk_ctrl->get_block_id());
+        uhd::rfnoc::rx_block_ctrl_base::sptr radio_ctrl =
+            usrp->get_device3()->find_block_ctrl< uhd::rfnoc::rx_block_ctrl_base >("0/Radio_0");
+        radio_ctrl->set_bytes_per_output_packet(64);
+        usrp->clear_channels();
+        usrp->set_channel(blk_ctrl->get_block_id());
     }
 
 #define recv_to_file_args(format) \
