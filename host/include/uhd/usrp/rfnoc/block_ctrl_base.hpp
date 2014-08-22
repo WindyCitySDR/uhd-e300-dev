@@ -44,7 +44,8 @@
             bool is_big_endian \
     );
 
-//! This macro must be placed inside a block implementation class
+//! This macro must be placed inside a block implementation file
+// after the class definition
 #define UHD_RFNOC_BLOCK_MAKE_CALL(CLASS_NAME) \
     CLASS_NAME::sptr CLASS_NAME::make( \
         uhd::wb_iface::sptr ctrl_iface, \

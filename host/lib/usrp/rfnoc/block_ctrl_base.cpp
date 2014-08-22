@@ -20,8 +20,6 @@
 #include <boost/format.hpp>
 
 #include <uhd/usrp/rfnoc/block_ctrl_base.hpp>
-// TODO can I delete this line? (5th august)
-//#include "radio_ctrl_core_3000.hpp"
 
 //! Convert register to a peek/poke compatible address
 inline boost::uint32_t _sr_to_addr(boost::uint32_t reg) { return reg * 4; };
@@ -219,30 +217,4 @@ void block_ctrl_base::register_upstream_block(block_ctrl_base::sptr upstream_blo
 {
     _upstream_blocks.push_back(boost::weak_ptr<block_ctrl_base>(upstream_block));
 }
-
-//void block_ctrl_base::setup_rx_streamer(uhd::stream_args_t &, const uhd::sid_t &data_sid)
-//{
-    //set_destination(data_sid.get_src_address());
-//}
-
-//void block_ctrl_base::setup_tx_streamer(uhd::stream_args_t &args)
-//{
-    //// nop
-//}
-
-//void block_ctrl_base::handle_overrun()
-//{
-    //// nop
-//}
-
-//uhd::time_spec_t block_ctrl_base::get_time_now(void)
-//{
-    //return uhd::time_spec_t();
-//}
-
-//bool block_ctrl_base::in_continuous_streaming_mode(void)
-//{
-    //return false;
-//}
-
 // vim: sw=4 et:
