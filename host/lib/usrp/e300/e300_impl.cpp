@@ -259,7 +259,7 @@ static device::sptr e300_make(const device_addr_t &device_addr)
     if(device_addr.has_key("server"))
         throw uhd::runtime_error(
             str(boost::format("Please run the server executable \"%s\"")
-            % "usrp_e3x0_network_mode"));
+                % "usrp_e3x0_network_mode"));
     else
         return device::sptr(new e300_impl(device_addr));
 }
@@ -273,8 +273,6 @@ e300_impl::e300_impl(const uhd::device_addr_t &device_addr)
     , _sid_framer(0)
 {
     _type = uhd::device::USRP;
-    _device_addr = device_addr;
-    _xport_path = device_addr.has_key("addr") ? ETH : AXI;
 
     _async_md.reset(new async_md_type(1000/*messages deep*/));
 
@@ -380,10 +378,8 @@ e300_impl::e300_impl(const uhd::device_addr_t &device_addr)
             UHD_MSG(error) << "An error occured making GPSDO control: " << e.what() << std::endl;
         }
         _sensor_manager = e300_sensor_manager::make_local(_gps);
-        UHD_MSG(status) << (_sensor_manager->get_gps_found() ? "found" : "not found")  << std::endl;
-    } else {
-        UHD_MSG(status) << (_sensor_manager->get_gps_found() ? "found" : "not found")  << std::endl;
     }
+    UHD_MSG(status) << (_sensor_manager->get_gps_found() ? "found" : "not found")  << std::endl;
 
     // Verify we can talk to the e300 core control registers ...
     UHD_MSG(status) << "Initializing core control..." << std::endl;
@@ -565,20 +561,18 @@ e300_impl::e300_impl(const uhd::device_addr_t &device_addr)
     _tree->access<subdev_spec_t>(mb_path / "tx_subdev_spec").set(tx_spec);
 
     if (_sensor_manager->get_gps_found()) {
-            _tree->access<std::string>(mb_path / "clock_source" / "value").set("gpsdo");
-            _tree->access<std::string>(mb_path / "time_source" / "value").set("gpsdo");
-            UHD_MSG(status) << "References initialized to GPSDO sources" << std::endl;
-            const time_t tp = time_t(_sensor_manager->get_gps_time().to_int());
-            _tree->access<time_spec_t>(mb_path / "time" / "pps").set(time_spec_t(tp));
-            //wait for time to be set (timeout after 1 second)
-            for (int i = 0; i < 10; i++)
-            {
-                boost::this_thread::sleep(boost::posix_time::milliseconds(100));
-                if(tp == (_tree->access<time_spec_t>(mb_path / "time" / "pps").get()).get_full_secs()) {
-                    std::cout << "done" << std::endl;
-                    break;
-                }
-            }
+        _tree->access<std::string>(mb_path / "clock_source" / "value").set("gpsdo");
+        _tree->access<std::string>(mb_path / "time_source" / "value").set("gpsdo");
+        UHD_MSG(status) << "References initialized to GPSDO sources" << std::endl;
+        const time_t tp = time_t(_sensor_manager->get_gps_time().to_int());
+        _tree->access<time_spec_t>(mb_path / "time" / "pps").set(time_spec_t(tp));
+        //wait for time to be set (timeout after 1 second)
+        for (int i = 0; i < 10; i++)
+        {
+            boost::this_thread::sleep(boost::posix_time::milliseconds(100));
+            if(tp == (_tree->access<time_spec_t>(mb_path / "time" / "pps").get()).get_full_secs())
+                break;
+        }
     } else {
         // init to default time and clock source
         _tree->access<std::string>(mb_path / "clock_source" / "value").set(
@@ -955,9 +949,10 @@ void e300_impl::_setup_radio(const size_t dspno)
        _ctrl_xport_params,
        ctrl_sid);
 
-    this->_setup_dest_mapping(ctrl_sid,
-                              dspno ? E300_R1_CTRL_STREAM
-                                    : E300_R0_CTRL_STREAM);
+    this->_setup_dest_mapping(
+        ctrl_sid,
+        dspno ? E300_R1_CTRL_STREAM
+              : E300_R0_CTRL_STREAM);
 
     ////////////////////////////////////////////////////////////////////
     // radio control
@@ -1089,8 +1084,7 @@ void e300_impl::_setup_radio(const size_t dspno)
             .publish(boost::bind(&ad9361_ctrl::get_rf_freq_range));
 
         //setup antenna stuff
-        if (key[0] == 'R')
-        {
+        if (key[0] == 'R') {
             static const std::vector<std::string> ants = boost::assign::list_of("TX/RX")("RX2");
             _tree->create<std::vector<std::string> >(rf_fe_path / "antenna" / "options").set(ants);
             _tree->create<std::string>(rf_fe_path / "antenna" / "value")
@@ -1098,8 +1092,7 @@ void e300_impl::_setup_radio(const size_t dspno)
                 .set("RX2");
 
         }
-        if (key[0] == 'T')
-        {
+        if (key[0] == 'T') {
             static const std::vector<std::string> ants(1, "TX/RX");
             _tree->create<std::vector<std::string> >(rf_fe_path / "antenna" / "options").set(ants);
             _tree->create<std::string>(rf_fe_path / "antenna" / "value").set("TX/RX");
