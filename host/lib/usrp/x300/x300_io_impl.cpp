@@ -23,16 +23,12 @@
 #include <uhd/transport/nirio_zero_copy.hpp>
 #include "async_packet_handler.hpp"
 #include <uhd/transport/bounded_buffer.hpp>
-#include <uhd/usrp/rfnoc/rx_block_ctrl_base.hpp>
 #include <boost/bind.hpp>
 #include <uhd/utils/tasks.hpp>
 #include <uhd/utils/log.hpp>
 #include <boost/foreach.hpp>
 #include <boost/make_shared.hpp>
-
-////////////// RFNOC /////////////////
-#include <uhd/utils/cast.hpp>
-////////////// RFNOC /////////////////
+#include <uhd/usrp/rfnoc/rx_block_ctrl_base.hpp>
 
 using namespace uhd;
 using namespace uhd::usrp;
@@ -561,118 +557,6 @@ rx_streamer::sptr x300_impl::get_rx_stream(const uhd::stream_args_t &args_)
 
     return my_streamer;
 }
-
-
-boost::uint32_t x300_impl::rfnoc_cmd(
-                const std::string &dst, const std::string &type,
-                boost::uint32_t arg1, boost::uint32_t arg2
-) {
-    mboard_members_t &mb = _mb[0];
-    if (dst == "ce0" or dst == "ce1" or dst == "ce2") {
-        size_t ce_index = boost::lexical_cast<size_t>(dst[2]);
-        if (type == "poke") {
-            UHD_MSG(status) << "Setting register " << std::dec << arg1 << " on CE " << ce_index << " to " << str(boost::format("0x%08x") % arg2) << std::endl;
-            _rfnoc_block_ctrl[ce_index]->sr_write(arg1, arg2);
-            return 0;
-        }
-        else if (type == "set_fc") {
-            if (arg1) {
-                UHD_MSG(status) << "Activating downstream flow control for CE " << ce_index << ". Downstream block buffer size: " << arg1 << " packets." << std::endl;
-                //_rfnoc_block_ctrl[ce_index]->poke32(SR_ADDR(0x0000, 1), 0);
-                //boost::this_thread::sleep(boost::posix_time::milliseconds(1000));
-                _rfnoc_block_ctrl[ce_index]->configure_flow_control_out(arg1);
-            } else {
-                UHD_MSG(status) << "Disabling downstream flow control for CE " << ce_index << "." << std::endl;
-                _rfnoc_block_ctrl[ce_index]->configure_flow_control_out(0, false);
-            }
-            if (arg2) {
-                UHD_MSG(status) << "Activating upstream flow control for CE " << ce_index << ". Send ACKs every " << arg2 << " packets." << std::endl;
-                _rfnoc_block_ctrl[ce_index]->configure_flow_control_in(0 /* cycs off */, arg2);
-            } else {
-                UHD_MSG(status) << "Disabling upstream flow control for CE " << ce_index << "." << std::endl;
-                _rfnoc_block_ctrl[ce_index]->configure_flow_control_in(0 , 0);
-            }
-            UHD_MSG(status) << "Resetting fc counters." << std::endl;
-            _rfnoc_block_ctrl[ce_index]->reset_flow_control();
-            return 0;
-        }
-        throw uhd::value_error("x300_impl::rfnoc_cmd only supports poke and setup_fc on CEs");
-    }
-    else if (dst == "radio_rx0") {
-        if (type == "setup_dsp") {
-            UHD_MSG(status) << "Setting radio0, spp=" << arg1 << ", SID=" << str(boost::format("0x%08x") % arg2) << std::endl;
-            uhd::stream_args_t args;
-            args.otw_format = "sc16";
-            args.cpu_format = "sc16";
-            radio_perifs_t &perif = mb.radio_perifs[0];
-            size_t spp = arg1;
-            perif.framer->clear();
-            perif.framer->set_nsamps_per_packet(spp); //seems to be a good place to set this
-            perif.framer->set_sid(arg2);
-            perif.framer->setup(args);
-            perif.ddc->setup(args);
-            return 0;
-        }
-        else if (type == "setup_fc") {
-            UHD_MSG(status) << "Setting radio0, downstream buffer size =" << arg1 << std::endl;
-            radio_perifs_t &perif = mb.radio_perifs[0];
-            perif.framer->configure_flow_control(arg1);
-            return 0;
-        }
-        else if (type == "stream_cmd") {
-            UHD_MSG(status) << "Stream cmd to radio0 " << arg1 << std::endl;
-            radio_perifs_t &perif = mb.radio_perifs[0];
-            uhd::stream_cmd_t stream_cmd(
-                    arg1 == uhd::stream_cmd_t::STREAM_MODE_START_CONTINUOUS ? uhd::stream_cmd_t::STREAM_MODE_START_CONTINUOUS : 
-                    arg1 == uhd::stream_cmd_t::STREAM_MODE_STOP_CONTINUOUS ? uhd::stream_cmd_t::STREAM_MODE_START_CONTINUOUS : 
-                    uhd::stream_cmd_t::STREAM_MODE_NUM_SAMPS_AND_DONE
-            );
-            UHD_MSG(status) << stream_cmd.stream_mode << std::endl;
-            switch (arg1) {
-                case 97:
-                    UHD_MSG(status) << "STREAM_MODE_START_CONTINUOUS " << arg1<< std::endl;
-                    break;
-
-                case 100:
-                    UHD_MSG(status) << "STREAM_MODE_STOP_CONTINUOUS " << arg1<< std::endl;
-                    break;
-
-                case 111:
-                    UHD_MSG(status) << "STREAM_MODE_NUM_SAMPS_AND_DONE " << arg1<< std::endl;
-                    stream_cmd.num_samps = arg2;
-                    break;
-            }
-            stream_cmd.stream_now = true;
-            stream_cmd.time_spec = uhd::time_spec_t();
-            perif.framer->issue_stream_command(stream_cmd);
-            return 0;
-        }
-        throw uhd::value_error("x300_impl::rfnoc_cmd got invalid cmd type");
-    }
-    else if (dst == "radio_tx0") {
-        if (type == "setup_dsp") {
-            uhd::stream_args_t args;
-            args.otw_format = "sc16";
-            args.cpu_format = "sc16";
-            radio_perifs_t &perif = mb.radio_perifs[0];
-            perif.deframer->clear();
-            perif.deframer->setup(args);
-            perif.duc->setup(args);
-            return 0;
-        }
-        else if (type == "setup_fc") {
-            UHD_MSG(status) << "Setting radio0, ack packet every N==" << arg1 << std::endl;
-            radio_perifs_t &perif = mb.radio_perifs[0];
-            perif.deframer->configure_flow_control(0/*cycs off*/, arg1);
-            return 0;
-        }
-        throw uhd::value_error("x300_impl::rfnoc_cmd got invalid cmd type");
-    }
-    throw uhd::value_error("x300_impl::rfnoc_cmd got unknown dst");
-    return 0;
-}
-//////////////// RFNOC ////////////////////////////////
-
 
 /***********************************************************************
  * Transmit streamer

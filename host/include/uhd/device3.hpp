@@ -88,21 +88,6 @@ class UHD_API device3 : public uhd::device {
         return boost::dynamic_pointer_cast<T>(find_block_ctrl(block_id));
     }
 
-    /*!
-     * \param dst Who gets this command (radio0, ce1, ...)
-     * \param type Type of command (setup_radio, poke)
-     * \param arg1 First command arg (for poke: settings register)
-     * \param arg2 Second command arg (for poke: register value)
-     */
-    virtual boost::uint32_t rfnoc_cmd(
-            const std::string &dst,
-            const std::string &type,
-            boost::uint32_t arg1=0,
-            boost::uint32_t arg2=0
-    ) {
-        throw uhd::not_implemented_error(str(boost::format("%s %s %d %d") % dst % type % arg1 % arg2));
-    }
-
   protected:
     //! List of *all* RFNoC blocks available on this device.
     //  It is the responsibility of the deriving class to make
