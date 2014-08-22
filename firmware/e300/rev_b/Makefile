@@ -31,7 +31,7 @@ CFLAGS = -Os -std=gnu99 -Wall -fshort-enums -pedantic-errors -Wl,--gc-sections \
 # Files
 ##################################################
 HDRS =
-SRCS =  main.c io.c spi.c power.c ltc3675.c i2c.c debug.c bq24190.c
+SRCS =  main.c io.c power.c ltc3675.c i2c.c debug.c bq24190.c
 TARGET = main
 
 ##################################################
