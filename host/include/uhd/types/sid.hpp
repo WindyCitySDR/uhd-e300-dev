@@ -34,17 +34,29 @@ namespace uhd{
      * address.
      * Every address is split into two parts: A remote part
      * and a local part, which each are 8 Bits.
-     * A typical representation is in an IPv4-fashion, e.g.
-     * 2.3.0.6.
+     * A typical representation is in an IPv4-like fashion, e.g.
+     * 2.3>0.6. The '>' symbol shows the direction, so in this case,
+     * data is flowing from address 2.3 to 0.6.
+     *
+     * As a convention, ':' is used instead of '.' when giving the
+     * SID in hexadecimal numbers, and two characters are used for each
+     * address part. As an example, the following two SIDs are identical:
+     *
+     *     2.3>0.16 (decimal)
+     *     02:03>00.10 (hexadecimal)
      *
      * The format is:
-     *     REMOTE_SRC.LOCAL_SRC.REMOTE_DST.LOCAL_DST
+     *     REMOTE_SRC.LOCAL_SRC>REMOTE_DST.LOCAL_DST
      */
     class UHD_API sid_t
     {
     public:
-        sid_t(boost::uint32_t sid);
+        //! Create an unset SID
         sid_t();
+        //! Create a sid_t object from a 32-Bit SID value
+        sid_t(boost::uint32_t sid);
+        //! Convert a string representation of a SID into its numerical representation
+        sid_t(const std::string &);
 
         //! Return a string like this: 2.12/0.18 (decimal numbers)
         std::string to_pp_string() const;
@@ -90,6 +102,10 @@ namespace uhd{
 
         //! Alias for set_sid()
         void set(boost::uint32_t new_sid) { set_sid(new_sid); };
+        //! Convert a string representation of a SID into a numerical one
+        // Throws uhd::value_error if the string is not a valid SID
+        // representation.
+        void set_from_str(const std::string &);
         void set_sid(boost::uint32_t new_sid);
         //! Return the source address of this SID
         //  (the first 16 Bits)
@@ -123,12 +139,22 @@ namespace uhd{
             return *this;
         }
 
+        sid_t operator = (const std::string &sid_str) {
+            set_from_str(sid_str);
+            return *this;
+        }
+
         bool operator == (const sid_t &sid) const {
             return (not _set and not sid.is_set()) or (_sid == sid.get_sid());
         }
 
         bool operator == (boost::uint32_t sid) const {
             return _set and _sid == sid;
+        }
+
+        bool operator == (const std::string &sid_str) const {
+            sid_t rhs(sid_str);
+            return *this == rhs;
         }
 
         // overloaded type casts are tricky, but for now we'll need them

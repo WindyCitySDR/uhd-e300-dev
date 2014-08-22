@@ -19,14 +19,17 @@
 #include <sstream>
 #include <boost/test/unit_test.hpp>
 #include <uhd/types/sid.hpp>
+#include <uhd/exception.hpp>
+
+using uhd::sid_t;
 
 BOOST_AUTO_TEST_CASE(test_sid_t) {
     boost::uint32_t sid_value = 0x01020310;
-    uhd::sid_t sid(sid_value);
+    sid_t sid(sid_value);
 
     BOOST_CHECK_EQUAL(sid.is_set(), true);
-    BOOST_CHECK_EQUAL(sid.to_pp_string(), "1.2/3.16");
-    BOOST_CHECK_EQUAL(sid.to_pp_string_hex(), "01:02/03:10");
+    BOOST_CHECK_EQUAL(sid.to_pp_string(), "1.2>3.16");
+    BOOST_CHECK_EQUAL(sid.to_pp_string_hex(), "01:02>03:10");
     BOOST_CHECK_EQUAL(sid.get_src_address(), 0x0102);
     BOOST_CHECK_EQUAL(sid.get_dst_address(), 0x0310);
     BOOST_CHECK_EQUAL(sid.get_remote_src_address(), 0x01);
@@ -41,16 +44,16 @@ BOOST_AUTO_TEST_CASE(test_sid_t) {
 
     std::stringstream ss_dec;
     ss_dec << sid;
-    BOOST_CHECK_EQUAL(ss_dec.str(), "1.2/3.16");
+    BOOST_CHECK_EQUAL(ss_dec.str(), "1.2>3.16");
 
     std::stringstream ss_hex;
     ss_hex << std::hex << sid;
-    BOOST_CHECK_EQUAL(ss_hex.str(), "01:02/03:10");
+    BOOST_CHECK_EQUAL(ss_hex.str(), "01:02>03:10");
 
-    uhd::sid_t empty_sid;
+    sid_t empty_sid;
     BOOST_CHECK_EQUAL(empty_sid.is_set(), false);
-    BOOST_CHECK_EQUAL(empty_sid.to_pp_string(), "x.x/x.x");
-    BOOST_CHECK_EQUAL(empty_sid.to_pp_string_hex(), "xx:xx/xx:xx");
+    BOOST_CHECK_EQUAL(empty_sid.to_pp_string(), "x.x>x.x");
+    BOOST_CHECK_EQUAL(empty_sid.to_pp_string_hex(), "xx:xx>xx:xx");
     BOOST_CHECK_EQUAL(empty_sid == sid, false);
     BOOST_CHECK_EQUAL(empty_sid == sid_value, false);
     BOOST_CHECK_EQUAL((bool) empty_sid, false);
@@ -62,7 +65,7 @@ BOOST_AUTO_TEST_CASE(test_sid_t) {
 
 BOOST_AUTO_TEST_CASE(test_sid_t_set) {
     boost::uint32_t sid_value = 0x0;
-    uhd::sid_t sid(sid_value);
+    sid_t sid(sid_value);
 
     sid.set(0x01020304);
     BOOST_CHECK_EQUAL(sid.get(), 0x01020304);
@@ -99,6 +102,37 @@ BOOST_AUTO_TEST_CASE(test_sid_t_set) {
     BOOST_CHECK_EQUAL(sid.get_remote_dst_address(), 0x0c);
     BOOST_CHECK_EQUAL(sid.get_local_dst_address(), 0x0d);
 
-    uhd::sid_t flipped_sid = sid.reversed();
+    sid_t flipped_sid = sid.reversed();
     BOOST_CHECK_EQUAL(flipped_sid.get(), 0x0c0d0a0b);
+}
+
+BOOST_AUTO_TEST_CASE(test_sid_t_from_str) {
+    sid_t sid("1.2>3.4");
+    BOOST_CHECK_EQUAL(sid.get_remote_src_address(), 1);
+    BOOST_CHECK_EQUAL(sid.get_local_src_address(), 2);
+    BOOST_CHECK_EQUAL(sid.get_remote_dst_address(), 3);
+    BOOST_CHECK_EQUAL(sid.get_local_dst_address(), 4);
+
+    sid = "01:02>03:10";
+    BOOST_CHECK_EQUAL(sid.get_remote_src_address(), 1);
+    BOOST_CHECK_EQUAL(sid.get_local_src_address(), 2);
+    BOOST_CHECK_EQUAL(sid.get_remote_dst_address(), 3);
+    BOOST_CHECK_EQUAL(sid.get_local_dst_address(), 16);
+
+    sid = "01:06/03:10";
+    BOOST_CHECK_EQUAL(sid.get_remote_src_address(), 1);
+    BOOST_CHECK_EQUAL(sid.get_local_src_address(), 6);
+    BOOST_CHECK_EQUAL(sid.get_remote_dst_address(), 3);
+    BOOST_CHECK_EQUAL(sid.get_local_dst_address(), 16);
+
+    sid = "01:02:04:10";
+    BOOST_CHECK_EQUAL(sid.get_remote_src_address(), 1);
+    BOOST_CHECK_EQUAL(sid.get_local_src_address(), 2);
+    BOOST_CHECK_EQUAL(sid.get_remote_dst_address(), 4);
+    BOOST_CHECK_EQUAL(sid.get_local_dst_address(), 16);
+
+    BOOST_REQUIRE_THROW(sid_t fail_sid("foobar"), uhd::value_error);
+    BOOST_REQUIRE_THROW(sid_t fail_sid("01:02:03:4"), uhd::value_error);
+    BOOST_REQUIRE_THROW(sid_t fail_sid("01:02:03:004"), uhd::value_error);
+    BOOST_REQUIRE_THROW(sid_t fail_sid("1.2.3.0004"), uhd::value_error);
 }
