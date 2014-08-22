@@ -20,9 +20,6 @@
 
 #include <uhd/property_tree.hpp>
 #include <uhd/device3.hpp>
-///////////// RFNOC /////////////////////
-#include <uhd/usrp/rfnoc/block_ctrl.hpp>
-///////////// RFNOC /////////////////////
 #include <uhd/usrp/mboard_eeprom.hpp>
 #include <uhd/usrp/dboard_manager.hpp>
 #include <uhd/usrp/dboard_eeprom.hpp>
@@ -52,6 +49,9 @@
 #include <uhd/transport/nirio/niusrprio_session.h>
 #include <uhd/transport/vrt_if_packet.hpp>
 #include "recv_packet_demuxer_3000.hpp"
+///////////// RFNOC /////////////////////
+#include <uhd/usrp/rfnoc/block_ctrl.hpp>
+///////////// RFNOC /////////////////////
 
 
 static const std::string X300_FW_FILE_NAME  = "usrp_x300_fw.bin";
@@ -155,12 +155,6 @@ public:
     //the io interface
     uhd::rx_streamer::sptr get_rx_stream(const uhd::stream_args_t &);
     uhd::tx_streamer::sptr get_tx_stream(const uhd::stream_args_t &);
-    ///////////// RFNOC ////////////////////////
-    boost::uint32_t rfnoc_cmd(
-                const std::string &dst, const std::string &type,
-                boost::uint32_t arg1=0, boost::uint32_t arg2=0
-    );
-    ///////////// RFNOC ////////////////////////
 
     //support old async call
     bool recv_async_msg(uhd::async_metadata_t &, double);
@@ -198,12 +192,8 @@ private:
     //vector of member objects per motherboard
     struct mboard_members_t
     {
-        uhd::dict<size_t, boost::weak_ptr<uhd::rx_streamer> > rx_streamers;
-        uhd::dict<size_t, boost::weak_ptr<uhd::tx_streamer> > tx_streamers;
-        //////////////////// RFNOC ///////////////////////////////////
-        uhd::dict<std::string, boost::weak_ptr<uhd::rx_streamer> > ce_rx_streamers;
-        uhd::dict<std::string, boost::weak_ptr<uhd::tx_streamer> > ce_tx_streamers;
-        //////////////////// RFNOC ///////////////////////////////////
+        uhd::dict<std::string, boost::weak_ptr<uhd::rx_streamer> > rx_streamers;
+        uhd::dict<std::string, boost::weak_ptr<uhd::tx_streamer> > tx_streamers;
 
         uhd::task::sptr claimer_task;
         std::string addr;

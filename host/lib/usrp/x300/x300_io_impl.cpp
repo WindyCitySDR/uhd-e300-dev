@@ -37,58 +37,53 @@ using namespace uhd::transport;
 /***********************************************************************
  * update streamer rates
  **********************************************************************/
+// TODO: Move to device3?
 void x300_impl::update_tick_rate(mboard_members_t &mb, const double rate)
 {
-    BOOST_FOREACH(const size_t &dspno, mb.rx_streamers.keys())
-    {
-        boost::shared_ptr<sph::recv_packet_streamer> my_streamer =
-            boost::dynamic_pointer_cast<sph::recv_packet_streamer>(mb.rx_streamers[dspno].lock());
-        if (my_streamer) my_streamer->set_tick_rate(rate);
-    }
-    BOOST_FOREACH(const size_t &dspno, mb.tx_streamers.keys())
-    {
-        boost::shared_ptr<sph::send_packet_streamer> my_streamer =
-            boost::dynamic_pointer_cast<sph::send_packet_streamer>(mb.tx_streamers[dspno].lock());
-        if (my_streamer) my_streamer->set_tick_rate(rate);
-    }
-    //////// RFNOC ///////////////
-    BOOST_FOREACH(const std::string &block_id, mb.ce_rx_streamers.keys())
-    {
+    BOOST_FOREACH(const std::string &block_id, mb.rx_streamers.keys()) {
         UHD_MSG(status) << "setting ce rx streamer " << block_id << " rate to " << rate << std::endl;
         boost::shared_ptr<sph::recv_packet_streamer> my_streamer =
-            boost::dynamic_pointer_cast<sph::recv_packet_streamer>(mb.ce_rx_streamers[block_id].lock());
-        if (my_streamer) my_streamer->set_tick_rate(rate);
-        if (my_streamer) my_streamer->set_samp_rate(rate);
+            boost::dynamic_pointer_cast<sph::recv_packet_streamer>(mb.rx_streamers[block_id].lock());
+        if (my_streamer) {
+            my_streamer->set_tick_rate(rate);
+            my_streamer->set_samp_rate(rate);
+        }
     }
-    BOOST_FOREACH(const std::string &block_id, mb.ce_tx_streamers.keys())
-    {
-        UHD_MSG(status) << "setting ce tx streamer " << block_id << std::endl;
+    BOOST_FOREACH(const std::string &block_id, mb.tx_streamers.keys()) {
+        UHD_MSG(status) << "setting ce tx streamer " << block_id << " rate to " << rate << std::endl;
         boost::shared_ptr<sph::send_packet_streamer> my_streamer =
-            boost::dynamic_pointer_cast<sph::send_packet_streamer>(mb.ce_tx_streamers[block_id].lock());
-        if (my_streamer) my_streamer->set_tick_rate(rate);
-        if (my_streamer) my_streamer->set_samp_rate(rate);
+            boost::dynamic_pointer_cast<sph::send_packet_streamer>(mb.tx_streamers[block_id].lock());
+        if (my_streamer) {
+            my_streamer->set_tick_rate(rate);
+            my_streamer->set_samp_rate(rate);
+        }
     }
-    //////// RFNOC ///////////////
 }
 
+// TODO: Move to device3?
 void x300_impl::update_rx_samp_rate(mboard_members_t &mb, const size_t dspno, const double rate)
 {
-    if (not mb.rx_streamers.has_key(dspno)) return;
+    std::string radio_block_id = str(boost::format("Radio_%d") % dspno);
+    if (not mb.rx_streamers.has_key(radio_block_id)) return;
     boost::shared_ptr<sph::recv_packet_streamer> my_streamer =
-        boost::dynamic_pointer_cast<sph::recv_packet_streamer>(mb.rx_streamers[dspno].lock());
+        boost::dynamic_pointer_cast<sph::recv_packet_streamer>(mb.rx_streamers[radio_block_id].lock());
     if (not my_streamer) return;
     my_streamer->set_samp_rate(rate);
+    // TODO move these details to radio_ctrl
     const double adj = mb.radio_perifs[dspno].ddc->get_scaling_adjustment();
     my_streamer->set_scale_factor(adj);
 }
 
+// TODO: Move to device3?
 void x300_impl::update_tx_samp_rate(mboard_members_t &mb, const size_t dspno, const double rate)
 {
-    if (not mb.tx_streamers.has_key(dspno)) return;
+    std::string radio_block_id = str(boost::format("Radio_%d") % dspno);
+    if (not mb.tx_streamers.has_key(radio_block_id)) return;
     boost::shared_ptr<sph::send_packet_streamer> my_streamer =
-        boost::dynamic_pointer_cast<sph::send_packet_streamer>(mb.tx_streamers[dspno].lock());
+        boost::dynamic_pointer_cast<sph::send_packet_streamer>(mb.tx_streamers[radio_block_id].lock());
     if (not my_streamer) return;
     my_streamer->set_samp_rate(rate);
+    // TODO move these details to radio_ctrl
     const double adj = mb.radio_perifs[dspno].duc->get_scaling_adjustment();
     my_streamer->set_scale_factor(adj);
 }
@@ -543,7 +538,7 @@ rx_streamer::sptr x300_impl::get_rx_stream(const uhd::stream_args_t &args_)
         my_streamer->set_xport_chan_sid(stream_i, true, data_sid);
 
         // Store a weak pointer to prevent a streamer->x300_impl->streamer circular dependency
-        mb.ce_rx_streamers[ce_ctrl->get_block_id().get()] = boost::weak_ptr<sph::recv_packet_streamer>(my_streamer);
+        mb.rx_streamers[ce_ctrl->get_block_id().get()] = boost::weak_ptr<sph::recv_packet_streamer>(my_streamer);
 
         //sets all tick and samp rates on this streamer
         const fs_path mb_path = "/mboards/"+boost::lexical_cast<std::string>(mb_index);
@@ -691,7 +686,7 @@ tx_streamer::sptr x300_impl::get_tx_stream(const uhd::stream_args_t &args_)
         my_streamer->set_enable_trailer(false); //TODO not implemented trailer support yet
 
         //Store a weak pointer to prevent a streamer->x300_impl->streamer circular dependency
-        mb.ce_tx_streamers[ce_ctrl->get_block_id().get()] = boost::weak_ptr<sph::send_packet_streamer>(my_streamer);
+        mb.tx_streamers[ce_ctrl->get_block_id().get()] = boost::weak_ptr<sph::send_packet_streamer>(my_streamer);
 
         //sets all tick and samp rates on this streamer
         const fs_path mb_path = "/mboards/"+boost::lexical_cast<std::string>(mb_index);
