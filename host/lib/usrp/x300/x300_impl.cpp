@@ -979,7 +979,7 @@ void x300_impl::setup_radio(const size_t mb_i, const std::string &slot_name)
     perif.ctrl->poke32(TOREG(SR_MISC_OUTS),  (1 << 1) | (1 << 0)); //out of reset + dac enable
 
     // FIXME put this back?
-    //this->register_loopback_self_test(perif.ctrl);
+    this->register_loopback_self_test(perif.ctrl);
 
     perif.spi = spi_core_3000::make(perif.ctrl, TOREG(SR_SPI), RB32_SPI);
     perif.adc = x300_adc_ctrl::make(perif.spi, DB_ADC_SEN);
@@ -1213,11 +1213,14 @@ x300_impl::both_xports_t x300_impl::make_transport(
     uhd::sid_t &sid, // On input: Provides the endpoint address. On output: The SID of this transport, going to the device.
     const uhd::device_addr_t& args
 ) {
+    UHD_MSG(status) << "x300_impl::make_transport()" << std::endl;
     const size_t mb_index = sid.get_remote_dst_address() - X300_DEVICE_THERE;
     // divide by 4, just to make it confusing:
     const boost::uint8_t destination = sid.get_local_dst_address() / 4;
     const boost::uint8_t prefix = 0;
     boost::uint32_t new_sid;
+    UHD_VAR(destination);
+    UHD_VAR(mb_index);
 
     x300_impl::both_xports_t xports = make_transport(
             mb_index,

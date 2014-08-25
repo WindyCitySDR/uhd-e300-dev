@@ -194,7 +194,7 @@ void block_ctrl_base::set_destination(
         boost::uint32_t next_address,
         size_t output_block_port
 ) {
-    UHD_MSG(status) << "block_ctrl_base::set_destination() " << next_address << std::endl;
+    UHD_MSG(status) << "block_ctrl_base::set_destination() " << uhd::sid_t(next_address) << std::endl;
     sid_t new_sid(next_address);
     new_sid.set_remote_src_address(_ctrl_sid.get_remote_src_address());
     new_sid.set_local_src_address(_ctrl_sid.get_local_src_address() + output_block_port);

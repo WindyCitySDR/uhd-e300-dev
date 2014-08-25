@@ -41,7 +41,7 @@ using namespace uhd::transport;
 void x300_impl::update_tick_rate(mboard_members_t &mb, const double rate)
 {
     BOOST_FOREACH(const std::string &block_id, mb.rx_streamers.keys()) {
-        UHD_MSG(status) << "setting ce rx streamer " << block_id << " rate to " << rate << std::endl;
+        UHD_MSG(status) << "setting rx streamer " << block_id << " rate to " << rate << std::endl;
         boost::shared_ptr<sph::recv_packet_streamer> my_streamer =
             boost::dynamic_pointer_cast<sph::recv_packet_streamer>(mb.rx_streamers[block_id].lock());
         if (my_streamer) {
@@ -50,7 +50,7 @@ void x300_impl::update_tick_rate(mboard_members_t &mb, const double rate)
         }
     }
     BOOST_FOREACH(const std::string &block_id, mb.tx_streamers.keys()) {
-        UHD_MSG(status) << "setting ce tx streamer " << block_id << " rate to " << rate << std::endl;
+        UHD_MSG(status) << "setting tx streamer " << block_id << " rate to " << rate << std::endl;
         boost::shared_ptr<sph::send_packet_streamer> my_streamer =
             boost::dynamic_pointer_cast<sph::send_packet_streamer>(mb.tx_streamers[block_id].lock());
         if (my_streamer) {
@@ -454,12 +454,11 @@ rx_streamer::sptr x300_impl::get_rx_stream(const uhd::stream_args_t &args_)
         }
 
         //allocate sid and create transport
-        boost::uint8_t sid_lower = ce_ctrl->get_address() & 0xFF;
-        sid_lower /= 4; // TODO remove this line ASAP
-        boost::uint32_t data_sid;
-        UHD_LOG << "creating rx stream " << device_addr.to_string() << std::endl;
-        both_xports_t xport = this->make_transport(mb_index, sid_lower, 0x00, device_addr, data_sid);
-        UHD_LOG << boost::format("data_sid = 0x%08x, actual recv_buff_size = %d\n") % data_sid % xport.recv_buff_size << std::endl;
+        uhd::sid_t data_sid = ce_ctrl->get_address();
+        UHD_MSG(status) << "creating rx stream " << device_addr.to_string() << std::endl;
+        both_xports_t xport = this->make_transport(data_sid, device_addr);
+                //mb_index, sid_lower, 0x00, device_addr, data_sid);
+        UHD_MSG(status) << "data_sid = " << data_sid << " actual recv_buff_size = " << xport.recv_buff_size << std::endl;
 
         // To calculate the max number of samples per packet, we assume the maximum header length
         // to avoid fragmentation should the entire header be used.
@@ -492,7 +491,7 @@ rx_streamer::sptr x300_impl::get_rx_stream(const uhd::stream_args_t &args_)
         // Configure the block
         ce_ctrl->setup_rx_streamer(args);
         // TODO: Take care of correct block port
-        ce_ctrl->set_destination(uhd::sid_t(data_sid).get_src_address(), 0);
+        ce_ctrl->set_destination(data_sid.get_src_address(), 0);
 
         //flow control setup
         const size_t pkt_size = spp * bpi + X300_RX_MAX_HDR_LEN;
@@ -618,12 +617,11 @@ tx_streamer::sptr x300_impl::get_tx_stream(const uhd::stream_args_t &args_)
         device_addr_t device_addr = mb.send_args;
 
         //allocate sid and create transport
-        boost::uint8_t sid_lower = ce_ctrl->get_address() & 0xFF;
-        sid_lower /= 4; // TODO remove this line ASAP
-        boost::uint32_t data_sid;
-        UHD_LOG << "creating tx stream " << device_addr.to_string() << std::endl;
-        both_xports_t xport = this->make_transport(mb_index, sid_lower, 0x00, device_addr, data_sid);
-        UHD_LOG << "data_sid = " << uhd::sid_t(data_sid) << std::endl;
+        uhd::sid_t data_sid = ce_ctrl->get_address();
+        UHD_MSG(status) << "creating tx stream " << device_addr.to_string() << std::endl;
+        both_xports_t xport = this->make_transport(data_sid, device_addr);
+                //mb_index, sid_lower, 0x00, device_addr, data_sid);
+        UHD_MSG(status) << "data_sid = " << data_sid << std::endl;
 
         // To calculate the max number of samples per packet, we assume the maximum header length
         // to avoid fragmentation should the entire header be used.

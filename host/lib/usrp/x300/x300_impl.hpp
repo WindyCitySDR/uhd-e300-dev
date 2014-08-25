@@ -285,6 +285,7 @@ private:
         const uhd::device_addr_t& args,
         boost::uint32_t& sid);
 
+    // TODO declare this in device3
     both_xports_t make_transport(
         uhd::sid_t &sid, // On input: Provides the endpoint address. On output: The SID of this transport, going to the device.
         const uhd::device_addr_t& args
