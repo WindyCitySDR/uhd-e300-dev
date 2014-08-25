@@ -145,7 +145,18 @@ template<typename samp_type> void recv_to_file(
 				break;
 		}
     }
-    
+
+    stream_cmd.stream_mode = uhd::stream_cmd_t::STREAM_MODE_STOP_CONTINUOUS;
+    std::cout << "Issueing stop stream cmd" << std::endl;
+    rx_stream->issue_stream_cmd(stream_cmd);
+    std::cout << "Done" << std::endl;
+
+    // Run recv until nothing is left
+    int num_post_samps = 0;
+    do {
+        num_post_samps = rx_stream->recv(&buff.front(), buff.size(), md, 3.0);
+    } while(num_post_samps and md.error_code == uhd::rx_metadata_t::ERROR_CODE_NONE);
+
     if (outfile.is_open())
 		outfile.close();
     
