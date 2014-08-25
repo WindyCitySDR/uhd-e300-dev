@@ -694,6 +694,7 @@ tx_streamer::sptr x300_impl::get_tx_stream(const uhd::stream_args_t &args_)
         const fs_path mb_path = "/mboards/"+boost::lexical_cast<std::string>(mb_index);
         _tree->access<double>(mb_path / "tick_rate").update();
         if (ce_ctrl->get_block_id().get_block_name() == "Radio") {
+            // TODO this is specific to radios and thus should be done by radio_ctrl
             UHD_MSG(status) << "This is a radio, thus updating sample rate" << std::endl;
             _tree->access<double>(mb_path / "tx_dsps" / boost::lexical_cast<std::string>(ce_ctrl->get_block_id().get_block_count()) / "rate" / "value").update();
         }
