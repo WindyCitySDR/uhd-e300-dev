@@ -86,10 +86,6 @@ block_ctrl_base::block_ctrl_base(
     _tree->create<double>(_root_path / "clock_rate").set(160e6);
 
     // TODO: Add IO signature
-
-
-    // FIXME remove this from here! It will always call block_ctrl_base::reset_flow_control().
-    reset_flow_control();
 }
 
 block_ctrl_base::~block_ctrl_base() {
