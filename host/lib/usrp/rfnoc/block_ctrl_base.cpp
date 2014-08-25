@@ -124,24 +124,12 @@ double block_ctrl_base::get_clock_rate() const
     return _tree->access<double>(_root_path / "clock_rate").get();
 }
 
-//void block_ctrl_base::issue_stream_cmd(
-        //const uhd::stream_cmd_t &stream_cmd
-//) {
-    //if (_upstream_blocks.empty()) {
-        //UHD_MSG(warning) << "issue_stream_cmd() not implemented for " << _block_id << std::endl;
-        //return;
-    //}
-
-    //BOOST_FOREACH(const boost::weak_ptr<block_ctrl_base> upstream_block_ctrl, _upstream_blocks) {
-        //sptr(upstream_block_ctrl)->issue_stream_cmd(stream_cmd);
-    //}
-//}
-
 void block_ctrl_base::configure_flow_control_in(
         size_t cycles,
         size_t packets,
         UHD_UNUSED(size_t block_port)
 ) {
+    UHD_MSG(status) << "block_ctrl_base::configure_flow_control_in() " << cycles << " " << packets << std::endl;
     boost::uint32_t cycles_word = 0;
     if (cycles) {
         cycles_word = (1<<31) | cycles;
@@ -160,6 +148,7 @@ void block_ctrl_base::configure_flow_control_out(
             UHD_UNUSED(size_t block_port),
             UHD_UNUSED(const uhd::sid_t &sid)
 ) {
+    UHD_MSG(status) << "block_ctrl_base::configure_flow_control_out() " << buf_size_pkts << std::endl;
     // This actually takes counts between acks. So if the buffer size is 1 packet, we set
     // set this to zero.
     sr_write(SR_FLOW_CTRL_BUF_SIZE, (buf_size_pkts == 0) ? 0 : buf_size_pkts-1);
@@ -168,13 +157,15 @@ void block_ctrl_base::configure_flow_control_out(
 
 void block_ctrl_base::reset_flow_control()
 {
+    UHD_MSG(status) << "block_ctrl_base::reset_flow_control() " << std::endl;
     sr_write(SR_FLOW_CTRL_CLR_SEQ, 0x00C1EA12); // 'CLEAR', but we can write anything, really
     return;
 }
 
 
-bool block_ctrl_base::set_bytes_per_output_packet(size_t bpp, UHD_UNUSED(size_t out_block_port))
+bool block_ctrl_base::set_bytes_per_output_packet(size_t bpp, size_t out_block_port)
 {
+    UHD_MSG(status) << "block_ctrl_base::set_bytes_per_output_packet() " << bpp << std::endl;
     if (bpp % BYTES_PER_LINE) {
         return false;
     }
@@ -190,6 +181,7 @@ bool block_ctrl_base::set_bytes_per_output_packet(size_t bpp, UHD_UNUSED(size_t 
 
 bool block_ctrl_base::set_bytes_per_input_packet(UHD_UNUSED(size_t bpp), UHD_UNUSED(size_t in_block_port))
 {
+    UHD_MSG(status) << "block_ctrl_base::set_bytes_per_input_packet() " << bpp << std::endl;
     return true;
 }
 
@@ -206,6 +198,7 @@ void block_ctrl_base::set_destination(
         boost::uint32_t next_address,
         size_t output_block_port
 ) {
+    UHD_MSG(status) << "block_ctrl_base::set_destination() " << next_address << std::endl;
     sid_t new_sid(next_address);
     new_sid.set_remote_src_address(_ctrl_sid.get_remote_src_address());
     new_sid.set_local_src_address(_ctrl_sid.get_local_src_address() + output_block_port);
