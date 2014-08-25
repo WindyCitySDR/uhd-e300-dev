@@ -38,6 +38,7 @@ template<typename samp_type> void recv_to_file(
     uhd::usrp::multi_usrp::sptr usrp,
     const std::string &cpu_format,
     const std::string &wire_format,
+    const std::string &stream_args_args,
     const std::string &file,
     size_t samps_per_buff,
     unsigned long long num_requested_samples,
@@ -51,13 +52,14 @@ template<typename samp_type> void recv_to_file(
     unsigned long long num_total_samps = 0;
     //create a receive streamer
     uhd::stream_args_t stream_args(cpu_format,wire_format);
+    stream_args.args = stream_args_args;
     uhd::rx_streamer::sptr rx_stream = usrp->get_rx_stream(stream_args);
 
     uhd::rx_metadata_t md;
     std::vector<samp_type> buff(samps_per_buff);
     std::ofstream outfile;
     if (not null)
-		outfile.open(file.c_str(), std::ofstream::binary);
+        outfile.open(file.c_str(), std::ofstream::binary);
     bool overflow_message = true;
 
     //setup streaming
@@ -214,7 +216,7 @@ int UHD_SAFE_MAIN(int argc, char *argv[]){
     uhd::set_thread_priority_safe();
 
     //variables to be set by po
-    std::string args, file, type, ant, subdev, ref, wirefmt, blockid;
+    std::string args, file, type, ant, subdev, ref, wirefmt, streamargs, blockid;
     size_t total_num_samps, spb;
     double rate, freq, gain, bw, total_time, setup_time;
 
@@ -223,6 +225,7 @@ int UHD_SAFE_MAIN(int argc, char *argv[]){
     desc.add_options()
         ("help", "help message")
         ("args", po::value<std::string>(&args)->default_value(""), "multi uhd device address args")
+        ("streamargs", po::value<std::string>(&streamargs)->default_value(""), "stream args")
         ("file", po::value<std::string>(&file)->default_value("usrp_samples.dat"), "name of the file to write binary samples to")
         ("type", po::value<std::string>(&type)->default_value("short"), "sample type: double, float, or short")
         ("nsamps", po::value<size_t>(&total_num_samps)->default_value(0), "total number of samples to receive")
@@ -339,13 +342,12 @@ int UHD_SAFE_MAIN(int argc, char *argv[]){
         usrp->connect(uhd::rfnoc::block_id_t("0/Radio_0"), blk_ctrl->get_block_id());
         uhd::rfnoc::rx_block_ctrl_base::sptr radio_ctrl =
             usrp->get_device3()->find_block_ctrl< uhd::rfnoc::rx_block_ctrl_base >("0/Radio_0");
-        radio_ctrl->set_bytes_per_output_packet(64);
         usrp->clear_channels();
         usrp->set_channel(blk_ctrl->get_block_id());
     }
 
 #define recv_to_file_args(format) \
-	(usrp, format, wirefmt, file, spb, total_num_samps, total_time, bw_summary, stats, null, enable_size_map, continue_on_bad_packet)
+	(usrp, format, wirefmt, streamargs, file, spb, total_num_samps, total_time, bw_summary, stats, null, enable_size_map, continue_on_bad_packet)
     //recv to file
     if (type == "double") recv_to_file<std::complex<double> >recv_to_file_args("fc64");
     else if (type == "float") recv_to_file<std::complex<float> >recv_to_file_args("fc32");
