@@ -82,9 +82,9 @@ static std::vector<std::string> discover_ip_addrs(
     // we send a read request to i2c address 0x51,
     // to read register 0
     i2c_transaction_t req;
-    req.is_write = 0;
+    req.type = i2c::READ | i2c::ONEBYTE;
     req.addr = 0x51; // mboard's eeprom address, we don't really care
-    req.reg = 0;
+    req.reg = 4;
 
     // send dummy request
     try {
@@ -503,8 +503,18 @@ e300_impl::e300_impl(const uhd::device_addr_t &device_addr)
     // dboard eeproms but not really
     ////////////////////////////////////////////////////////////////////
     dboard_eeprom_t db_eeprom;
-    _tree->create<dboard_eeprom_t>(mb_path / "dboards" / "A" / "rx_eeprom").set(db_eeprom);
-    _tree->create<dboard_eeprom_t>(mb_path / "dboards" / "A" / "tx_eeprom").set(db_eeprom);
+    _tree->create<dboard_eeprom_t>(mb_path / "dboards" / "A" / "rx_eeprom")
+        .set(_eeprom_manager->get_db_eeprom())
+        .subscribe(boost::bind(
+            &e300_eeprom_manager::write_db_eeprom,
+            _eeprom_manager, _1));
+
+    _tree->create<dboard_eeprom_t>(mb_path / "dboards" / "A" / "tx_eeprom")
+        .set(_eeprom_manager->get_db_eeprom())
+        .subscribe(boost::bind(
+            &e300_eeprom_manager::write_db_eeprom,
+            _eeprom_manager, _1));
+
     _tree->create<dboard_eeprom_t>(mb_path / "dboards" / "A" / "gdb_eeprom").set(db_eeprom);
 
     ////////////////////////////////////////////////////////////////////

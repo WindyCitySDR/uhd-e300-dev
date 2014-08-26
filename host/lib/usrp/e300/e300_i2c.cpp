@@ -16,7 +16,9 @@
 //
 
 #include <uhd/exception.hpp>
+#include <uhd/utils/byteswap.hpp>
 #include <uhd/transport/udp_simple.hpp>
+
 
 #include "e300_i2c.hpp"
 #include <cstring>
@@ -34,15 +36,15 @@ public:
     {
     }
 
-    void set_i2c_reg(
+    void set_i2c_reg8(
         const boost::uint8_t addr,
         const boost::uint8_t reg,
         const boost::uint8_t value)
     {
         i2c_transaction_t transaction;
-        transaction.is_write = 1;
+        transaction.type = WRITE | ONEBYTE;
         transaction.addr = addr;
-        transaction.reg = reg;
+        transaction.reg  = uhd::htonx<boost::uint16_t>(reg);
         transaction.data = value;
         {
             uhd::transport::managed_send_buffer::sptr buff = _xport->get_send_buff(10.0);
@@ -53,14 +55,14 @@ public:
         }
     }
 
-    boost::uint8_t get_i2c_reg(
+    boost::uint8_t get_i2c_reg8(
         const boost::uint8_t addr,
         const boost::uint8_t reg)
     {
         i2c_transaction_t transaction;
-        transaction.is_write = 0;
+        transaction.type = READ | ONEBYTE;
         transaction.addr = addr;
-        transaction.reg = reg;
+        transaction.reg = uhd::htonx<boost::uint16_t>(reg);
         {
             uhd::transport::managed_send_buffer::sptr buff = _xport->get_send_buff(10.0);
             if (not buff or buff->size() < sizeof(transaction))
@@ -76,6 +78,50 @@ public:
         }
         return transaction.data;
     }
+
+    void set_i2c_reg16(
+        const boost::uint8_t addr,
+        const boost::uint16_t reg,
+        const boost::uint8_t value)
+    {
+        i2c_transaction_t transaction;
+        transaction.type = WRITE | TWOBYTE;
+        transaction.addr = addr;
+        transaction.reg  = uhd::htonx<boost::uint16_t>(reg);
+        transaction.data = value;
+        {
+            uhd::transport::managed_send_buffer::sptr buff = _xport->get_send_buff(10.0);
+            if (not buff or buff->size() < sizeof(transaction))
+                throw uhd::runtime_error("i2c_zc_impl send timeout");
+            std::memcpy(buff->cast<void *>(), &transaction, sizeof(transaction));
+            buff->commit(sizeof(transaction));
+        }
+    }
+
+    boost::uint8_t get_i2c_reg16(
+        const boost::uint8_t addr,
+        const boost::uint16_t reg)
+    {
+        i2c_transaction_t transaction;
+        transaction.type = READ | TWOBYTE;
+        transaction.addr = addr;
+        transaction.reg  = uhd::htonx<boost::uint16_t>(reg);
+        {
+            uhd::transport::managed_send_buffer::sptr buff = _xport->get_send_buff(10.0);
+            if (not buff or buff->size() < sizeof(transaction))
+                throw std::runtime_error("i2c_zc_impl send timeout");
+            std::memcpy(buff->cast<void *>(), &transaction, sizeof(transaction));
+            buff->commit(sizeof(transaction));
+        }
+        {
+            uhd::transport::managed_recv_buffer::sptr buff = _xport->get_recv_buff(10.0);
+            if (not buff or buff->size() < sizeof(transaction))
+                throw std::runtime_error("i2c_zc_impl recv timeout");
+            std::memcpy(&transaction, buff->cast<const void *>(), sizeof(transaction));
+        }
+        return transaction.data;
+    }
+
 
 private:
     uhd::transport::zero_copy_if::sptr _xport;
@@ -98,15 +144,15 @@ public:
     {
     }
 
-    void set_i2c_reg(
+    void set_i2c_reg8(
         const boost::uint8_t addr,
         const boost::uint8_t reg,
         const boost::uint8_t value)
     {
         i2c_transaction_t transaction;
-        transaction.is_write = 1;
+        transaction.type = i2c::WRITE | ONEBYTE;
         transaction.addr = addr;
-        transaction.reg = reg;
+        transaction.reg  = uhd::htonx<boost::uint16_t>(reg);
         transaction.data = value;
 
         _xport->send(
@@ -115,14 +161,14 @@ public:
                 sizeof(transaction)));
     }
 
-    boost::uint8_t get_i2c_reg(
+    boost::uint8_t get_i2c_reg8(
         const boost::uint8_t addr,
         const boost::uint8_t reg)
     {
         i2c_transaction_t transaction;
-        transaction.is_write = 0;
+        transaction.type = i2c::READ | ONEBYTE;
         transaction.addr = addr;
-        transaction.reg  = reg;
+        transaction.reg  = uhd::htonx<boost::uint16_t>(reg);
         transaction.data = 0;
 
         _xport->send(
@@ -138,6 +184,48 @@ public:
         i2c_transaction_t *reply = reinterpret_cast<i2c_transaction_t*>(buff);
         return reply->data;
     }
+
+    void set_i2c_reg16(
+        const boost::uint8_t addr,
+        const boost::uint16_t reg,
+        const boost::uint8_t value)
+    {
+        i2c_transaction_t transaction;
+        transaction.type = i2c::WRITE | TWOBYTE;
+        transaction.addr = addr;
+        transaction.reg = uhd::htonx<boost::uint16_t>(reg);
+        transaction.data = value;
+
+        _xport->send(
+            boost::asio::buffer(
+                &transaction,
+                sizeof(transaction)));
+    }
+
+    boost::uint8_t get_i2c_reg16(
+        const boost::uint8_t addr,
+        const boost::uint16_t reg)
+    {
+        i2c_transaction_t transaction;
+        transaction.type = i2c::READ | TWOBYTE;
+        transaction.addr = addr;
+        transaction.reg = uhd::htonx<boost::uint16_t>(reg);
+        transaction.data = 0;
+
+        _xport->send(
+            boost::asio::buffer(
+                &transaction,
+                sizeof(transaction)));
+
+        boost::uint8_t buff[sizeof(i2c_transaction_t)] = {};
+        const size_t nbytes = _xport->recv(
+            boost::asio::buffer(buff), 0.100);
+        if (not (nbytes == sizeof(transaction)))
+            throw std::runtime_error("i2c_simple_udp_impl recv timeout");
+        i2c_transaction_t *reply = reinterpret_cast<i2c_transaction_t*>(buff);
+        return reply->data;
+    }
+
 private:
     uhd::transport::udp_simple::sptr _xport;
 };
@@ -179,7 +267,7 @@ public:
         close(_fd);
     }
 
-    void set_i2c_reg(
+    void set_i2c_reg8(
         const boost::uint8_t addr,
         const boost::uint8_t reg,
         const boost::uint8_t value)
@@ -206,7 +294,7 @@ public:
         boost::this_thread::sleep(boost::posix_time::milliseconds(5));
     }
 
-    boost::uint8_t get_i2c_reg(
+    boost::uint8_t get_i2c_reg8(
         const boost::uint8_t addr,
         const boost::uint8_t reg)
     {
@@ -234,6 +322,71 @@ public:
 
         return inbuf;
     }
+
+    // the daughterboard uses 16 bit addresses
+    void set_i2c_reg16(
+        const boost::uint8_t addr,
+        const boost::uint16_t reg,
+        const boost::uint8_t value)
+    {
+        boost::uint8_t outbuf[3];
+        i2c_rdwr_ioctl_data packets;
+        i2c_msg messages[1];
+
+        messages[0].addr = addr;
+        messages[0].flags = 0;
+        messages[0].len = sizeof(outbuf);
+        messages[0].buf = outbuf;
+
+        outbuf[0] = (reg >> 8) & 0xff;
+        outbuf[1] = reg & 0xff;
+        outbuf[2] = value;
+
+        packets.msgs = messages;
+        packets.nmsgs = 1;
+
+        if(::ioctl(_fd, I2C_RDWR, &packets) < 0) {
+            throw std::runtime_error("ioctl failed");
+        }
+        // this is ugly
+        boost::this_thread::sleep(boost::posix_time::milliseconds(5));
+    }
+
+
+    // the daughterboard eeprom uses 16 bit addresses
+    boost::uint8_t get_i2c_reg16(
+        const boost::uint8_t addr,
+        const boost::uint16_t reg)
+    {
+        i2c_rdwr_ioctl_data packets;
+        i2c_msg messages[2];
+
+        // always little endian
+        boost::uint8_t outbuf[2];
+        outbuf[0] = (reg >> 8) & 0xff;
+        outbuf[1] = reg & 0xff;
+
+        messages[0].addr = addr;
+        messages[0].flags = 0;
+        messages[0].len = sizeof(outbuf);
+        messages[0].buf = outbuf;
+
+        boost::uint8_t inbuf;
+        messages[1].addr = addr;
+        messages[1].flags = I2C_M_RD;
+        messages[1].len = sizeof(inbuf);
+        messages[1].buf = &inbuf;
+
+        packets.msgs = messages;
+        packets.nmsgs = 2;
+
+        if(::ioctl(_fd, I2C_RDWR, &packets) < 0) {
+            throw std::runtime_error("ioctl failed.");
+        }
+
+        return inbuf;
+    }
+
 private:
     int _fd;
 };

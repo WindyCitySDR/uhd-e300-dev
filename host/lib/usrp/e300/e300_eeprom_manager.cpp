@@ -45,6 +45,7 @@ static void _string_to_bytes(const std::string &string, size_t max_len, uint8_t*
 e300_eeprom_manager::e300_eeprom_manager(i2c::sptr i2c) : _i2c(i2c)
 {
     read_mb_eeprom();
+    read_db_eeprom();
 }
 
 e300_eeprom_manager::~e300_eeprom_manager(void)
@@ -62,7 +63,7 @@ const mboard_eeprom_t& e300_eeprom_manager::read_mb_eeprom(void)
 
     // get the old contents
     for(size_t i = 0; i < sizeof(mb_eeprom_map_t); i++)
-        bytes[i] = _i2c->get_i2c_reg(MB_ADDR, i);
+        bytes[i] = _i2c->get_i2c_reg8(MB_ADDR, i);
 
     mb_eeprom_map_t &map = *map_ptr;
 
@@ -82,6 +83,66 @@ const mboard_eeprom_t& e300_eeprom_manager::read_mb_eeprom(void)
     return _mb_eeprom;
 }
 
+const dboard_eeprom_t& e300_eeprom_manager::read_db_eeprom(void)
+{
+    boost::mutex::scoped_lock(_mutex);
+
+    std::vector<boost::uint8_t> bytes;
+    bytes.resize(sizeof(db_eeprom_map_t));
+    db_eeprom_map_t *map_ptr = reinterpret_cast<db_eeprom_map_t*>(&bytes[0]);
+    memset(map_ptr, 0xff, sizeof(db_eeprom_map_t));
+
+    // get the old contents
+    for(size_t i = 0; i < sizeof(db_eeprom_map_t); i++)
+        bytes[i] = _i2c->get_i2c_reg16(DB_ADDR, i);
+
+    db_eeprom_map_t &map = *map_ptr;
+
+    _db_eeprom.id = uhd::usrp::dboard_id_t::from_uint16(
+        uhd::ntohx<boost::uint16_t>(map.hw_product));
+
+    _db_eeprom.revision = boost::lexical_cast<std::string>(
+        uhd::ntohx<boost::uint16_t>(map.hw_revision));
+    _db_eeprom.serial = _bytes_to_string(
+        map.serial, DB_SERIAL_LEN);
+
+    return _db_eeprom;
+}
+
+void e300_eeprom_manager::write_db_eeprom(const dboard_eeprom_t& eeprom)
+{
+    boost::mutex::scoped_lock(_mutex);
+    _db_eeprom = eeprom;
+    std::vector<boost::uint8_t> bytes;
+    bytes.resize(sizeof(db_eeprom_map_t));
+
+
+    db_eeprom_map_t *map_ptr = reinterpret_cast<db_eeprom_map_t*>(&bytes[0]);
+    memset(map_ptr, 0xff, sizeof(db_eeprom_map_t));
+
+    // get the old contents
+    for(size_t i = 0; i < sizeof(db_eeprom_map_t); i++)
+        bytes[i] = _i2c->get_i2c_reg16(DB_ADDR, i);
+
+    db_eeprom_map_t &map = *map_ptr;
+
+    if (_db_eeprom.id != dboard_id_t::none()) {
+        map.hw_product = uhd::htonx<boost::uint16_t>(
+            _db_eeprom.id.to_uint16());
+    }
+
+    if (not _db_eeprom.revision.empty()) {
+        map.hw_revision = uhd::htonx<boost::uint16_t>(
+            boost::lexical_cast<boost::uint16_t>(_db_eeprom.revision));
+    }
+
+    if (not _db_eeprom.serial.empty()) {
+        _string_to_bytes(_db_eeprom.serial, DB_SERIAL_LEN, map.serial);
+    }
+    for(size_t i = 0; i < sizeof(mb_eeprom_map_t); i++)
+        _i2c->set_i2c_reg16(DB_ADDR, i, bytes[i]);
+}
+
 void e300_eeprom_manager::write_mb_eeprom(const mboard_eeprom_t& eeprom)
 {
     boost::mutex::scoped_lock(_mutex);
@@ -95,7 +156,7 @@ void e300_eeprom_manager::write_mb_eeprom(const mboard_eeprom_t& eeprom)
 
     // get the old contents
     for(size_t i = 0; i < sizeof(mb_eeprom_map_t); i++)
-        bytes[i] = _i2c->get_i2c_reg(MB_ADDR, i);
+        bytes[i] = _i2c->get_i2c_reg8(MB_ADDR, i);
 
     mb_eeprom_map_t &map = *map_ptr;
 
@@ -121,7 +182,7 @@ void e300_eeprom_manager::write_mb_eeprom(const mboard_eeprom_t& eeprom)
     }
 
     for(size_t i = 0; i < sizeof(mb_eeprom_map_t); i++)
-        _i2c->set_i2c_reg(MB_ADDR, i, bytes[i]);
+        _i2c->set_i2c_reg8(MB_ADDR, i, bytes[i]);
 
 }
 
