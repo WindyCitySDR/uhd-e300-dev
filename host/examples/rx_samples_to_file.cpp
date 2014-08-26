@@ -351,8 +351,6 @@ int UHD_SAFE_MAIN(int argc, char *argv[]){
             return ~0;
         }
         usrp->connect(uhd::rfnoc::block_id_t("0/Radio_0"), blk_ctrl->get_block_id());
-        uhd::rfnoc::rx_block_ctrl_base::sptr radio_ctrl =
-            usrp->get_device3()->find_block_ctrl< uhd::rfnoc::rx_block_ctrl_base >("0/Radio_0");
         usrp->clear_channels();
         usrp->set_channel(blk_ctrl->get_block_id());
     }
