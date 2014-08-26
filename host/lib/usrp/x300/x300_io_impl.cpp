@@ -182,6 +182,7 @@ static void x300_if_hdr_pack_le(
 /***********************************************************************
  * RX flow control handler
  **********************************************************************/
+// TODO move to rx_block_ctrl_base
 static size_t get_rx_flow_control_window(size_t frame_size, size_t sw_buff_size, const device_addr_t& rx_args)
 {
     double fullness_factor = rx_args.cast<double>("recv_buff_fullness", X300_RX_SW_BUFF_FULL_FACTOR);
@@ -197,6 +198,7 @@ static size_t get_rx_flow_control_window(size_t frame_size, size_t sw_buff_size,
     return window_in_pkts;
 }
 
+// TODO: Definitely move to rx_block_ctrl_base
 static void handle_rx_flowctrl(const boost::uint32_t sid, zero_copy_if::sptr xport, bool big_endian, boost::shared_ptr<boost::uint32_t> seq32_state, const size_t last_seq)
 {
     static size_t fc_pkt_count = 0;
@@ -396,7 +398,7 @@ rx_streamer::sptr x300_impl::get_rx_stream(const uhd::stream_args_t &args_)
     args.channels = args.channels.empty()? std::vector<size_t>(1, 0) : args.channels;
 
     // I. Generate the channel list
-    // TODO move this into its own function
+    // TODO move this into its own function, it's the same for rx and tx
     std::vector<uhd::rfnoc::block_id_t> chan_list;
     std::vector<device_addr_t> chan_args;
     if (args.args.has_key("block_id")) { // Override channel settings
@@ -420,7 +422,6 @@ rx_streamer::sptr x300_impl::get_rx_stream(const uhd::stream_args_t &args_)
             chan_args.push_back(this_chan_args);
         }
     }
-
 
     // II. Iterate over all channels
     boost::shared_ptr<sph::recv_packet_streamer> my_streamer;
@@ -495,7 +496,7 @@ rx_streamer::sptr x300_impl::get_rx_stream(const uhd::stream_args_t &args_)
 
         //flow control setup
         const size_t pkt_size = spp * bpi + X300_RX_MAX_HDR_LEN;
-        UHD_VAR(pkt_size);
+        UHD_VAR(pkt_size); // TODO remove this line
         const size_t fc_window = get_rx_flow_control_window(pkt_size, xport.recv_buff_size, device_addr);
         const size_t fc_handle_window = std::max<size_t>(1, fc_window / X300_RX_FC_REQUEST_FREQ);
         UHD_LOG << "RX Flow Control Window = " << fc_window << ", RX Flow Control Handler Window = " << fc_handle_window << std::endl;
