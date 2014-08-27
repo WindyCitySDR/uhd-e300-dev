@@ -31,7 +31,6 @@ localparam SR_MISC_OUTS  = 24;
 localparam SR_READBACK   = 32;
 localparam SR_TX_CTRL    = 64;
 localparam SR_RX_CTRL    = 96;
-localparam SR_CODEC_IDLE = 100;
 localparam SR_TIME       = 128;
 localparam SR_RX_DSP     = 144;
 localparam SR_TX_DSP     = 184;
@@ -39,6 +38,7 @@ localparam SR_LEDS       = 196;
 localparam SR_FP_GPIO    = 200;
 localparam SR_RX_FRONT   = 208;
 localparam SR_TX_FRONT   = 216;
+localparam SR_CODEC_IDLE = 250;
 
 
 localparam RB32_SPI             = 4;
