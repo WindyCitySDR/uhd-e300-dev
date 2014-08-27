@@ -52,6 +52,10 @@ using namespace uhd::transport;
 namespace fs = boost::filesystem;
 namespace asio = boost::asio;
 
+//! mapping of frontend to radio perif index
+static const size_t FE0 = 1;
+static const size_t FE1 = 0;
+
 namespace uhd { namespace usrp { namespace e300 {
 
 /***********************************************************************
@@ -1058,10 +1062,10 @@ void e300_impl::_setup_radio(const size_t dspno)
     ////////////////////////////////////////////////////////////////////
     // create RF frontend interfacing
     ////////////////////////////////////////////////////////////////////
-    static const std::vector<std::string> data_directions = boost::assign::list_of("tx")("rx");
+    static const std::vector<std::string> data_directions = boost::assign::list_of("rx")("tx");
     BOOST_FOREACH(const std::string& direction, data_directions)
     {
-        const std::string key = boost::to_upper_copy(direction) + str(boost::format("%u") % (dspno + 1));
+        const std::string key = boost::to_upper_copy(direction) + std::string(((dspno == FE0)? "1" : "2"));
         const fs_path rf_fe_path
             = mb_path / "dboards" / "A" / (direction + "_frontends") / ((dspno == 0) ? "A" : "B");
 
@@ -1113,10 +1117,10 @@ void e300_impl::_setup_radio(const size_t dspno)
 void e300_impl::_update_enables(void)
 {
     //extract settings from state variables
-    const bool enb_tx1 = bool(_radio_perifs[0].tx_streamer.lock());
-    const bool enb_rx1 = bool(_radio_perifs[0].rx_streamer.lock());
-    const bool enb_tx2 = bool(_radio_perifs[1].tx_streamer.lock());
-    const bool enb_rx2 = bool(_radio_perifs[1].rx_streamer.lock());
+    const bool enb_tx1 = bool(_radio_perifs[FE0].tx_streamer.lock());
+    const bool enb_rx1 = bool(_radio_perifs[FE0].rx_streamer.lock());
+    const bool enb_tx2 = bool(_radio_perifs[FE1].tx_streamer.lock());
+    const bool enb_rx2 = bool(_radio_perifs[FE1].rx_streamer.lock());
     const size_t num_rx = (enb_rx1 ? 1 : 0) + (enb_rx2 ? 1:0);
     const size_t num_tx = (enb_tx1 ? 1 : 0) + (enb_tx2 ? 1:0);
     const bool mimo = num_rx == 2 or num_tx == 2;
@@ -1125,10 +1129,8 @@ void e300_impl::_update_enables(void)
     _codec_ctrl->set_active_chains(enb_tx1, enb_tx2, enb_rx1, enb_rx2);
     if ((num_rx + num_tx) == 0)
         _codec_ctrl->set_active_chains(
-            true,
-            false,
-            true,
-            false); //enable something
+            true, false, true, false); // enable something
+
     //set_active_chains could cause a clock rate change - reset dcm
     _reset_codec_mmcm();
 

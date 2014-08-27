@@ -119,16 +119,24 @@ void e300_impl::_update_subdev_spec(
 
     UHD_ASSERT_THROW(spec.size() <= fpga::NUM_RADIOS);
 
-    if (spec.size() == 1) {
+    if (spec.size() >= 1)
+    {
         UHD_ASSERT_THROW(spec[0].db_name == "A");
+        UHD_ASSERT_THROW(spec[0].sd_name == "A" or spec[0].sd_name == "B");
     }
-    if (spec.size() == 2) {
-        //TODO we can support swapping at a later date, only this combo is supported
-        UHD_ASSERT_THROW(spec[0].db_name == "A");
-        UHD_ASSERT_THROW(spec[0].sd_name == "A");
+    if (spec.size() == 2)
+    {
         UHD_ASSERT_THROW(spec[1].db_name == "A");
-        UHD_ASSERT_THROW(spec[1].sd_name == "B");
+        UHD_ASSERT_THROW(
+            (spec[0].sd_name == "A" and spec[1].sd_name == "B") or
+            (spec[0].sd_name == "B" and spec[1].sd_name == "A")
+        );
     }
+
+    std::vector<size_t> chan_to_dsp_map(spec.size(), 0);
+    for (size_t i = 0; i < spec.size(); i++)
+        chan_to_dsp_map[i] = (spec[i].sd_name == "A") ? 0 : 1;
+    _tree->access<std::vector<size_t> >("/mboards/0" / (txrx + "_chan_dsp_mapping")).set(chan_to_dsp_map);
 
     const fs_path mb_path = "/mboards/0";
 
@@ -408,7 +416,8 @@ rx_streamer::sptr e300_impl::get_rx_stream(const uhd::stream_args_t &args_)
     for (size_t stream_i = 0; stream_i < args.channels.size(); stream_i++)
     {
 
-        const size_t radio_index = args.channels[stream_i];
+        const size_t radio_index = _tree->access<std::vector<size_t> >("/mboards/0/rx_chan_dsp_mapping")
+                                       .get().at(args.channels[stream_i]);
 
         radio_perifs_t &perif = _radio_perifs[radio_index];
 
@@ -506,7 +515,9 @@ tx_streamer::sptr e300_impl::get_tx_stream(const uhd::stream_args_t &args_)
 
     for (size_t stream_i = 0; stream_i < args.channels.size(); stream_i++)
     {
-        const size_t radio_index = args.channels[stream_i];
+        const size_t radio_index = _tree->access<std::vector<size_t> >("/mboards/0/tx_chan_dsp_mapping")
+                                       .get().at(args.channels[stream_i]);
+
 
         radio_perifs_t &perif = _radio_perifs[radio_index];
 
