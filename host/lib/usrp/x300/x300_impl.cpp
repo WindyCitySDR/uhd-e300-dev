@@ -1223,7 +1223,7 @@ x300_impl::both_xports_t x300_impl::make_transport(
     const boost::uint8_t destination = sid.get_local_dst_address() / 4;
     const boost::uint8_t prefix = 0;
     boost::uint32_t new_sid;
-    UHD_VAR(destination);
+    UHD_VAR(size_t(destination));
     UHD_VAR(mb_index);
 
     x300_impl::both_xports_t xports = make_transport(

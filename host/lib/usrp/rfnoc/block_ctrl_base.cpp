@@ -65,6 +65,9 @@ block_ctrl_base::block_ctrl_base(
     if (noc_id == 0xAAAABBBBCCCC0000) {
         blockname = "NullSrcSink";
     }
+    else if (((noc_id >> 48) & 0xFFFF) == 0xF1F0) {
+        blockname = "FIFO";
+    }
     else if (((noc_id >> 48) & 0xFFFF) != 0xAAAA) {
         blockname = "Radio";
     }
