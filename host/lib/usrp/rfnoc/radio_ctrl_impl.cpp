@@ -52,7 +52,7 @@ public:
             size_t packets,
             size_t block_port
     ) {
-        UHD_MSG(status) << "radio_ctrl::configure_flow_control_in()" << std::endl;
+        UHD_MSG(status) << "radio_ctrl::configure_flow_control_in()" << cycles << " " << packets << std::endl;
         UHD_ASSERT_THROW(block_port == 0);
         _perifs.deframer->configure_flow_control(cycles, packets);
     }
@@ -62,7 +62,7 @@ public:
                 size_t,
                 const uhd::sid_t &
     ) {
-        UHD_MSG(status) << "radio_ctrl::configure_flow_control_out()" << std::endl;
+        UHD_MSG(status) << "radio_ctrl::configure_flow_control_out() " << buf_size_pkts << std::endl;
         _perifs.framer->configure_flow_control(buf_size_pkts);
     }
 
