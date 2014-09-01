@@ -365,6 +365,13 @@ private:
     boost::uint32_t get_fp_gpio(gpio_core_200::sptr, const std::string &);
     void set_fp_gpio(gpio_core_200::sptr, const std::string &, const boost::uint32_t);
 
+
+    void generate_channel_list(
+            const uhd::stream_args_t &args,
+            std::vector<uhd::rfnoc::block_id_t> &chan_list,
+            std::vector<uhd::device_addr_t> &chan_args
+    );
+
     // Loopback stuff
     void test_rfnoc_loopback(size_t mb_index, int ce_index);
 };

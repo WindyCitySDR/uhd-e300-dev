@@ -380,27 +380,29 @@ bool x300_impl::recv_async_msg(
     return _async_md->pop_with_timed_wait(async_metadata, timeout);
 }
 
+
 /***********************************************************************
- * Receive streamer
+ * Helper functions for get_?x_stream()
+ * TODO: Move these up, they are generic
  **********************************************************************/
-rx_streamer::sptr x300_impl::get_rx_stream(const uhd::stream_args_t &args_)
+uhd::stream_args_t sanitize_stream_args(const uhd::stream_args_t &args_)
 {
-    boost::mutex::scoped_lock lock(_transport_setup_mutex);
-    stream_args_t args = args_;
-
-    // 0. Sanity check on stream args
-    // TODO: This check should be performed by the block controls
-    if (not args.otw_format.empty() and args.otw_format != "sc16")
-    {
-        throw uhd::value_error("x300_impl::get_rx_stream only supports otw_format sc16");
+    uhd::stream_args_t args = args_;
+    if (args.otw_format.empty()) {
+        args.otw_format = "sc16";
     }
-    args.otw_format = "sc16";
-    args.channels = args.channels.empty()? std::vector<size_t>(1, 0) : args.channels;
+    if (args.channels.empty()) {
+        args.channels = std::vector<size_t>(1, 0);
+    }
 
-    // I. Generate the channel list
-    // TODO move this into its own function, it's the same for rx and tx
-    std::vector<uhd::rfnoc::block_id_t> chan_list;
-    std::vector<device_addr_t> chan_args;
+    return args;
+}
+
+void x300_impl::generate_channel_list(
+        const uhd::stream_args_t &args,
+        std::vector<uhd::rfnoc::block_id_t> &chan_list,
+        std::vector<device_addr_t> &chan_args
+) {
     if (args.args.has_key("block_id")) { // Override channel settings
         // TODO: Figure out how to put in more than one block ID in the stream args args
         if (not (args.channels.size() == 1 and args.channels[0] == 0)) {
@@ -422,6 +424,20 @@ rx_streamer::sptr x300_impl::get_rx_stream(const uhd::stream_args_t &args_)
             chan_args.push_back(this_chan_args);
         }
     }
+}
+
+/***********************************************************************
+ * Receive streamer
+ **********************************************************************/
+rx_streamer::sptr x300_impl::get_rx_stream(const uhd::stream_args_t &args_)
+{
+    boost::mutex::scoped_lock lock(_transport_setup_mutex);
+    stream_args_t args = sanitize_stream_args(args_);
+
+    // I. Generate the channel list
+    std::vector<uhd::rfnoc::block_id_t> chan_list;
+    std::vector<device_addr_t> chan_args;
+    generate_channel_list(args, chan_list, chan_args);
 
     // II. Iterate over all channels
     boost::shared_ptr<sph::recv_packet_streamer> my_streamer;
@@ -561,42 +577,12 @@ rx_streamer::sptr x300_impl::get_rx_stream(const uhd::stream_args_t &args_)
 tx_streamer::sptr x300_impl::get_tx_stream(const uhd::stream_args_t &args_)
 {
     boost::mutex::scoped_lock lock(_transport_setup_mutex);
-    stream_args_t args = args_;
-
-    // 0. Sanity check on stream args
-    // TODO: This check should be performed by the block controls
-    if (not args.otw_format.empty() and args.otw_format != "sc16")
-    {
-        throw uhd::value_error("x300_impl::get_tx_stream only supports otw_format sc16");
-    }
-    args.otw_format = "sc16";
-    args.channels = args.channels.empty()? std::vector<size_t>(1, 0) : args.channels;
+    stream_args_t args = sanitize_stream_args(args_);
 
     // I. Generate the channel list
-    // TODO Move this into its own function
     std::vector<uhd::rfnoc::block_id_t> chan_list;
     std::vector<device_addr_t> chan_args;
-    if (args.args.has_key("block_id")) { // Override channel settings
-        // TODO: Figure out how to put in more than one block ID in the stream args args
-        if (not (args.channels.size() == 1 and args.channels[0] == 0)) {
-            throw uhd::runtime_error("When specifying the block ID in stream args, channels must start at 0.");
-        }
-        chan_list.push_back(uhd::rfnoc::block_id_t(args.args["block_id"]));
-        chan_args.push_back(device_addr_t());
-    } else {
-        BOOST_FOREACH(const size_t chan_idx, args.channels) {
-            fs_path chan_root = str(boost::format("/channels/%d") % args.channels[chan_idx]);
-            if (not _tree->exists(chan_root)) {
-                throw uhd::runtime_error("No channel definition for " + chan_root);
-            }
-            device_addr_t this_chan_args;
-            if (not _tree->exists(chan_root / "args")) {
-                this_chan_args = _tree->access<device_addr_t>(chan_root / "args").get();
-            }
-            chan_list.push_back(_tree->access<uhd::rfnoc::block_id_t>(chan_root).get());
-            chan_args.push_back(this_chan_args);
-        }
-    }
+    generate_channel_list(args, chan_list, chan_args);
 
     //shared async queue for all channels in streamer
     boost::shared_ptr<async_md_type> async_md(new async_md_type(1000/*messages deep*/));

@@ -162,7 +162,11 @@ protected:
     void _init_rx(uhd::stream_args_t &args)
     {
         UHD_MSG(status) << "radio_ctrl::init_rx()" << std::endl;
-        _perifs.framer->clear();
+        // TODO move this to my own clear()
+        //_perifs.framer->clear();
+        if (args.otw_format != "sc16") {
+            throw uhd::value_error("this radio only supports otw_format sc16");
+        }
         // Set spp, if applicable
         if (not args.args.has_key("spp")) {
             args.args["spp"] = str(boost::format("%d") % _rx_spp);
