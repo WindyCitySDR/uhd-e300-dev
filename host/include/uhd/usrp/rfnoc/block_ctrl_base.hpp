@@ -133,6 +133,9 @@ protected:
     //! List of upstream blocks
     std::vector< boost::weak_ptr<block_ctrl_base> > _upstream_blocks;
 
+    //! List of downstream blocks
+    std::vector< boost::weak_ptr<block_ctrl_base> > _downstream_blocks;
+
 public:
     typedef boost::shared_ptr<block_ctrl_base> sptr;
 
@@ -141,7 +144,7 @@ public:
 
     /*! Initialize the block arguments.
      */
-    set_args(const uhd::device_addr_t &args) { _args = args; };
+    void set_args(const uhd::device_addr_t &args) { _args = args; };
 
     /*! Allows setting one register on the settings bus.
      *
@@ -308,12 +311,21 @@ public:
      */
     void register_upstream_block(sptr upstream_block);
 
-    /*! Clears the list of upstream blocks.
+    /*! Register a block downstream of this one (i.e., a block that receives data from this block).
+     *
+     * Note: This does *not* affect any settings (flow control etc.). This literally only tells
+     * this block about downstream blocks.
+     *
+     * \param downstream_block A pointer to the block instantiation
+     */
+    void register_downstream_block(sptr downstream_block);
+
+    /*! Clears the lists of upstream and downstream blocks, respectively.
      *
      * After calling this, and before calling register_upstream_block() again,
      * block_ctrl_base::issue_stream_cmd() will not do anything but issue a warning.
      */
-    void clear_upstream_blocks() { _upstream_blocks.clear(); };
+    void clear_connections() { _upstream_blocks.clear(); _downstream_blocks.clear(); };
 
     virtual ~block_ctrl_base();
 

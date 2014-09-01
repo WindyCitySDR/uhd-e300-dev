@@ -29,11 +29,11 @@ void tx_block_ctrl_base::setup_tx_streamer(uhd::stream_args_t &args)
     BOOST_FOREACH(const std::string key, _args.keys()) {
         if (args.args.has_key(key) and _args[key] != args.args[key]) {
             throw uhd::runtime_error(
-                    str(boost::format(
-                            "Conflicting options for block %s: Block options require '%s' == '%s',\n"
-                            "but streamer requests '%s' == '%s'."
-                            ) % get_block_id().get() % key % _args[key] % key % args.args[key]
-                    )
+                str(boost::format(
+                        "Conflicting options for block %s: Block options require '%s' == '%s',\n"
+                        "but streamer requests '%s' == '%s'."
+                        ) % get_block_id().get() % key % _args[key] % key % args.args[key]
+                )
             );
         }
         args.args[key] = _args[key];
@@ -51,14 +51,14 @@ void tx_block_ctrl_base::setup_tx_streamer(uhd::stream_args_t &args)
         return;
     }
 
-    // 3. Call all upstream blocks
-    BOOST_FOREACH(const boost::weak_ptr<block_ctrl_base> upstream_block_ctrl, _upstream_blocks) {
+    // 3. Call all downstream blocks
+    BOOST_FOREACH(const boost::weak_ptr<block_ctrl_base> downstream_block_ctrl, _downstream_blocks) {
         // Make a copy so that modifications downstream aren't propagated upstream
         uhd::stream_args_t new_args = args;
-        sptr this_upstream_block_ctrl =
-            boost::dynamic_pointer_cast<tx_block_ctrl_base>(upstream_block_ctrl.lock());
-        if (this_upstream_block_ctrl) {
-            this_upstream_block_ctrl->setup_tx_streamer(new_args);
+        sptr this_downstream_block_ctrl =
+            boost::dynamic_pointer_cast<tx_block_ctrl_base>(downstream_block_ctrl.lock());
+        if (this_downstream_block_ctrl) {
+            this_downstream_block_ctrl->setup_tx_streamer(new_args);
         }
     }
 }

@@ -72,7 +72,8 @@ public:
 
     void reset_flow_control()
     {
-        // nop
+        // TODO can't call this here... but where?
+        //_perifs.deframer->clear();
     }
 
     bool set_bytes_per_output_packet(
@@ -179,9 +180,9 @@ protected:
     {
         UHD_MSG(status) << "radio_ctrl::init_tx()" << std::endl;
 
-        _perifs.deframer->clear();
         _perifs.deframer->setup(args);
         _perifs.duc->setup(args);
+        return;
     }
 
     bool _is_final_rx_block()

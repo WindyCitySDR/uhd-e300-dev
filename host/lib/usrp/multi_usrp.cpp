@@ -1094,6 +1094,7 @@ public:
 
         // Register blocks
         dst->register_upstream_block(src);
+        src->register_downstream_block(dst);
     }
 
     void connect(const uhd::rfnoc::block_id_t &src_block, const uhd::rfnoc::block_id_t &dst_block) {

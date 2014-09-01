@@ -53,7 +53,7 @@ public:
             const uhd::sid_t &sid=uhd::sid_t()
      ) = 0;
 
-    //! Don't reset flow control
+    //! Don't reset flow control (this is a nop)
     virtual void reset_flow_control() = 0;
 
     //! Set packet size in the VITA framer
@@ -75,10 +75,6 @@ public:
 
     virtual void handle_overrun(boost::weak_ptr<uhd::rx_streamer>) = 0;
 
-    ///////// Tx Streamer Methods ////////////////
-
-    virtual void setup_tx_streamer(uhd::stream_args_t &args) = 0;
-
     ////// radio_ctrl specific methods Methods ///
 
     virtual void set_perifs(
@@ -92,6 +88,9 @@ public:
 protected:
     //! Configures framer and ddc
     virtual void _init_rx(uhd::stream_args_t &args) = 0;
+
+    //! Configures deframer and duc
+    virtual void _init_tx(uhd::stream_args_t &args) = 0;
 
     //! Will return true
     virtual bool _is_final_rx_block() = 0;

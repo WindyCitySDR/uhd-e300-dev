@@ -212,4 +212,9 @@ void block_ctrl_base::register_upstream_block(block_ctrl_base::sptr upstream_blo
 {
     _upstream_blocks.push_back(boost::weak_ptr<block_ctrl_base>(upstream_block));
 }
+
+void block_ctrl_base::register_downstream_block(block_ctrl_base::sptr downstream_block)
+{
+    _downstream_blocks.push_back(boost::weak_ptr<block_ctrl_base>(downstream_block));
+}
 // vim: sw=4 et:
