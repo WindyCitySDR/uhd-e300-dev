@@ -607,6 +607,8 @@ tx_streamer::sptr x300_impl::get_tx_stream(const uhd::stream_args_t &args_)
         // Get block ID and mb index
         uhd::rfnoc::block_id_t block_id = chan_list[stream_i];
         size_t mb_index = block_id.get_device_no();
+        // TODO When block ports work, change this to whatever's correct
+        size_t block_port = 0;
         UHD_ASSERT_THROW(mb_index < _mb.size());
 
         // Access to this channel's mboard and block control
@@ -614,14 +616,20 @@ tx_streamer::sptr x300_impl::get_tx_stream(const uhd::stream_args_t &args_)
         uhd::rfnoc::tx_block_ctrl_base::sptr ce_ctrl =
             boost::dynamic_pointer_cast<uhd::rfnoc::tx_block_ctrl_base>(get_block_ctrl(block_id));
 
-        //setup the dsp transport hints (TODO)
-        device_addr_t device_addr = mb.send_args;
+        // Setup the dsp transport hints
+        device_addr_t device_tx_args = mb.send_args;
+        if (not device_tx_args.has_key("send_buff_size")) {
+            device_tx_args["send_buff_size"] = boost::lexical_cast<std::string>(ce_ctrl->get_fifo_size(block_port));
+            // FIXME FIXME FIXME: This should probably be handled in make_transport, and this is a hack
+            if (ce_ctrl->get_fifo_size(block_port) < 500000) {
+                device_tx_args["num_send_frames"] = "8";
+            }
+        }
 
         //allocate sid and create transport
         uhd::sid_t data_sid = ce_ctrl->get_address();
-        UHD_MSG(status) << "creating tx stream " << device_addr.to_string() << std::endl;
-        both_xports_t xport = this->make_transport(data_sid, device_addr);
-                //mb_index, sid_lower, 0x00, device_addr, data_sid);
+        UHD_MSG(status) << "creating tx stream " << device_tx_args.to_string() << std::endl;
+        both_xports_t xport = this->make_transport(data_sid, device_tx_args);
         UHD_MSG(status) << "data_sid = " << data_sid << std::endl;
 
         // To calculate the max number of samples per packet, we assume the maximum header length
@@ -658,9 +666,9 @@ tx_streamer::sptr x300_impl::get_tx_stream(const uhd::stream_args_t &args_)
         //flow control setup
         const size_t pkt_size = spp * bpi + X300_TX_MAX_HDR_LEN;
         UHD_VAR(pkt_size);
-        size_t fc_window = get_tx_flow_control_window(pkt_size, device_addr);  //In packets
+        size_t fc_window = get_tx_flow_control_window(pkt_size, device_tx_args);  //In packets
         const size_t fc_handle_window = std::max<size_t>(1, fc_window/X300_TX_FC_RESPONSE_FREQ);
-        UHD_LOG << "TX Flow Control Window = " << fc_window << ", TX Flow Control Handler Window = " << fc_handle_window << std::endl;
+        UHD_MSG(status) << "TX Flow Control Window = " << fc_window << ", TX Flow Control Handler Window = " << fc_handle_window << std::endl;
         ce_ctrl->configure_flow_control_in(0/*cycs off*/, fc_handle_window);
 
         boost::shared_ptr<x300_tx_fc_guts_t> guts(new x300_tx_fc_guts_t());

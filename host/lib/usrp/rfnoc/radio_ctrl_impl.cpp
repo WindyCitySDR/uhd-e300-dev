@@ -39,6 +39,10 @@ public:
         _rx_stream_args.channels = std::vector<size_t>(1, 0);
         // SPP is stored for calls to set_bytes_per_output_packet etc.
         _rx_spp = get_bytes_per_output_packet(0) / _rx_bpi;
+
+        // TODO: Once the radio looks like a NoC-Block, remove this!
+        _tree->remove(_root_path / "input_buffer_size");
+        _tree->create<size_t>(_root_path / "input_buffer_size/0").set(0x90000/2);
     }
 
     void issue_stream_cmd(const uhd::stream_cmd_t &stream_cmd)

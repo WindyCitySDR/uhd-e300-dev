@@ -1256,6 +1256,7 @@ x300_impl::both_xports_t x300_impl::make_transport(
 
     static const uhd::device_addr_t DEFAULT_XPORT_ARGS;
 
+    // TODO X300_RADIO_DEST_PREFIX_CTRL will go away
     const uhd::device_addr_t& xport_args =
         (prefix != X300_RADIO_DEST_PREFIX_CTRL) ? args : DEFAULT_XPORT_ARGS;
 
