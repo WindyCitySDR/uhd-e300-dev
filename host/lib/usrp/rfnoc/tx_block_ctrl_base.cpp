@@ -25,8 +25,22 @@ void tx_block_ctrl_base::setup_tx_streamer(uhd::stream_args_t &args)
 {
     UHD_MSG(status) << "tx_block_ctrl_base::setup_tx_streamer() on " << get_block_id() << std::endl;
 
+    // 0. Check if args collides with our own options
+    BOOST_FOREACH(const std::string key, _args.keys()) {
+        if (args.args.has_key(key) and _args[key] != args.args[key]) {
+            throw uhd::runtime_error(
+                    str(boost::format(
+                            "Conflicting options for block %s: Block options require '%s' == '%s',\n"
+                            "but streamer requests '%s' == '%s'."
+                            ) % get_block_id().get() % key % _args[key] % key % args.args[key]
+                    )
+            );
+        }
+        args.args[key] = _args[key];
+    }
+
     // 1. Call our own init_tx() function
-    // This may modify "args".
+    // This should modify "args" if necessary.
     _init_tx(args);
     // TODO: Decide if this is a good place to keep this
     reset_flow_control();

@@ -127,6 +127,9 @@ protected:
     //! Endianness of underlying transport (for data transport)
     bool _transport_is_big_endian;
 
+    //! Stores default block arguments
+    uhd::device_addr_t _args;
+
     //! List of upstream blocks
     std::vector< boost::weak_ptr<block_ctrl_base> > _upstream_blocks;
 
@@ -135,6 +138,10 @@ public:
 
     //! Returns a shared_ptr of type T. Use this to access the derived block types.
     template <class T> UHD_INLINE T cast(void) const { return boost::dynamic_pointer_cast<T>(shared_from_this()); };
+
+    /*! Initialize the block arguments.
+     */
+    set_args(const uhd::device_addr_t &args) { _args = args; };
 
     /*! Allows setting one register on the settings bus.
      *

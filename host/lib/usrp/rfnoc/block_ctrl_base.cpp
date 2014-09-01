@@ -47,7 +47,6 @@ block_ctrl_base::block_ctrl_base(
     boost::uint64_t noc_id = sr_read64(SR_READBACK_REG_ID);
     UHD_MSG(status) << "NOC ID: " << str(boost::format("0x%016x") % noc_id) << std::endl;
 
-
     // Figure out block ID
     // TODO replace with something that actually sets a name
     std::string blockname = "CE"; // Until we can read the actual block names
@@ -86,7 +85,6 @@ block_ctrl_base::block_ctrl_base(
             ).set(buf_size_bytes);
         }
     }
-
 
     _tree->create<size_t>(_root_path / "bytes_per_packet/default").set(DEFAULT_PACKET_SIZE);
     // TODO this value might be different.
@@ -153,7 +151,7 @@ void block_ctrl_base::configure_flow_control_out(
             UHD_UNUSED(const uhd::sid_t &sid)
 ) {
     UHD_MSG(status) << "block_ctrl_base::configure_flow_control_out() " << buf_size_pkts << std::endl;
-    // This actually takes counts between acks. So if the buffer size is 1 packet, we set
+    // This actually takes counts between acks. So if the buffer size is 1 packet, we
     // set this to zero.
     sr_write(SR_FLOW_CTRL_BUF_SIZE, (buf_size_pkts == 0) ? 0 : buf_size_pkts-1);
     sr_write(SR_FLOW_CTRL_ENABLE, (buf_size_pkts != 0));

@@ -112,14 +112,6 @@ public:
         _perifs.framer->set_sid(sid.get());
     }
 
-    void setup_tx_streamer(uhd::stream_args_t &args)
-    {
-        UHD_MSG(status) << "radio_ctrl::setup_tx_streamer()" << std::endl;
-        _perifs.deframer->clear();
-        _perifs.deframer->setup(args);
-        _perifs.duc->setup(args);
-    }
-
     void handle_overrun(boost::weak_ptr<uhd::rx_streamer> streamer)
     {
         UHD_MSG(status) << "radio_ctrl::handle_overrun()" << std::endl;
@@ -183,15 +175,30 @@ protected:
         _perifs.ddc->setup(args);
     }
 
+    void _init_tx(uhd::stream_args_t &args)
+    {
+        UHD_MSG(status) << "radio_ctrl::init_tx()" << std::endl;
+
+        _perifs.deframer->clear();
+        _perifs.deframer->setup(args);
+        _perifs.duc->setup(args);
+    }
+
     bool _is_final_rx_block()
     {
-        // Radio is the end
+        // Radio is end of line
+        return true;
+    }
+
+    bool _is_final_tx_block()
+    {
+        // Radio is end of line
         return true;
     }
 
 private:
 
-    //! Stores pointers to all radio cores
+    //! Stores pointers to all streaming-related radio cores
     struct radio_v_perifs_t
     {
         time_core_3000::sptr    time64;
