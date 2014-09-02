@@ -53,17 +53,29 @@ block_ctrl_base::block_ctrl_base(
     if (noc_id == 0xAAAABBBBCCCC0000) {
         blockname = "NullSrcSink";
     }
+    if (noc_id == 0) {
+        blockname = "NullSrcSink";
+    }
     else if (((noc_id >> 48) & 0xFFFF) == 0xF1F0) {
         blockname = "FIFO";
     }
     else if (noc_id == 0x0000000100000000) {
         blockname = "SchmidlCox";
     }
+    else if (noc_id == 0x5CC0000000000000) {
+        blockname = "FIR";
+    }
     else if (noc_id == 0x0000000200000000) {
         blockname = "FIR";
     }
     else if (noc_id == 0x0000000300000000) {
         blockname = "FFT";
+    }
+    else if (noc_id == 0xFF70000000000000) {
+        blockname = "FFT";
+    }
+    else if (noc_id == 0xF112000000000000) {
+        blockname = "FIR";
     }
     else if (((noc_id >> 48) & 0xFFFF) != 0xAAAA) {
         blockname = "Radio";

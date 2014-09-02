@@ -897,7 +897,7 @@ void x300_impl::setup_mb(const size_t mb_i, const uhd::device_addr_t &dev_addr)
         UHD_MSG(status) << str(boost::format("Port %d: Found NoC-Block with ID %016X.") % int(block_port) % noc_id) << std::endl;
         // TODO: Implement cunning method to figure out the right block_ctrl_base
         // derivative using the noc-id
-        if (noc_id == 0xaaaabbbbcccc0000) {
+        if (noc_id == 0) {
             UHD_MSG(status) << "It's a... null block!" << std::endl;
             _rfnoc_block_ctrl.push_back(
                 uhd::rfnoc::null_block_ctrl::make(
