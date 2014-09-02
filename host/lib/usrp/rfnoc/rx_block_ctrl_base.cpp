@@ -41,7 +41,8 @@ void rx_block_ctrl_base::setup_rx_streamer(uhd::stream_args_t &args)
 {
     UHD_MSG(status) << "rx_block_ctrl_base::setup_rx_streamer() on " << get_block_id() << std::endl;
 
-    // 0. Check if args collides with our own options
+    // 0. Check if args collides with our own _args
+    // and merge them
     BOOST_FOREACH(const std::string key, _args.keys()) {
         if (args.args.has_key(key) and _args[key] != args.args[key]) {
             throw uhd::runtime_error(

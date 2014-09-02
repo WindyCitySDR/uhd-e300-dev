@@ -892,7 +892,7 @@ void x300_impl::setup_mb(const size_t mb_i, const uhd::device_addr_t &dev_addr)
                 ctrl_sid,
                 str(boost::format("CE_%02d_Port_%02d") % i % block_port)
         );
-        std::cout << "OK" << std::endl;
+        UHD_MSG(status) << "OK" << std::endl;
         boost::uint64_t noc_id = ctrl->peek64(0);
         UHD_MSG(status) << str(boost::format("Port %d: Found NoC-Block with ID %016X.") % int(block_port) % noc_id) << std::endl;
         // TODO: Implement cunning method to figure out the right block_ctrl_base

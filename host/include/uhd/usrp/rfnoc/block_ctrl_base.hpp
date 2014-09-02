@@ -144,7 +144,7 @@ public:
 
     /*! Initialize the block arguments.
      */
-    void set_args(const uhd::device_addr_t &args) { _args = args; };
+    void set_args(const uhd::device_addr_t &args);
 
     /*! Allows setting one register on the settings bus.
      *

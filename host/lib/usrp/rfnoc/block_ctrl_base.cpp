@@ -56,6 +56,15 @@ block_ctrl_base::block_ctrl_base(
     else if (((noc_id >> 48) & 0xFFFF) == 0xF1F0) {
         blockname = "FIFO";
     }
+    else if (noc_id == 0x0000000100000000) {
+        blockname = "SchmidlCox";
+    }
+    else if (noc_id == 0x0000000200000000) {
+        blockname = "FIR";
+    }
+    else if (noc_id == 0x0000000300000000) {
+        blockname = "FFT";
+    }
     else if (((noc_id >> 48) & 0xFFFF) != 0xAAAA) {
         blockname = "Radio";
     }
@@ -96,6 +105,13 @@ block_ctrl_base::block_ctrl_base(
 
 block_ctrl_base::~block_ctrl_base() {
 }
+
+
+void block_ctrl_base::set_args(const uhd::device_addr_t &args)
+{
+    _args = args;
+    UHD_MSG(status) << "block_ctrl_base::set_args() " << _args.to_string() << std::endl;
+};
 
 void block_ctrl_base::sr_write(const boost::uint32_t reg, const boost::uint32_t data) {
     UHD_MSG(status) << str(boost::format("sr_write(%d, %08x) on %s") % reg % data % get_block_id()) << std::endl;
