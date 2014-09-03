@@ -22,6 +22,7 @@
 #include <uhd/types/wb_iface.hpp>
 #include <uhd/device3.hpp>
 #include <uhd/usrp/rfnoc/block_ctrl.hpp>
+#include <uhd/usrp/rfnoc/null_block_ctrl.hpp>
 
 using namespace uhd;
 using namespace uhd::rfnoc;
@@ -87,10 +88,12 @@ class pseudo_device3_impl : public uhd::device3
         make_args.device_index = 0;
         make_args.tree = _tree;
         make_args.is_big_endian = false;
-        _rfnoc_block_ctrl.push_back( block_ctrl::make(make_args) );
+        std::cout << "Generating block controls " << std::endl;
+
+        _rfnoc_block_ctrl.push_back( block_ctrl_base::make(make_args) );
 
         make_args.ctrl_sid = TEST_SID1;
-        _rfnoc_block_ctrl.push_back( block_ctrl::make(make_args) );
+        _rfnoc_block_ctrl.push_back( block_ctrl::make(make_args, 0) );
     }
 
     rx_streamer::sptr get_rx_stream(const stream_args_t &args) {
@@ -116,24 +119,27 @@ BOOST_AUTO_TEST_CASE(test_device3) {
     device3::sptr my_device = make_pseudo_device();
 
     std::cout << "Getting block 0..." << std::endl;
-    block_ctrl_base::sptr block0 = my_device->find_block_ctrl("CE");
-    BOOST_CHECK_EQUAL(block0->get_block_id(), "0/CE_0");
+    block_ctrl_base::sptr block0 = my_device->find_block_ctrl("Block");
+    BOOST_REQUIRE(block0);
+    BOOST_CHECK_EQUAL(block0->get_block_id(), "0/Block_0");
 
     std::cout << "Getting block 1..." << std::endl;
-    block_ctrl_base::sptr block1 = my_device->get_block_ctrl(block_id_t("0/CE_1"));
-    BOOST_CHECK_EQUAL(block1->get_block_id(), "0/CE_1");
+    block_ctrl_base::sptr block1 = my_device->get_block_ctrl(block_id_t("0/NullSrcSink_0"));
+    BOOST_REQUIRE(block1);
+    BOOST_CHECK_EQUAL(block1->get_block_id(), "0/NullSrcSink_0");
 }
 
 BOOST_AUTO_TEST_CASE(test_device3_cast) {
     device3::sptr my_device = make_pseudo_device();
 
     std::cout << "Getting block 0..." << std::endl;
-    block_ctrl::sptr block0 = my_device->find_block_ctrl<block_ctrl>("CE");
-    BOOST_CHECK_EQUAL(block0->get_block_id(), "0/CE_0");
+    block_ctrl::sptr block0 = my_device->find_block_ctrl<block_ctrl>("Block");
+    BOOST_REQUIRE(block0);
+    BOOST_CHECK_EQUAL(block0->get_block_id(), "0/Block_0");
 
     std::cout << "Getting block 1..." << std::endl;
-    block_ctrl_base::sptr block1 = my_device->get_block_ctrl<block_ctrl>(block_id_t("0/CE_1"));
-    BOOST_CHECK_EQUAL(block1->get_block_id(), "0/CE_1");
+    block_ctrl_base::sptr block1 = my_device->get_block_ctrl<null_block_ctrl>(block_id_t("0/NullSrcSink_0"));
+    BOOST_CHECK_EQUAL(block1->get_block_id(), "0/NullSrcSink_0");
 }
 
 BOOST_AUTO_TEST_CASE(test_device3_fail) {

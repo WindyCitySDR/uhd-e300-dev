@@ -15,18 +15,20 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 //
 
+// This file contains the block control functions for block controller classes.
+// See block_ctrl_base_factory.cpp for discovery and factory functions.
+
+#include <boost/format.hpp>
 #include <uhd/utils/msg.hpp>
 #include <uhd/utils/log.hpp>
-#include <boost/format.hpp>
-
 #include <uhd/usrp/rfnoc/block_ctrl_base.hpp>
+
+using namespace uhd;
+using namespace uhd::rfnoc;
 
 //! Convert register to a peek/poke compatible address
 inline boost::uint32_t _sr_to_addr(boost::uint32_t reg) { return reg * 4; };
 inline boost::uint32_t _sr_to_addr64(boost::uint32_t reg) { return reg * 8; }; // for peek64
-
-using namespace uhd;
-using namespace uhd::rfnoc;
 
 // One line in FPGA is 64 Bits
 static const size_t BYTES_PER_LINE = 8;
@@ -43,39 +45,7 @@ block_ctrl_base::block_ctrl_base(
     boost::uint64_t noc_id = sr_read64(SR_READBACK_REG_ID);
     UHD_MSG(status) << "NOC ID: " << str(boost::format("0x%016x") % noc_id) << std::endl;
 
-    // Figure out block ID
-    // TODO replace with something that actually sets a name
-    std::string blockname = "CE"; // Until we can read the actual block names
-    if (noc_id == 0xAAAABBBBCCCC0000) {
-        blockname = "NullSrcSink";
-    }
-    if (noc_id == 0) {
-        blockname = "NullSrcSink";
-    }
-    else if (((noc_id >> 48) & 0xFFFF) == 0xF1F0) {
-        blockname = "FIFO";
-    }
-    else if (noc_id == 0x0000000100000000) {
-        blockname = "SchmidlCox";
-    }
-    else if (noc_id == 0x5CC0000000000000) {
-        blockname = "FIR";
-    }
-    else if (noc_id == 0x0000000200000000) {
-        blockname = "FIR";
-    }
-    else if (noc_id == 0x0000000300000000) {
-        blockname = "FFT";
-    }
-    else if (noc_id == 0xFF70000000000000) {
-        blockname = "FFT";
-    }
-    else if (noc_id == 0xF112000000000000) {
-        blockname = "FIR";
-    }
-    else if (((noc_id >> 48) & 0xFFFF) != 0xAAAA) {
-        blockname = "Radio";
-    }
+    std::string blockname = make_args.block_name;
 
     _block_id.set(make_args.device_index, blockname, 0);
     while (_tree->exists("xbar/" + _block_id.get_local())) {

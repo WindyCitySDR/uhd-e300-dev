@@ -28,6 +28,7 @@
 #include <uhd/types/sid.hpp>
 #include <uhd/types/stream_cmd.hpp>
 #include <uhd/types/wb_iface.hpp>
+#include <uhd/utils/static.hpp>
 #include <uhd/usrp/rfnoc/constants.hpp>
 #include <uhd/usrp/rfnoc/block_id.hpp>
 
@@ -37,18 +38,24 @@ namespace uhd {
 
 struct make_args_t
 {
+    make_args_t(const std::string &name = "") :
+        device_index(0),
+        is_big_endian(true),
+        block_name(name)
+    {}
+
     uhd::wb_iface::sptr ctrl_iface;
     uhd::sid_t ctrl_sid;
     size_t device_index;
     uhd::property_tree::sptr tree;
     bool is_big_endian;
+    std::string block_name;
 };
 
 //! This macro must be put in the public section of an RFNoC
 // block class
 #define UHD_RFNOC_BLOCK_OBJECT(class_name)  \
-    typedef boost::shared_ptr< class_name > sptr; \
-    static sptr make(const make_args_t &make_args);
+    typedef boost::shared_ptr< class_name > sptr;
 
 //! Shorthand for block constructor
 #define UHD_RFNOC_BLOCK_CONSTRUCTOR(CLASS_NAME) \
@@ -59,22 +66,24 @@ struct make_args_t
 //! This macro must be placed inside a block implementation file
 // after the class definition
 #define UHD_RFNOC_BLOCK_REGISTER(CLASS_NAME, BLOCK_NAME) \
-    CLASS_NAME::sptr CLASS_NAME::make( \
+    block_ctrl_base::sptr CLASS_NAME##_make( \
         const make_args_t &make_args \
     ) { \
-        return sptr( \
-            new CLASS_NAME##_impl(make_args) \
-        ); \
+        return block_ctrl_base::sptr(new CLASS_NAME##_impl(make_args)); \
+    } \
+    UHD_STATIC_BLOCK(register_rfnoc_##CLASS_NAME) \
+    { \
+        uhd::rfnoc::block_ctrl_base::register_block(&CLASS_NAME##_make, BLOCK_NAME); \
     }
 
 /*! \brief Base class for all block controller objects.
  *
  * Inside UHD, block controller objects must be derived from
- * uhd::rfnoc::block_ctrl. This class provides all functions
+ * uhd::rfnoc::block_ctrl_base. This class provides all functions
  * that a block *must* provide. Typically, you would not derive
  * a block controller class directly from block_ctrl_base, but
  * from a class such as rx_block_ctrl_base or tx_block_ctrl_base
- * which extends the functionality.
+ * which extends its functionality.
  */
 class UHD_API block_ctrl_base;
 class block_ctrl_base : boost::noncopyable, public boost::enable_shared_from_this<block_ctrl_base>
@@ -130,6 +139,34 @@ public:
 
     //! Returns a shared_ptr of type T. Use this to access the derived block types.
     template <class T> UHD_INLINE T cast(void) const { return boost::dynamic_pointer_cast<T>(shared_from_this()); };
+
+    /*! Register a block controller class into the discovery and factory system.
+     *
+     * Note: It is not recommended to call this function directly.
+     * Rather, use the UHD_RFNOC_BLOCK_REGISTER() macro, which will set up
+     * the discovery and factory system correctly.
+     *
+     * \param make A factory function that makes a block controller object
+     * \param name A unique block name, e.g. 'FFT'. If a block has this block name,
+     *             it will use \p make to generate the block controller class.
+     */
+    static void register_block(const make_t &make, const std::string &name);
+
+    /*!
+     * \brief Create a block controller class given a NoC-ID or a block name.
+     *
+     * If a block name is given in \p make_args, it will directly try to
+     * generate a block of this type. If no block name is given, it will
+     * look up a name using the NoC-ID and use that.
+     * If it can't find a suitable block controller class, it will generate
+     * a uhd::rfnoc::block_ctrl. However, if a block name *is* specified,
+     * it will throw a uhd::runtime_error if this block type is not registered.
+     *
+     * \param make_args Valid make args.
+     * \param noc_id The 64-Bit NoC-ID.
+     * \return a shared pointer to a new device instance
+     */
+    static sptr make(const make_args_t &make_args, boost::uint64_t noc_id = ~0);
 
     /*! Initialize the block arguments.
      */

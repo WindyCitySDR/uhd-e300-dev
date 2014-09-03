@@ -905,14 +905,14 @@ void x300_impl::setup_mb(const size_t mb_i, const uhd::device_addr_t &dev_addr)
         make_args.is_big_endian = mb.if_pkt_is_big_endian;
         if (noc_id == 0) {
             UHD_MSG(status) << "It's a... null block!" << std::endl;
-            _rfnoc_block_ctrl.push_back(
-                uhd::rfnoc::null_block_ctrl::make(make_args)
-            );
+            //_rfnoc_block_ctrl.push_back(
+                //uhd::rfnoc::null_block_ctrl::make(make_args)
+            //);
         } else {
             // For now, it's just block_ctrl
-            _rfnoc_block_ctrl.push_back(
-                uhd::rfnoc::block_ctrl::make(make_args)
-            );
+            //_rfnoc_block_ctrl.push_back(
+                //uhd::rfnoc::block_ctrl::make(make_args)
+            //);
         }
     }
     UHD_MSG(status) << "========== Full list of RFNoC blocks: ============" << std::endl;
@@ -1168,16 +1168,17 @@ void x300_impl::setup_radio(const size_t mb_i, const std::string &slot_name)
     make_args.device_index = mb_i;
     make_args.tree = _tree->subtree(mb_path);
     make_args.is_big_endian = mb.if_pkt_is_big_endian;
-    uhd::rfnoc::radio_ctrl::sptr r_ctrl =
-        uhd::rfnoc::radio_ctrl::make(make_args);
-    r_ctrl->set_perifs(
-            perif.time64,
-            perif.framer,
-            perif.ddc,
-            perif.deframer,
-            perif.duc
-    );
-    _rfnoc_block_ctrl.push_back(r_ctrl);
+    // FIXME
+    //uhd::rfnoc::radio_ctrl::sptr r_ctrl =
+        //uhd::rfnoc::radio_ctrl::make(make_args);
+    //r_ctrl->set_perifs(
+            //perif.time64,
+            //perif.framer,
+            //perif.ddc,
+            //perif.deframer,
+            //perif.duc
+    //);
+    //_rfnoc_block_ctrl.push_back(r_ctrl);
 
     ////// Add default channels
     size_t channel_idx = 0;
@@ -1185,7 +1186,9 @@ void x300_impl::setup_radio(const size_t mb_i, const std::string &slot_name)
         channel_idx++;
     }
     _tree->create<uhd::rfnoc::block_id_t>(str(boost::format("/channels/%d") % channel_idx))
-            .set(r_ctrl->get_block_id());
+            //.set(r_ctrl->get_block_id());
+            // FIXME
+            .set(uhd::rfnoc::block_id_t("0/Radio_0"));
     UHD_MSG(status)
         << _tree->access<uhd::rfnoc::block_id_t>(str(boost::format("/channels/%d") % channel_idx)).get()
         << std::endl;
