@@ -61,7 +61,7 @@ static std::string lookup_block_name(boost::uint64_t noc_id)
         blockname = "SchmidlCox";
     }
     else if (noc_id == 0x5CC0000000000000) {
-        blockname = "FIR";
+        blockname = "SchmidlCox";
     }
     else if (noc_id == 0x0000000200000000) {
         blockname = "FIR";
