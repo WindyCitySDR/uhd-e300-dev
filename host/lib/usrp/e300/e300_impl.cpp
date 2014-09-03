@@ -1246,43 +1246,43 @@ void e300_impl::_update_atrs(void)
         const bool tx_low_band = _settings.tx_freq < 2940.0e6;
 
         // VCRX
-        int vcrx_1_rxing = 1;
-        int vcrx_2_rxing = 0;
-        int vcrx_1_txing = 1;
-        int vcrx_2_txing = 0;
+        int vcrx_v1_rxing = 1;
+        int vcrx_v2_rxing = 0;
+        int vcrx_v1_txing = 1;
+        int vcrx_v2_txing = 0;
 
         if (rx_low_band) {
-            vcrx_1_rxing = rx_ant_rx2 ? 0 : 1;
-            vcrx_2_rxing = rx_ant_rx2 ? 1 : 0;
-            vcrx_1_txing = 0;
-            vcrx_2_txing = 1;
+            vcrx_v1_rxing = rx_ant_rx2 ? 0 : 1;
+            vcrx_v2_rxing = rx_ant_rx2 ? 1 : 0;
+            vcrx_v1_txing = 0;
+            vcrx_v2_txing = 1;
         } else {
-            vcrx_1_rxing = rx_ant_rx2 ? 1 : 0;
-            vcrx_2_rxing = rx_ant_rx2 ? 0 : 1;
-            vcrx_1_txing = 1;
-            vcrx_2_txing = 0;
+            vcrx_v1_rxing = rx_ant_rx2 ? 1 : 0;
+            vcrx_v2_rxing = rx_ant_rx2 ? 0 : 1;
+            vcrx_v1_txing = 1;
+            vcrx_v2_txing = 0;
         }
 
         // VCTX
-        int vctxrx_1_rxing = 0;
-        int vctxrx_2_rxing = 1;
-        int vctxrx_1_txing = 0;
-        int vctxrx_2_txing = 1;
+        int vctxrx_v1_rxing = 0;
+        int vctxrx_v2_rxing = 1;
+        int vctxrx_v1_txing = 0;
+        int vctxrx_v2_txing = 1;
 
         if (tx_low_band) {
-            vctxrx_1_rxing = rx_ant_rx2 ? 0 : 1;
-            vctxrx_2_rxing = rx_ant_rx2 ? 1 : 0;
-            vctxrx_1_txing = 0;
-            vctxrx_2_txing = 1;
+            vctxrx_v1_rxing = rx_ant_rx2 ? 0 : 1;
+            vctxrx_v2_rxing = rx_ant_rx2 ? 1 : 0;
+            vctxrx_v1_txing = 1;
+            vctxrx_v2_txing = 0;
         } else {
-            vctxrx_1_rxing = rx_ant_rx2 ? 1 : 1;
-            vctxrx_2_rxing = rx_ant_rx2 ? 0 : 0;
-            vctxrx_1_txing = 1;
-            vctxrx_2_txing = 1;
+            vctxrx_v1_rxing = rx_ant_rx2 ? 1 : 1;
+            vctxrx_v2_rxing = rx_ant_rx2 ? 0 : 0;
+            vctxrx_v1_txing = 1;
+            vctxrx_v2_txing = 1;
         }
         //swapped for routing reasons, reswap it here
         if (instance == 1)
-            std::swap(vctxrx_1_txing, vctxrx_2_txing);
+            std::swap(vctxrx_v1_txing, vctxrx_v2_txing);
 
         int tx_enable_a = (!tx_low_band and enb_tx) ? 1 : 0;
         int tx_enable_b = (tx_low_band and  enb_tx) ? 1 : 0;
@@ -1297,16 +1297,16 @@ void e300_impl::_update_atrs(void)
         const int xx_leds = tx_leds | (1 << LED_RX_RX); //forced to rx2
 
         const int rx_selects = 0
-            | (vcrx_1_rxing << VCRX_V1)
-            | (vcrx_2_rxing << VCRX_V2)
-            | (vctxrx_1_rxing << VCTXRX_V1)
-            | (vctxrx_2_rxing << VCTXRX_V2)
+            | (vcrx_v1_rxing << VCRX_V1)
+            | (vcrx_v2_rxing << VCRX_V2)
+            | (vctxrx_v1_rxing << VCTXRX_V1)
+            | (vctxrx_v2_rxing << VCTXRX_V2)
         ;
         const int tx_selects = 0
-            | (vcrx_1_txing << VCRX_V1)
-            | (vcrx_2_txing << VCRX_V2)
-            | (vctxrx_1_txing << VCTXRX_V1)
-            | (vctxrx_2_txing << VCTXRX_V2)
+            | (vcrx_v1_txing << VCRX_V1)
+            | (vcrx_v2_txing << VCRX_V2)
+            | (vctxrx_v1_txing << VCTXRX_V1)
+            | (vctxrx_v2_txing << VCTXRX_V2)
         ;
         const int tx_enables = 0
             | (tx_enable_a << TX_ENABLEA)
