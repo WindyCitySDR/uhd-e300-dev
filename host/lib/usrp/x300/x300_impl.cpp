@@ -895,25 +895,13 @@ void x300_impl::setup_mb(const size_t mb_i, const uhd::device_addr_t &dev_addr)
         UHD_MSG(status) << "OK" << std::endl;
         boost::uint64_t noc_id = ctrl->peek64(0);
         UHD_MSG(status) << str(boost::format("Port %d: Found NoC-Block with ID %016X.") % int(block_port) % noc_id) << std::endl;
-        // TODO: Implement cunning method to figure out the right block_ctrl_base
-        // derivative using the noc-id
         uhd::rfnoc::make_args_t make_args;
         make_args.ctrl_iface = ctrl;
         make_args.ctrl_sid = ctrl_sid;
         make_args.device_index = mb_i;
         make_args.tree = _tree->subtree(mb_path);
         make_args.is_big_endian = mb.if_pkt_is_big_endian;
-        if (noc_id == 0) {
-            UHD_MSG(status) << "It's a... null block!" << std::endl;
-            //_rfnoc_block_ctrl.push_back(
-                //uhd::rfnoc::null_block_ctrl::make(make_args)
-            //);
-        } else {
-            // For now, it's just block_ctrl
-            //_rfnoc_block_ctrl.push_back(
-                //uhd::rfnoc::block_ctrl::make(make_args)
-            //);
-        }
+        _rfnoc_block_ctrl.push_back(block_ctrl_base::make(make_args, noc_id));
     }
     UHD_MSG(status) << "========== Full list of RFNoC blocks: ============" << std::endl;
     BOOST_FOREACH(uhd::rfnoc::block_ctrl_base::sptr this_block, _rfnoc_block_ctrl) {
@@ -977,7 +965,6 @@ void x300_impl::setup_radio(const size_t mb_i, const std::string &slot_name)
     perif.ctrl->poke32(TOREG(SR_MISC_OUTS), (1 << 2)); //reset adc + dac
     perif.ctrl->poke32(TOREG(SR_MISC_OUTS),  (1 << 1) | (1 << 0)); //out of reset + dac enable
 
-    // FIXME put this back?
     this->register_loopback_self_test(perif.ctrl);
 
     perif.spi = spi_core_3000::make(perif.ctrl, TOREG(SR_SPI), RB32_SPI);
@@ -1162,23 +1149,21 @@ void x300_impl::setup_radio(const size_t mb_i, const std::string &slot_name)
     }
 
     /////// Create the RFNoC block
-    uhd::rfnoc::make_args_t make_args;
+    uhd::rfnoc::make_args_t make_args("Radio");
     make_args.ctrl_iface = perif.ctrl;
     make_args.ctrl_sid = ctrl_sid;
     make_args.device_index = mb_i;
     make_args.tree = _tree->subtree(mb_path);
     make_args.is_big_endian = mb.if_pkt_is_big_endian;
-    // FIXME
-    //uhd::rfnoc::radio_ctrl::sptr r_ctrl =
-        //uhd::rfnoc::radio_ctrl::make(make_args);
-    //r_ctrl->set_perifs(
-            //perif.time64,
-            //perif.framer,
-            //perif.ddc,
-            //perif.deframer,
-            //perif.duc
-    //);
-    //_rfnoc_block_ctrl.push_back(r_ctrl);
+    radio_ctrl::sptr r_ctrl = boost::dynamic_pointer_cast<radio_ctrl>(block_ctrl_base::make(make_args));
+    r_ctrl->set_perifs(
+            perif.time64,
+            perif.framer,
+            perif.ddc,
+            perif.deframer,
+            perif.duc
+    );
+    _rfnoc_block_ctrl.push_back(r_ctrl);
 
     ////// Add default channels
     size_t channel_idx = 0;
@@ -1186,9 +1171,7 @@ void x300_impl::setup_radio(const size_t mb_i, const std::string &slot_name)
         channel_idx++;
     }
     _tree->create<uhd::rfnoc::block_id_t>(str(boost::format("/channels/%d") % channel_idx))
-            //.set(r_ctrl->get_block_id());
-            // FIXME
-            .set(uhd::rfnoc::block_id_t("0/Radio_0"));
+            .set(r_ctrl->get_block_id());
     UHD_MSG(status)
         << _tree->access<uhd::rfnoc::block_id_t>(str(boost::format("/channels/%d") % channel_idx)).get()
         << std::endl;

@@ -21,6 +21,9 @@
 namespace uhd {
     namespace rfnoc {
 
+//! If the block name can't be automatically detected, this name is used
+static const std::string DEFAULT_BLOCK_NAME = "Block";
+
 static const size_t MAX_PACKET_SIZE = 8000; // bytes
 static const size_t DEFAULT_PACKET_SIZE = 1456; // bytes
 

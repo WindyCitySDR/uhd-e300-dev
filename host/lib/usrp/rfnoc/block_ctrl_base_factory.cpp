@@ -97,6 +97,7 @@ block_ctrl_base::sptr block_ctrl_base::make(
             str(boost::format("No block controller class registered for type '%s'.") % key)
         );
     }
+    UHD_MSG(status) << "[RFNoC Factory] Using controller key '" << key << "' and block name '" << new_make_args.block_name << "'" << std::endl;
 
     if (not get_block_fcn_regs().has_key(key)) {
         key = DEFAULT_BLOCK_NAME;
