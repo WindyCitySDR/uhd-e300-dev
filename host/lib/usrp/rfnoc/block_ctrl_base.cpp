@@ -32,15 +32,11 @@ using namespace uhd::rfnoc;
 static const size_t BYTES_PER_LINE = 8;
 
 block_ctrl_base::block_ctrl_base(
-        wb_iface::sptr ctrl_iface,
-        sid_t ctrl_sid,
-        size_t device_index,
-        property_tree::sptr tree,
-        bool transport_is_big_endian
-) : _ctrl_sid(ctrl_sid),
-    _ctrl_iface(ctrl_iface),
-    _tree(tree),
-    _transport_is_big_endian(transport_is_big_endian)
+        const make_args_t &make_args
+) : _ctrl_sid(make_args.ctrl_sid),
+    _ctrl_iface(make_args.ctrl_iface),
+    _tree(make_args.tree),
+    _transport_is_big_endian(make_args.is_big_endian)
 {
     UHD_MSG(status) << "block_ctrl_base()" << std::endl;
     // Read NoC-ID
@@ -81,7 +77,7 @@ block_ctrl_base::block_ctrl_base(
         blockname = "Radio";
     }
 
-    _block_id.set(device_index, blockname, 0);
+    _block_id.set(make_args.device_index, blockname, 0);
     while (_tree->exists("xbar/" + _block_id.get_local())) {
         _block_id++;
     }

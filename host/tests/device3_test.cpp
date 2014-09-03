@@ -81,27 +81,16 @@ class pseudo_device3_impl : public uhd::device3
         wb_iface::sptr ctrl_iface = wb_iface::sptr(new pseudo_wb_iface_impl());
 
         // Add two block controls:
-        sid_t sid1 = TEST_SID0; // 0.0.2.0
-        _rfnoc_block_ctrl.push_back(
-            block_ctrl::make(
-                ctrl_iface,
-                sid1,
-                0,
-                _tree,
-                false
-            )
-        );
+        uhd::rfnoc::make_args_t make_args;
+        make_args.ctrl_iface = ctrl_iface;
+        make_args.ctrl_sid = TEST_SID0;
+        make_args.device_index = 0;
+        make_args.tree = _tree;
+        make_args.is_big_endian = false;
+        _rfnoc_block_ctrl.push_back( block_ctrl::make(make_args) );
 
-        sid_t sid2 = TEST_SID1; // 0.0.2.1
-        _rfnoc_block_ctrl.push_back(
-            block_ctrl::make(
-                ctrl_iface,
-                sid2,
-                0,
-                _tree,
-                false
-            )
-        );
+        make_args.ctrl_sid = TEST_SID1;
+        _rfnoc_block_ctrl.push_back( block_ctrl::make(make_args) );
     }
 
     rx_streamer::sptr get_rx_stream(const stream_args_t &args) {

@@ -30,4 +30,4 @@ public:
     // Very empty class, this one
 };
 
-UHD_RFNOC_BLOCK_MAKE_CALL(block_ctrl);
+UHD_RFNOC_BLOCK_REGISTER(block_ctrl, "Block");

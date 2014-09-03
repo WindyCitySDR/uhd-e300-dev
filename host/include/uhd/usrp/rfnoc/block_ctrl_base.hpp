@@ -32,48 +32,40 @@
 #include <uhd/usrp/rfnoc/block_id.hpp>
 
 
+namespace uhd {
+    namespace rfnoc {
+
+struct make_args_t
+{
+    uhd::wb_iface::sptr ctrl_iface;
+    uhd::sid_t ctrl_sid;
+    size_t device_index;
+    uhd::property_tree::sptr tree;
+    bool is_big_endian;
+};
+
 //! This macro must be put in the public section of an RFNoC
 // block class
 #define UHD_RFNOC_BLOCK_OBJECT(class_name)  \
     typedef boost::shared_ptr< class_name > sptr; \
-    static sptr make( \
-            uhd::wb_iface::sptr ctrl_iface, \
-            uhd::sid_t ctrl_sid, \
-            size_t device_index, \
-            uhd::property_tree::sptr tree, \
-            bool is_big_endian \
-    );
+    static sptr make(const make_args_t &make_args);
 
-//! This macro must be placed inside a block implementation file
-// after the class definition
-#define UHD_RFNOC_BLOCK_MAKE_CALL(CLASS_NAME) \
-    CLASS_NAME::sptr CLASS_NAME::make( \
-        uhd::wb_iface::sptr ctrl_iface, \
-        uhd::sid_t ctrl_sid, \
-        size_t device_index, \
-        uhd::property_tree::sptr tree, \
-        bool is_big_endian \
-    ) { \
-        return sptr( \
-            new CLASS_NAME##_impl( \
-                ctrl_iface, ctrl_sid, device_index, tree, is_big_endian \
-            ) \
-        ); \
-    }
-
-// TODO decide if we keep this
 //! Shorthand for block constructor
 #define UHD_RFNOC_BLOCK_CONSTRUCTOR(CLASS_NAME) \
     CLASS_NAME##_impl( \
-            uhd::wb_iface::sptr ctrl_iface, \
-            uhd::sid_t ctrl_sid, \
-            size_t device_index, \
-            uhd::property_tree::sptr tree, \
-            bool is_big_endian \
-    ) : block_ctrl_base(ctrl_iface, ctrl_sid, device_index, tree, is_big_endian)
+        const make_args_t &make_args \
+    ) : block_ctrl_base(make_args)
 
-namespace uhd {
-    namespace rfnoc {
+//! This macro must be placed inside a block implementation file
+// after the class definition
+#define UHD_RFNOC_BLOCK_REGISTER(CLASS_NAME, BLOCK_NAME) \
+    CLASS_NAME::sptr CLASS_NAME::make( \
+        const make_args_t &make_args \
+    ) { \
+        return sptr( \
+            new CLASS_NAME##_impl(make_args) \
+        ); \
+    }
 
 /*! \brief Base class for all block controller objects.
  *
@@ -108,11 +100,7 @@ protected:
      *             to the constructor.
      */
     block_ctrl_base(
-            uhd::wb_iface::sptr ctrl_iface,
-            uhd::sid_t ctrl_sid,
-            size_t device_index,
-            uhd::property_tree::sptr tree,
-            bool transport_is_big_endian
+            const make_args_t &make_args
     );
 
     //! An object to actually send and receive the commands
@@ -138,6 +126,7 @@ protected:
 
 public:
     typedef boost::shared_ptr<block_ctrl_base> sptr;
+    typedef boost::function<sptr(const make_args_t &)> make_t;
 
     //! Returns a shared_ptr of type T. Use this to access the derived block types.
     template <class T> UHD_INLINE T cast(void) const { return boost::dynamic_pointer_cast<T>(shared_from_this()); };

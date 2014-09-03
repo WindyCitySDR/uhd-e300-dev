@@ -897,27 +897,21 @@ void x300_impl::setup_mb(const size_t mb_i, const uhd::device_addr_t &dev_addr)
         UHD_MSG(status) << str(boost::format("Port %d: Found NoC-Block with ID %016X.") % int(block_port) % noc_id) << std::endl;
         // TODO: Implement cunning method to figure out the right block_ctrl_base
         // derivative using the noc-id
+        uhd::rfnoc::make_args_t make_args;
+        make_args.ctrl_iface = ctrl;
+        make_args.ctrl_sid = ctrl_sid;
+        make_args.device_index = mb_i;
+        make_args.tree = _tree->subtree(mb_path);
+        make_args.is_big_endian = mb.if_pkt_is_big_endian;
         if (noc_id == 0) {
             UHD_MSG(status) << "It's a... null block!" << std::endl;
             _rfnoc_block_ctrl.push_back(
-                uhd::rfnoc::null_block_ctrl::make(
-                    ctrl,
-                    ctrl_sid,
-                    mb_i,
-                    _tree->subtree(mb_path),
-                    mb.if_pkt_is_big_endian
-                )
+                uhd::rfnoc::null_block_ctrl::make(make_args)
             );
         } else {
             // For now, it's just block_ctrl
             _rfnoc_block_ctrl.push_back(
-                uhd::rfnoc::block_ctrl::make(
-                    ctrl,
-                    ctrl_sid,
-                    mb_i,
-                    _tree->subtree(mb_path),
-                    mb.if_pkt_is_big_endian
-                )
+                uhd::rfnoc::block_ctrl::make(make_args)
             );
         }
     }
@@ -1168,13 +1162,14 @@ void x300_impl::setup_radio(const size_t mb_i, const std::string &slot_name)
     }
 
     /////// Create the RFNoC block
-    uhd::rfnoc::radio_ctrl::sptr r_ctrl = uhd::rfnoc::radio_ctrl::make(
-            perif.ctrl,
-            ctrl_sid,
-            mb_i,
-            _tree->subtree(mb_path),
-            mb.if_pkt_is_big_endian
-    );
+    uhd::rfnoc::make_args_t make_args;
+    make_args.ctrl_iface = perif.ctrl;
+    make_args.ctrl_sid = ctrl_sid;
+    make_args.device_index = mb_i;
+    make_args.tree = _tree->subtree(mb_path);
+    make_args.is_big_endian = mb.if_pkt_is_big_endian;
+    uhd::rfnoc::radio_ctrl::sptr r_ctrl =
+        uhd::rfnoc::radio_ctrl::make(make_args);
     r_ctrl->set_perifs(
             perif.time64,
             perif.framer,

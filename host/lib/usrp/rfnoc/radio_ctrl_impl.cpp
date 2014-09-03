@@ -220,5 +220,5 @@ private:
 
 };
 
-UHD_RFNOC_BLOCK_MAKE_CALL(radio_ctrl);
+UHD_RFNOC_BLOCK_REGISTER(radio_ctrl, "Radio");
 // vim: sw=4 expandtab:

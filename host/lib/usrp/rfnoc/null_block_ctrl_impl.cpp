@@ -128,5 +128,5 @@ private:
 
 };
 
-UHD_RFNOC_BLOCK_MAKE_CALL(null_block_ctrl);
+UHD_RFNOC_BLOCK_REGISTER(null_block_ctrl, "NullSrcSink");
 
