@@ -775,7 +775,9 @@ void e300_impl::_codec_loopback_self_test(wb_iface::sptr iface)
 
 boost::uint32_t e300_impl::_allocate_sid(const sid_config_t &config)
 {
-    const boost::uint32_t stream = (config.dst_prefix | (config.router_dst_there << 2)) & 0xff;
+    const boost::uint32_t stream = _get_axi_dma_channel(
+        config.router_dst_there,
+        config.dst_prefix);
 
     const boost::uint32_t sid = 0
         | (E300_DEVICE_HERE << 24)
@@ -844,9 +846,25 @@ size_t e300_impl::_get_axi_dma_channel(
     static const boost::uint32_t RADIO_GRP_SIZE = 4;
     static const boost::uint32_t RADIO0_GRP     = 0;
     static const boost::uint32_t RADIO1_GRP     = 1;
+    static const boost::uint32_t CE0_GRP        = 2;
+    static const boost::uint32_t CE1_GRP        = 3;
 
-    boost::uint32_t radio_grp = (destination == E300_XB_DST_R0) ? RADIO0_GRP : RADIO1_GRP;
-    return ((radio_grp * RADIO_GRP_SIZE) + prefix);
+    switch (destination) {
+    case E300_XB_DST_R0:
+        return (RADIO0_GRP * RADIO_GRP_SIZE) + prefix;
+
+    case E300_XB_DST_R1:
+        return (RADIO1_GRP * RADIO_GRP_SIZE) + prefix;
+
+    case E300_XB_DST_CE0:
+        return (CE0_GRP * RADIO_GRP_SIZE) + prefix;
+
+    case E300_XB_DST_CE1:
+        return (CE1_GRP * RADIO_GRP_SIZE) + prefix;
+
+    default:
+        throw uhd::value_error("Invalid destination specified.");
+    };
 }
 
 boost::uint16_t e300_impl::_get_udp_port(
@@ -976,7 +994,7 @@ void e300_impl::_setup_radio(const size_t dspno)
         ctrl_xports.send,
         ctrl_xports.recv,
         ctrl_sid,
-        dspno ? "1" : "0");
+        dspno ? "R1" : "R0");
     this->_register_loopback_self_test(perif.ctrl);
     perif.atr = gpio_core_200_32wo::make(perif.ctrl, TOREG(SR_GPIO));
 
