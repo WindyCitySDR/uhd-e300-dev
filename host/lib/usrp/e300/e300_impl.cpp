@@ -332,6 +332,15 @@ e300_impl::e300_impl(const uhd::device_addr_t &device_addr)
             std::min(e300::MAX_NET_RX_DATA_FRAME_SIZE, _data_xport_params.recv_frame_size);
         _data_xport_params.send_frame_size =
             std::min(e300::MAX_NET_TX_DATA_FRAME_SIZE, _data_xport_params.send_frame_size);
+
+        // our UDP WSA implementation cannot deal with more that 64 events,
+        // so clip it ...
+        _data_xport_params.num_recv_frames = std::min(
+            e300::MAX_NET_RX_DATA_NUM_FRAMES,
+            _data_xport_params.num_recv_frames);
+        _data_xport_params.num_send_frames = std::min(
+            e300::MAX_NET_TX_DATA_NUM_FRAMES,
+            _data_xport_params.num_send_frames);
     }
     udp_zero_copy::buff_params dummy_buff_params_out;
 

@@ -50,6 +50,9 @@ static const size_t DEFAULT_CTRL_NUM_FRAMES    = 32;
 static const size_t MAX_NET_RX_DATA_FRAME_SIZE = 1200;
 static const size_t MAX_NET_TX_DATA_FRAME_SIZE = 1200;
 
+static const size_t MAX_NET_RX_DATA_NUM_FRAMES = 64;
+static const size_t MAX_NET_TX_DATA_NUM_FRAMES = 64;
+
 class e300_ad9361_client_t : public ad9361_params {
 public:
     ~e300_ad9361_client_t() {}
