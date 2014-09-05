@@ -189,8 +189,8 @@ private: // types
         static const size_t CODEC_ARST  = 3;
         static const size_t TX_BANDSEL  = 4;
         static const size_t RX_BANDSELA = 7;
-        static const size_t RX_BANDSELB = 12;
-        static const size_t RX_BANDSELC = 16;
+        static const size_t RX_BANDSELB = 13;
+        static const size_t RX_BANDSELC = 17;
     };
 
 private: // methods
