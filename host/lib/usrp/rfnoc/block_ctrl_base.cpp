@@ -92,7 +92,7 @@ void block_ctrl_base::set_args(const uhd::device_addr_t &args)
 };
 
 void block_ctrl_base::sr_write(const boost::uint32_t reg, const boost::uint32_t data) {
-    UHD_MSG(status) << str(boost::format("sr_write(%d, %08x) on %s") % reg % data % get_block_id()) << std::endl;
+    UHD_MSG(status) << str(boost::format("sr_write(%d, %08X) on %s") % reg % data % get_block_id()) << std::endl;
     _ctrl_iface->poke32(_sr_to_addr(reg), data);
 }
 
@@ -151,11 +151,20 @@ void block_ctrl_base::configure_flow_control_out(
     sr_write(SR_FLOW_CTRL_ENABLE, (buf_size_pkts != 0));
 }
 
-void block_ctrl_base::reset_flow_control()
+void block_ctrl_base::clear()
 {
-    UHD_MSG(status) << "block_ctrl_base::reset_flow_control() " << std::endl;
+    UHD_MSG(status) << "block_ctrl_base::clear() " << std::endl;
+    // Reset connections
+    _upstream_blocks.clear();
+    _downstream_blocks.clear();
+    // Call block-specific reset
+    _clear();
+}
+
+void block_ctrl_base::_clear()
+{
+    UHD_MSG(status) << "block_ctrl_base::_clear() " << std::endl;
     sr_write(SR_FLOW_CTRL_CLR_SEQ, 0x00C1EA12); // 'CLEAR', but we can write anything, really
-    return;
 }
 
 

@@ -269,13 +269,20 @@ public:
             const uhd::sid_t &sid=uhd::sid_t()
      );
 
-    /*! Reset seqnum on flow control.
+    /*! Reset block after streaming operation.
      *
-     * This function is called in the constructor.
+     * This does the following:
+     * - Reset flow control (sequence numbers etc.)
+     * - Clear the list of connected blocks
      *
-     * TODO explain when this is necessary
+     * Between runs, it can be necessary to call this method,
+     * or blocks might be left hanging in a streaming state, and can get
+     * confused when a new application starts.
+     *
+     * Overwrite _clear() if you want to change the specifics register
+     * settings for this call.
      */
-    virtual void reset_flow_control();
+    void clear();
 
     /*! Configure the size (in bytes) of the packets this block produces.
      *
@@ -354,6 +361,11 @@ public:
     void clear_connections() { _upstream_blocks.clear(); _downstream_blocks.clear(); };
 
     virtual ~block_ctrl_base();
+
+protected:
+    //! Override this function if your block does something else
+    // than reset register SR_FLOW_CTRL_CLR_SEQ.
+    virtual void _clear();
 
 }; /* class block_ctrl_base */
 

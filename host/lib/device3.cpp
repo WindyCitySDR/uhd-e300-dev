@@ -45,4 +45,10 @@ block_ctrl_base::sptr device3::find_block_ctrl(const std::string &block_id) cons
     return block_ctrl_base::sptr();
 }
 
+void device3::clear()
+{
+    BOOST_FOREACH(const block_ctrl_base::sptr &block, _rfnoc_block_ctrl) {
+        block->clear();
+    }
+}
 // vim: sw=4 et:

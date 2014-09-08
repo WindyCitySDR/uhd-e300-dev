@@ -26,13 +26,20 @@ namespace uhd {
 /*!
  * \brief Extends uhd::device for third-generation USRP devices.
  *
- * One major feature of these devices is that they support
- * RFNoC (RF Network-on-Chip).
+ * Generation-3 devices are characterized by the following traits:
+ * - They support RFNoC (RF Network-on-Chip).
+ * - Data transport uses the compressed VITA (CVITA/CHDR) data format.
  */
 class UHD_API device3 : public uhd::device {
 
   public:
     typedef boost::shared_ptr<device3> sptr;
+
+    /*! Reset blocks after a stream.
+     *
+     * TODO write docs
+     */
+    void clear();
 
     /*! \brief Returns a block controller class for an RFNoC block.
      *
@@ -74,7 +81,12 @@ class UHD_API device3 : public uhd::device {
      * }
      * \endcode
      *
-     * \param block_id Block name (e.g. "FFT").
+     * To access specialized block controller classes (i.e. derived from block_ctrl_base),
+     * use the templated version of this function, e.g.
+     * \code{.cpp}
+     * // Assume DEV is a device3::sptr
+     * null_block_ctrl::sptr null_block = DEV->find_block_ctrl<null_block_ctrl>("NullSrcSink");
+     * \endcode
      */
     rfnoc::block_ctrl_base::sptr find_block_ctrl(const std::string &block_id) const;
 

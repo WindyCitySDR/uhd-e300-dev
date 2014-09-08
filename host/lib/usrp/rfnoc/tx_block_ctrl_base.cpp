@@ -42,8 +42,6 @@ void tx_block_ctrl_base::setup_tx_streamer(uhd::stream_args_t &args)
     // 1. Call our own init_tx() function
     // This should modify "args" if necessary.
     _init_tx(args);
-    // TODO: Decide if this is a good place to keep this
-    reset_flow_control();
 
     // 2. Check if we're the last block
     if (_is_final_tx_block()) {

@@ -53,9 +53,6 @@ public:
             const uhd::sid_t &sid=uhd::sid_t()
      ) = 0;
 
-    //! Don't reset flow control (this is a nop)
-    virtual void reset_flow_control() = 0;
-
     //! Set packet size in the VITA framer
     virtual bool set_bytes_per_output_packet(
             size_t bpp,
@@ -94,6 +91,9 @@ protected:
 
     //! Will return true
     virtual bool _is_final_rx_block() = 0;
+
+    //! Clear the Rx & Tx VITA cores
+    virtual void _clear() = 0;
 
 }; /* class radio_ctrl*/
 

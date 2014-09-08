@@ -277,6 +277,12 @@ int UHD_SAFE_MAIN(int argc, char *argv[])
         num_proc_blocks = 2;
     }
 
+    // Set up SIGINT handler. For indefinite streaming, display info on how to stop.
+    std::signal(SIGINT, &sig_int_handler);
+    if (total_num_samps == 0) {
+        std::cout << "Press Ctrl + C to stop streaming..." << std::endl;
+    }
+
     /////////////////////////////////////////////////////////////////////////
     //////// 1. Setup a USRP device /////////////////////////////////////////
     /////////////////////////////////////////////////////////////////////////
@@ -291,12 +297,8 @@ int UHD_SAFE_MAIN(int argc, char *argv[])
     }
     std::cout << boost::format("Using Device: %s") % usrp->get_pp_string() << std::endl;
     boost::this_thread::sleep(boost::posix_time::seconds(setup_time)); //allow for some setup time
-
-    // Set up SIGINT handler. For indefinite streaming, display info on how to stop.
-    std::signal(SIGINT, &sig_int_handler);
-    if (total_num_samps == 0) {
-        std::cout << "Press Ctrl + C to stop streaming..." << std::endl;
-    }
+    // Reset device streaming state
+    usrp->get_device3()->clear();
 
     /////////////////////////////////////////////////////////////////////////
     //////// 2. Get block control objects ///////////////////////////////////

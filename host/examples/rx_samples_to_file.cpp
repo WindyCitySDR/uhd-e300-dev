@@ -344,6 +344,7 @@ int UHD_SAFE_MAIN(int argc, char *argv[]){
     }
 
     if (not blockid.empty() and usrp->is_device3()) {
+        usrp->get_device3()->clear();
         uhd::rfnoc::rx_block_ctrl_base::sptr blk_ctrl =
             usrp->get_device3()->find_block_ctrl< uhd::rfnoc::rx_block_ctrl_base >(blockid);
         if (not blk_ctrl) {

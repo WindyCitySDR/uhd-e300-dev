@@ -62,18 +62,18 @@ public:
     }
 
     void configure_flow_control_out(
-                size_t buf_size_pkts,
-                size_t,
-                const uhd::sid_t &
+            size_t buf_size_pkts,
+            size_t,
+            const uhd::sid_t &
     ) {
         UHD_MSG(status) << "radio_ctrl::configure_flow_control_out() " << buf_size_pkts << std::endl;
         _perifs.framer->configure_flow_control(buf_size_pkts);
     }
 
-    void reset_flow_control()
+    void _clear()
     {
-        // TODO can't call this here... but where?
-        //_perifs.deframer->clear();
+        _perifs.deframer->clear();
+        _perifs.framer->clear();
     }
 
     bool set_bytes_per_output_packet(
@@ -162,8 +162,6 @@ protected:
     void _init_rx(uhd::stream_args_t &args)
     {
         UHD_MSG(status) << "radio_ctrl::init_rx()" << std::endl;
-        // TODO move this to my own clear()
-        //_perifs.framer->clear();
         if (args.otw_format != "sc16") {
             throw uhd::value_error("this radio only supports otw_format sc16");
         }
