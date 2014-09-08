@@ -43,7 +43,7 @@ block_ctrl_base::block_ctrl_base(
     UHD_MSG(status) << "block_ctrl_base()" << std::endl;
     // Read NoC-ID
     boost::uint64_t noc_id = sr_read64(SR_READBACK_REG_ID);
-    UHD_MSG(status) << "NOC ID: " << str(boost::format("0x%016x") % noc_id) << std::endl;
+    UHD_MSG(status) << "NOC ID: " << str(boost::format("0x%016X") % noc_id) << std::endl;
 
     std::string blockname = make_args.block_name;
 
@@ -76,9 +76,11 @@ block_ctrl_base::block_ctrl_base(
     _tree->create<size_t>(_root_path / "bytes_per_packet/default").set(DEFAULT_PACKET_SIZE);
     // TODO this value might be different.
     // Figure out true value, or allow setter, or register publisher
-    _tree->create<double>(_root_path / "clock_rate").set(160e6);
+    _tree->create<double>(_root_path / "clock_rate").set(166.666667e6);
 
-    // TODO: Add IO signature
+    // Add I/O signature
+    // TODO actually use values from the block definition
+    _tree->create<double>(_root_path / "input_sig/0").set(160e6);
 }
 
 block_ctrl_base::~block_ctrl_base() {
@@ -106,7 +108,10 @@ boost::uint32_t block_ctrl_base::sr_read32(const settingsbus_reg_t reg) {
 }
 
 size_t block_ctrl_base::get_fifo_size(size_t block_port) const {
-    return _tree->access<size_t>(_root_path / "input_buffer_size" / str(boost::format("%d") % block_port)).get();
+    if (_tree->exists(_root_path / "input_buffer_size" / str(boost::format("%d") % block_port))) {
+        return _tree->access<size_t>(_root_path / "input_buffer_size" / str(boost::format("%d") % block_port)).get();
+    }
+    return 0;
 }
 
 boost::uint32_t block_ctrl_base::get_address(size_t block_port) { // Accept the 'unused' warning as a reminder we actually need it!
