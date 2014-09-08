@@ -31,7 +31,7 @@
 #include <uhd/utils/static.hpp>
 #include <uhd/usrp/rfnoc/constants.hpp>
 #include <uhd/usrp/rfnoc/block_id.hpp>
-
+#include <uhd/usrp/rfnoc/stream_sig.hpp>
 
 namespace uhd {
     namespace rfnoc {
@@ -107,6 +107,8 @@ protected:
      * \param tree A property tree for this motherboard. Example: If the root a device's
      *             property tree is /mboards/0, pass a subtree starting at /mboards/0
      *             to the constructor.
+     *
+     * TODO fix this doxy block
      */
     block_ctrl_base(
             const make_args_t &make_args
@@ -168,9 +170,7 @@ public:
      */
     static sptr make(const make_args_t &make_args, boost::uint64_t noc_id = ~0);
 
-    /*! Initialize the block arguments.
-     */
-    void set_args(const uhd::device_addr_t &args);
+    //////// FPGA control methods ///////////////////////////////////////////
 
     /*! Allows setting one register on the settings bus.
      *
@@ -213,6 +213,10 @@ public:
     /*! Returns the 16-Bit address for this block.
      */
     boost::uint32_t get_address(size_t block_port=0);
+
+    /*! Initialize the block arguments.
+     */
+    void set_args(const uhd::device_addr_t &args);
 
     /*! Returns the unique block ID for this block (e.g. "0/FFT_1").
      */
@@ -284,48 +288,45 @@ public:
      */
     void clear();
 
-    /*! Configure the size (in bytes) of the packets this block produces.
+    /*! Return the input stream signature for a given block port.
      *
-     * Note: block_ctrl_base only stores this value internally, but does not
-     * set any registers. It is recommended to overload this function
-     * to actually change settings.
+     * If \p block_port is not a valid input port, throws
+     * a uhd::runtime_error.
      *
-     * If this block is not capable of setting the packet size as requested,
-     * this block returns false (does not throw). The calling function must
-     * check this and handle accordingly.
-     *
-     * Setting \p bpp to 0 indicates a variable packet size.
+     * Calling set_input_signature() can change the return value
+     * of this function.
      */
-    virtual bool set_bytes_per_output_packet(size_t bpp, size_t out_block_port=0);
+    stream_sig_t get_input_signature(size_t block_port=0) const;
 
-    /*! Inform the block of the packet size (in bytes) it is to expect on a given input port.
+    /*! Return the output stream signature for a given block port.
      *
-     * This usually is called after configuring an upstream block. That block will
-     * probably produce data at a certain packet size, and this function is used
-     * to tell this block about the packet size.
+     * If \p block_port is not a valid output port, throws
+     * a uhd::runtime_error.
      *
-     * If this block is not capable of receiving the specified packet size,
-     * this block returns false (does not throw). The caller must check this
-     * and handle accordingly.
-     *
-     * *Important*: It may be that calling this function also changes the size
-     * of outgoing packets. Call get_bytes_per_output_packet() to get the
-     * definitive value.
-     *
-     * *Default behaviour*: Does nothing, just returns true. This function
-     * is most definitely one you want to override when subclassing
-     * block_ctrl_base.
-     *
-     * Setting \p bpp to 0 indicates a variable packet size.
+     * Calling set_output_signature() *or* set_input_signature() can
+     * change the return value of this function.
      */
-    virtual bool set_bytes_per_input_packet(size_t bpp, size_t in_block_port=0);
+    stream_sig_t get_output_signature(size_t block_port=0) const;
 
-    /*! Query the size of packets (in bytes) produced on a given output port.
+    /*! Tell this block about the stream signature incoming on a given block port.
      *
-     * A return value of 0 indicates that the packet size is not yet set on this
-     * port, or is variable in size.
+     * If \p block_port is not a valid output port, throws
+     * a uhd::runtime_error.
+     *
+     * If the input signature is incompatible with this block's signature,
+     * it does not throw, but returns false.
+     *
+     * This function may also affect the output stream signature.
      */
-    virtual size_t get_bytes_per_output_packet(size_t out_block_port=0);
+    virtual bool set_input_signature(const stream_sig_t &stream_sig, size_t port=0);
+
+    /*! Change the output stream signature for a given output block port.
+     *
+     * If the requested stream signature is not possible with this block,
+     * it returns false (does not throw).
+     * Recommended behaviour is not to modify the input signature.
+     */
+    virtual bool set_output_signature(const stream_sig_t &stream_sig, size_t port=0);
 
     /*! Configures data flowing from port \p output_block_port to go to \p next_address
      *
@@ -352,13 +353,6 @@ public:
      * \param downstream_block A pointer to the block instantiation
      */
     void register_downstream_block(sptr downstream_block);
-
-    /*! Clears the lists of upstream and downstream blocks, respectively.
-     *
-     * After calling this, and before calling register_upstream_block() again,
-     * block_ctrl_base::issue_stream_cmd() will not do anything but issue a warning.
-     */
-    void clear_connections() { _upstream_blocks.clear(); _downstream_blocks.clear(); };
 
     virtual ~block_ctrl_base();
 

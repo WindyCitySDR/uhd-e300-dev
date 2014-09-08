@@ -37,12 +37,21 @@ public:
         _rx_bpi = uhd::convert::get_bytes_per_item(_rx_stream_args.otw_format);
         // Default: 1 Channel
         _rx_stream_args.channels = std::vector<size_t>(1, 0);
-        // SPP is stored for calls to set_bytes_per_output_packet etc.
-        _rx_spp = get_bytes_per_output_packet(0) / _rx_bpi;
+        // SPP is stored for calls to set_output_signature() etc.
+        _rx_spp = get_output_signature(0).packet_size / _rx_bpi;
+        if (_rx_spp == 0) {
+            _rx_spp = DEFAULT_PACKET_SIZE / _rx_bpi;
+        }
+        UHD_MSG(status) << "radio_ctrl::radio_ctrl() _rx_spp==" << _rx_spp << std::endl;
 
         // TODO: Once the radio looks like a NoC-Block, remove this!
         _tree->remove(_root_path / "input_buffer_size");
         _tree->create<size_t>(_root_path / "input_buffer_size/0").set(0x90000/2);
+
+        // TODO this is a hack
+        stream_sig_t out_sig("sc16", 0, false);
+        out_sig.packet_size = _rx_spp * _rx_bpi;
+        _tree->access<stream_sig_t>(_root_path / "output_sig/0").set(out_sig);
     }
 
     void issue_stream_cmd(const uhd::stream_cmd_t &stream_cmd)
@@ -76,26 +85,27 @@ public:
         _perifs.framer->clear();
     }
 
-    bool set_bytes_per_output_packet(
-            size_t bpp,
-            size_t out_block_port
-    ) {
-        UHD_MSG(status) << "radio_ctrl::set_bytes_per_output_packet()" << std::endl;
-        UHD_ASSERT_THROW(out_block_port == 0);
-        if (bpp % _rx_bpi) {
+    bool set_output_signature(const stream_sig_t &out_sig_, size_t block_port)
+    {
+        UHD_MSG(status) << "radio_ctrl::set_output_signature()" << std::endl;
+        UHD_ASSERT_THROW(block_port == 0);
+        stream_sig_t out_sig = out_sig_;
+
+        if (out_sig_.packet_size % _rx_bpi) {
             return false;
         }
-        _tree->access<size_t>(_root_path / "bytes_per_packet/default").set(bpp);
+        if (out_sig_.packet_size == 0) {
+            return false;
+        }
 
-        _rx_spp = bpp / _rx_bpi;
-        UHD_MSG(status) << "radio_ctrl::set_bytes_per_output_packet(): Setting spp to " << _rx_spp << std::endl;
-        _perifs.framer->set_nsamps_per_packet(_rx_spp);
-        return true;
-    }
+        if (block_ctrl_base::set_output_signature(out_sig, block_port)) {
+            _rx_spp = out_sig_.packet_size / _rx_bpi;
+            UHD_MSG(status) << "radio_ctrl::set_output_signature(): Setting spp to " << _rx_spp << std::endl;
+            _perifs.framer->set_nsamps_per_packet(_rx_spp);
+            return true;
+        }
 
-    size_t get_bytes_per_output_packet(UHD_UNUSED(size_t out_block_port))
-    {
-        return _tree->access<size_t>(_root_path / "bytes_per_packet/default").get();
+        return false;
     }
 
     void set_destination(
@@ -171,9 +181,12 @@ protected:
         } else {
             _rx_spp = boost::lexical_cast<size_t>(args.args["spp"]);
         }
-        if (not set_bytes_per_output_packet(_rx_spp * _rx_bpi, 0)) {
+        stream_sig_t new_stream_sig = get_output_signature();
+        new_stream_sig.packet_size = _rx_spp * _rx_bpi;
+        if (not set_output_signature(new_stream_sig, 0)) {
             throw uhd::value_error("radio_ctrl::init_rx(): Invalid spp value.");
         }
+
         _perifs.framer->setup(args);
         _perifs.ddc->setup(args);
     }

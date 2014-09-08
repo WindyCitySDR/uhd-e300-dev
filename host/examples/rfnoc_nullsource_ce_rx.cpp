@@ -340,8 +340,12 @@ int UHD_SAFE_MAIN(int argc, char *argv[])
     //////// 4. Configure blocks (packet size and rate) /////////////////////
     /////////////////////////////////////////////////////////////////////////
     std::cout << "Samples per packet coming from null source: " << spp << std::endl;
+    // This could be made a setter in the null block control, but we can always
+    // change these kind of things by changing the output signature of a block:
+    uhd::rfnoc::stream_sig_t out_sig = null_src_ctrl->get_output_signature(0);
     const size_t BYTES_PER_SAMPLE = 4;
-    if (not null_src_ctrl->set_bytes_per_output_packet(spp * BYTES_PER_SAMPLE)) {
+    out_sig.packet_size = spp * BYTES_PER_SAMPLE;
+    if (not null_src_ctrl->set_output_signature(out_sig)) {
         std::cout << "[ERROR] Could not set samples per packet!" << std::endl;
         return ~0;
     }
@@ -361,11 +365,6 @@ int UHD_SAFE_MAIN(int argc, char *argv[])
     uhd::fs_path line_rate_path = null_src_ctrl->get_block_id().get_tree_root() + "/line_rate/value";
     double actual_rate_mega = usrp->get_device()->get_tree()->access<double>(line_rate_path).get() / 1e6 * 2;
     std::cout << str(boost::format("Actually got rate: %.2f Msps (%.2f MByte/s).") % actual_rate_mega % (actual_rate_mega * 4)) << std::endl;
-
-    proc_block_ctrl->set_bytes_per_input_packet(spp * BYTES_PER_SAMPLE);
-    if (num_proc_blocks == 2) {
-        proc_block_ctrl2->set_bytes_per_input_packet(proc_block_ctrl->get_bytes_per_output_packet());
-    }
 
     /////////////////////////////////////////////////////////////////////////
     //////// 5. Connect blocks //////////////////////////////////////////////

@@ -22,6 +22,7 @@ UHD_INSTALL(FILES
     constants.hpp
     null_block_ctrl.hpp
     rx_block_ctrl_base.hpp
+    stream_sig.hpp
     tx_block_ctrl_base.hpp
     DESTINATION ${INCLUDE_DIR}/uhd/usrp/rfnoc
     COMPONENT headers

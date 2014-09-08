@@ -40,6 +40,7 @@ SET(test_sources
     sid_t_test.cpp
     sph_recv_test.cpp
     sph_send_test.cpp
+    stream_sig_test.cpp
     subdev_spec_test.cpp
     time_spec_test.cpp
     vrt_test.cpp

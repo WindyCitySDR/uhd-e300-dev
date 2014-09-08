@@ -1064,7 +1064,14 @@ public:
         dst_block_port &= 0xF;
 
         // Check IO signatures match
-        // TODO
+        if (not dst->set_input_signature(src->get_output_signature(src_block_port), dst_block_port)) {
+            throw uhd::runtime_error(str(
+                boost::format("Can't connect block %s to %s: IO signature mismatch\n(%s is incompatible with %s).")
+                % src->get_block_id().get() % dst->get_block_id().get()
+                % src->get_output_signature(src_block_port)
+                % dst->get_input_signature(dst_block_port)
+            ));
+        }
 
         // Calculate SID
         sid_t sid = dst->get_address(dst_block_port);
@@ -1074,12 +1081,22 @@ public:
         src->set_destination(sid.get_dst_address(), src_block_port);
 
         // Set flow control
-        size_t pkt_size = src->get_bytes_per_output_packet(src_block_port);
+        rfnoc::stream_sig_t output_sig = src->get_output_signature(src_block_port);
+        size_t pkt_size = output_sig.packet_size;
         if (pkt_size == 0) { // Unspecified packet rate. Assume max packet size.
+            UHD_MSG(status) << "Assuming max packet size for " << src->get_block_id() << std::endl;
             pkt_size = uhd::rfnoc::MAX_PACKET_SIZE;
         }
         // FC window (in packets) depends on FIFO size...          ...and packet size.
         size_t buf_size_pkts = dst->get_fifo_size(dst_block_port) / pkt_size;
+        if (buf_size_pkts == 0) {
+            throw uhd::runtime_error(str(
+                boost::format("Input FIFO for block %s is too small (%d kiB) for packets of size %d kiB\n"
+                              "coming from block %s.")
+                % dst->get_block_id().get() % (dst->get_fifo_size(dst_block_port) / 1024)
+                % (pkt_size / 1024) % src->get_block_id().get()
+            ));
+        }
         src->configure_flow_control_out(buf_size_pkts, src_block_port);
 
         size_t pkts_per_ack = uhd::rfnoc::DEFAULT_FC_XBAR_PKTS_PER_ACK;

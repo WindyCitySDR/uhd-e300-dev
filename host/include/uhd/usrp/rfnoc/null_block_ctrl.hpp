@@ -71,14 +71,7 @@ public:
     // a uhd::not_implemented_error to be thrown.
     virtual void issue_stream_cmd(const uhd::stream_cmd_t &stream_cmd) = 0;
 
-    //! This is important for the 'source' component. The 'sink' does
-    // not care about packet sizes.
-    virtual bool set_bytes_per_output_packet(
-            size_t bpp,
-            size_t out_block_port=0
-    ) = 0;
-
-    virtual size_t get_bytes_per_output_packet(size_t out_block_port=0) = 0;
+    virtual bool set_output_signature(const stream_sig_t &, size_t port=0) = 0;
 
     //! This must be overridden because as a true source, we must also
     // set the source address.

@@ -512,7 +512,6 @@ rx_streamer::sptr x300_impl::get_rx_stream(const uhd::stream_args_t &args_)
 
         //flow control setup
         const size_t pkt_size = spp * bpi + X300_RX_MAX_HDR_LEN;
-        UHD_VAR(pkt_size); // TODO remove this line
         const size_t fc_window = get_rx_flow_control_window(pkt_size, xport.recv_buff_size, device_addr);
         const size_t fc_handle_window = std::max<size_t>(1, fc_window / X300_RX_FC_REQUEST_FREQ);
         UHD_LOG << "RX Flow Control Window = " << fc_window << ", RX Flow Control Handler Window = " << fc_handle_window << std::endl;

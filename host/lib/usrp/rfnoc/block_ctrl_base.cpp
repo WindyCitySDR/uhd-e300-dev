@@ -73,17 +73,21 @@ block_ctrl_base::block_ctrl_base(
         }
     }
 
-    _tree->create<size_t>(_root_path / "bytes_per_packet/default").set(DEFAULT_PACKET_SIZE);
+    // Declare clock rate
     // TODO this value might be different.
     // Figure out true value, or allow setter, or register publisher
     _tree->create<double>(_root_path / "clock_rate").set(166.666667e6);
 
     // Add I/O signature
     // TODO actually use values from the block definition
-    _tree->create<double>(_root_path / "input_sig/0").set(160e6);
+    _tree->create<stream_sig_t>(_root_path / "input_sig/0").set(stream_sig_t("sc16", 0));
+    // FIXME default packet size?
+    _tree->create<stream_sig_t>(_root_path / "output_sig/0").set(stream_sig_t("sc16", 0, DEFAULT_PACKET_SIZE));
 }
 
-block_ctrl_base::~block_ctrl_base() {
+block_ctrl_base::~block_ctrl_base()
+{
+    // nop
 }
 
 
@@ -162,6 +166,7 @@ void block_ctrl_base::clear()
     // Reset connections
     _upstream_blocks.clear();
     _downstream_blocks.clear();
+    // TODO: Reset stream signatures to defaults from block definition
     // Call block-specific reset
     _clear();
 }
@@ -173,35 +178,76 @@ void block_ctrl_base::_clear()
 }
 
 
-bool block_ctrl_base::set_bytes_per_output_packet(size_t bpp, size_t out_block_port)
+stream_sig_t block_ctrl_base::get_input_signature(size_t block_port) const
 {
-    UHD_MSG(status) << "block_ctrl_base::set_bytes_per_output_packet() " << bpp << std::endl;
-    if (bpp % BYTES_PER_LINE) {
+    UHD_MSG(status) << "block_ctrl_base::get_input_signature() " << std::endl;
+    if (not _tree->exists(_root_path / "input_sig" / str(boost::format("%d") % block_port))) {
+        throw uhd::runtime_error(str(
+            boost::format("Can't query input signature on block %s: Port %d is not defined.")
+            % get_block_id().to_string() % block_port
+        ));
+    }
+    return _tree->access<stream_sig_t>(_root_path / "input_sig" / str(boost::format("%d") % block_port)).get();
+}
+
+stream_sig_t block_ctrl_base::get_output_signature(size_t block_port) const
+{
+    UHD_MSG(status) << "block_ctrl_base::get_output_signature() " << std::endl;
+    if (not _tree->exists(_root_path / "output_sig" / str(boost::format("%d") % block_port))) {
+        throw uhd::runtime_error(str(
+            boost::format("Can't query output signature on block %s: Port %d is not defined.")
+            % get_block_id().to_string() % block_port
+        ));
+    }
+    return _tree->access<stream_sig_t>(_root_path / "output_sig" / str(boost::format("%d") % block_port)).get();
+}
+
+bool block_ctrl_base::set_input_signature(const stream_sig_t &in_sig, size_t block_port)
+{
+    UHD_MSG(status) << "block_ctrl_base::set_input_signature() " << in_sig << " " << block_port << std::endl;
+    if (not _tree->exists(_root_path / "input_sig" / str(boost::format("%d") % block_port))) {
+        throw uhd::runtime_error(str(
+            boost::format("Can't modify input signature on block %s: Port %d is not defined.")
+            % get_block_id().to_string() % block_port
+        ));
+    }
+
+    if (not
+        _tree->access<stream_sig_t>(_root_path / "input_sig" / str(boost::format("%d") % block_port))
+        .get().is_compatible(in_sig)
+    ) {
         return false;
     }
 
-    fs_path bpp_path = _root_path / str(boost::format("bytes_per_packet/%d") % out_block_port);
-    if (_tree->exists(bpp_path)) {
-        _tree->access<size_t>(bpp_path).set(bpp);
-    } else {
-        _tree->create<size_t>(bpp_path).set(bpp);
+    // TODO more and better rules, check block definition
+    if (in_sig.packet_size % BYTES_PER_LINE) {
+        return false;
     }
+
+    _tree->access<stream_sig_t>(_root_path / "input_sig" / str(boost::format("%d") % block_port)).set(in_sig);
+    // FIXME figure out good rules to propagate the signature
+    _tree->access<stream_sig_t>(_root_path / "output_sig" / str(boost::format("%d") % block_port)).set(in_sig);
     return true;
 }
 
-bool block_ctrl_base::set_bytes_per_input_packet(UHD_UNUSED(size_t bpp), UHD_UNUSED(size_t in_block_port))
+bool block_ctrl_base::set_output_signature(const stream_sig_t &out_sig, size_t block_port)
 {
-    UHD_MSG(status) << "block_ctrl_base::set_bytes_per_input_packet() " << bpp << std::endl;
-    return true;
-}
+    UHD_MSG(status) << "block_ctrl_base::set_output_signature() " << out_sig << " " << block_port << std::endl;
 
-size_t block_ctrl_base::get_bytes_per_output_packet(size_t out_block_port)
-{
-    fs_path bpp_path = _root_path / str(boost::format("bytes_per_packet/%d") % out_block_port);
-    if (_tree->exists(bpp_path)) {
-        return _tree->access<size_t>(bpp_path).get();
+    if (not _tree->exists(_root_path / "output_sig" / str(boost::format("%d") % block_port))) {
+        throw uhd::runtime_error(str(
+            boost::format("Can't modify output signature on block %s: Port %d is not defined.")
+            % get_block_id().to_string() % block_port
+        ));
     }
-    return _tree->access<size_t>(_root_path / "bytes_per_packet/default").get();
+
+    // TODO more and better rules, check block definition
+    if (out_sig.packet_size % BYTES_PER_LINE) {
+        return false;
+    }
+
+    _tree->access<stream_sig_t>(_root_path / "output_sig" / str(boost::format("%d") % block_port)).set(out_sig);
+    return true;
 }
 
 void block_ctrl_base::set_destination(

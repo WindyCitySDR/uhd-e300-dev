@@ -89,25 +89,21 @@ public:
         }
     }
 
-    bool set_bytes_per_output_packet(
-            size_t bpp,
-            UHD_UNUSED(size_t out_block_port) // Is not relevant for this block
-    ) {
-        if (bpp % BYTES_PER_LINE) {
-            return false;
-        }
-        if (bpp == 0) {
-            bpp = DEFAULT_LINES_PER_PACKET;
-        }
-        boost::uint32_t lines_per_packet = std::max(bpp / BYTES_PER_LINE, size_t(1));
-        sr_write(SR_LINES_PER_PACKET, lines_per_packet);
-        _tree->access<size_t>(_root_path / "bytes_per_packet/default").set(bpp);
-        return true;
-    }
-
-    size_t get_bytes_per_output_packet(UHD_UNUSED(size_t out_block_port))
+    bool set_output_signature(const stream_sig_t &out_sig_, size_t block_port)
     {
-        return _tree->access<size_t>(_root_path / "bytes_per_packet/default").get();
+        stream_sig_t out_sig = out_sig_;
+        boost::uint32_t lines_per_packet = DEFAULT_LINES_PER_PACKET;
+        if (out_sig.packet_size) {
+            lines_per_packet = std::max<size_t>(out_sig.packet_size / BYTES_PER_LINE, 1);;
+        }
+        out_sig.packet_size = lines_per_packet * BYTES_PER_LINE;
+
+        if (block_ctrl_base::set_output_signature(out_sig, block_port)) {
+            sr_write(SR_LINES_PER_PACKET, lines_per_packet);
+            return true;
+        }
+
+        return false;
     }
 
     void set_destination(
