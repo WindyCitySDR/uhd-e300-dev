@@ -51,6 +51,11 @@ enum settingsbus_reg_t {
     SR_READBACK_REG_USER       = 3,
 };
 
+// AXI stream configuration bus (output master bus of axi wrapper) registers
+static const boost::uint32_t AXI_WRAPPER_BASE      = 8;
+static const boost::uint32_t AXIS_CONFIG_BUS       = AXI_WRAPPER_BASE+8; // tdata with tvalid asserted
+static const boost::uint32_t AXIS_CONFIG_BUS_TLAST = AXI_WRAPPER_BASE+9; // tdata with tvalid & tlast asserted
+
 // Regular expressions
 static const std::string VALID_BLOCKNAME_REGEX = "[A-Za-z][A-Za-z0-9]*";
 static const std::string VALID_BLOCKID_REGEX = "(?:(\\d+)(?:/))?([A-Za-z][A-Za-z0-9]*)(?:(?:_)(\\d\\d?))?";
