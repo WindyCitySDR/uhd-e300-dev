@@ -19,6 +19,7 @@
 
 #include <boost/thread.hpp>
 #include <boost/assign/list_of.hpp>
+#include <boost/format.hpp>
 
 #include <cstring>
 #include <uhd/exception.hpp>
@@ -48,6 +49,9 @@ public:
             return get_gps_lock();
         else if (key == "gps_time")
             return get_gps_time();
+        else
+            throw uhd::lookup_error(
+                str(boost::format("Invalid sensor %s requested.") % key));
     }
 
     uhd::sensor_value_t get_mb_temp(void)
@@ -232,6 +236,9 @@ public:
             return get_gps_lock();
         else if (key == "gps_time")
             return get_gps_time();
+        else
+            throw uhd::lookup_error(
+                str(boost::format("Invalid sensor %s requested.") % key));
     }
 
     uhd::sensor_value_t get_mb_temp(void)
