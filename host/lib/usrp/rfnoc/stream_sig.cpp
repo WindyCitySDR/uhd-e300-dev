@@ -48,8 +48,8 @@ std::string stream_sig_t::to_string()
 {
     return str(
         boost::format(
-            "%s,vlen=%d%s"
-        ) % _item_type % vlen % (is_bursty ? ",bursty" : "")
+            "%s,vlen=%d,packet_size=%d%s"
+        ) % get_item_type() % vlen % packet_size % (is_bursty ? ",bursty" : "")
     );
 }
 

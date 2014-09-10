@@ -80,10 +80,12 @@ public:
 
     bool set_input_signature(const stream_sig_t &stream_sig, size_t port=0)
     {
+        UHD_MSG(status) << "fft_block::set_input_signature()" << std::endl;
         UHD_ASSERT_THROW(port == 0);
         if (stream_sig.get_item_type() != _item_type
-            or (stream_sig.packet_size != 0 and stream_sig.packet_size != _fft_size * _bpi)
+            //or (stream_sig.packet_size != 0 and stream_sig.packet_size != _fft_size * _bpi) FIXME put this back in
             or (stream_sig.vlen != 0 and stream_sig.vlen != _fft_size)) {
+            UHD_MSG(status) << "not valid." << std::endl;
             return false;
         }
 
@@ -94,7 +96,7 @@ public:
     {
         UHD_ASSERT_THROW(port == 0);
         if (stream_sig.get_item_type() != _item_type
-            or (stream_sig.packet_size != 0 and stream_sig.packet_size != _fft_size * _bpi)
+            //or (stream_sig.packet_size != 0 and stream_sig.packet_size != _fft_size * _bpi) FIXME put this back in
             or (stream_sig.vlen != 0 and stream_sig.vlen != _fft_size)) {
             return false;
         }
@@ -105,6 +107,7 @@ public:
 protected:
     void _set_args()
     {
+        UHD_MSG(status) << "fft_block::_set_args()" << std::endl;
         if (_args.has_key("fftsize")) {
             size_t req_fft_size = _args.cast<size_t>("fftsize", _fft_size);
             if (req_fft_size != _fft_size) {
