@@ -118,6 +118,22 @@ boost::uint32_t block_ctrl_base::sr_read32(const settingsbus_reg_t reg) {
     return _ctrl_iface->peek32(_sr_to_addr(reg));
 }
 
+boost::uint64_t block_ctrl_base::user_reg_read64(const boost::uint32_t addr)
+{
+      // Set readback register address
+      sr_write(SR_READBACK_ADDR, addr);
+      // Read readback register via RFNoC
+      return sr_read64(SR_READBACK_REG_USER);
+}
+
+boost::uint32_t block_ctrl_base::user_reg_read32(const boost::uint32_t addr)
+{
+      // Set readback register address
+      sr_write(SR_READBACK_ADDR, addr);
+      // Read readback register via RFNoC
+      return sr_read32(SR_READBACK_REG_USER);
+}
+
 size_t block_ctrl_base::get_fifo_size(size_t block_port) const {
     if (_tree->exists(_root_path / "input_buffer_size" / str(boost::format("%d") % block_port))) {
         return _tree->access<size_t>(_root_path / "input_buffer_size" / str(boost::format("%d") % block_port)).get();

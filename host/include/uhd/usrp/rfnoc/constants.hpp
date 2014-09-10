@@ -42,6 +42,7 @@ static const boost::uint32_t SR_FLOW_CTRL_PKTS_PER_ACK = 3;
 static const boost::uint32_t SR_FLOW_CTRL_CLR_SEQ      = 4;
 static const boost::uint32_t SR_NEXT_DST               = 8;
 static const boost::uint32_t SR_READBACK               = 32;
+static const boost::uint32_t SR_READBACK_ADDR          = 255;
 
 //! Settings register readback
 enum settingsbus_reg_t {

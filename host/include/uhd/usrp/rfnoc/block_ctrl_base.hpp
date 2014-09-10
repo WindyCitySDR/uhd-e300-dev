@@ -198,6 +198,28 @@ public:
      */
     boost::uint32_t sr_read32(const settingsbus_reg_t reg);
 
+    /*! Allows reading one user-defined register (64-Bit version).
+     *
+     * This is a shorthand for setting the requested address
+     * through sr_write() and then reading SR_READBACK_REG_USER
+     * with sr_read64().
+     *
+     * \param addr The user register address.
+     * \returns the readback value.
+     */
+    boost::uint64_t user_reg_read64(const boost::uint32_t addr);
+
+    /*! Allows reading one user-defined register (32-Bit version).
+     *
+     * This is a shorthand for setting the requested address
+     * through sr_write() and then reading SR_READBACK_REG_USER
+     * with sr_read32().
+     *
+     * \param addr The user register address.
+     * \returns the readback value.
+     */
+    boost::uint32_t user_reg_read32(const boost::uint32_t addr);
+
     /*! Return the size of input buffer on a given block port.
      *
      * This is necessary for setting up flow control, among other things.
