@@ -361,6 +361,13 @@ protected:
     // than reset register SR_FLOW_CTRL_CLR_SEQ.
     virtual void _clear();
 
+    //! This function is called whenever _args is changed.
+    // Override it to update block-specific settings, or to sanity-check
+    // the new _args string.
+    //
+    // May throw.
+    virtual void _set_args();
+
 }; /* class block_ctrl_base */
 
 }} /* namespace uhd::rfnoc */

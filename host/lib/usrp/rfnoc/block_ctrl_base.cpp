@@ -93,9 +93,16 @@ block_ctrl_base::~block_ctrl_base()
 
 void block_ctrl_base::set_args(const uhd::device_addr_t &args)
 {
+    UHD_MSG(status) << "block_ctrl_base::set_args() " << args.to_string() << std::endl;
     _args = args;
-    UHD_MSG(status) << "block_ctrl_base::set_args() " << _args.to_string() << std::endl;
-};
+    _set_args();
+}
+
+void block_ctrl_base::_set_args()
+{
+    UHD_MSG(status) << "block_ctrl_base::_set_args() " << _args.to_string() << std::endl;
+    return;
+}
 
 void block_ctrl_base::sr_write(const boost::uint32_t reg, const boost::uint32_t data) {
     UHD_MSG(status) << str(boost::format("sr_write(%d, %08X) on %s") % reg % data % get_block_id()) << std::endl;
