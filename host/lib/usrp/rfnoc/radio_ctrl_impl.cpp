@@ -179,7 +179,7 @@ protected:
         if (not args.args.has_key("spp")) {
             args.args["spp"] = str(boost::format("%d") % _rx_spp);
         } else {
-            _rx_spp = boost::lexical_cast<size_t>(args.args["spp"]);
+            _rx_spp = args.args.cast<size_t>("spp", _rx_spp);
         }
         stream_sig_t new_stream_sig = get_output_signature();
         new_stream_sig.packet_size = _rx_spp * _rx_bpi;
