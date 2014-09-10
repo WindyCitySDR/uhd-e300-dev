@@ -139,9 +139,6 @@ public:
     typedef boost::shared_ptr<block_ctrl_base> sptr;
     typedef boost::function<sptr(const make_args_t &)> make_t;
 
-    //! Returns a shared_ptr of type T. Use this to access the derived block types.
-    template <class T> UHD_INLINE T cast(void) const { return boost::dynamic_pointer_cast<T>(shared_from_this()); };
-
     /*! Register a block controller class into the discovery and factory system.
      *
      * Note: It is not recommended to call this function directly.
