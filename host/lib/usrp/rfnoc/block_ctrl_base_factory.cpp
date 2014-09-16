@@ -75,6 +75,9 @@ static std::string lookup_block_name(boost::uint64_t noc_id)
     else if (noc_id == 0xF112000000000000) {
         blockname = "FIR";
     }
+    else if (((noc_id >> 48) & 0xFFFF) == 0xD053) {
+        blockname = "Window";
+    }
 
     return blockname;
 }

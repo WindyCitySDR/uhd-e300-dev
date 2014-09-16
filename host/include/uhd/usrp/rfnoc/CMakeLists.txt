@@ -23,6 +23,7 @@ UHD_INSTALL(FILES
     fir_block_ctrl.hpp
     fft_block_ctrl.hpp
     null_block_ctrl.hpp
+    window_block_ctrl.hpp
     rx_block_ctrl_base.hpp
     stream_sig.hpp
     tx_block_ctrl_base.hpp
