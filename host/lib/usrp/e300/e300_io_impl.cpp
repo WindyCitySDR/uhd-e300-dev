@@ -254,7 +254,7 @@ static void handle_rx_flowctrl(
 
     //load packet info
     vrt::if_packet_info_t packet_info;
-    packet_info.packet_type = vrt::if_packet_info_t::PACKET_TYPE_CONTEXT;
+    packet_info.packet_type = vrt::if_packet_info_t::PACKET_TYPE_FC;
     packet_info.num_payload_words32 = RXFC_PACKET_LEN_IN_WORDS;
     packet_info.num_payload_bytes = packet_info.num_payload_words32*sizeof(boost::uint32_t);
     packet_info.packet_count = seq_sw;
@@ -273,6 +273,9 @@ static void handle_rx_flowctrl(
     //load payload
     pkt[packet_info.num_header_words32+RXFC_CMD_CODE_OFFSET] = uhd::htowx<boost::uint32_t>(0);
     pkt[packet_info.num_header_words32+RXFC_SEQ_NUM_OFFSET] = uhd::htowx<boost::uint32_t>(seq_sw);
+
+    // hardcode bits
+    pkt[0] = (pkt[0] & 0x00ffffff) | 0x40000000;
 
     //send the buffer over the interface
     buff->commit(sizeof(boost::uint32_t)*(packet_info.num_packet_words32));
@@ -439,7 +442,7 @@ rx_streamer::sptr e300_impl::get_rx_stream(const uhd::stream_args_t &args_)
         ;
         const size_t bpp = data_xports.recv->get_recv_frame_size() - hdr_size;
         const size_t bpi = convert::get_bytes_per_item(args.otw_format);
-        const size_t spp = unsigned(args.args.cast<double>("spp", bpp/bpi));
+        const size_t spp = std::min(args.args.cast<size_t>("spp", bpp/bpi), bpp/bpi); // samples per packet
 
         //make the new streamer given the samples per packet
         if (not my_streamer)
@@ -540,7 +543,7 @@ tx_streamer::sptr e300_impl::get_tx_stream(const uhd::stream_args_t &args_)
         ;
         const size_t bpp = data_xports.send->get_send_frame_size() - hdr_size;
         const size_t bpi = convert::get_bytes_per_item(args.otw_format);
-        const size_t spp = unsigned(args.args.cast<double>("spp", bpp/bpi));
+        const size_t spp = std::min(args.args.cast<size_t>("spp", bpp/bpi), bpp/bpi); // samples per packet
 
         //make the new streamer given the samples per packet
         if (not my_streamer)

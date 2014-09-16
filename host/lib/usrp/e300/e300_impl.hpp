@@ -18,7 +18,7 @@
 #ifndef INCLUDED_E300_IMPL_HPP
 #define INCLUDED_E300_IMPL_HPP
 
-#include <uhd/device.hpp>
+#include <uhd/device3.hpp>
 #include <uhd/property_tree.hpp>
 #include <uhd/usrp/subdev_spec.hpp>
 #include <uhd/usrp/mboard_eeprom.hpp>
@@ -26,6 +26,9 @@
 #include <uhd/transport/bounded_buffer.hpp>
 #include <uhd/types/serial.hpp>
 #include <uhd/types/sensors.hpp>
+
+#include <uhd/usrp/rfnoc/block_ctrl.hpp>
+
 #include <boost/weak_ptr.hpp>
 #include <boost/thread/mutex.hpp>
 #include "e300_fifo_config.hpp"
@@ -99,7 +102,7 @@ static const size_t E300_R1_RX_DATA_STREAM = (1 << 2) | E300_RADIO_DEST_PREFIX_R
  * The implementation details are encapsulated here.
  * Handles properties on the mboard, dboard, dsps...
  */
-class e300_impl : public uhd::device
+class e300_impl : public uhd::device3
 {
 public:
     //structors
