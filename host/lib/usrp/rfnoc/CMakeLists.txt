@@ -1,5 +1,5 @@
 #
-# Copyright 2013-2014 Ettus Research LLC
+# Copyright 2014 Ettus Research LLC
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -19,20 +19,19 @@
 # This file included, use CMake directory variables
 ########################################################################
 
-########################################################################
-# Conditionally configure the X300 support
-########################################################################
-LIBUHD_REGISTER_COMPONENT("X300" ENABLE_X300 ON "ENABLE_LIBUHD" OFF)
+INCLUDE_DIRECTORIES(${CMAKE_CURRENT_SOURCE_DIR})
 
-IF(ENABLE_X300)
-    LIBUHD_APPEND_SOURCES(
-        ${CMAKE_CURRENT_SOURCE_DIR}/x300_impl.cpp
-        ${CMAKE_CURRENT_SOURCE_DIR}/x300_fw_ctrl.cpp
-        ${CMAKE_CURRENT_SOURCE_DIR}/x300_fw_uart.cpp
-        ${CMAKE_CURRENT_SOURCE_DIR}/x300_adc_ctrl.cpp
-        ${CMAKE_CURRENT_SOURCE_DIR}/x300_dac_ctrl.cpp
-        ${CMAKE_CURRENT_SOURCE_DIR}/x300_io_impl.cpp
-        ${CMAKE_CURRENT_SOURCE_DIR}/x300_dboard_iface.cpp
-        ${CMAKE_CURRENT_SOURCE_DIR}/x300_clock_ctrl.cpp
-    )
-ENDIF(ENABLE_X300)
+LIBUHD_APPEND_SOURCES(
+    ${CMAKE_CURRENT_SOURCE_DIR}/block_id.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/block_ctrl_base.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/block_ctrl_base_factory.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/block_ctrl_impl.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/fir_block_ctrl_impl.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/fft_block_ctrl_impl.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/null_block_ctrl_impl.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/window_block_ctrl_impl.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/radio_ctrl_impl.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/stream_sig.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/rx_block_ctrl_base.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/tx_block_ctrl_base.cpp
+)

@@ -1,5 +1,5 @@
 #
-# Copyright 2010-2011 Ettus Research LLC
+# Copyright 2014 Ettus Research LLC
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -15,27 +15,18 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
 
-
 UHD_INSTALL(FILES
-    clock_config.hpp
-    cvita_sid.hpp
-    device_addr.hpp
-    dict.ipp
-    dict.hpp
-    io_type.hpp
-    mac_addr.hpp
-    metadata.hpp
-    otw_type.hpp
-    ranges.hpp
-    ref_vector.hpp
-    sensors.hpp
-    serial.hpp
-    sid.hpp
-    stream_cmd.hpp
-    time_spec.hpp
-    tune_request.hpp
-    tune_result.hpp
-    wb_iface.hpp
-    DESTINATION ${INCLUDE_DIR}/uhd/types
+    block_ctrl_base.hpp
+    block_ctrl.hpp
+    block_id.hpp
+    constants.hpp
+    fir_block_ctrl.hpp
+    fft_block_ctrl.hpp
+    null_block_ctrl.hpp
+    window_block_ctrl.hpp
+    rx_block_ctrl_base.hpp
+    stream_sig.hpp
+    tx_block_ctrl_base.hpp
+    DESTINATION ${INCLUDE_DIR}/uhd/usrp/rfnoc
     COMPONENT headers
 )
