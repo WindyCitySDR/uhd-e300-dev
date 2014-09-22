@@ -46,6 +46,9 @@
 #include <boost/asio.hpp>
 #include <fstream>
 
+#include <uhd/usrp/rfnoc/null_block_ctrl.hpp>
+#include "../rfnoc/radio_ctrl.hpp"
+
 using namespace uhd;
 using namespace uhd::usrp;
 using namespace uhd::transport;
@@ -596,6 +599,56 @@ e300_impl::e300_impl(const uhd::device_addr_t &device_addr)
 
             UHD_MSG(status) << "References initialized to internal sources" << std::endl;
     }
+
+    //////////////// RFNOC /////////////////
+    // Here's the plan:
+    // - We cycle through all ports on this mb's xbar
+    //     - For now: Just check ports 5, 6, 7 and add radios manually
+    // - Calculate destination address and create a transport
+    // - Create a block_ctrl and connect it
+    // - Poll readback register 1
+    // - Figure out if there's a better derivative of block_ctrl_base than the standard
+    // - If yes, add that sptr to the list of block controls
+    // - Else, just add the original block_ctrl sptr
+    //
+    //const size_t NUM_CE = 0;
+    size_t NUM_CE = _global_regs->peek32(global_regs::RB32_CORE_NUM_CE);
+    UHD_VAR(NUM_CE);
+    for (size_t i = 0; i < NUM_CE; i++) {
+        boost::uint32_t ctrl_sid_;
+        boost::uint8_t block_port = (i & 0xff) + E300_XB_DST_CE0;
+        both_xports_t xport = this->_make_transport(
+            i == 0 ? E300_XB_DST_CE0 : i == 1 ? E300_XB_DST_CE1 : i == E300_XB_DST_CE2, // destination (top 6 bits of local part of sid)
+            E300_RADIO_DEST_PREFIX_CTRL, // "prefix" (lower 2 bits of sid, not relevant unless radio)
+            _ctrl_xport_params,
+            ctrl_sid_ // sid (output)
+        );
+        uhd::sid_t ctrl_sid(ctrl_sid_);
+        UHD_MSG(status) << str(boost::format("Setting up NoC-Shell Control #%d (SID: %s)...") % i % ctrl_sid.to_pp_string());
+        radio_ctrl_core_3000::sptr ctrl = radio_ctrl_core_3000::make(
+            false, /* lilE */
+            xport.recv,
+            xport.send,
+            ctrl_sid,
+            str(boost::format("CE_%02d_Port_%02d") % i % block_port)
+        );
+        UHD_MSG(status) << "OK" << std::endl;
+        boost::uint64_t noc_id = ctrl->peek64(0);
+        UHD_MSG(status) << str(boost::format("Port %d: Found NoC-Block with ID %016X.") % int(block_port) % noc_id) << std::endl;
+        //uhd::rfnoc::make_args_t make_args;
+        //make_args.ctrl_iface = ctrl;
+        //make_args.ctrl_sid = ctrl_sid;
+        //make_args.device_index = 0;
+        //make_args.tree = _tree->subtree(mb_path);
+        //make_args.is_big_endian = false, [> lilE <]
+        //_rfnoc_block_ctrl.push_back(uhd::rfnoc::block_ctrl_base::make(make_args, noc_id));
+    }
+    UHD_MSG(status) << "========== Full list of RFNoC blocks: ============" << std::endl;
+    BOOST_FOREACH(uhd::rfnoc::block_ctrl_base::sptr this_block, _rfnoc_block_ctrl) {
+        UHD_MSG(status) << "* " << this_block->get_block_id() << std::endl;
+    }
+    //////////////// RFNOC /////////////////
+
 }
 
 boost::uint8_t e300_impl::_get_internal_gpio(
@@ -848,6 +901,7 @@ size_t e300_impl::_get_axi_dma_channel(
     static const boost::uint32_t RADIO1_GRP     = 1;
     static const boost::uint32_t CE0_GRP        = 2;
     static const boost::uint32_t CE1_GRP        = 3;
+    static const boost::uint32_t CE2_GRP        = 4;
 
     switch (destination) {
     case E300_XB_DST_R0:
@@ -861,6 +915,9 @@ size_t e300_impl::_get_axi_dma_channel(
 
     case E300_XB_DST_CE1:
         return (CE1_GRP * RADIO_GRP_SIZE) + prefix;
+
+    case E300_XB_DST_CE2:
+        return (CE2_GRP * RADIO_GRP_SIZE) + prefix;
 
     default:
         throw uhd::value_error("Invalid destination specified.");

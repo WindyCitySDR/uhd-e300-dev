@@ -84,6 +84,8 @@ static const boost::uint8_t E300_XB_DST_R0  = 1;
 static const boost::uint8_t E300_XB_DST_R1  = 2;
 static const boost::uint8_t E300_XB_DST_CE0 = 3;
 static const boost::uint8_t E300_XB_DST_CE1 = 4;
+static const boost::uint8_t E300_XB_DST_CE2 = 5;
+static const boost::uint8_t E300_XB_DST_CE3 = 6;
 
 static const boost::uint8_t E300_DEVICE_THERE = 2;
 static const boost::uint8_t E300_DEVICE_HERE  = 0;
