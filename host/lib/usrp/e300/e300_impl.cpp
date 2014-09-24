@@ -1038,11 +1038,6 @@ void e300_impl::_setup_radio(const size_t dspno)
        _ctrl_xport_params,
        ctrl_sid);
 
-    this->_setup_dest_mapping(
-        ctrl_sid,
-        dspno ? E300_R1_CTRL_STREAM
-              : E300_R0_CTRL_STREAM);
-
     ////////////////////////////////////////////////////////////////////
     // radio control
     ////////////////////////////////////////////////////////////////////
