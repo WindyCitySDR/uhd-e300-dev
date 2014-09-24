@@ -627,8 +627,8 @@ e300_impl::e300_impl(const uhd::device_addr_t &device_addr)
         UHD_MSG(status) << str(boost::format("Setting up NoC-Shell Control #%d (SID: %s)...") % i % ctrl_sid.to_pp_string());
         radio_ctrl_core_3000::sptr ctrl = radio_ctrl_core_3000::make(
             false, /* lilE */
-            xport.recv,
             xport.send,
+            xport.recv,
             ctrl_sid,
             str(boost::format("CE_%02d_Port_%02d") % i % block_port)
         );
