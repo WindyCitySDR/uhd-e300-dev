@@ -65,7 +65,7 @@ public:
         }
     }
     clocking_mode_t get_clocking_mode() {
-        return AD9361_XTAL_N_CLK_PATH;
+        return AD9361_XTAL_P_CLK_PATH;
     }
     digital_interface_mode_t get_digital_interface_mode() {
         return AD9361_DDR_FDD_LVCMOS;
