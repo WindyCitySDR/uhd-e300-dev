@@ -1209,23 +1209,23 @@ void e300_impl::_update_bandsel(const std::string& which, double freq)
         _update_gpio_state();
     } else if(which[0] == 'T') {
         if (freq < 117.7e6)
-            _misc.tx_bandsels = 7;
-        else if (freq < 178.2e6)
-            _misc.tx_bandsels = 6;
-        else if (freq < 284.3e6)
-            _misc.tx_bandsels = 5;
-        else if (freq < 453.7e6)
-            _misc.tx_bandsels = 4;
-        else if (freq < 723.8e6)
-            _misc.tx_bandsels = 3;
-        else if (freq < 1154.9e6)
-            _misc.tx_bandsels = 2;
-        else if (freq < 1842.6e6)
-            _misc.tx_bandsels = 1;
-        else if (freq < 2940.0e6)
             _misc.tx_bandsels = 0;
-        else
+        else if (freq < 178.2e6)
+            _misc.tx_bandsels = 1;
+        else if (freq < 284.3e6)
+            _misc.tx_bandsels = 2;
+        else if (freq < 453.7e6)
+            _misc.tx_bandsels = 3;
+        else if (freq < 723.8e6)
+            _misc.tx_bandsels = 4;
+        else if (freq < 1154.9e6)
+            _misc.tx_bandsels = 5;
+        else if (freq < 1842.6e6)
+            _misc.tx_bandsels = 6;
+        else if (freq < 2940.0e6)
             _misc.tx_bandsels = 7;
+        else
+            _misc.tx_bandsels = 0;
         _update_gpio_state();
     } else {
         UHD_THROW_INVALID_CODE_PATH();
