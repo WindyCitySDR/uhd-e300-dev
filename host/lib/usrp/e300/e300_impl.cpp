@@ -335,6 +335,15 @@ e300_impl::e300_impl(const uhd::device_addr_t &device_addr)
             std::min(e300::MAX_NET_RX_DATA_FRAME_SIZE, _data_xport_params.recv_frame_size);
         _data_xport_params.send_frame_size =
             std::min(e300::MAX_NET_TX_DATA_FRAME_SIZE, _data_xport_params.send_frame_size);
+
+        // our UDP WSA implementation cannot deal with more that 64 events,
+        // so clip it ...
+        _data_xport_params.num_recv_frames = std::min(
+            e300::MAX_NET_RX_DATA_NUM_FRAMES,
+            _data_xport_params.num_recv_frames);
+        _data_xport_params.num_send_frames = std::min(
+            e300::MAX_NET_TX_DATA_NUM_FRAMES,
+            _data_xport_params.num_send_frames);
     }
     udp_zero_copy::buff_params dummy_buff_params_out;
 
@@ -1275,23 +1284,23 @@ void e300_impl::_update_bandsel(const std::string& which, double freq)
         _update_gpio_state();
     } else if(which[0] == 'T') {
         if (freq < 117.7e6)
-            _misc.tx_bandsels = 7;
-        else if (freq < 178.2e6)
-            _misc.tx_bandsels = 6;
-        else if (freq < 284.3e6)
-            _misc.tx_bandsels = 5;
-        else if (freq < 453.7e6)
-            _misc.tx_bandsels = 4;
-        else if (freq < 723.8e6)
-            _misc.tx_bandsels = 3;
-        else if (freq < 1154.9e6)
-            _misc.tx_bandsels = 2;
-        else if (freq < 1842.6e6)
-            _misc.tx_bandsels = 1;
-        else if (freq < 2940.0e6)
             _misc.tx_bandsels = 0;
-        else
+        else if (freq < 178.2e6)
+            _misc.tx_bandsels = 1;
+        else if (freq < 284.3e6)
+            _misc.tx_bandsels = 2;
+        else if (freq < 453.7e6)
+            _misc.tx_bandsels = 3;
+        else if (freq < 723.8e6)
+            _misc.tx_bandsels = 4;
+        else if (freq < 1154.9e6)
+            _misc.tx_bandsels = 5;
+        else if (freq < 1842.6e6)
+            _misc.tx_bandsels = 6;
+        else if (freq < 2940.0e6)
             _misc.tx_bandsels = 7;
+        else
+            _misc.tx_bandsels = 0;
         _update_gpio_state();
     } else {
         UHD_THROW_INVALID_CODE_PATH();
